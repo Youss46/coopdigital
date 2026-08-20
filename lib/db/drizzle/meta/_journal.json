@@ -848,6 +848,13 @@
       "when": 1788481700000,
       "tag": "0120_livraison_certification_cacao",
       "breakpoints": true
+    },
+    {
+      "idx": 121,
+      "version": "7",
+      "when": 1788481800000,
+      "tag": "0121_historique_retenues_commissions_delegues_localites",
+      "breakpoints": true
     }
   ]
 }

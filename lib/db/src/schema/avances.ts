@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 import { membresTable } from "./membres";
 import { usersTable } from "./users";
 import { livraisonsTable } from "./livraisons";
+import { commissionsMembresDelaguesTable } from "./commissions_membres_delegues";
 
 export const avanceStatutEnum = pgEnum("avance_statut", ["en_cours", "rembourse", "en_retard"]);
 export const avancePlanTypeEnum = pgEnum("avance_plan_type", ["integral", "partiel", "reporte"]);
@@ -39,6 +40,8 @@ export const remboursementsAvancesMembresTable = pgTable("remboursements_avances
     .references(() => avancesTable.id, { onDelete: "cascade" }),
   livraisonId: integer("livraison_id")
     .references(() => livraisonsTable.id, { onDelete: "set null" }),
+  commissionMembreDelegueId: integer("commission_membre_delegue_id")
+    .references(() => commissionsMembresDelaguesTable.id, { onDelete: "set null" }),
   montantFcfa: integer("montant_fcfa").notNull(),
   note: text("note"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

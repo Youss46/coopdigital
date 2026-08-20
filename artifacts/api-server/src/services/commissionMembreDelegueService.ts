@@ -17,6 +17,7 @@ import {
   membresTable,
   campagnesTable,
   avancesTable,
+  remboursementsAvancesMembresTable,
   sessionsPeseeTable,
   bonsReceptionMembresDeleguesTable,
 } from "@workspace/db";
@@ -27,6 +28,8 @@ import { generateEcrituresCommission, proposerEcriture } from "./comptabiliteSer
 function toNum(v: unknown): number {
   return Number(v ?? 0);
 }
+
+const CATEGORIE_DELEGUE_LOCALITE = "délégué de localités";
 
 // ─── Résolution du taux actif ─────────────────────────────────────────────
 
@@ -223,6 +226,7 @@ export async function getRecapCommissionsParMembreDelegue(
     .where(
       and(
         eq(membresTable.cooperativeId, cooperativeId),
+        eq(membresTable.categorieMembre, CATEGORIE_DELEGUE_LOCALITE),
         campagneId ? eq(commissionsMembresDelaguesTable.campagneId, campagneId) : undefined
       )
     )
@@ -262,7 +266,8 @@ export async function getCommissionsMembreDelegue(
     .where(
       and(
         eq(membresTable.id, membreDelegueId),
-        eq(membresTable.cooperativeId, cooperativeId)
+        eq(membresTable.cooperativeId, cooperativeId),
+        eq(membresTable.categorieMembre, CATEGORIE_DELEGUE_LOCALITE)
       )
     )
     .limit(1);
@@ -299,22 +304,29 @@ export async function payerCommissionsMembreDelegue(
     referencePaiement?: string | null;
   }
 ): Promise<{ montantTotal: number; totalRetenu: number; montantNet: number; nb: number }> {
+  const datePaiement = new Date().toISOString().slice(0, 10);
+  const paiement = await db.transaction(async (tx) => {
   // Vérifier appartenance
-  const [membre] = await db
+  const [membre] = await tx
     .select({ id: membresTable.id, nom: membresTable.nom, prenoms: membresTable.prenoms })
     .from(membresTable)
     .where(
       and(
         eq(membresTable.id, membreDelegueId),
-        eq(membresTable.cooperativeId, cooperativeId)
+        eq(membresTable.cooperativeId, cooperativeId),
+        eq(membresTable.categorieMembre, CATEGORIE_DELEGUE_LOCALITE)
       )
     )
     .limit(1);
 
   if (!membre) throw new Error("Membre délégué introuvable");
 
+  // Un verrou transactionnel par membre évite deux paiements concurrents
+  // de déduire la même commission ou la même avance.
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(${membreDelegueId})`);
+
   // Récupérer les commissions en attente (triées par date pour déduire avances des plus anciennes d'abord)
-  const toutes = await db
+  const toutes = await tx
     .select()
     .from(commissionsMembresDelaguesTable)
     .where(and(
@@ -327,12 +339,13 @@ export async function payerCommissionsMembreDelegue(
     ? toutes.filter((c) => data.commissionIds!.includes(c.id))
     : toutes;
 
-  if (aTraiter.length === 0) return { montantTotal: 0, totalRetenu: 0, montantNet: 0, nb: 0 };
+  if (aTraiter.length === 0) {
+    return { membre, aTraiter, montantTotal: 0, totalRetenu: 0, montantNet: 0 };
+  }
 
   // ── Déduction des avances membres ─────────────────────────────────────────
   // Les avances sont déduites des commissions (oldest first) en appliquant planType.
-  const today = new Date().toISOString().slice(0, 10);
-  const avancesEnCours = await db
+  const avancesEnCours = await tx
     .select()
     .from(avancesTable)
     .where(and(
@@ -343,6 +356,7 @@ export async function payerCommissionsMembreDelegue(
 
   // Préparer une map commissionId → retenue à appliquer
   const retenueParCommission = new Map<number, number>(aTraiter.map(c => [c.id, 0]));
+  const remboursementsAutomatiques: Array<{ avanceId: number; commissionMembreDelegueId: number; montantFcfa: number }> = [];
 
   // Itérer avances, déduire séquentiellement des commissions
   let idxCommission = 0;
@@ -353,7 +367,7 @@ export async function payerCommissionsMembreDelegue(
     } else if (avance.planType === "partiel" && avance.montantPartielFcfa) {
       retenueTotale = Math.min(avance.montantPartielFcfa, avance.soldeRestantFcfa);
     } else if (avance.planType === "reporte") {
-      if (!avance.reportDate || today < String(avance.reportDate)) continue;
+      if (!avance.reportDate || datePaiement < String(avance.reportDate)) continue;
       retenueTotale = avance.soldeRestantFcfa;
     } else {
       continue;
@@ -370,6 +384,11 @@ export async function payerCommissionsMembreDelegue(
       if (disponible <= 0) { idxCommission++; continue; }
       const prise = Math.min(resteAvance, disponible);
       retenueParCommission.set(comm.id, dejaRetenu + prise);
+      remboursementsAutomatiques.push({
+        avanceId: avance.id,
+        commissionMembreDelegueId: comm.id,
+        montantFcfa: prise,
+      });
       resteAvance -= prise;
       if (dejaRetenu + prise >= montantComm) idxCommission++;
     }
@@ -382,11 +401,20 @@ export async function payerCommissionsMembreDelegue(
     const nouveauSolde     = avance.soldeRestantFcfa - retenueAppliquee;
     const nouveauRembourse = avance.montantRembourse_fcfa + retenueAppliquee;
     const nouveauStatut    = nouveauSolde === 0 ? "rembourse" : "en_cours";
-    await db.update(avancesTable).set({
+    await tx.update(avancesTable).set({
       montantRembourse_fcfa: nouveauRembourse,
       soldeRestantFcfa:      nouveauSolde,
       statut:                nouveauStatut as "en_cours" | "rembourse" | "en_retard",
     }).where(eq(avancesTable.id, avance.id));
+  }
+
+  if (remboursementsAutomatiques.length > 0) {
+    await tx.insert(remboursementsAvancesMembresTable).values(
+      remboursementsAutomatiques.map((remboursement) => ({
+        ...remboursement,
+        note: "Retenue sur commission de délégué de localités",
+      })),
+    );
   }
 
   const totalRetenu = [...retenueParCommission.values()].reduce((s, v) => s + v, 0);
@@ -397,7 +425,7 @@ export async function payerCommissionsMembreDelegue(
   // Marquer chaque commission comme payée avec sa retenue individuelle
   for (const comm of aTraiter) {
     const retenue = retenueParCommission.get(comm.id) ?? 0;
-    await db
+    await tx
       .update(commissionsMembresDelaguesTable)
       .set({
         statut:             "payé",
@@ -409,11 +437,14 @@ export async function payerCommissionsMembreDelegue(
       .where(eq(commissionsMembresDelaguesTable.id, comm.id));
   }
 
+  return { membre, aTraiter, montantTotal, totalRetenu, montantNet };
+  });
+
+  const { membre, aTraiter, montantTotal, totalRetenu, montantNet } = paiement;
   logger.info({ membreDelegueId, montantTotal, totalRetenu, montantNet, nb: aTraiter.length }, "Commissions membre délégué payées");
 
   // ── Écritures OHADA — fire-and-forget ──────────────────────────────────────
   const membreNomComplet = `${membre.nom} ${membre.prenoms ?? ""}`.trim();
-  const datePaiement = today; // alias pour clarté dans le bloc async
   void (async () => {
     try {
       // 1. Commission nette versée — 6322 / [571|554|521]

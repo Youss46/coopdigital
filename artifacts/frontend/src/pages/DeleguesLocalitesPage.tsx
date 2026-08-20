@@ -5,7 +5,7 @@ import {
   Users, Search, Phone, MapPin, Wallet, PlusCircle, X,
   ChevronRight, AlertCircle, CalendarDays, TrendingUp, Settings,
   CheckCircle2, Clock, Banknote, Trash2, ArrowDownCircle, Package,
-  Download, ShoppingCart, Truck, Pencil,
+  Download, ShoppingCart, Truck, Pencil, History,
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
@@ -52,10 +52,23 @@ interface Avance {
   id: number;
   membreId: number;
   montantOctroyeFcfa: number;
+  montantRembourseFcfa: number;
   soldeRestantFcfa: number;
   statut: "en_cours" | "rembourse" | "en_retard";
   dateOctroi: string;
+  dateEcheance: string | null;
   motif: string | null;
+  planType: "integral" | "partiel" | "reporte";
+  montantPartielFcfa: number | null;
+  reportDate: string | null;
+}
+
+interface RemboursementAvance {
+  id: number;
+  montantFcfa: number;
+  note: string | null;
+  createdAt: string;
+  commissionMembreDelegueId: number | null;
 }
 
 interface CommissionRecap {
@@ -162,7 +175,7 @@ function TableauChargement({ colonnes }: { colonnes: number }) {
   );
 }
 
-type Onglet = "membres" | "commissions" | "taux" | "livraisons";
+type Onglet = "membres" | "avances" | "commissions" | "taux" | "livraisons";
 type FiltreStatutLivraison = "tous" | "EN_ATTENTE" | "PAYÉ";
 
 export default function DeleguesLocalitesPage() {
@@ -170,6 +183,7 @@ export default function DeleguesLocalitesPage() {
   const qc = useQueryClient();
   const { utilisateur } = useAuth();
   const isMagasinier = utilisateur?.role === "magasinier";
+  const peutLireAvances = usePermission("avances", "lire");
   const peutOctroyer   = usePermission("avances", "octroyer");
   const peutRembourser = usePermission("avances", "rembourser");
   const peutPayerCommissions = usePermission("commissions_delegues", "payer");
@@ -180,14 +194,22 @@ export default function DeleguesLocalitesPage() {
   const [filtreLivraisons, setFiltreLivraisons] = useState<FiltreStatutLivraison>("tous");
   const [searchLivraisons, setSearchLivraisons] = useState("");
   const [modalMembre, setModalMembre] = useState<MembreDelegue | null>(null);
+  const [membreAvancesId, setMembreAvancesId] = useState<number | null>(null);
   const [showOctroi, setShowOctroi] = useState(false);
-  const [formOctroi, setFormOctroi] = useState({ montant: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "" });
+  const [formOctroi, setFormOctroi] = useState({
+    montant: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "",
+    planType: "integral" as Avance["planType"], montantPartiel: "", reportDate: "",
+  });
   const [errOctroi, setErrOctroi] = useState("");
 
   // Remboursement manuel d'une avance
   const [rembourserAvanceId, setRembourserAvanceId] = useState<number | null>(null);
-  const [formRembours, setFormRembours] = useState({ montant: "" });
+  const [formRembours, setFormRembours] = useState({ montant: "", note: "" });
   const [errRembours, setErrRembours] = useState("");
+  const [avancePlanEdition, setAvancePlanEdition] = useState<Avance | null>(null);
+  const [formPlan, setFormPlan] = useState({ planType: "integral" as Avance["planType"], montantPartiel: "", reportDate: "" });
+  const [errPlan, setErrPlan] = useState("");
+  const [avanceHistoriqueId, setAvanceHistoriqueId] = useState<number | null>(null);
 
   // ── Commission : modal paiement ───────────────────────────────────────────
   const [modalCommission, setModalCommission] = useState<CommissionRecap | null>(null);
@@ -233,7 +255,7 @@ export default function DeleguesLocalitesPage() {
 
   const { data: toutesAvances = [] } = useQuery<Avance[]>({
     queryKey: ["avances-delegues-localites"],
-    queryFn: () => apiFetch<{ avances: Avance[]; total: number }>(`/api/avances`).then(r => r.avances ?? []),
+    queryFn: () => apiFetch<{ avances: Avance[]; total: number }>(`/api/delegues-localites/avances`).then(r => r.avances ?? []),
     enabled: !isMagasinier,
     staleTime: 30_000,
   });
@@ -252,8 +274,34 @@ export default function DeleguesLocalitesPage() {
 
   const { data: avancesModal = [], isLoading: loadAvances } = useQuery<Avance[]>({
     queryKey: ["avances-membre", modalMembre?.id],
-    queryFn: () => apiFetch<{ avances: Avance[]; total: number; soldeTotal: number }>(`/api/avances?membre_id=${modalMembre!.id}`).then(r => r.avances ?? []),
+    queryFn: () => apiFetch<{ avances: Avance[]; total: number }>(`/api/delegues-localites/${modalMembre!.id}/avances`).then(r => r.avances ?? []),
     enabled: !!modalMembre && !isMagasinier,
+    staleTime: 0,
+  });
+
+  const { data: avancesMembreSelectionne = [], isLoading: loadAvancesMembreSelectionne } = useQuery<Avance[]>({
+    queryKey: ["avances-delegue-localite", membreAvancesId],
+    queryFn: () => apiFetch<{ avances: Avance[]; total: number }>(`/api/delegues-localites/${membreAvancesId}/avances`).then(r => r.avances ?? []),
+    enabled: onglet === "avances" && membreAvancesId !== null,
+    staleTime: 0,
+  });
+
+  const { data: avancesReportees = { avances: [], total: 0, soldeTotal: 0 } } = useQuery<{
+    avances: Avance[];
+    total: number;
+    soldeTotal: number;
+  }>({
+    queryKey: ["avances-delegues-localites-reportees"],
+    queryFn: () => apiFetch("/api/delegues-localites/avances-reportees"),
+    enabled: onglet === "avances" && !isMagasinier,
+    staleTime: 30_000,
+  });
+
+  const membreCibleAvanceId = modalMembre?.id ?? membreAvancesId ?? null;
+  const { data: remboursementsHistorique = [], isLoading: loadHistorique } = useQuery<RemboursementAvance[]>({
+    queryKey: ["remboursements-avance-delegue-localite", membreCibleAvanceId, avanceHistoriqueId],
+    queryFn: () => apiFetch(`/api/delegues-localites/${membreCibleAvanceId}/avances/${avanceHistoriqueId}/remboursements`),
+    enabled: membreCibleAvanceId !== null && avanceHistoriqueId !== null,
     staleTime: 0,
   });
 
@@ -294,18 +342,22 @@ export default function DeleguesLocalitesPage() {
 
   // ── Mutations ─────────────────────────────────────────────────────────────
   const mutOctroyer = useMutation({
-    mutationFn: () => apiPost("/api/avances", {
-      membreId: modalMembre!.id,
+    mutationFn: () => apiPost(`/api/delegues-localites/${membreCibleAvanceId}/avances`, {
       montantOctroyeFcfa: parseInt(formOctroi.montant),
       dateOctroi: formOctroi.dateOctroi,
       dateEcheance: formOctroi.dateEcheance || undefined,
       motif: formOctroi.motif || undefined,
+      planType: formOctroi.planType,
+      montantPartielFcfa: formOctroi.planType === "partiel" ? Number(formOctroi.montantPartiel) : undefined,
+      reportDate: formOctroi.planType === "reporte" ? formOctroi.reportDate : undefined,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["avances-membre", modalMembre?.id] });
+      qc.invalidateQueries({ queryKey: ["avances-delegue-localite", membreAvancesId] });
       qc.invalidateQueries({ queryKey: ["avances-delegues-localites"] });
+      qc.invalidateQueries({ queryKey: ["avances-delegues-localites-reportees"] });
       setShowOctroi(false);
-      setFormOctroi({ montant: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "" });
+      setFormOctroi({ montant: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "", planType: "integral", montantPartiel: "", reportDate: "" });
       setErrOctroi("");
     },
     onError: (e: Error) => setErrOctroi(e.message),
@@ -313,15 +365,47 @@ export default function DeleguesLocalitesPage() {
 
   const mutRembourser = useMutation({
     mutationFn: (avanceId: number) =>
-      apiPut(`/api/avances/${avanceId}/rembourser`, { montantFcfa: parseInt(formRembours.montant) }),
+      apiPost(`/api/delegues-localites/${membreCibleAvanceId}/avances/${avanceId}/rembourser`, {
+        montantFcfa: parseInt(formRembours.montant),
+        note: formRembours.note || undefined,
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["avances-membre", modalMembre?.id] });
+      qc.invalidateQueries({ queryKey: ["avances-delegue-localite", membreAvancesId] });
       qc.invalidateQueries({ queryKey: ["avances-delegues-localites"] });
+      qc.invalidateQueries({ queryKey: ["remboursements-avance-delegue-localite", membreCibleAvanceId] });
       setRembourserAvanceId(null);
-      setFormRembours({ montant: "" });
+      setFormRembours({ montant: "", note: "" });
       setErrRembours("");
     },
     onError: (e: Error) => setErrRembours(e.message),
+  });
+
+  const mutModifierPlan = useMutation({
+    mutationFn: () => {
+      const avance = avancePlanEdition!;
+      return fetch(`${BASE}/api/delegues-localites/${membreCibleAvanceId}/avances/${avance.id}/plan`, {
+        method: "PATCH",
+        headers: hdr(),
+        body: JSON.stringify({
+          plan_type: formPlan.planType,
+          montant_partiel_fcfa: formPlan.planType === "partiel" ? Number(formPlan.montantPartiel) : null,
+          report_date: formPlan.planType === "reporte" ? formPlan.reportDate : null,
+        }),
+      }).then(async r => {
+        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).erreur ?? r.statusText);
+        return r.json();
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["avances-membre", modalMembre?.id] });
+      qc.invalidateQueries({ queryKey: ["avances-delegue-localite", membreAvancesId] });
+      qc.invalidateQueries({ queryKey: ["avances-delegues-localites"] });
+      qc.invalidateQueries({ queryKey: ["avances-delegues-localites-reportees"] });
+      setAvancePlanEdition(null);
+      setErrPlan("");
+    },
+    onError: (e: Error) => setErrPlan(e.message),
   });
 
   const mutPayer = useMutation({
@@ -411,7 +495,7 @@ export default function DeleguesLocalitesPage() {
     try {
       const [commData, avancesData] = await Promise.all([
         apiFetch<Commission[]>(`/api/delegues-localites/${recap.membreId}/commissions`),
-        apiFetch<{ avances: Avance[]; total: number; soldeTotal: number }>(`/api/avances?membre_id=${recap.membreId}`).then(r => r.avances ?? []),
+        apiFetch<{ avances: Avance[]; total: number }>(`/api/delegues-localites/${recap.membreId}/avances`).then(r => r.avances ?? []),
       ]);
       setDetailCommissions(commData.filter(c => c.statut === "en_attente"));
       setAvancesModalComm(avancesData.filter(a => a.statut !== "rembourse"));
@@ -434,6 +518,16 @@ export default function DeleguesLocalitesPage() {
   });
 
   const totalEnAttente = recapCommissions.reduce((s, r) => s + r.enAttenteFcfa, 0);
+  const membreAvancesSelectionne = membres.find(m => m.id === membreAvancesId) ?? null;
+  const planLibelle = (avance: Pick<Avance, "planType" | "montantPartielFcfa" | "reportDate">) => {
+    if (avance.planType === "partiel") {
+      return `Partiel — ${formaterMontant(avance.montantPartielFcfa ?? 0)} par paiement`;
+    }
+    if (avance.planType === "reporte") {
+      return `Reporté jusqu’au ${avance.reportDate ? formaterDate(avance.reportDate) : "nouvel ordre"}`;
+    }
+    return "Intégral au prochain paiement";
+  };
 
   return (
     <div className="space-y-5 sm:space-y-6 p-4 sm:p-6 max-w-5xl mx-auto min-w-0">
@@ -451,6 +545,7 @@ export default function DeleguesLocalitesPage() {
       <div className="flex gap-1 border-b border-gray-200 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
         {([
           { id: "membres" as Onglet,     label: "Membres",     icon: Users,      hidden: false },
+          { id: "avances" as Onglet,      label: "Avances",     icon: Wallet,     hidden: isMagasinier || !peutLireAvances },
           { id: "livraisons" as Onglet,  label: "Livraisons",  icon: Truck,      hidden: isMagasinier },
           { id: "commissions" as Onglet, label: "Commissions", icon: TrendingUp, hidden: isMagasinier },
           { id: "taux" as Onglet,        label: "Taux",        icon: Settings,   hidden: isMagasinier },
@@ -558,6 +653,261 @@ export default function DeleguesLocalitesPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* ── Onglet Avances ────────────────────────────────────────────────── */}
+      {onglet === "avances" && (
+        <section className="space-y-4">
+          {avancesReportees.total > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+              <AlertCircle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-amber-800">
+                  {avancesReportees.total} avance{avancesReportees.total > 1 ? "s" : ""} reportée{avancesReportees.total > 1 ? "s" : ""} à reprendre
+                </p>
+                <p className="text-xs text-amber-700 mt-0.5">
+                  {formaterMontant(avancesReportees.soldeTotal)} restent à recouvrer sur les prochaines commissions.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+            <select
+              value={membreAvancesId ?? ""}
+              onChange={e => {
+                setMembreAvancesId(e.target.value ? Number(e.target.value) : null);
+                setShowOctroi(false);
+                setRembourserAvanceId(null);
+                setAvanceHistoriqueId(null);
+              }}
+              className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1a4731]"
+            >
+              <option value="">— Sélectionner un délégué de localités —</option>
+              {membres.map(m => (
+                <option key={m.id} value={m.id}>
+                  {m.prenoms} {m.nom}{m.section ? ` — ${m.section}` : m.village ? ` — ${m.village}` : ""}
+                </option>
+              ))}
+            </select>
+            {membreAvancesId !== null && peutOctroyer && (
+              <button
+                onClick={() => { setErrOctroi(""); setShowOctroi(true); }}
+                className="flex items-center justify-center gap-1.5 rounded-lg bg-[#1a4731] px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#123525]"
+              >
+                <PlusCircle size={15} /> Octroyer une avance
+              </button>
+            )}
+          </div>
+
+          {!membreAvancesId ? (
+            <div className="bg-white rounded-xl border border-gray-200">
+              <EmptyState
+                icone={Wallet}
+                titre="Sélectionnez un délégué de localités"
+                description="Vous pourrez consulter ses avances, choisir un plan de retenue et suivre les remboursements sur ses commissions."
+              />
+            </div>
+          ) : (
+            <>
+              {showOctroi && (
+                <div className="bg-white border border-[#1a4731]/20 rounded-xl p-4 sm:p-5 space-y-4">
+                  <div>
+                    <p className="text-sm font-semibold text-[#1a4731]">Nouvelle avance</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      La retenue sera appliquée uniquement lors du paiement des commissions de {membreAvancesSelectionne?.prenoms} {membreAvancesSelectionne?.nom}.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Montant (FCFA) *</label>
+                      <input type="number" min="1" value={formOctroi.montant} onChange={e => setFormOctroi(f => ({ ...f, montant: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Date d’octroi *</label>
+                      <input type="date" value={formOctroi.dateOctroi} onChange={e => setFormOctroi(f => ({ ...f, dateOctroi: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Échéance (facultative)</label>
+                      <input type="date" value={formOctroi.dateEcheance} onChange={e => setFormOctroi(f => ({ ...f, dateEcheance: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Motif (facultatif)</label>
+                      <input type="text" value={formOctroi.motif} onChange={e => setFormOctroi(f => ({ ...f, motif: e.target.value }))}
+                        placeholder="Ex. déplacement ou frais de collecte"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]" />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs text-gray-600 mb-1">Plan de retenue *</label>
+                      <select value={formOctroi.planType} onChange={e => setFormOctroi(f => ({ ...f, planType: e.target.value as Avance["planType"] }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]">
+                        <option value="integral">Intégral — retenir le maximum au prochain paiement</option>
+                        <option value="partiel">Partiel — retenir un montant défini à chaque paiement</option>
+                        <option value="reporte">Reporté — ne retenir qu’à partir d’une date</option>
+                      </select>
+                    </div>
+                    {formOctroi.planType === "partiel" && (
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Montant par paiement (FCFA) *</label>
+                        <input type="number" min="1" value={formOctroi.montantPartiel} onChange={e => setFormOctroi(f => ({ ...f, montantPartiel: e.target.value }))}
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]" />
+                      </div>
+                    )}
+                    {formOctroi.planType === "reporte" && (
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Date de reprise *</label>
+                        <input type="date" value={formOctroi.reportDate} onChange={e => setFormOctroi(f => ({ ...f, reportDate: e.target.value }))}
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]" />
+                      </div>
+                    )}
+                  </div>
+                  {errOctroi && <p className="text-xs text-red-600 flex items-center gap-1"><AlertCircle size={12} /> {errOctroi}</p>}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => mutOctroyer.mutate()}
+                      disabled={!formOctroi.montant || (formOctroi.planType === "partiel" && !formOctroi.montantPartiel) || (formOctroi.planType === "reporte" && !formOctroi.reportDate) || mutOctroyer.isPending}
+                      className="bg-[#1a4731] text-white text-sm font-medium px-4 py-2 rounded-lg disabled:opacity-50"
+                    >
+                      {mutOctroyer.isPending ? "Enregistrement…" : "Enregistrer l’avance"}
+                    </button>
+                    <button onClick={() => { setShowOctroi(false); setErrOctroi(""); }} className="px-4 text-sm text-gray-500 hover:text-gray-700">Annuler</button>
+                  </div>
+                </div>
+              )}
+
+              {loadAvancesMembreSelectionne ? (
+                <TableauChargement colonnes={6} />
+              ) : avancesMembreSelectionne.length === 0 ? (
+                <div className="bg-white rounded-xl border border-gray-200">
+                  <EmptyState icone={Wallet} titre="Aucune avance enregistrée" description="Les avances de ce délégué de localités apparaîtront ici." />
+                </div>
+              ) : (
+                <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+                  <table className="w-full min-w-[800px] text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-100">
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Octroyée</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Plan de retenue</th>
+                        <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Remboursée</th>
+                        <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Solde</th>
+                        <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Statut</th>
+                        <th className="px-4 py-3" />
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {avancesMembreSelectionne.map(a => {
+                        const active = a.statut !== "rembourse";
+                        const rembourseEnCours = rembourserAvanceId === a.id;
+                        const historiqueOuvert = avanceHistoriqueId === a.id;
+                        return (
+                          <>
+                            <tr key={a.id} className="hover:bg-gray-50">
+                              <td className="px-4 py-3">
+                                <p className="font-semibold text-gray-900">{formaterMontant(a.montantOctroyeFcfa)}</p>
+                                <p className="text-xs text-gray-400 mt-0.5">{formaterDate(a.dateOctroi)}{a.motif ? ` · ${a.motif}` : ""}</p>
+                              </td>
+                              <td className="px-4 py-3 text-xs text-gray-600">{planLibelle(a)}</td>
+                              <td className="px-4 py-3 text-right text-gray-600">{formaterMontant(a.montantRembourseFcfa)}</td>
+                              <td className="px-4 py-3 text-right font-semibold text-amber-700">{formaterMontant(a.soldeRestantFcfa)}</td>
+                              <td className="px-4 py-3 text-center">
+                                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                                  a.statut === "rembourse" ? "bg-gray-100 text-gray-500" : a.statut === "en_retard" ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-700"
+                                }`}>
+                                  {a.statut === "rembourse" ? "Remboursée" : a.statut === "en_retard" ? "En retard" : "En cours"}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  <button onClick={() => setAvanceHistoriqueId(historiqueOuvert ? null : a.id)} className="text-xs font-medium text-gray-500 hover:text-[#1a4731]">
+                                    <History size={13} className="inline mr-1" /> Historique
+                                  </button>
+                                  {active && peutRembourser && (
+                                    <>
+                                      <button
+                                        onClick={() => {
+                                          setAvancePlanEdition(a);
+                                          setFormPlan({ planType: a.planType, montantPartiel: a.montantPartielFcfa ? String(a.montantPartielFcfa) : "", reportDate: a.reportDate ?? "" });
+                                          setErrPlan("");
+                                        }}
+                                        className="text-xs font-medium text-[#1a4731] hover:underline"
+                                      >
+                                        Plan
+                                      </button>
+                                      <button
+                                        onClick={() => { setRembourserAvanceId(rembourseEnCours ? null : a.id); setFormRembours({ montant: String(a.soldeRestantFcfa), note: "" }); setErrRembours(""); }}
+                                        className="text-xs font-medium text-[#1a4731] hover:underline"
+                                      >
+                                        Rembourser
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                            {rembourseEnCours && (
+                              <tr key={`${a.id}-remboursement`} className="bg-amber-50/50">
+                                <td colSpan={6} className="px-4 py-3">
+                                  <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
+                                    <div className="w-full sm:w-48">
+                                      <label className="block text-xs text-gray-600 mb-1">Montant (FCFA)</label>
+                                      <input type="number" min="1" max={a.soldeRestantFcfa} value={formRembours.montant} onChange={e => setFormRembours(f => ({ ...f, montant: e.target.value }))}
+                                        className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm" />
+                                    </div>
+                                    <div className="flex-1">
+                                      <label className="block text-xs text-gray-600 mb-1">Note (facultative)</label>
+                                      <input type="text" value={formRembours.note} onChange={e => setFormRembours(f => ({ ...f, note: e.target.value }))}
+                                        className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm" placeholder="Précision sur le remboursement" />
+                                    </div>
+                                    <button onClick={() => mutRembourser.mutate(a.id)} disabled={!formRembours.montant || mutRembourser.isPending}
+                                      className="bg-[#1a4731] text-white text-xs font-medium px-3 py-2 rounded-lg disabled:opacity-50">
+                                      {mutRembourser.isPending ? "…" : "Confirmer"}
+                                    </button>
+                                    <button onClick={() => { setRembourserAvanceId(null); setErrRembours(""); }} className="text-xs text-gray-500 px-2 py-2">Annuler</button>
+                                  </div>
+                                  {errRembours && <p className="mt-2 text-xs text-red-600">{errRembours}</p>}
+                                </td>
+                              </tr>
+                            )}
+                            {historiqueOuvert && (
+                              <tr key={`${a.id}-historique`} className="bg-gray-50">
+                                <td colSpan={6} className="px-4 py-3">
+                                  <p className="text-xs font-semibold text-gray-700 mb-2">Historique des remboursements</p>
+                                  {loadHistorique ? <p className="text-xs text-gray-400">Chargement…</p> : remboursementsHistorique.length === 0 ? (
+                                    <p className="text-xs text-gray-400">Aucun remboursement enregistré.</p>
+                                  ) : (
+                                    <div className="space-y-1">
+                                      {remboursementsHistorique.map(r => (
+                                        <div key={r.id} className="flex justify-between text-xs text-gray-600">
+                                          <span>{formaterDate(r.createdAt)} · {r.note ?? (r.commissionMembreDelegueId ? "Retenue sur commission" : "Remboursement manuel")}</span>
+                                          <strong>{formaterMontant(r.montantFcfa)}</strong>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </td>
+                              </tr>
+                            )}
+                          </>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-gray-50 border-t border-gray-200">
+                        <td colSpan={2} className="px-4 py-3 text-xs font-medium text-gray-500">{avancesMembreSelectionne.length} avance{avancesMembreSelectionne.length > 1 ? "s" : ""}</td>
+                        <td className="px-4 py-3 text-right font-semibold text-gray-700">{formaterMontant(avancesMembreSelectionne.reduce((s, a) => s + a.montantRembourseFcfa, 0))}</td>
+                        <td className="px-4 py-3 text-right font-bold text-amber-700">{formaterMontant(avancesMembreSelectionne.filter(a => a.statut !== "rembourse").reduce((s, a) => s + a.soldeRestantFcfa, 0))}</td>
+                        <td colSpan={2} />
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+        </section>
       )}
 
       {/* ── Onglet Livraisons ─────────────────────────────────────────────── */}
@@ -994,6 +1344,58 @@ export default function DeleguesLocalitesPage() {
         </>
       )}
 
+      {avancePlanEdition && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="font-bold text-gray-900">Modifier le plan de retenue</h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  Solde à recouvrer : {formaterMontant(avancePlanEdition.soldeRestantFcfa)}
+                </p>
+              </div>
+              <button onClick={() => setAvancePlanEdition(null)} className="text-gray-400 hover:text-gray-700"><X size={18} /></button>
+            </div>
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Plan de retenue</label>
+                <select value={formPlan.planType} onChange={e => setFormPlan(f => ({ ...f, planType: e.target.value as Avance["planType"] }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                  <option value="integral">Intégral au prochain paiement</option>
+                  <option value="partiel">Partiel à chaque paiement</option>
+                  <option value="reporte">Reporté à une date définie</option>
+                </select>
+              </div>
+              {formPlan.planType === "partiel" && (
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Montant par paiement (FCFA) *</label>
+                  <input type="number" min="1" value={formPlan.montantPartiel} onChange={e => setFormPlan(f => ({ ...f, montantPartiel: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+                </div>
+              )}
+              {formPlan.planType === "reporte" && (
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Date de reprise *</label>
+                  <input type="date" value={formPlan.reportDate} onChange={e => setFormPlan(f => ({ ...f, reportDate: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+                </div>
+              )}
+              {errPlan && <p className="text-xs text-red-600">{errPlan}</p>}
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button onClick={() => setAvancePlanEdition(null)} className="px-3 py-2 text-sm text-gray-500">Annuler</button>
+              <button
+                onClick={() => mutModifierPlan.mutate()}
+                disabled={(formPlan.planType === "partiel" && !formPlan.montantPartiel) || (formPlan.planType === "reporte" && !formPlan.reportDate) || mutModifierPlan.isPending}
+                className="px-4 py-2 text-sm font-semibold text-white bg-[#1a4731] rounded-lg disabled:opacity-50"
+              >
+                {mutModifierPlan.isPending ? "Enregistrement…" : "Enregistrer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Modal membre (avances) ────────────────────────────────────────── */}
       {modalMembre && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-2 sm:p-4">
@@ -1029,7 +1431,7 @@ export default function DeleguesLocalitesPage() {
                     setShowOctroi(false);
                     setErrOctroi("");
                     setRembourserAvanceId(null);
-                    setFormRembours({ montant: "" });
+                    setFormRembours({ montant: "", note: "" });
                     setErrRembours("");
                   }}
                   className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"
@@ -1167,7 +1569,7 @@ export default function DeleguesLocalitesPage() {
                               <button
                                 onClick={() => {
                                   setRembourserAvanceId(a.id);
-                                  setFormRembours({ montant: String(a.soldeRestantFcfa) });
+                                  setFormRembours({ montant: String(a.soldeRestantFcfa), note: "" });
                                   setErrRembours("");
                                 }}
                                 className="mt-1 flex items-center gap-1 text-xs text-[#1a4731] font-medium hover:underline ml-auto"
@@ -1190,7 +1592,7 @@ export default function DeleguesLocalitesPage() {
                                 <input
                                   type="number"
                                   value={formRembours.montant}
-                                  onChange={e => setFormRembours({ montant: e.target.value })}
+                                  onChange={e => setFormRembours(f => ({ ...f, montant: e.target.value }))}
                                   className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]"
                                   placeholder="Montant"
                                   min="1"

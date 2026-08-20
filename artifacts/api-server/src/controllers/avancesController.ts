@@ -9,6 +9,17 @@ import { CampagneFermeeError, assertCampagneActiveExiste } from "../lib/campagne
 import { CreateAvanceBody, RembourserAvanceBody } from "@workspace/api-zod";
 import { generateEcrituresAvance } from "../services/comptabiliteService";
 
+const CATEGORIE_DELEGUE_LOCALITE = "délégué de localités";
+
+function estPorteeDelegueLocalite(res: Response): boolean {
+  return res.locals.membreDelegueLocalite === true;
+}
+
+function membreDelegueLocaliteCible(res: Response): number | null {
+  const id = Number(res.locals.membreDelegueId);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
 export async function listAvances(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
   if (!cooperativeId) {
@@ -18,11 +29,16 @@ export async function listAvances(req: Request, res: Response): Promise<void> {
 
   try {
     const statut = req.query["statut"] as string | undefined;
-    const membreId = req.query["membre_id"] ? parseInt(String(req.query["membre_id"])) : undefined;
+    const membreId = membreDelegueLocaliteCible(res)
+      ?? (req.params["membreId"] ? parseInt(String(req.params["membreId"])) : undefined)
+      ?? (req.query["membre_id"] ? parseInt(String(req.query["membre_id"])) : undefined);
 
     const conditions: ReturnType<typeof eq>[] = [eq(membresTable.cooperativeId, cooperativeId)];
     if (statut) conditions.push(eq(avancesTable.statut, statut as "en_cours" | "rembourse" | "en_retard"));
     if (membreId) conditions.push(eq(avancesTable.membreId, membreId));
+    if (estPorteeDelegueLocalite(res)) {
+      conditions.push(eq(membresTable.categorieMembre, CATEGORIE_DELEGUE_LOCALITE));
+    }
     // Un délégué ne voit que les avances des membres qui lui sont rattachés
     if (req.user?.role === "delegue" && req.user?.id) {
       conditions.push(eq(membresTable.delegueId, req.user.id));
@@ -69,16 +85,35 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const parse = CreateAvanceBody.safeParse(req.body);
+  const body: Record<string, unknown> = {
+    ...(req.body as Record<string, unknown>),
+    ...(membreDelegueLocaliteCible(res) ? { membreId: membreDelegueLocaliteCible(res) } : {}),
+  };
+  const parse = CreateAvanceBody.safeParse(body);
   if (!parse.success) {
     res.status(400).json({ erreur: "Données invalides", details: parse.error.issues });
     return;
   }
 
   const { membreId, montantOctroyeFcfa, dateOctroi, dateEcheance, motif } = parse.data;
+  const planType = body["planType"] ?? "integral";
+  const montantPartielFcfa = body["montantPartielFcfa"];
+  const reportDate = body["reportDate"];
 
-  if (montantOctroyeFcfa <= 0) {
-    res.status(400).json({ erreur: "Le montant de l'avance doit être supérieur à 0" });
+  if (!Number.isInteger(montantOctroyeFcfa) || montantOctroyeFcfa <= 0) {
+    res.status(400).json({ erreur: "Le montant de l'avance doit être un entier strictement positif" });
+    return;
+  }
+  if (!["integral", "partiel", "reporte"].includes(String(planType))) {
+    res.status(400).json({ erreur: "Plan de remboursement invalide" });
+    return;
+  }
+  if (planType === "partiel" && (!Number.isInteger(Number(montantPartielFcfa)) || Number(montantPartielFcfa) <= 0)) {
+    res.status(400).json({ erreur: "Un montant partiel entier strictement positif est requis" });
+    return;
+  }
+  if (planType === "reporte" && (typeof reportDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(reportDate))) {
+    res.status(400).json({ erreur: "Une date de reprise valide est requise pour un plan reporté" });
     return;
   }
 
@@ -90,6 +125,10 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
     }
     if (membre.cooperativeId !== cooperativeId) {
       res.status(403).json({ erreur: "Ce membre n'appartient pas à votre coopérative" });
+      return;
+    }
+    if (estPorteeDelegueLocalite(res) && membre.categorieMembre !== CATEGORIE_DELEGUE_LOCALITE) {
+      res.status(404).json({ erreur: "Délégué de localités introuvable" });
       return;
     }
 
@@ -132,6 +171,9 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
         motif: motif ?? null,
         statut: "en_cours",
         agentId: req.user?.id ?? null,
+        planType: planType as "integral" | "partiel" | "reporte",
+        montantPartielFcfa: planType === "partiel" ? Number(montantPartielFcfa) : null,
+        reportDate: planType === "reporte" ? String(reportDate) : null,
       })
       .returning();
 
@@ -220,10 +262,14 @@ export async function rembourserAvance(req: Request, res: Response): Promise<voi
 
   const { montantFcfa } = parse.data;
   const id = parseInt(String(req.params["id"] ?? "0"));
+  if (!Number.isInteger(montantFcfa) || montantFcfa <= 0) {
+    res.status(400).json({ erreur: "Le montant remboursé doit être un entier strictement positif" });
+    return;
+  }
 
   try {
     const [row] = await db
-      .select({ avance: avancesTable, membreCoopId: membresTable.cooperativeId })
+      .select({ avance: avancesTable, membreCoopId: membresTable.cooperativeId, categorieMembre: membresTable.categorieMembre })
       .from(avancesTable)
       .leftJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
       .where(eq(avancesTable.id, id))
@@ -236,28 +282,54 @@ export async function rembourserAvance(req: Request, res: Response): Promise<voi
       res.status(403).json({ erreur: "Cette avance n'appartient pas à votre coopérative" });
       return;
     }
+    if (
+      estPorteeDelegueLocalite(res)
+      && (row.categorieMembre !== CATEGORIE_DELEGUE_LOCALITE
+        || (membreDelegueLocaliteCible(res) !== null && row.avance.membreId !== membreDelegueLocaliteCible(res)))
+    ) {
+      res.status(404).json({ erreur: "Avance de délégué de localités introuvable" });
+      return;
+    }
     const avance = row.avance;
+    if (avance.statut === "rembourse" || avance.soldeRestantFcfa <= 0) {
+      res.status(400).json({ erreur: "Cette avance est déjà remboursée" });
+      return;
+    }
 
-    const montantReel = Math.min(montantFcfa, avance.soldeRestantFcfa);
-    const nouveauRembourse = avance.montantRembourse_fcfa + montantReel;
-    const nouveauSolde = avance.soldeRestantFcfa - montantReel;
-    const nouveauStatut = nouveauSolde === 0 ? "rembourse" : "en_cours";
+    const avanceMaj = await db.transaction(async (tx) => {
+      // Partage le même verrou que le paiement automatique des commissions.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${avance.membreId})`);
+      const [avanceFraiche] = await tx
+        .select()
+        .from(avancesTable)
+        .where(eq(avancesTable.id, id))
+        .limit(1);
+      if (!avanceFraiche || avanceFraiche.statut === "rembourse" || avanceFraiche.soldeRestantFcfa <= 0) {
+        throw new Error("Cette avance est déjà remboursée");
+      }
 
-    const [avanceMaj] = await db
-      .update(avancesTable)
-      .set({
-        montantRembourse_fcfa: nouveauRembourse,
-        soldeRestantFcfa: nouveauSolde,
-        statut: nouveauStatut,
-      })
-      .where(eq(avancesTable.id, id))
-      .returning();
+      const montantReel = Math.min(montantFcfa, avanceFraiche.soldeRestantFcfa);
+      const nouveauRembourse = avanceFraiche.montantRembourse_fcfa + montantReel;
+      const nouveauSolde = avanceFraiche.soldeRestantFcfa - montantReel;
+      const nouveauStatut = nouveauSolde === 0 ? "rembourse" : "en_cours";
+      const [updated] = await tx
+        .update(avancesTable)
+        .set({
+          montantRembourse_fcfa: nouveauRembourse,
+          soldeRestantFcfa: nouveauSolde,
+          statut: nouveauStatut,
+        })
+        .where(eq(avancesTable.id, id))
+        .returning();
 
-    // Enregistrer dans l'historique
-    await db.insert(remboursementsAvancesMembresTable).values({
-      avanceId: id,
-      montantFcfa: montantReel,
-      note: "Remboursement manuel",
+      await tx.insert(remboursementsAvancesMembresTable).values({
+        avanceId: id,
+        montantFcfa: montantReel,
+        note: typeof req.body?.note === "string" && req.body.note.trim()
+          ? req.body.note.trim().slice(0, 500)
+          : "Remboursement manuel",
+      });
+      return updated!;
     });
 
     res.json(avanceMaj);
@@ -288,7 +360,7 @@ export async function updatePlanAvanceMembre(req: Request, res: Response): Promi
 
   try {
     const [row] = await db
-      .select({ avance: avancesTable, coopId: membresTable.cooperativeId })
+      .select({ avance: avancesTable, coopId: membresTable.cooperativeId, categorieMembre: membresTable.categorieMembre })
       .from(avancesTable)
       .leftJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
       .where(eq(avancesTable.id, id))
@@ -296,16 +368,37 @@ export async function updatePlanAvanceMembre(req: Request, res: Response): Promi
 
     if (!row) { res.status(404).json({ erreur: "Avance introuvable" }); return; }
     if (row.coopId !== cooperativeId) { res.status(403).json({ erreur: "Accès refusé" }); return; }
+    if (
+      estPorteeDelegueLocalite(res)
+      && (row.categorieMembre !== CATEGORIE_DELEGUE_LOCALITE
+        || (membreDelegueLocaliteCible(res) !== null && row.avance.membreId !== membreDelegueLocaliteCible(res)))
+    ) {
+      res.status(404).json({ erreur: "Avance de délégué de localités introuvable" }); return;
+    }
     if (row.avance.statut === "rembourse") {
       res.status(400).json({ erreur: "Cette avance est déjà remboursée" }); return;
+    }
+    const finalPlan = plan_type ?? row.avance.planType;
+    const finalMontantPartiel = plan_type === "partiel"
+      ? montant_partiel_fcfa
+      : row.avance.montantPartielFcfa;
+    const finalReportDate = plan_type === "reporte"
+      ? report_date
+      : row.avance.reportDate;
+
+    if (finalPlan === "partiel" && (!Number.isInteger(Number(finalMontantPartiel)) || Number(finalMontantPartiel) <= 0)) {
+      res.status(400).json({ erreur: "Un montant partiel entier strictement positif est requis" }); return;
+    }
+    if (finalPlan === "reporte" && (!finalReportDate || !/^\d{4}-\d{2}-\d{2}$/.test(finalReportDate))) {
+      res.status(400).json({ erreur: "Une date de reprise valide est requise" }); return;
     }
 
     const [updated] = await db
       .update(avancesTable)
       .set({
-        ...(plan_type != null && { planType: plan_type as "integral" | "partiel" | "reporte" }),
-        ...(montant_partiel_fcfa !== undefined && { montantPartielFcfa: montant_partiel_fcfa }),
-        ...(report_date !== undefined && { reportDate: report_date }),
+        planType: finalPlan as "integral" | "partiel" | "reporte",
+        montantPartielFcfa: finalPlan === "partiel" ? Number(finalMontantPartiel) : null,
+        reportDate: finalPlan === "reporte" ? finalReportDate : null,
       })
       .where(eq(avancesTable.id, id))
       .returning();
@@ -336,6 +429,9 @@ export async function getAvancesReportees(req: Request, res: Response): Promise<
     // Un délégué ne voit que les avances des membres qui lui sont rattachés
     if (req.user?.role === "delegue" && req.user?.id) {
       conditions.push(eq(membresTable.delegueId, req.user.id));
+    }
+    if (estPorteeDelegueLocalite(res)) {
+      conditions.push(eq(membresTable.categorieMembre, CATEGORIE_DELEGUE_LOCALITE));
     }
 
     const avances = await db
@@ -373,7 +469,7 @@ export async function getRemboursementsAvanceMembre(req: Request, res: Response)
 
   try {
     const [row] = await db
-      .select({ coopId: membresTable.cooperativeId })
+      .select({ avance: avancesTable, coopId: membresTable.cooperativeId, categorieMembre: membresTable.categorieMembre })
       .from(avancesTable)
       .leftJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
       .where(eq(avancesTable.id, id))
@@ -381,6 +477,13 @@ export async function getRemboursementsAvanceMembre(req: Request, res: Response)
 
     if (!row) { res.status(404).json({ erreur: "Avance introuvable" }); return; }
     if (row.coopId !== cooperativeId) { res.status(403).json({ erreur: "Accès refusé" }); return; }
+    if (
+      estPorteeDelegueLocalite(res)
+      && (row.categorieMembre !== CATEGORIE_DELEGUE_LOCALITE
+        || (membreDelegueLocaliteCible(res) !== null && row.avance.membreId !== membreDelegueLocaliteCible(res)))
+    ) {
+      res.status(404).json({ erreur: "Avance de délégué de localités introuvable" }); return;
+    }
 
     const rows = await db
       .select()
