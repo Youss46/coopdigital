@@ -1306,7 +1306,11 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
           f.nom
       `);
     } else {
-      // membre (défaut) — Comptes 401/4091/4092
+      // membre (défaut) — Comptes 401/4091/4092.
+      // Une avance peut être en attente de validation comptable lorsque
+      // autoAvances est désactivé. Elle doit malgré tout apparaître dans la
+      // balance du membre, sinon les membres délégués ayant uniquement une
+      // avance sont absents jusqu'à la validation de l'écriture.
       result = await db.execute<Row>(sql`
         SELECT
           e.tiers_id                                                            AS "tiersId",
@@ -1320,11 +1324,37 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
           SUM(CASE WHEN e.compte_credit = '4091' THEN e.montant_fcfa ELSE 0 END)::integer AS "totalIntrantsRemb",
           (SUM(CASE WHEN e.compte_credit IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END)
            - SUM(CASE WHEN e.compte_debit  IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END))::integer AS "soldeNet"
-        FROM ecritures_comptables e
+        FROM (
+          SELECT
+            e.tiers_id,
+            e.compte_credit,
+            e.compte_debit,
+            e.montant_fcfa,
+            e.source
+          FROM ecritures_comptables e
+          WHERE e.cooperative_id = ${coop}
+            AND e.tiers_type = 'membre'
+            ${exerciceCond}
+
+          UNION ALL
+
+          SELECT
+            a.membre_id AS tiers_id,
+            ea.compte_credit_propose AS compte_credit,
+            ea.compte_debit_propose AS compte_debit,
+            ea.montant_fcfa,
+            ea.source::text AS source
+          FROM ecritures_en_attente ea
+          INNER JOIN avances a ON a.id = ea.source_id
+          INNER JOIN membres am ON am.id = a.membre_id
+          WHERE ea.cooperative_id = ${coop}
+            AND ea.source = 'avance'
+            AND ea.statut = 'en_attente'
+            AND am.cooperative_id = ${coop}
+            ${exercice ? sql`AND EXTRACT(YEAR FROM ea.date_proposee) = ${exercice}` : sql``}
+        ) e
         LEFT JOIN membres m ON m.id = e.tiers_id
-        WHERE e.cooperative_id = ${coop}
-          AND e.tiers_type = 'membre'
-          ${exerciceCond}
+        WHERE m.cooperative_id = ${coop}
         GROUP BY e.tiers_id, m.nom, m.prenoms, m.carte_numero
         ORDER BY
           ABS(SUM(CASE WHEN e.compte_credit IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END)
