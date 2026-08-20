@@ -4176,6 +4176,16 @@ export async function generateBordereauAchatSession(
           inArray(avancesTable.statut, ["en_cours", "en_retard"] as const),
         ));
       soldeAvancesFcfa = avancesMembre.reduce((s, a) => s + a.soldeRestantFcfa, 0);
+
+      // Pour une commission encore en attente, afficher la retenue
+      // prévisionnelle sans dépasser ni la commission ni l'avance disponible.
+      if (
+        retenueAvancesFcfa <= 0 &&
+        fraisCollecteFcfa > 0 &&
+        soldeAvancesFcfa > 0
+      ) {
+        retenueAvancesFcfa = Math.min(fraisCollecteFcfa, soldeAvancesFcfa);
+      }
     }
   }
 
