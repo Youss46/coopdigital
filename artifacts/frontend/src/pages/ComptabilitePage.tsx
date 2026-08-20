@@ -2454,15 +2454,28 @@ function OngletBalanceAuxiliaire() {
   return (
     <div>
       {/* Sélecteur de type de tiers */}
-      <div className="grid grid-cols-2 gap-1 bg-gray-100 rounded-xl p-1 w-full sm:flex sm:flex-wrap sm:w-fit mb-5">
+      <div className="sm:hidden mb-5">
+        <label htmlFor="balance-tiers-type" className="block text-xs font-medium text-gray-500 mb-1">
+          Type de tiers
+        </label>
+        <select
+          id="balance-tiers-type"
+          value={tiersType}
+          onChange={(e) => { setTiersType(e.target.value as TiersType); setRecherche(""); }}
+          className="w-full border border-gray-200 rounded-lg bg-white px-3 py-2.5 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-700"
+        >
+          {TYPES_TIERS.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+        </select>
+      </div>
+      <div className="hidden sm:flex gap-1 bg-gray-100 rounded-xl p-1 w-fit mb-5">
         {TYPES_TIERS.map((t) => (
           <button key={t.id}
             onClick={() => { setTiersType(t.id); setRecherche(""); }}
-            className={`min-w-0 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`min-w-0 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               tiersType === t.id ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"
             }`}
           >
-            <span className="block truncate">{t.label}</span>
+            {t.label}
           </button>
         ))}
       </div>
