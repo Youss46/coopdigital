@@ -2454,20 +2454,20 @@ function OngletBalanceAuxiliaire() {
   return (
     <div>
       {/* Sélecteur de type de tiers */}
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit mb-5">
+      <div className="grid grid-cols-2 gap-1 bg-gray-100 rounded-xl p-1 w-full sm:flex sm:flex-wrap sm:w-fit mb-5">
         {TYPES_TIERS.map((t) => (
           <button key={t.id}
             onClick={() => { setTiersType(t.id); setRecherche(""); }}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`min-w-0 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               tiersType === t.id ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"
             }`}
           >
-            {t.label}
+            <span className="block truncate">{t.label}</span>
           </button>
         ))}
       </div>
 
-      <div className="flex flex-wrap items-end gap-3 mb-5">
+      <div className="grid grid-cols-[auto_minmax(0,1fr)] items-end gap-3 mb-5">
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">Exercice</label>
           <select value={exercice} onChange={(e) => setExercice(Number(e.target.value))}
@@ -2475,7 +2475,7 @@ function OngletBalanceAuxiliaire() {
             {annees.map((a) => <option key={a} value={a}>{a}</option>)}
           </select>
         </div>
-        <div className="flex-1 min-w-[200px]">
+        <div className="min-w-0">
           <label className="block text-xs font-medium text-gray-500 mb-1">Recherche</label>
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -2487,7 +2487,7 @@ function OngletBalanceAuxiliaire() {
             />
           </div>
         </div>
-        <div className="ml-auto flex items-center gap-3">
+        <div className="col-span-2 flex min-w-0 flex-wrap items-center justify-between gap-3 sm:col-span-2 sm:justify-end">
           <p className="text-sm text-gray-500">{list.length} {typeMeta.label.toLowerCase()}</p>
           <button onClick={handleExport} disabled={list.length === 0}
             className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-1.5 disabled:opacity-40">
@@ -2566,7 +2566,7 @@ function OngletBalanceAuxiliaire() {
               </tfoot>
             </table>
           </div>
-          <div className="px-4 py-3 border-t border-gray-100 flex gap-6 text-xs text-gray-500">
+          <div className="px-4 py-3 border-t border-gray-100 flex flex-wrap gap-x-6 gap-y-2 text-xs text-gray-500">
             <span><span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-1"></span>Solde positif = coop doit au tiers</span>
             <span><span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-1"></span>Solde négatif = tiers doit à la coop</span>
           </div>
