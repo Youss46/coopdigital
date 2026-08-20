@@ -892,12 +892,22 @@ export interface MembreHistorique {
   paiements: Paiement[];
 }
 
+export type AvanceInputModePaiement = typeof AvanceInputModePaiement[keyof typeof AvanceInputModePaiement];
+
+
+export const AvanceInputModePaiement = {
+  especes: 'especes',
+  mobile: 'mobile',
+  banque: 'banque',
+} as const;
+
 export interface AvanceInput {
   membreId: number;
   montantOctroyeFcfa: number;
   dateOctroi: string;
   dateEcheance?: string;
   motif?: string;
+  modePaiement?: AvanceInputModePaiement;
 }
 
 export interface RemboursementInput {

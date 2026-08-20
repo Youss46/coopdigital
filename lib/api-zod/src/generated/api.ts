@@ -355,7 +355,8 @@ export const CreateAvanceBody = zod.object({
   "montantOctroyeFcfa": zod.number(),
   "dateOctroi": zod.string(),
   "dateEcheance": zod.string().optional(),
-  "motif": zod.string().optional()
+  "motif": zod.string().optional(),
+  "modePaiement": zod.enum(['especes', 'mobile', 'banque']).optional()
 })
 
 

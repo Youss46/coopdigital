@@ -99,6 +99,7 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
   const planType = body["planType"] ?? "integral";
   const montantPartielFcfa = body["montantPartielFcfa"];
   const reportDate = body["reportDate"];
+  const modePaiement = body["modePaiement"] ?? "especes";
 
   if (!Number.isInteger(montantOctroyeFcfa) || montantOctroyeFcfa <= 0) {
     res.status(400).json({ erreur: "Le montant de l'avance doit être un entier strictement positif" });
@@ -106,6 +107,10 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
   }
   if (!["integral", "partiel", "reporte"].includes(String(planType))) {
     res.status(400).json({ erreur: "Plan de remboursement invalide" });
+    return;
+  }
+  if (!["especes", "mobile", "banque"].includes(String(modePaiement))) {
+    res.status(400).json({ erreur: "Mode de paiement invalide" });
     return;
   }
   if (planType === "partiel" && (!Number.isInteger(Number(montantPartielFcfa)) || Number(montantPartielFcfa) <= 0)) {
@@ -187,6 +192,7 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
       membreNom: `${membre.prenoms} ${membre.nom}`,
       montantFcfa: montantOctroyeFcfa,
       dateOctroi: avance!.dateOctroi,
+      modePaiement: modePaiement as "especes" | "mobile" | "banque",
     });
 
     res.status(201).json(avance);

@@ -198,6 +198,7 @@ export default function DeleguesLocalitesPage() {
   const [showOctroi, setShowOctroi] = useState(false);
   const [formOctroi, setFormOctroi] = useState({
     montant: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "",
+    modePaiement: "especes" as "especes" | "mobile" | "banque",
     planType: "integral" as Avance["planType"], montantPartiel: "", reportDate: "",
   });
   const [errOctroi, setErrOctroi] = useState("");
@@ -347,6 +348,7 @@ export default function DeleguesLocalitesPage() {
       dateOctroi: formOctroi.dateOctroi,
       dateEcheance: formOctroi.dateEcheance || undefined,
       motif: formOctroi.motif || undefined,
+      modePaiement: formOctroi.modePaiement,
       planType: formOctroi.planType,
       montantPartielFcfa: formOctroi.planType === "partiel" ? Number(formOctroi.montantPartiel) : undefined,
       reportDate: formOctroi.planType === "reporte" ? formOctroi.reportDate : undefined,
@@ -357,7 +359,7 @@ export default function DeleguesLocalitesPage() {
       qc.invalidateQueries({ queryKey: ["avances-delegues-localites"] });
       qc.invalidateQueries({ queryKey: ["avances-delegues-localites-reportees"] });
       setShowOctroi(false);
-      setFormOctroi({ montant: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "", planType: "integral", montantPartiel: "", reportDate: "" });
+      setFormOctroi({ montant: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "", modePaiement: "especes", planType: "integral", montantPartiel: "", reportDate: "" });
       setErrOctroi("");
     },
     onError: (e: Error) => setErrOctroi(e.message),
@@ -739,6 +741,18 @@ export default function DeleguesLocalitesPage() {
                       <input type="text" value={formOctroi.motif} onChange={e => setFormOctroi(f => ({ ...f, motif: e.target.value }))}
                         placeholder="Ex. déplacement ou frais de collecte"
                         className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]" />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs text-gray-600 mb-1">Mode de décaissement *</label>
+                      <select
+                        value={formOctroi.modePaiement}
+                        onChange={e => setFormOctroi(f => ({ ...f, modePaiement: e.target.value as typeof f.modePaiement }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]"
+                      >
+                        <option value="especes">Espèces — caisse (571)</option>
+                        <option value="mobile">Mobile Marchand (552)</option>
+                        <option value="banque">Banque (521)</option>
+                      </select>
                     </div>
                     <div className="sm:col-span-2">
                       <label className="block text-xs text-gray-600 mb-1">Plan de retenue *</label>
@@ -1498,6 +1512,18 @@ export default function DeleguesLocalitesPage() {
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]"
                       placeholder="Achat d'intrants, frais de déplacement…"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Mode de décaissement *</label>
+                    <select
+                      value={formOctroi.modePaiement}
+                      onChange={e => setFormOctroi(f => ({ ...f, modePaiement: e.target.value as typeof f.modePaiement }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]"
+                    >
+                      <option value="especes">Espèces — caisse (571)</option>
+                      <option value="mobile">Mobile Marchand (552)</option>
+                      <option value="banque">Banque (521)</option>
+                    </select>
                   </div>
                   {errOctroi && (
                     <p className="text-xs text-red-600 flex items-center gap-1">

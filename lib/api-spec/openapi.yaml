@@ -7276,6 +7276,9 @@ components:
           type: string
         motif:
           type: string
+        modePaiement:
+          type: string
+          enum: [especes, mobile, banque]
 
     RemboursementInput:
       type: object

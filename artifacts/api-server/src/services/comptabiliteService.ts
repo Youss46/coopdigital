@@ -472,12 +472,23 @@ export async function generateEcrituresAvance(cooperativeId: number, params: {
   membreNom: string;
   montantFcfa: number;
   dateOctroi: string;
+  modePaiement?: "especes" | "mobile" | "banque";
 }) {
+  // Le mode de paiement indique quel actif diminue au décaissement.
+  // 571 = caisse, 552 = Mobile Money/Marchand, 521 = banque.
+  const compteCreditParMode: Record<NonNullable<typeof params.modePaiement>, string> = {
+    especes: "571",
+    mobile: "552",
+    banque: "521",
+  };
   const c = await resolveComptes(cooperativeId, "avances", "octroi_avance_producteur", "4091", "521");
+  const compteCredit = params.modePaiement
+    ? compteCreditParMode[params.modePaiement]
+    : c.compteCredit;
   await proposerEcriture(cooperativeId, {
     source: "avance", sourceId: params.avanceId,
     libelle: `Avance octroyée – ${params.membreNom}`,
-    compteDebit: c.compteDebit, compteCredit: c.compteCredit,
+    compteDebit: c.compteDebit, compteCredit,
     montantFcfa: params.montantFcfa, date: params.dateOctroi,
     numeroPiece: `AVA-${params.avanceId}`,
     tiersId: params.membreId, tiersType: "membre",
