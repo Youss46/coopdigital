@@ -82,6 +82,20 @@ function formaterDateHeure(d: string | Date): string {
   return `${date} à ${heure}`;
 }
 
+function libelleStatutPaiement(statut: string | null | undefined): string {
+  const statuts: Record<string, string> = {
+    PAYÉ: "Payé",
+    EN_ATTENTE: "En attente",
+    "EN ATTENTE": "En attente",
+    PARTIEL: "Partiellement payé",
+    IMPAYE: "Impayé",
+    IMPAYÉ: "Impayé",
+    DIFFERE: "Différé",
+    DIFFÉRÉ: "Différé",
+  };
+  return statuts[statut?.trim().toUpperCase() ?? ""] ?? statut?.replace(/_/g, " ") ?? "Non enregistré";
+}
+
 function ligneTableau(doc: InstanceType<typeof PDFDocument>, colonnes: string[], widths: number[], x: number, y: number, fond?: string) {
   if (fond) doc.rect(x, y, widths.reduce((a, b) => a + b, 0), 16).fill(fond);
   let cx = x;
@@ -3993,6 +4007,7 @@ export async function generateBordereauAchatSession(
         autresChargesDeduitesFcfa: livraisonsTable.autresChargesDeduitesFcfa,
         avanceDeduiteFcfa: livraisonsTable.avanceDeduiteFcfa,
         prixUnitaireFcfa: livraisonsTable.prixUnitaireFcfa,
+        statutPaiement: livraisonsTable.statutPaiement,
       })
       .from(livraisonsTable)
       .where(eq(livraisonsTable.id, session.livraisonId))
@@ -4433,6 +4448,7 @@ export async function generateBordereauAchatSession(
     : "Cacao");
   fieldRow("Ouverture",     formaterDateHeure(session.createdAt));
   fieldRow("Clôture",       session.dateFin ? formaterDateHeure(session.dateFin) : "—");
+  fieldRow("Statut paiement", libelleStatutPaiement(livraisonReglement?.statutPaiement));
 
   const leftBottom = y;
 
