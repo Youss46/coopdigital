@@ -4194,7 +4194,12 @@ export async function generateBordereauAchatSession(
   // On lit montantBrutFcfa pour afficher la commission brute, indépendamment des
   // éventuelles charges de transport qui sont déduites séparément sur le bordereau.
   // Fallback : taux × poids net si le record n'existe pas encore.
-  fraisCollecteFcfa = 0;
+  // Pour un membre délégué de localités, la commission a déjà été lue dans
+  // le bloc spécifique session.membreId. Ne pas l'écraser ici : ce bloc
+  // concerne uniquement les commissions des délégués terrain/transferts.
+  if (!estDelegueMembre) {
+    fraisCollecteFcfa = 0;
+  }
   if (session.transfertId) {
     const [comm] = await db
       .select({
