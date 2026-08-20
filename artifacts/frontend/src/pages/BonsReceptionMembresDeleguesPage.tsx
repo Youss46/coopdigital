@@ -16,6 +16,7 @@ import {
   useGetVehicules,
   useGetChauffeurs,
 } from "@workspace/api-client-react";
+import { MoneyInput } from "@/components/ui/money-input";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok  = () => localStorage.getItem("coop_token") ?? "";
@@ -622,14 +623,14 @@ export default function BonsReceptionMembresDeleguesPage() {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                   <div>
                     <label style={{ ...labelStyle, fontWeight: 500, color: "#6b7280" }}>Carburant (F CFA)</label>
-                    <input type="number" min="0" step="500" value={form.fraisCarburantFcfa}
-                      onChange={e => setForm(f => ({ ...f, fraisCarburantFcfa: e.target.value }))}
+                    <MoneyInput min="0" step="500" value={form.fraisCarburantFcfa}
+                      onChange={value => setForm(f => ({ ...f, fraisCarburantFcfa: value }))}
                       style={inputStyle} placeholder="0" />
                   </div>
                   <div>
                     <label style={{ ...labelStyle, fontWeight: 500, color: "#6b7280" }}>Autres charges (F CFA)</label>
-                    <input type="number" min="0" step="500" value={form.autresChargesFcfa}
-                      onChange={e => setForm(f => ({ ...f, autresChargesFcfa: e.target.value }))}
+                    <MoneyInput min="0" step="500" value={form.autresChargesFcfa}
+                      onChange={value => setForm(f => ({ ...f, autresChargesFcfa: value }))}
                       style={inputStyle} placeholder="0" />
                   </div>
                 </div>

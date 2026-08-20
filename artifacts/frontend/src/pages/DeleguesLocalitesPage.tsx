@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
+import { MoneyInput } from "@/components/ui/money-input";
 import { usePermission } from "@/hooks/usePermission";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -723,7 +724,7 @@ export default function DeleguesLocalitesPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Montant (FCFA) *</label>
-                      <input type="number" min="1" value={formOctroi.montant} onChange={e => setFormOctroi(f => ({ ...f, montant: e.target.value }))}
+                      <MoneyInput min="1" value={formOctroi.montant} onChange={value => setFormOctroi(f => ({ ...f, montant: value }))}
                         className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]" />
                     </div>
                     <div>
@@ -766,7 +767,7 @@ export default function DeleguesLocalitesPage() {
                     {formOctroi.planType === "partiel" && (
                       <div>
                         <label className="block text-xs text-gray-600 mb-1">Montant par paiement (FCFA) *</label>
-                        <input type="number" min="1" value={formOctroi.montantPartiel} onChange={e => setFormOctroi(f => ({ ...f, montantPartiel: e.target.value }))}
+                        <MoneyInput min="1" value={formOctroi.montantPartiel} onChange={value => setFormOctroi(f => ({ ...f, montantPartiel: value }))}
                           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]" />
                       </div>
                     )}
@@ -867,7 +868,7 @@ export default function DeleguesLocalitesPage() {
                                   <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
                                     <div className="w-full sm:w-48">
                                       <label className="block text-xs text-gray-600 mb-1">Montant (FCFA)</label>
-                                      <input type="number" min="1" max={a.soldeRestantFcfa} value={formRembours.montant} onChange={e => setFormRembours(f => ({ ...f, montant: e.target.value }))}
+                                      <MoneyInput min="1" max={a.soldeRestantFcfa} value={formRembours.montant} onChange={value => setFormRembours(f => ({ ...f, montant: value }))}
                                         className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm" />
                                     </div>
                                     <div className="flex-1">
