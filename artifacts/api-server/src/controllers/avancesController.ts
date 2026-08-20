@@ -1,6 +1,20 @@
 import { type Request, type Response } from "express";
 import { checkAvance, creerAnomalies } from "../services/anomalieService";
-import { db, avancesTable, membresTable, campagnesTable, remboursementsAvancesMembresTable, usersTable } from "@workspace/db";
+import {
+  db,
+  avancesTable,
+  membresTable,
+  campagnesTable,
+  remboursementsAvancesMembresTable,
+  usersTable,
+  caissesTable,
+  sessionsCaisseTable,
+  mouvementsCaisseTable,
+  comptesMobilesMarchandsTable,
+  mouvementsMobileMarchandTable,
+  comptesBancairesTable,
+  mouvementsBanqueTable,
+} from "@workspace/db";
 import { eq, and, sql, desc, ne, isNull, or, lt } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
@@ -165,22 +179,141 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
     }
     const anomaliesAttention = anomaliesDetectees.filter((a) => a.niveauGravite !== "critique");
 
-    const [avance] = await db
-      .insert(avancesTable)
-      .values({
-        membreId,
-        montantOctroyeFcfa,
-        soldeRestantFcfa: montantOctroyeFcfa,
-        dateOctroi: dateOctroi ?? new Date().toISOString().split("T")[0]!,
-        dateEcheance: dateEcheance ?? null,
-        motif: motif ?? null,
-        statut: "en_cours",
-        agentId: req.user?.id ?? null,
-        planType: planType as "integral" | "partiel" | "reporte",
-        montantPartielFcfa: planType === "partiel" ? Number(montantPartielFcfa) : null,
-        reportDate: planType === "reporte" ? String(reportDate) : null,
-      })
-      .returning();
+    const dateOctroiEffective = dateOctroi ?? new Date().toISOString().split("T")[0]!;
+    const avance = await db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(avancesTable)
+        .values({
+          membreId,
+          montantOctroyeFcfa,
+          soldeRestantFcfa: montantOctroyeFcfa,
+          dateOctroi: dateOctroiEffective,
+          dateEcheance: dateEcheance ?? null,
+          motif: motif ?? null,
+          statut: "en_cours",
+          agentId: req.user?.id ?? null,
+          planType: planType as "integral" | "partiel" | "reporte",
+          montantPartielFcfa: planType === "partiel" ? Number(montantPartielFcfa) : null,
+          reportDate: planType === "reporte" ? String(reportDate) : null,
+        })
+        .returning();
+
+      const reference = `AVA-${created!.id}`;
+      const libelle = `Avance – ${membre.prenoms} ${membre.nom}`;
+      const montant = montantOctroyeFcfa;
+      const userId = req.user?.id ?? null;
+
+      if (modePaiement === "especes") {
+        const [caisse] = await tx
+          .select()
+          .from(caissesTable)
+          .where(and(
+            eq(caissesTable.cooperativeId, cooperativeId),
+            eq(caissesTable.typeCaisse, "centrale"),
+            eq(caissesTable.actif, true),
+          ))
+          .limit(1);
+        if (!caisse) throw new Error("Aucune caisse centrale active n'est configurée.");
+
+        const [session] = await tx
+          .select()
+          .from(sessionsCaisseTable)
+          .where(and(
+            eq(sessionsCaisseTable.caisseId, caisse.id),
+            eq(sessionsCaisseTable.statut, "ouverte"),
+          ))
+          .orderBy(desc(sessionsCaisseTable.id))
+          .limit(1);
+        if (!session) throw new Error("Aucune session de caisse ouverte pour la caisse centrale.");
+
+        const solde = Number(caisse.soldeActuelFcfa);
+        if (solde < montant) {
+          throw new Error(`Solde caisse insuffisant. Disponible : ${solde.toLocaleString("fr-FR")} FCFA`);
+        }
+        const nouveauSolde = solde - montant;
+        await tx.insert(mouvementsCaisseTable).values({
+          caisseId: caisse.id,
+          sessionId: session.id,
+          cooperativeId,
+          type: "sortie",
+          motif: "avance",
+          montantFcfa: String(montant),
+          libelle,
+          referenceOperation: reference,
+          soldeApresFcfa: String(nouveauSolde),
+          enregistrePar: userId,
+        });
+        await tx.update(caissesTable)
+          .set({ soldeActuelFcfa: String(nouveauSolde) })
+          .where(eq(caissesTable.id, caisse.id));
+      } else if (modePaiement === "mobile") {
+        const [compte] = await tx
+          .select()
+          .from(comptesMobilesMarchandsTable)
+          .where(and(
+            eq(comptesMobilesMarchandsTable.cooperativeId, cooperativeId),
+            eq(comptesMobilesMarchandsTable.actif, true),
+          ))
+          .orderBy(comptesMobilesMarchandsTable.id)
+          .limit(1);
+        if (!compte) throw new Error("Aucun compte Mobile Marchand actif n'est configuré.");
+
+        const solde = Number(compte.soldeActuelFcfa);
+        if (solde < montant) {
+          throw new Error(`Solde Mobile Marchand insuffisant. Disponible : ${solde.toLocaleString("fr-FR")} FCFA`);
+        }
+        const nouveauSolde = solde - montant;
+        await tx.insert(mouvementsMobileMarchandTable).values({
+          compteId: compte.id,
+          cooperativeId,
+          type: "debit",
+          motif: "avance",
+          montantFcfa: String(montant),
+          libelle,
+          reference,
+          dateOperation: dateOctroiEffective,
+          soldeApresFcfa: String(nouveauSolde),
+          enregistrePar: userId,
+        });
+        await tx.update(comptesMobilesMarchandsTable)
+          .set({ soldeActuelFcfa: String(nouveauSolde) })
+          .where(eq(comptesMobilesMarchandsTable.id, compte.id));
+      } else {
+        const [compte] = await tx
+          .select()
+          .from(comptesBancairesTable)
+          .where(and(
+            eq(comptesBancairesTable.cooperativeId, cooperativeId),
+            eq(comptesBancairesTable.actif, true),
+          ))
+          .orderBy(comptesBancairesTable.id)
+          .limit(1);
+        if (!compte) throw new Error("Aucun compte bancaire actif n'est configuré.");
+
+        const solde = Number(compte.soldeActuelFcfa);
+        if (solde < montant) {
+          throw new Error(`Solde bancaire insuffisant. Disponible : ${solde.toLocaleString("fr-FR")} FCFA`);
+        }
+        const nouveauSolde = solde - montant;
+        await tx.insert(mouvementsBanqueTable).values({
+          compteId: compte.id,
+          cooperativeId,
+          type: "debit",
+          motif: "avance",
+          montantFcfa: String(montant),
+          libelle,
+          reference,
+          dateOperation: dateOctroiEffective,
+          soldeApresFcfa: String(nouveauSolde),
+          enregistrePar: userId,
+        });
+        await tx.update(comptesBancairesTable)
+          .set({ soldeActuelFcfa: String(nouveauSolde) })
+          .where(eq(comptesBancairesTable.id, compte.id));
+      }
+
+      return created!;
+    });
 
     if (anomaliesAttention.length > 0) {
       void creerAnomalies(cooperativeId, anomaliesAttention, "avances", { entiteId: avance!.id, entiteType: "avance" });
@@ -191,7 +324,7 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
       membreId,
       membreNom: `${membre.prenoms} ${membre.nom}`,
       montantFcfa: montantOctroyeFcfa,
-      dateOctroi: avance!.dateOctroi,
+      dateOctroi: avance.dateOctroi,
       modePaiement: modePaiement as "especes" | "mobile" | "banque",
     });
 
