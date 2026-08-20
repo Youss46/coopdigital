@@ -1306,11 +1306,14 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
           f.nom
       `);
     } else {
-      // membre (défaut) — Comptes 401/4091/4092.
+      // membre / membre délégué de localités — Comptes 401/4091/4092.
       // Une avance peut être en attente de validation comptable lorsque
       // autoAvances est désactivé. Elle doit malgré tout apparaître dans la
       // balance du membre, sinon les membres délégués ayant uniquement une
       // avance sont absents jusqu'à la validation de l'écriture.
+      const categorieMembreCond = tiersType === "membre_delegue"
+        ? sql`AND m.categorie_membre = 'délégué de localités'`
+        : sql`AND (m.categorie_membre IS NULL OR m.categorie_membre <> 'délégué de localités')`;
       result = await db.execute<Row>(sql`
         SELECT
           e.tiers_id                                                            AS "tiersId",
@@ -1355,6 +1358,7 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
         ) e
         LEFT JOIN membres m ON m.id = e.tiers_id
         WHERE m.cooperative_id = ${coop}
+           ${categorieMembreCond}
         GROUP BY e.tiers_id, m.nom, m.prenoms, m.carte_numero
         ORDER BY
           ABS(SUM(CASE WHEN e.compte_credit IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END)
