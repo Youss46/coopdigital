@@ -1312,8 +1312,8 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
       // balance du membre, sinon les membres délégués ayant uniquement une
       // avance sont absents jusqu'à la validation de l'écriture.
       const categorieMembreCond = tiersType === "membre_delegue"
-        ? sql`AND m.categorie_membre = 'délégué de localités'`
-        : sql`AND (m.categorie_membre IS NULL OR m.categorie_membre <> 'délégué de localités')`;
+        ? sql`AND lower(trim(m.categorie_membre)) = 'délégué de localités'`
+        : sql`AND (m.categorie_membre IS NULL OR lower(trim(m.categorie_membre)) <> 'délégué de localités')`;
       result = await db.execute<Row>(sql`
         SELECT
           e.tiers_id                                                            AS "tiersId",
@@ -1372,7 +1372,8 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
           WHERE am.cooperative_id = ${coop}
             AND a.statut IN ('en_cours', 'en_retard')
             AND a.solde_restant_fcfa > 0
-            ${exercice ? sql`AND EXTRACT(YEAR FROM a.date_octroi) = ${exercice}` : sql``}
+            -- Une avance active est un solde reporté : elle reste visible
+            -- sur l'exercice courant même si elle est antérieure.
             AND NOT EXISTS (
               SELECT 1
               FROM ecritures_comptables ec
