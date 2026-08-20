@@ -1330,7 +1330,7 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
             e.compte_credit,
             e.compte_debit,
             e.montant_fcfa,
-            e.source
+            e.source::text AS source
           FROM ecritures_comptables e
           WHERE e.cooperative_id = ${coop}
             AND e.tiers_type = 'membre'
