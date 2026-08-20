@@ -1355,6 +1355,39 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
             AND ea.statut = 'en_attente'
             AND am.cooperative_id = ${coop}
             ${exercice ? sql`AND EXTRACT(YEAR FROM ea.date_proposee) = ${exercice}` : sql``}
+
+          UNION ALL
+
+          -- Secours pour les avances dont l'écriture n'a pas été générée
+          -- (ou n'est pas encore en attente). La balance doit tout de même
+          -- afficher le solde réel de l'avance existante.
+          SELECT
+            a.membre_id AS tiers_id,
+            '0000' AS compte_credit,
+            '4091' AS compte_debit,
+            a.solde_restant_fcfa AS montant_fcfa,
+            'avance' AS source
+          FROM avances a
+          INNER JOIN membres am ON am.id = a.membre_id
+          WHERE am.cooperative_id = ${coop}
+            AND a.statut IN ('en_cours', 'en_retard')
+            AND a.solde_restant_fcfa > 0
+            ${exercice ? sql`AND EXTRACT(YEAR FROM a.date_octroi) = ${exercice}` : sql``}
+            AND NOT EXISTS (
+              SELECT 1
+              FROM ecritures_comptables ec
+              WHERE ec.cooperative_id = ${coop}
+                AND ec.source = 'avance'
+                AND ec.source_id = a.id
+            )
+            AND NOT EXISTS (
+              SELECT 1
+              FROM ecritures_en_attente ea2
+              WHERE ea2.cooperative_id = ${coop}
+                AND ea2.source = 'avance'
+                AND ea2.source_id = a.id
+                AND ea2.statut = 'en_attente'
+            )
         ) e
         LEFT JOIN membres m ON m.id = e.tiers_id
         WHERE m.cooperative_id = ${coop}
