@@ -4019,6 +4019,7 @@ export async function generateBordereauAchatSession(
   let fraisCollecteFcfa  = 0;
   let soldeAvancesFcfa   = 0;
   let retenueAvancesFcfa = 0;
+  let retenueCommissionFcfa = 0;
 
   if (session.transfertId) {
     const [t] = await db
@@ -4142,6 +4143,7 @@ export async function generateBordereauAchatSession(
 
       if (commMembre) {
         fraisCollecteFcfa = Math.round(parseFloat(commMembre.montantFcfa));
+        retenueCommissionFcfa = Number(commMembre.retenueAvancesFcfa ?? 0);
       }
 
       // Retenue réelle : lire depuis remboursements_avances_membres.
@@ -4297,7 +4299,13 @@ export async function generateBordereauAchatSession(
   if (livraisonReglement) {
     carburantFcfa = livraisonReglement.fraisCarburantDeduitsFcfa;
     autresChargesFcfa = livraisonReglement.autresChargesDeduitesFcfa;
-    retenueAvancesFcfa = livraisonReglement.avanceDeduiteFcfa;
+    // La livraison peut avoir été créée avant le paiement de la commission.
+    // Dans ce cas, sa retenue persistée vaut encore zéro alors que la
+    // commission porte désormais la retenue réelle.
+    retenueAvancesFcfa = Math.max(
+      Number(livraisonReglement.avanceDeduiteFcfa ?? 0),
+      retenueCommissionFcfa,
+    );
   }
 
   // Frais de collecte net = commission brute − carburant − autres charges de transport
@@ -4315,8 +4323,10 @@ export async function generateBordereauAchatSession(
   const montantNetCalcule = caisseCoop
     ? Math.max(0, fraisCollecteNet - retenueAvancesFcfa)
     : Math.max(0, resteValeurFcfa + fraisCollecteFcfa - carburantFcfa - autresChargesFcfa - retenueAvancesFcfa);
-  const montantNet = livraisonReglement?.montantNetFcfa
-    ?? (estDelegueMembre
+  const retenueLivraison = Number(livraisonReglement?.avanceDeduiteFcfa ?? 0);
+  const montantNet = livraisonReglement && retenueAvancesFcfa <= retenueLivraison
+    ? livraisonReglement.montantNetFcfa
+    : (estDelegueMembre
       ? calculerReglementMembreDelegue({
         valeurProduitFcfa: valeurProduit,
         fraisCarburantFcfa: carburantFcfa,
