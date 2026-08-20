@@ -22,6 +22,7 @@ const saisiseurAlias = alias(usersTable, "saisiseur_user");
 import { CampagneFermeeError, assertCampagneActiveExiste } from "../lib/campagneGuard";
 import { CreateAvanceBody, RembourserAvanceBody } from "@workspace/api-zod";
 import { generateEcrituresAvance } from "../services/comptabiliteService";
+import { apiError } from "../lib/apiError";
 
 const CATEGORIE_DELEGUE_LOCALITE = "délégué de localités";
 
@@ -331,7 +332,9 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
     res.status(201).json(avance);
   } catch (err) {
     req.log.error({ err }, "Erreur createAvance");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    const erreur = apiError(err);
+    const estErreurMetier = err instanceof Error && !err.message.startsWith("Failed query:");
+    res.status(estErreurMetier ? 400 : 500).json({ erreur });
   }
 }
 
