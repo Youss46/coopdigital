@@ -1358,6 +1358,26 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
 
           UNION ALL
 
+          -- Les livraisons dont l'écriture comptable est encore en attente
+          -- doivent déjà constituer une dette envers le membre.
+          SELECT
+            l.membre_id AS tiers_id,
+            ea_liv.compte_credit_propose AS compte_credit,
+            ea_liv.compte_debit_propose AS compte_debit,
+            ea_liv.montant_fcfa,
+            ea_liv.source::text AS source
+          FROM ecritures_en_attente ea_liv
+          INNER JOIN livraisons l ON l.id = ea_liv.source_id
+          INNER JOIN membres lm ON lm.id = l.membre_id
+          WHERE ea_liv.cooperative_id = ${coop}
+            AND ea_liv.source = 'livraison'
+            AND ea_liv.statut = 'en_attente'
+            AND l.membre_id IS NOT NULL
+            AND lm.cooperative_id = ${coop}
+            ${exercice ? sql`AND EXTRACT(YEAR FROM ea_liv.date_proposee) = ${exercice}` : sql``}
+
+          UNION ALL
+
           -- Secours pour les avances dont l'écriture n'a pas été générée
           -- (ou n'est pas encore en attente). La balance doit tout de même
           -- afficher le solde réel de l'avance existante.
@@ -1388,6 +1408,37 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
                 AND ea2.source = 'avance'
                 AND ea2.source_id = a.id
                 AND ea2.statut = 'en_attente'
+            )
+
+          UNION ALL
+
+          -- Même secours pour une livraison non encore comptabilisée.
+          SELECT
+            l.membre_id AS tiers_id,
+            '401' AS compte_credit,
+            '0000' AS compte_debit,
+            COALESCE(l.montant_restant, l.montant_net_fcfa)::integer AS montant_fcfa,
+            'livraison' AS source
+          FROM livraisons l
+          INNER JOIN membres lm ON lm.id = l.membre_id
+          WHERE lm.cooperative_id = ${coop}
+            AND l.membre_id IS NOT NULL
+            AND COALESCE(l.montant_restant, l.montant_net_fcfa)::numeric > 0
+            AND COALESCE(l.statut_paiement, 'EN ATTENTE') <> 'PAYÉ'
+            AND NOT EXISTS (
+              SELECT 1
+              FROM ecritures_comptables ec_liv
+              WHERE ec_liv.cooperative_id = ${coop}
+                AND ec_liv.source = 'livraison'
+                AND ec_liv.source_id = l.id
+            )
+            AND NOT EXISTS (
+              SELECT 1
+              FROM ecritures_en_attente ea_liv2
+              WHERE ea_liv2.cooperative_id = ${coop}
+                AND ea_liv2.source = 'livraison'
+                AND ea_liv2.source_id = l.id
+                AND ea_liv2.statut = 'en_attente'
             )
         ) e
         LEFT JOIN membres m ON m.id = e.tiers_id
