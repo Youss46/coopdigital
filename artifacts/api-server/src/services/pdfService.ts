@@ -4263,6 +4263,18 @@ export async function generateBordereauAchatSession(
       ));
     soldeAvancesFcfa = avances.reduce((s, a) => s + a.soldeRestantFcfa, 0);
 
+    // Une commission peut encore être en attente de paiement au moment où le
+    // bordereau est consulté. Afficher alors la retenue prévisionnelle,
+    // plafonnée par le solde d'avance disponible et la commission brute.
+    if (
+      estDelegueMembre &&
+      retenueAvancesFcfa <= 0 &&
+      fraisCollecteFcfa > 0 &&
+      soldeAvancesFcfa > 0
+    ) {
+      retenueAvancesFcfa = Math.min(fraisCollecteFcfa, soldeAvancesFcfa);
+    }
+
     // 6b. Si mode caisse_cooperative : montant pré-financé sur le cycle courant
     if (modeFinancement === "caisse_cooperative" && delegueIdSession) {
       {
