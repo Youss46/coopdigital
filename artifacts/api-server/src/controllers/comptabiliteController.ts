@@ -1350,11 +1350,15 @@ export async function getGrandLivreTiers(req: Request, res: Response): Promise<v
     const exercice  = req.query["exercice"] ? parseInt(String(req.query["exercice"])) : undefined;
 
     if (!tiersId) { res.status(400).json({ erreur: "id invalide" }); return; }
+    if (!["membre", "delegue", "personnel", "exportateur", "fournisseur_ext"].includes(tiersType)) {
+      res.status(400).json({ erreur: "type de tiers invalide" });
+      return;
+    }
 
     const conds = [
       eq(ecrituresComptablesTable.cooperativeId, coop),
       eq(ecrituresComptablesTable.tiersId, tiersId),
-      sql`tiers_type = ${tiersType}`,
+      eq(ecrituresComptablesTable.tiersType, tiersType),
     ];
     if (exercice) conds.push(eq(ecrituresComptablesTable.exercice, exercice));
 

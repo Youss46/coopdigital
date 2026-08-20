@@ -360,16 +360,35 @@ function PositionComptableMembre({ membreId }: { membreId: number }) {
   const token = localStorage.getItem("coop_token") ?? "";
   const BASE = import.meta.env.VITE_API_URL ?? "";
 
-  const { data, isLoading } = useQuery<GrandLivreTiers>({
+  const { data, isLoading, isError, error } = useQuery<GrandLivreTiers>({
     queryKey: ["position-comptable-membre", membreId],
-    queryFn: () =>
-      fetch(`${BASE}/api/comptabilite/tiers/${membreId}/grand-livre?type=membre`, {
+    queryFn: async () => {
+      const response = await fetch(`${BASE}/api/comptabilite/tiers/${membreId}/grand-livre?type=membre`, {
         headers: { Authorization: `Bearer ${token}` },
-      }).then(r => r.json()) as Promise<GrandLivreTiers>,
+      });
+      const body = await response.json().catch(() => null) as GrandLivreTiers & { erreur?: string } | null;
+      if (!response.ok) {
+        throw new Error(body?.erreur ?? "Impossible de charger la position comptable");
+      }
+      if (!body || !Array.isArray(body.lignes) || !body.totaux) {
+        throw new Error("La réponse de la position comptable est invalide");
+      }
+      return body;
+    },
     enabled: !!membreId,
   });
 
   if (isLoading) return <div className="text-center py-12 text-gray-400 text-sm">Chargement…</div>;
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 gap-2 text-red-500">
+        <AlertTriangle size={28} className="opacity-70" />
+        <p className="text-sm text-center">{error instanceof Error ? error.message : "Impossible de charger la position comptable."}</p>
+        <p className="text-xs text-gray-400">Réessayez en ouvrant à nouveau l’onglet Position comptable.</p>
+      </div>
+    );
+  }
 
   if (!data || data.lignes.length === 0) {
     return (

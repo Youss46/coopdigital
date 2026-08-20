@@ -1,4 +1,5 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { Link } from "wouter";
 import ExcelJS from "exceljs";
 import { MoneyInput } from "@/components/ui/money-input";
 import { useQuery, useMutation, useQueryClient as useQC } from "@tanstack/react-query";
@@ -2395,12 +2396,13 @@ const TYPES_TIERS = [
   { id: "exportateur",    label: "Exportateurs",    labelDu: "Créance (4111)",     labelPaye: "Encaissé", showIntrants: false, lienBase: null },
   { id: "fournisseur_ext", label: "Fournisseurs ext.", labelDu: "Dû fournisseur (401)", labelPaye: "Payé", showIntrants: false, lienBase: null },
 ] as const;
+type TiersType = typeof TYPES_TIERS[number]["id"];
 
 function OngletBalanceAuxiliaire() {
   const anneeActuelle = new Date().getFullYear();
   const [exercice, setExercice]   = useState(anneeActuelle);
   const [recherche, setRecherche] = useState("");
-  const [tiersType, setTiersType] = useState<"membre" | "delegue" | "personnel">("membre");
+  const [tiersType, setTiersType] = useState<TiersType>("membre");
   const annees = Array.from({ length: 5 }, (_, i) => anneeActuelle - i);
   const typeMeta = TYPES_TIERS.find(t => t.id === tiersType)!;
 
@@ -2540,10 +2542,10 @@ function OngletBalanceAuxiliaire() {
                       </td>
                       <td className="px-3 py-3">
                         {typeMeta.lienBase && (
-                          <a href={`${typeMeta.lienBase}${l.tiersId}`}
+                          <Link href={`${typeMeta.lienBase}${l.tiersId}`}
                             className="text-xs text-blue-600 hover:underline whitespace-nowrap">
                             Fiche →
-                          </a>
+                          </Link>
                         )}
                       </td>
                     </tr>
