@@ -2391,6 +2391,7 @@ interface BalanceAuxLigne {
 
 const TYPES_TIERS = [
   { id: "membre",         label: "Membres",        labelDu: "Dû au membre",      labelPaye: "Payé",    showIntrants: true,  lienBase: "/membres/" },
+  { id: "membre_delegue", label: "Membres délégués", labelDu: "Dû au membre-délégué", labelPaye: "Payé", showIntrants: false, lienBase: "/membres/" },
   { id: "delegue",        label: "Délégués",        labelDu: "Dû au délégué",     labelPaye: "Payé",    showIntrants: false, lienBase: null },
   { id: "personnel",      label: "Personnel",       labelDu: "Salaire dû (421)",  labelPaye: "Versé",   showIntrants: false, lienBase: null },
   { id: "exportateur",    label: "Exportateurs",    labelDu: "Créance (4111)",     labelPaye: "Encaissé", showIntrants: false, lienBase: null },
