@@ -321,8 +321,13 @@ export default function CampagnesPage() {
         anneeDebut: new Date().getFullYear(),
         anneeFin: new Date().getFullYear() + 1,
       });
-    } catch {
-      toast({ title: "Erreur lors de la création", variant: "destructive" });
+    } catch (err) {
+      toast({
+        title: err instanceof Error && err.message.trim()
+          ? err.message
+          : "Erreur lors de la création",
+        variant: "destructive",
+      });
     }
   }
 
