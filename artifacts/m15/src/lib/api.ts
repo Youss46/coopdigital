@@ -240,6 +240,19 @@ export function statutColor(s: string | undefined | null): string {
   }
 }
 
+export function statutLabel(s: string | undefined | null): string {
+  switch (s) {
+    case "active": return "Active";
+    case "trial": return "Période d’essai";
+    case "suspendue": return "Suspendue";
+    case "expiree": return "Expirée";
+    case "supprimee": return "Supprimée";
+    case "resiliee": return "Résiliée";
+    case "inactive": return "Inactive";
+    default: return s ?? "Sans licence";
+  }
+}
+
 export function joursColor(j: number | null | undefined): string {
   if (j === null || j === undefined) return "text-gray-400";
   if (j <= 0) return "text-red-600 font-bold";

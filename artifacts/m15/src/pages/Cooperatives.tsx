@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
-import { fetchCooperatives, formatDate, statutColor, joursColor, type CoopItem } from "@/lib/api";
+import { fetchCooperatives, formatDate, statutColor, statutLabel, joursColor, type CoopItem } from "@/lib/api";
 import { Building2, Plus, Search, Loader2, RefreshCw, ChevronRight } from "lucide-react";
 
 function CoopCard({ c }: { c: CoopItem }) {
@@ -18,7 +18,7 @@ function CoopCard({ c }: { c: CoopItem }) {
             {c.licence ? (
               <>
                 <span className={`inline-flex px-1.5 py-0.5 rounded-full text-xs font-medium ${statutColor(c.licence.statut)}`}>
-                  {c.licence.statut}
+                  {statutLabel(c.licence.statut)}
                 </span>
                 <span className="text-xs text-muted-foreground">{c.licence.planNom ?? "—"}</span>
                 {c.joursRestants !== null && (
@@ -143,7 +143,7 @@ export default function Cooperatives() {
                             <td className="px-4 py-3.5">
                               {c.licence ? (
                                 <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statutColor(c.licence.statut)}`}>
-                                  {c.licence.statut}
+                                  {statutLabel(c.licence.statut)}
                                 </span>
                               ) : (
                                 <span className="text-muted-foreground text-xs">Sans licence</span>

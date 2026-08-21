@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
-import { fetchCooperatives, formatDate, statutColor, joursColor, type CoopItem } from "@/lib/api";
+import { fetchCooperatives, formatDate, statutColor, statutLabel, joursColor, type CoopItem } from "@/lib/api";
 import { FileKey, Loader2, RefreshCw, AlertTriangle, Search, ChevronRight } from "lucide-react";
 
 function LicenceCard({ c }: { c: CoopItem }) {
@@ -13,7 +13,7 @@ function LicenceCard({ c }: { c: CoopItem }) {
             <span className="font-medium text-sm">{c.nom}</span>
             {c.licence && (
               <span className={`inline-flex px-1.5 py-0.5 rounded-full text-xs font-medium ${statutColor(c.licence.statut)}`}>
-                {c.licence.statut}
+                {statutLabel(c.licence.statut)}
               </span>
             )}
           </div>
@@ -175,7 +175,7 @@ export default function Licences() {
                             <td className="px-4 py-3.5">
                               {c.licence ? (
                                 <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statutColor(c.licence.statut)}`}>
-                                  {c.licence.statut}
+                                  {statutLabel(c.licence.statut)}
                                 </span>
                               ) : <span className="text-muted-foreground text-xs">—</span>}
                             </td>

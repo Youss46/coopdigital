@@ -5,7 +5,7 @@ import {
   fetchCooperative, fetchPlans, renouvelerLicence, suspendreCooperative,
   reactiverCooperative, supprimerCooperative, toggleRenouvellementAuto,
   resetPasswordPca, updatePca, activerCooperative,
-  formatDate, formatFcfa, statutColor, joursColor,
+  formatDate, formatFcfa, statutColor, statutLabel, joursColor,
   type CoopDetail as CoopDetailType, type Plan,
 } from "@/lib/api";
 import {
@@ -215,7 +215,7 @@ export default function CoopDetail() {
                     <h1 className="text-2xl font-bold">{data.cooperative.nom}</h1>
                     {data.licenceCourante && (
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statutColor(data.licenceCourante.statut)}`}>
-                        {data.licenceCourante.statut}
+                        {statutLabel(data.licenceCourante.statut)}
                       </span>
                     )}
                   </div>

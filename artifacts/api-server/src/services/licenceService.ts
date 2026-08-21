@@ -587,10 +587,10 @@ export async function loginM15(email: string, motDePasse: string) {
 export async function getDashboardM15() {
   const [stats] = await db
     .select({
-      totalActives: sql<number>`COUNT(*) FILTER (WHERE ${licencesTable.statut} = 'active')`,
-      totalTrials: sql<number>`COUNT(*) FILTER (WHERE ${licencesTable.statut} = 'trial')`,
+      totalActives: sql<number>`COUNT(*) FILTER (WHERE ${licencesTable.statut} = 'active' AND (${licencesTable.dateExpiration} IS NULL OR ${licencesTable.dateExpiration} > CURRENT_DATE))`,
+      totalTrials: sql<number>`COUNT(*) FILTER (WHERE ${licencesTable.statut} = 'trial' AND (${licencesTable.dateExpiration} IS NULL OR ${licencesTable.dateExpiration} > CURRENT_DATE))`,
       totalSuspendues: sql<number>`COUNT(*) FILTER (WHERE ${licencesTable.statut} = 'suspendue')`,
-      totalExpirees: sql<number>`COUNT(*) FILTER (WHERE ${licencesTable.statut} = 'expiree')`,
+      totalExpirees: sql<number>`COUNT(*) FILTER (WHERE ${licencesTable.statut} = 'expiree' OR (${licencesTable.statut} IN ('active', 'trial') AND ${licencesTable.dateExpiration} IS NOT NULL AND ${licencesTable.dateExpiration} <= CURRENT_DATE))`,
       revenus: sql<string>`COALESCE(SUM(${licencesTable.montantPayeFcfa}), 0)`,
     })
     .from(licencesTable);
@@ -611,6 +611,7 @@ export async function getDashboardM15() {
     .where(and(
       eq(licencesTable.statut, "active"),
       isNotNull(licencesTable.dateExpiration),
+      sql`${licencesTable.dateExpiration} > CURRENT_DATE`,
       lte(licencesTable.dateExpiration, sql`CURRENT_DATE + INTERVAL '30 days'`),
     ))
     .orderBy(licencesTable.dateExpiration);
@@ -642,7 +643,7 @@ export async function getCooperativesM15() {
     .orderBy(cooperativesTable.nom);
 
   const result = await Promise.all(coops.map(async (coop) => {
-    const [licence] = await db
+    const [licenceRow] = await db
       .select({
         id: licencesTable.id,
         statut: licencesTable.statut,
@@ -660,6 +661,18 @@ export async function getCooperativesM15() {
       .limit(1);
 
     const today = new Date();
+    const licence = licenceRow
+      ? {
+          ...licenceRow,
+          // Le cron persiste normalement ce statut, mais l'API doit rester
+          // correcte entre deux passages du cron.
+          statut: (licenceRow.statut === "active" || licenceRow.statut === "trial")
+            && licenceRow.dateExpiration
+            && new Date(licenceRow.dateExpiration).getTime() <= today.getTime()
+            ? "expiree"
+            : licenceRow.statut,
+        }
+      : null;
     const joursRestants = licence?.dateExpiration
       ? Math.floor((new Date(licence.dateExpiration).getTime() - today.getTime()) / (24 * 3600 * 1000))
       : null;
@@ -745,7 +758,17 @@ export async function getCooperativeDetailM15(cooperativeId: number) {
       .limit(1),
   ]);
 
-  const licenceCourante = licences[0] ?? null;
+  const rawLicenceCourante = licences[0] ?? null;
+  const licenceCourante = rawLicenceCourante
+    ? {
+        ...rawLicenceCourante,
+        statut: (rawLicenceCourante.statut === "active" || rawLicenceCourante.statut === "trial")
+          && rawLicenceCourante.dateExpiration
+          && new Date(rawLicenceCourante.dateExpiration).getTime() <= Date.now()
+          ? "expiree"
+          : rawLicenceCourante.statut,
+      }
+    : null;
   const joursRestants = licenceCourante?.dateExpiration
     ? Math.floor((new Date(licenceCourante.dateExpiration).getTime() - new Date().getTime()) / (24 * 3600 * 1000))
     : null;
