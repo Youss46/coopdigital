@@ -227,7 +227,7 @@ export default function CoopDetail() {
                   <button onClick={load} className="flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm hover:bg-muted">
                     <RefreshCw size={13} />
                   </button>
-                  {(data.licenceCourante?.statut === "inactive" || data.licenceCourante?.statut === "trial") && (
+                  {(data.licenceCourante?.statut === "inactive" || data.licenceCourante?.statut === "trial" || data.licenceCourante?.statut === "expiree") && (
                     <button onClick={() => { setShowActiver(true); setActionError(""); }} className="flex items-center gap-1.5 px-3 py-2 border border-green-300 text-green-700 bg-green-50 rounded-lg text-sm hover:bg-green-100 font-medium">
                       <Play size={13} /> Activer la licence
                     </button>

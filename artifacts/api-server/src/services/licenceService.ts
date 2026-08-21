@@ -189,7 +189,7 @@ export async function activerLicence(cleLicence: string, cooperativeId: number, 
     .from(licencesTable)
     .where(and(
       eq(licencesTable.cleLicence, cleLicence),
-      inArray(licencesTable.statut, ["inactive", "trial"]),
+      inArray(licencesTable.statut, ["inactive", "trial", "expiree"]),
     ))
     .limit(1);
 
