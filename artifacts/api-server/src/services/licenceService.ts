@@ -588,9 +588,9 @@ export async function getDashboardM15() {
   const [stats] = await db
     .select({
       totalActives: sql<number>`COUNT(*) FILTER (WHERE ${licencesTable.statut} = 'active' AND (${licencesTable.dateExpiration} IS NULL OR ${licencesTable.dateExpiration} > CURRENT_DATE))`,
-      totalTrials: sql<number>`COUNT(*) FILTER (WHERE ${licencesTable.statut} = 'trial' AND (${licencesTable.dateExpiration} IS NULL OR ${licencesTable.dateExpiration} > CURRENT_DATE))`,
+      totalTrials: sql<number>`COUNT(*) FILTER (WHERE ${licencesTable.statut} = 'trial' AND (${licencesTable.trialActif} = false OR ${licencesTable.dateFinTrial} IS NULL OR ${licencesTable.dateFinTrial} > CURRENT_DATE))`,
       totalSuspendues: sql<number>`COUNT(*) FILTER (WHERE ${licencesTable.statut} = 'suspendue')`,
-      totalExpirees: sql<number>`COUNT(*) FILTER (WHERE ${licencesTable.statut} = 'expiree' OR (${licencesTable.statut} IN ('active', 'trial') AND ${licencesTable.dateExpiration} IS NOT NULL AND ${licencesTable.dateExpiration} <= CURRENT_DATE))`,
+      totalExpirees: sql<number>`COUNT(*) FILTER (WHERE ${licencesTable.statut} = 'expiree' OR (${licencesTable.statut} = 'active' AND ${licencesTable.dateExpiration} IS NOT NULL AND ${licencesTable.dateExpiration} <= CURRENT_DATE) OR (${licencesTable.statut} = 'trial' AND ${licencesTable.trialActif} = true AND ${licencesTable.dateFinTrial} IS NOT NULL AND ${licencesTable.dateFinTrial} <= CURRENT_DATE))`,
       revenus: sql<string>`COALESCE(SUM(${licencesTable.montantPayeFcfa}), 0)`,
     })
     .from(licencesTable);
@@ -649,6 +649,8 @@ export async function getCooperativesM15() {
         statut: licencesTable.statut,
         dateActivation: licencesTable.dateActivation,
         dateExpiration: licencesTable.dateExpiration,
+        dateFinTrial: licencesTable.dateFinTrial,
+        trialActif: licencesTable.trialActif,
         renouvellementAuto: licencesTable.renouvellementAuto,
         planNom: plansAbonnementTable.nom,
         dureeAns: licencesTable.dureeAns,
@@ -661,14 +663,21 @@ export async function getCooperativesM15() {
       .limit(1);
 
     const today = new Date();
+    const dateExpirationEffective = licenceRow
+      && licenceRow.statut === "trial"
+      && licenceRow.trialActif
+      && licenceRow.dateFinTrial
+      ? licenceRow.dateFinTrial
+      : licenceRow?.dateExpiration;
     const licence = licenceRow
       ? {
           ...licenceRow,
+          dateExpiration: dateExpirationEffective,
           // Le cron persiste normalement ce statut, mais l'API doit rester
           // correcte entre deux passages du cron.
           statut: (licenceRow.statut === "active" || licenceRow.statut === "trial")
-            && licenceRow.dateExpiration
-            && new Date(licenceRow.dateExpiration).getTime() <= today.getTime()
+            && dateExpirationEffective
+            && new Date(dateExpirationEffective).getTime() <= today.getTime()
             ? "expiree"
             : licenceRow.statut,
         }
@@ -711,6 +720,8 @@ export async function getCooperativeDetailM15(cooperativeId: number) {
       statut: licencesTable.statut,
       dateActivation: licencesTable.dateActivation,
       dateExpiration: licencesTable.dateExpiration,
+      dateFinTrial: licencesTable.dateFinTrial,
+      trialActif: licencesTable.trialActif,
       dureeAns: licencesTable.dureeAns,
       renouvellementAuto: licencesTable.renouvellementAuto,
       nbRenouvellements: licencesTable.nbRenouvellements,
@@ -759,12 +770,19 @@ export async function getCooperativeDetailM15(cooperativeId: number) {
   ]);
 
   const rawLicenceCourante = licences[0] ?? null;
+  const dateExpirationEffective = rawLicenceCourante
+    && rawLicenceCourante.statut === "trial"
+    && rawLicenceCourante.trialActif
+    && rawLicenceCourante.dateFinTrial
+    ? rawLicenceCourante.dateFinTrial
+    : rawLicenceCourante?.dateExpiration;
   const licenceCourante = rawLicenceCourante
     ? {
         ...rawLicenceCourante,
+        dateExpiration: dateExpirationEffective,
         statut: (rawLicenceCourante.statut === "active" || rawLicenceCourante.statut === "trial")
-          && rawLicenceCourante.dateExpiration
-          && new Date(rawLicenceCourante.dateExpiration).getTime() <= Date.now()
+          && dateExpirationEffective
+          && new Date(dateExpirationEffective).getTime() <= Date.now()
           ? "expiree"
           : rawLicenceCourante.statut,
       }
