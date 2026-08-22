@@ -125,15 +125,7 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
       campagneId
         ? db.select({ t: sql<number>`coalesce(sum(poids_kg::numeric),0)::float` })
             .from(livraisonsTable)
-            .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
-            .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
-            .where(and(
-              eq(livraisonsTable.campagneId, campagneId),
-              or(
-                eq(membresTable.cooperativeId, cooperativeId),
-                eq(fournisseursTable.cooperativeId, cooperativeId),
-              ),
-            ))
+            .where(eq(livraisonsTable.campagneId, campagneId))
         : Promise.resolve([{ t: 0 }]),
 
       db.select({
@@ -659,15 +651,7 @@ export async function getComparaisonCampagnesPca(req: Request, res: Response): P
         const [tonnageActuelRow] = await db
           .select({ tonnageKg: sql<number>`coalesce(sum(${livraisonsTable.poidsKg}::numeric), 0)::float` })
           .from(livraisonsTable)
-          .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
-          .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
-          .where(and(
-            eq(livraisonsTable.campagneId, c.id),
-            or(
-              eq(membresTable.cooperativeId, cooperativeId),
-              eq(fournisseursTable.cooperativeId, cooperativeId),
-            ),
-          ));
+          .where(eq(livraisonsTable.campagneId, c.id));
 
         if (bilan) {
           const tonnageT = Number(tonnageActuelRow?.tonnageKg ?? 0) / 1000;
