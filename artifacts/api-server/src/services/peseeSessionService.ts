@@ -16,7 +16,7 @@ import {
   usersTable,
   bonsReceptionMembresDeleguesTable,
 } from "@workspace/db";
-import { eq, and, desc, sql, gte, lte, isNull, inArray } from "drizzle-orm";
+import { eq, and, desc, sql, gte, lte, isNull, inArray, or } from "drizzle-orm";
 import { getPrixActuel } from "./terrainService.js";
 import { generateEcrituresLivraison } from "./comptabiliteService.js";
 import { getMontantAlimentationsCaisseDelegue } from "./delegueService.js";
@@ -514,6 +514,7 @@ export async function getSessions(
   const sessions = await db
     .select({
       id: sessionsPeseeTable.id,
+      type: sql<"groupée">`'groupée'`,
       cooperativeId: sessionsPeseeTable.cooperativeId,
       peseurId: sessionsPeseeTable.peseurId,
       numeroSession: sessionsPeseeTable.numeroSession,
@@ -544,7 +545,71 @@ export async function getSessions(
     .orderBy(desc(sessionsPeseeTable.createdAt))
     .limit(opts.limit ?? 50);
 
-  return sessions;
+  // Les pesées simples ne créent pas de ligne dans sessions_pesee : elles
+  // sont enregistrées directement dans livraisons avec le peseur d'origine.
+  // On les expose dans la même liste, sans reprendre les livraisons issues
+  // d'une session groupée.
+  const livraisonConditions = [
+    eq(livraisonsTable.peseurId, opts.peseurId ?? livraisonsTable.peseurId),
+    sql`NOT EXISTS (
+      SELECT 1 FROM sessions_pesee sp WHERE sp.livraison_id = ${livraisonsTable.id}
+    )`,
+    or(
+      eq(membresTable.cooperativeId, cooperativeId),
+      eq(fournisseursTable.cooperativeId, cooperativeId),
+    )!,
+  ];
+  if (opts.peseurId !== undefined) {
+    livraisonConditions[0] = eq(livraisonsTable.peseurId, opts.peseurId);
+  } else {
+    livraisonConditions.shift();
+  }
+  if (opts.statut && opts.statut !== "terminee") {
+    return sessions;
+  }
+  if (opts.dateDebut) {
+    livraisonConditions.push(gte(livraisonsTable.createdAt, new Date(opts.dateDebut)));
+  }
+  if (opts.dateFin) {
+    livraisonConditions.push(lte(livraisonsTable.createdAt, new Date(opts.dateFin)));
+  }
+
+  const livraisonsSimples = await db
+    .select({
+      id: sql<number>`-${livraisonsTable.id}`,
+      type: sql<"simple">`'simple'`,
+      cooperativeId: sql<number>`${cooperativeId}`,
+      peseurId: livraisonsTable.peseurId,
+      numeroSession: sql<string>`concat('PES-S-', ${livraisonsTable.id})`,
+      membreId: livraisonsTable.membreId,
+      membreNom: membresTable.nom,
+      membrePrenoms: membresTable.prenoms,
+      fournisseurId: livraisonsTable.fournisseurId,
+      fournisseurNom: fournisseursTable.nom,
+      fournisseurPrenoms: fournisseursTable.prenoms,
+      produit: livraisonsTable.produit,
+      operation: sql<string>`'pesee_simple'`,
+      statut: sql<"terminee">`'terminee'`,
+      poidsTotalKg: sql<string>`coalesce(${livraisonsTable.poidsNetKg}, ${livraisonsTable.poidsKg})`,
+      nbSacsTotal: livraisonsTable.nombreSacs,
+      nbLignes: sql<number>`1`,
+      dateDebut: livraisonsTable.createdAt,
+      dateFin: livraisonsTable.createdAt,
+      notes: sql<string | null>`null`,
+      livraisonId: livraisonsTable.id,
+      bonReceptionId: sql<number | null>`null`,
+      createdAt: livraisonsTable.createdAt,
+    })
+    .from(livraisonsTable)
+    .leftJoin(membresTable, eq(membresTable.id, livraisonsTable.membreId))
+    .leftJoin(fournisseursTable, eq(fournisseursTable.id, livraisonsTable.fournisseurId))
+    .where(and(...livraisonConditions))
+    .orderBy(desc(livraisonsTable.createdAt))
+    .limit(opts.limit ?? 50);
+
+  return [...sessions, ...livraisonsSimples]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, opts.limit ?? 50);
 }
 
 // ─── Détail session avec lignes ───────────────────────────────────────────────
