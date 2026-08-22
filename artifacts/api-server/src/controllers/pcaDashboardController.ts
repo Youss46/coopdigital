@@ -2,7 +2,7 @@ import { type Request, type Response, type NextFunction } from "express";
 import {
   db,
   campagnesTable, bilansCampagneTable,
-  livraisonsTable, membresTable,
+  livraisonsTable, membresTable, fournisseursTable,
   avancesTable,
   ventesExportateursTable, exportateursTable,
   empruntsTable, echeancierEmpruntsTable, preteursTable,
@@ -646,8 +646,24 @@ export async function getComparaisonCampagnesPca(req: Request, res: Response): P
           .orderBy(desc(bilansCampagneTable.dateGeneration))
           .limit(1);
 
+        // Le tonnage doit rester synchronisé avec la carte de synthèse :
+        // contrairement aux indicateurs financiers, il est calculé en direct
+        // pour inclure les livraisons ajoutées depuis le dernier bilan.
+        const [tonnageActuelRow] = await db
+          .select({ tonnageKg: sql<number>`coalesce(sum(${livraisonsTable.poidsKg}::numeric), 0)::float` })
+          .from(livraisonsTable)
+          .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+          .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
+          .where(and(
+            eq(livraisonsTable.campagneId, c.id),
+            or(
+              eq(membresTable.cooperativeId, cooperativeId),
+              eq(fournisseursTable.cooperativeId, cooperativeId),
+            ),
+          ));
+
         if (bilan) {
-          const tonnageT = Number(bilan.tonnageTotalKg ?? 0) / 1000;
+          const tonnageT = Number(tonnageActuelRow?.tonnageKg ?? 0) / 1000;
           const margeNette = Number(bilan.margeNetteFcfa ?? 0);
           const margeKg = tonnageT > 0 ? Math.round(margeNette / tonnageT) : 0;
           const avOctroyees = Number(bilan.avancesOctroYeesFcfa ?? 0);
