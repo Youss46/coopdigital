@@ -6,6 +6,7 @@ import {
   getProfilHandler,
   getPrixHandler,
   getFournisseursHandler,
+  createFournisseurExterneHandler,
   getFournisseurRecapHandler,
   postCollecteHandler,
   postPaiementHandler,
@@ -59,6 +60,7 @@ router.get("/terrain/delegues-centraux", terrainAuthMiddleware, getDeleguesCentr
 
 // Fournisseurs : délégué ET peseur (le service filtre par périmètre du peseur)
 router.get("/terrain/fournisseurs", terrainAuthMiddleware, peseurOrDelegueOnly, getFournisseursHandler);
+router.post("/terrain/fournisseurs/externe", terrainAuthMiddleware, peseurOrDelegueOnly, createFournisseurExterneHandler);
 router.get("/terrain/fournisseur/:id/recap", terrainAuthMiddleware, peseurOrDelegueOnly, getFournisseurRecapHandler);
 router.post("/terrain/collecte", terrainAuthMiddleware, collecteAllowed, postCollecteHandler);
 router.post("/terrain/paiement", terrainAuthMiddleware, delegueOnly, postPaiementHandler);

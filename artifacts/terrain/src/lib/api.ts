@@ -55,6 +55,22 @@ export async function getFournisseurs(search?: string) {
   return apiGet<import("./types").Fournisseur[]>(`/fournisseurs${qs}`);
 }
 
+export async function createFournisseurExterne(data: {
+  nom: string;
+  prenoms?: string;
+  telephone?: string;
+  section?: string;
+}): Promise<{
+  id: number;
+  code: string | null;
+  nom: string;
+  prenoms: string | null;
+  telephone: string | null;
+  section: string | null;
+}> {
+  return apiPost("/fournisseurs/externe", data);
+}
+
 export async function getDeleguesCentraux() {
   return apiGet<import("./types").DelegueProxy[]>("/delegues-centraux");
 }

@@ -74,11 +74,38 @@ export async function getFournisseursHandler(req: Request, res: Response): Promi
     agent.role === "peseur" ? null :
     undefined;
   try {
-    const fournisseurs = await terrainService.getFournisseurs(cooperativeId, section, search, peseurScopeDelegueId, delegueIdForExternals ?? undefined);
+    const fournisseurs = await terrainService.getFournisseurs(cooperativeId, section, search, peseurScopeDelegueId, delegueIdForExternals);
     res.json(fournisseurs);
   } catch (err) {
     req.log.error({ err }, "Erreur fournisseurs terrain");
     res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function createFournisseurExterneHandler(req: Request, res: Response): Promise<void> {
+  const agent = getAgent(req);
+  if (!agent.cooperativeId) {
+    res.status(401).json({ erreur: "Coopérative non associée à l'agent" });
+    return;
+  }
+
+  const body = req.body as {
+    nom?: string;
+    prenoms?: string;
+    telephone?: string;
+    section?: string;
+  };
+  if (!body.nom?.trim()) {
+    res.status(400).json({ erreur: "Le nom du fournisseur est requis" });
+    return;
+  }
+
+  try {
+    const fournisseur = await terrainService.createFournisseurExterneTerrain(agent.cooperativeId, body);
+    res.status(201).json(fournisseur);
+  } catch (err) {
+    req.log.error({ err }, "Erreur création fournisseur externe terrain");
+    res.status(400).json({ erreur: (err as Error).message });
   }
 }
 

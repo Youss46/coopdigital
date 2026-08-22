@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { Search, User, Play, ChevronRight } from "lucide-react";
-import { getFournisseurs } from "../lib/api";
+import { Search, User, Play, ChevronRight, UserPlus, X, Loader2 } from "lucide-react";
+import { createFournisseurExterne, getFournisseurs } from "../lib/api";
 import { cacheFournisseurs, getCachedFournisseurs } from "../lib/idb";
 import { useOffline } from "../contexts/OfflineContext";
+import { useAuth } from "../contexts/AuthContext";
 import type { Fournisseur } from "../lib/types";
 
 interface Props {
@@ -21,9 +22,14 @@ export default function FournisseurSearch({
   onSelectActiveSession,
 }: Props) {
   const { isOnline } = useOffline();
+  const { user } = useAuth();
   const [search, setSearch] = useState("");
   const [items, setItems] = useState<Fournisseur[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
+  const [createForm, setCreateForm] = useState({ nom: "", prenoms: "", telephone: "", section: "" });
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -66,6 +72,52 @@ export default function FournisseurSearch({
     return `${f.nom[0] ?? ""}${f.prenoms[0] ?? ""}`.toUpperCase();
   }
 
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!isOnline) {
+      setCreateError("La création nécessite une connexion internet.");
+      return;
+    }
+    if (!createForm.nom.trim()) {
+      setCreateError("Le nom du fournisseur est requis.");
+      return;
+    }
+
+    setCreating(true);
+    setCreateError("");
+    try {
+      const created = await createFournisseurExterne({
+        nom: createForm.nom,
+        prenoms: createForm.prenoms || undefined,
+        telephone: createForm.telephone || undefined,
+        section: createForm.section || undefined,
+      });
+      const newItem: Fournisseur = {
+        id: created.id,
+        code: created.code ?? `EXT-${String(created.id).padStart(4, "0")}`,
+        nom: created.nom,
+        prenoms: created.prenoms ?? "",
+        telephone: created.telephone ?? "",
+        section: created.section,
+        village: null,
+        typeMembre: "externe",
+        avanceEnCours: 0,
+        intrantsDus: 0,
+        derniereLivraison: null,
+      };
+      const nextItems = [newItem, ...items];
+      setItems(nextItems);
+      await cacheFournisseurs(nextItems);
+      setSearch("");
+      setCreateForm({ nom: "", prenoms: "", telephone: "", section: "" });
+      setShowCreate(false);
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : "Impossible de créer le fournisseur.");
+    } finally {
+      setCreating(false);
+    }
+  }
+
   return (
     <>
       <div className="t-search-wrap">
@@ -85,7 +137,25 @@ export default function FournisseurSearch({
         </div>
       </div>
 
-      <div className="t-section-title">{title} ({loading ? "…" : `${filtered.length} résultats`})</div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, paddingRight: 16 }}>
+        <div className="t-section-title" style={{ paddingRight: 0 }}>{title} ({loading ? "…" : `${filtered.length} résultats`})</div>
+        {user?.role === "peseur" && (
+          <button
+            type="button"
+            onClick={() => { setCreateError(""); setShowCreate(true); }}
+            disabled={!isOnline}
+            title={isOnline ? "Créer un fournisseur externe" : "Connexion internet requise"}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 5, border: "none",
+              borderRadius: 8, padding: "8px 10px", background: isOnline ? "var(--t-peseur)" : "var(--t-border)",
+              color: isOnline ? "#fff" : "var(--t-muted)", fontSize: ".75rem", fontWeight: 700,
+              cursor: isOnline ? "pointer" : "not-allowed", whiteSpace: "nowrap",
+            }}
+          >
+            <UserPlus size={14} /> Nouveau externe
+          </button>
+        )}
+      </div>
 
       {loading && <div className="t-spinner" />}
 
@@ -155,6 +225,56 @@ export default function FournisseurSearch({
           );
         })}
       </div>
+
+      {showCreate && (
+        <div
+          role="presentation"
+          onClick={() => !creating && setShowCreate(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,.45)",
+            display: "flex", alignItems: "flex-end", justifyContent: "center",
+          }}
+        >
+          <form
+            onSubmit={handleCreate}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%", maxWidth: 520, background: "var(--t-surface, #fff)",
+              borderRadius: "18px 18px 0 0", padding: "20px 18px 24px",
+              boxShadow: "0 -8px 30px rgba(0,0,0,.18)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: "1.05rem", color: "var(--t-text)" }}>Nouveau fournisseur externe</div>
+                <div style={{ color: "var(--t-muted)", fontSize: ".78rem", marginTop: 3 }}>Il sera rattaché à la base centrale.</div>
+              </div>
+              <button type="button" onClick={() => setShowCreate(false)} disabled={creating} style={{ border: "none", background: "transparent", color: "var(--t-muted)", padding: 6 }}>
+                <X size={20} />
+              </button>
+            </div>
+            {(["nom", "prenoms", "telephone", "section"] as const).map((field) => {
+              const labels = { nom: "Nom *", prenoms: "Prénoms", telephone: "Téléphone", section: "Section / localité" };
+              return (
+                <label key={field} style={{ display: "block", marginBottom: 12, color: "var(--t-text)", fontSize: ".8rem", fontWeight: 700 }}>
+                  {labels[field]}
+                  <input
+                    required={field === "nom"}
+                    value={createForm[field]}
+                    onChange={(e) => setCreateForm({ ...createForm, [field]: e.target.value })}
+                    placeholder={field === "nom" ? "Nom du fournisseur" : field === "prenoms" ? "Prénoms" : field === "telephone" ? "Numéro de téléphone" : "Section ou localité"}
+                    style={{ display: "block", width: "100%", marginTop: 5, boxSizing: "border-box", border: "1px solid var(--t-border)", borderRadius: 9, padding: "11px 12px", fontSize: ".9rem", background: "var(--t-bg, #fff)", color: "var(--t-text)" }}
+                  />
+                </label>
+              );
+            })}
+            {createError && <div style={{ color: "var(--t-danger)", background: "var(--t-danger-bg)", borderRadius: 8, padding: "9px 11px", fontSize: ".8rem", marginBottom: 12 }}>{createError}</div>}
+            <button type="submit" disabled={creating || !isOnline} style={{ width: "100%", border: "none", borderRadius: 10, padding: "12px", background: "var(--t-peseur)", color: "#fff", fontWeight: 800, fontSize: ".9rem", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
+              {creating && <Loader2 size={16} className="t-spin" />} {creating ? "Création…" : "Créer le fournisseur"}
+            </button>
+          </form>
+        </div>
+      )}
     </>
   );
 }

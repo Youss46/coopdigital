@@ -187,7 +187,7 @@ export async function getFournisseurs(
    *  - number → externals créés par ce délégué uniquement
    *  - undefined → tous les externals actifs de la coopérative
    */
-  delegueId?: number,
+  delegueId?: number | null,
 ) {
   const whereConditions: ReturnType<typeof eq>[] = [eq(membresTable.cooperativeId, cooperativeId)];
   if (peseurScopeDelegueId !== undefined) {
@@ -262,18 +262,20 @@ export async function getFournisseurs(
   );
 
   // ── Fournisseurs externes ────────────────────────────────────────────────
-  // null = peseur sans délégué rattaché → aucun external à retourner
-  if (delegueId === null) {
-    return membresResult;
-  }
-
   const extConditions = [
     eq(fournisseursTable.cooperativeId, cooperativeId),
     eq(fournisseursTable.typeFournisseur, "externe"),
     eq(fournisseursTable.actif, true),
   ];
-  if (delegueId !== undefined) {
-    extConditions.push(eq(fournisseursTable.creeParDelegueId, delegueId) as ReturnType<typeof eq>);
+  if (delegueId === null) {
+    // Peseur central : fournisseurs créés depuis la base centrale.
+    extConditions.push(isNull(fournisseursTable.creeParDelegueId) as ReturnType<typeof eq>);
+  } else if (delegueId !== undefined) {
+    // Un peseur rattaché à un délégué voit ses fournisseurs et ceux de la base centrale.
+    extConditions.push(or(
+      eq(fournisseursTable.creeParDelegueId, delegueId),
+      isNull(fournisseursTable.creeParDelegueId),
+    ) as ReturnType<typeof eq>);
   }
 
   let externals = await db
@@ -316,6 +318,42 @@ export async function getFournisseurs(
   return [...membresResult, ...externalsResult].sort((a, b) =>
     a.nom.localeCompare(b.nom, "fr"),
   );
+}
+
+/** Création terrain d'un fournisseur externe dans la base centrale de la coopérative. */
+export async function createFournisseurExterneTerrain(
+  cooperativeId: number,
+  data: { nom: string; prenoms?: string; telephone?: string; section?: string },
+) {
+  const nom = data.nom.trim();
+  if (!nom) throw new Error("Le nom du fournisseur est requis");
+
+  const [countRow] = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(fournisseursTable)
+    .where(and(
+      eq(fournisseursTable.cooperativeId, cooperativeId),
+      eq(fournisseursTable.typeFournisseur, "externe"),
+    ));
+
+  const code = `EXT-${new Date().getFullYear()}-${String(Number(countRow?.count ?? 0) + 1).padStart(4, "0")}`;
+  const [fournisseur] = await db
+    .insert(fournisseursTable)
+    .values({
+      cooperativeId,
+      typeFournisseur: "externe",
+      code,
+      nom,
+      prenoms: data.prenoms?.trim() || undefined,
+      telephone: data.telephone?.trim() || undefined,
+      section: data.section?.trim() || undefined,
+      nationalite: "Ivoirienne",
+      // null signifie que le fournisseur appartient à la base centrale.
+      creeParDelegueId: null,
+    })
+    .returning();
+
+  return fournisseur;
 }
 
 // ─── Recap fournisseur ────────────────────────────────────────────────────
