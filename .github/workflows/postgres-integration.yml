@@ -49,5 +49,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Initialize disposable PostgreSQL schema
+        run: pnpm --filter @workspace/db fresh-migrate
+
       - name: Run PostgreSQL integration tests
         run: pnpm --filter @workspace/api-server test:integration
