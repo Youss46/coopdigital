@@ -700,11 +700,18 @@ export async function getComparaisonCampagnesPca(req: Request, res: Response): P
         }
 
         // Fallback: compute from raw data
-        const [[livraisonsRow], [avRow], [membresRow], [caRow]] = await Promise.all([
+        const [[livraisonsRow], [transfertsRow], [avRow], [membresRow], [caRow]] = await Promise.all([
           db.select({ t: sql<number>`coalesce(sum(poids_kg::numeric),0)::float` })
             .from(livraisonsTable)
             .innerJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
             .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(livraisonsTable.campagneId, c.id))),
+          db.select({ t: sql<number>`coalesce(sum(poids_arrivee_kg::numeric),0)::float` })
+            .from(transfertsStockTable)
+            .where(and(
+              eq(transfertsStockTable.campagneId, c.id),
+              eq(transfertsStockTable.cooperativeId, cooperativeId),
+              eq(transfertsStockTable.statut, "confirme"),
+            )),
           db.select({
               octroyees: sql<number>`coalesce(sum(montant_octroye_fcfa),0)::bigint`,
               remboursees: sql<number>`coalesce(sum(montant_rembourse_fcfa),0)::bigint`,
@@ -731,7 +738,7 @@ export async function getComparaisonCampagnesPca(req: Request, res: Response): P
             )),
         ]);
 
-        const tonnageT = (livraisonsRow?.t ?? 0) / 1000;
+        const tonnageT = ((livraisonsRow?.t ?? 0) + (transfertsRow?.t ?? 0)) / 1000;
         const caCampagne = Number(caRow?.ca ?? 0);
         const margeNette = Math.round(caCampagne * 0.09);
         const margeKg = tonnageT > 0 ? Math.round(margeNette / tonnageT) : 0;
