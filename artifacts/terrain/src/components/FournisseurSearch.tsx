@@ -120,6 +120,12 @@ export default function FournisseurSearch({
     }
   }
 
+  function openCreateForSearch() {
+    setCreateError("");
+    setCreateForm((current) => ({ ...current, nom: search.trim() }));
+    setShowCreate(true);
+  }
+
   return (
     <>
       <div className="t-search-wrap">
@@ -139,7 +145,7 @@ export default function FournisseurSearch({
         </div>
       </div>
 
-      {canCreateExternal && (
+      {canCreateExternal && (!search.trim() || filtered.length > 0) && (
         <div style={{
           display: "flex",
           justifyContent: "flex-end",
@@ -150,7 +156,7 @@ export default function FournisseurSearch({
         }}>
           <button
             type="button"
-            onClick={() => { setCreateError(""); setShowCreate(true); }}
+            onClick={openCreateForSearch}
             disabled={!isOnline}
             title={isOnline ? "Créer un fournisseur externe" : "Connexion internet requise"}
             style={{
@@ -179,7 +185,26 @@ export default function FournisseurSearch({
           <div className="t-empty__icon">
             <Search size={32} strokeWidth={1.5} />
           </div>
-          <div className="t-empty__text">Aucun résultat trouvé</div>
+          <div className="t-empty__text">
+            {search.trim() ? `Aucun fournisseur trouvé pour « ${search.trim()} »` : "Aucun résultat trouvé"}
+          </div>
+          {canCreateExternal && search.trim() && (
+            <button
+              type="button"
+              onClick={openCreateForSearch}
+              disabled={!isOnline}
+              style={{
+                marginTop: 12, display: "inline-flex", alignItems: "center", justifyContent: "center",
+                gap: 7, border: "none", borderRadius: 9, padding: "11px 15px",
+                background: isOnline ? "var(--t-peseur)" : "var(--t-border)",
+                color: isOnline ? "#fff" : "var(--t-muted)", fontSize: ".82rem", fontWeight: 800,
+                cursor: isOnline ? "pointer" : "not-allowed",
+              }}
+            >
+              <UserPlus size={16} />
+              {isOnline ? `Créer « ${search.trim()} »` : "Connexion internet requise"}
+            </button>
+          )}
         </div>
       )}
 
