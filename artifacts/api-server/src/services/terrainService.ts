@@ -15,6 +15,7 @@ import { logger } from "../lib/logger.js";
 import { envoyerPushGroupePortail } from "./pushService.js";
 import { entrerStockSiDelegue, getEntrepotDuDelegue } from "./entrepotDelegueService.js";
 import { computeCodeMembre } from "./portailService.js";
+import { isCertificationCacao } from "../lib/certificationCacao.js";
 
 function toNum(v: unknown): number {
   return Number(v ?? 0);
@@ -427,11 +428,16 @@ export async function enregistrerCollecte(
     avancePlanType?: "integral" | "partiel" | "reporte";
     /** Montant fixe à déduire si planType = "partiel" */
     avanceMontantPartiel?: number;
+    /** Certification du cacao déclarée pour le fournisseur externe */
+    certificationCacao?: string;
   },
   /** Utilisateur réellement connecté (mode proxy) — différent de agentId si saisie pour un délégué */
   agentSaisiseurId?: number,
 ) {
   const prix = await getPrixActuel(cooperativeId);
+  if (data.fournisseurId && !isCertificationCacao(data.certificationCacao)) {
+    throw new Error("La certification du cacao est requise pour un fournisseur externe");
+  }
   const prixUnitaire = prix.prixBordChampFcfa;
 
   const poidsNet = Math.max(0, data.poidsBrutKg - data.retenueKg);
@@ -508,6 +514,7 @@ export async function enregistrerCollecte(
     montantRestant: String(montantNet),
     numeroLivraison,
     planAvanceType: avance ? (data.avancePlanType ?? "integral") : null,
+    certificationCacao: data.certificationCacao ?? null,
   }).returning();
 
   if (!livraison) throw new Error("Erreur lors de l'enregistrement de la collecte");

@@ -67,6 +67,8 @@ export interface CollecteInput {
   avancePlanType?: "integral" | "partiel" | "reporte";
   /** Montant à déduire si planType = "partiel" */
   avanceMontantPartiel?: number;
+  /** Certification du cacao pour un fournisseur externe */
+  certificationCacao?: "RA" | "FAIRTRADE" | "ASR_1000" | "ORDINAIRE";
 }
 
 export interface DelegueProxy {
