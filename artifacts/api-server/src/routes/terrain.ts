@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { terrainAuthMiddleware, delegueOnly, collecteAllowed, peseurOrDelegueOnly } from "../middlewares/terrainAuth.js";
+import { terrainAuthMiddleware, delegueOnly, collecteAllowed, peseurOrDelegueOnly, fournisseurExterneCreationAllowed } from "../middlewares/terrainAuth.js";
 import { getVapidPublicKey, subscribePush, unsubscribePush } from "../controllers/pushController.js";
 import {
   loginTerrainHandler,
@@ -60,7 +60,7 @@ router.get("/terrain/delegues-centraux", terrainAuthMiddleware, getDeleguesCentr
 
 // Fournisseurs : délégué ET peseur (le service filtre par périmètre du peseur)
 router.get("/terrain/fournisseurs", terrainAuthMiddleware, peseurOrDelegueOnly, getFournisseursHandler);
-router.post("/terrain/fournisseurs/externe", terrainAuthMiddleware, peseurOrDelegueOnly, createFournisseurExterneHandler);
+router.post("/terrain/fournisseurs/externe", terrainAuthMiddleware, fournisseurExterneCreationAllowed, createFournisseurExterneHandler);
 router.get("/terrain/fournisseur/:id/recap", terrainAuthMiddleware, peseurOrDelegueOnly, getFournisseurRecapHandler);
 router.post("/terrain/collecte", terrainAuthMiddleware, collecteAllowed, postCollecteHandler);
 router.post("/terrain/paiement", terrainAuthMiddleware, delegueOnly, postPaiementHandler);

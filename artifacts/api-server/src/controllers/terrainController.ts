@@ -101,7 +101,10 @@ export async function createFournisseurExterneHandler(req: Request, res: Respons
   }
 
   try {
-    const fournisseur = await terrainService.createFournisseurExterneTerrain(agent.cooperativeId, body);
+    const fournisseur = await terrainService.createFournisseurExterneTerrain(agent.cooperativeId, {
+      ...body,
+      nom: body.nom.trim(),
+    });
     res.status(201).json(fournisseur);
   } catch (err) {
     req.log.error({ err }, "Erreur création fournisseur externe terrain");

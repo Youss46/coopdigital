@@ -68,6 +68,11 @@ export function peseurOrDelegueOnly(req: Request, res: Response, next: NextFunct
   next();
 }
 
+/** Autorise uniquement les profils terrain qui peuvent créer un fournisseur externe. */
+export function fournisseurExterneCreationAllowed(req: Request, res: Response, next: NextFunction): void {
+  peseurOrDelegueOnly(req, res, next);
+}
+
 /** Réservé au peseur central pour les opérations du magasin de réception. */
 export function peseurOnly(req: Request, res: Response, next: NextFunction): void {
   if (req.agent?.role !== "peseur" || req.agent.delegueId != null) {
