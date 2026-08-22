@@ -940,6 +940,7 @@ export async function debiterCompteMobilePourPrime(
       eq(comptesMobilesMarchandsTable.operateur, operateur as "wave" | "orange_money" | "mtn_momo"),
       eq(comptesMobilesMarchandsTable.actif, true),
     ))
+    .for("update")
     .limit(1);
 
   if (!compte) {
