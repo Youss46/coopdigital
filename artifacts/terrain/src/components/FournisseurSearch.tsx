@@ -23,6 +23,8 @@ export default function FournisseurSearch({
 }: Props) {
   const { isOnline } = useOffline();
   const { user } = useAuth();
+  // Certains anciens jetons peuvent conserver une variante formatée du rôle.
+  const canCreateExternal = user?.role?.trim().toLowerCase().startsWith("peseur") ?? false;
   const [search, setSearch] = useState("");
   const [items, setItems] = useState<Fournisseur[]>([]);
   const [loading, setLoading] = useState(true);
@@ -137,7 +139,7 @@ export default function FournisseurSearch({
         </div>
       </div>
 
-      {user?.role === "peseur" && (
+      {canCreateExternal && (
         <div style={{
           display: "flex",
           justifyContent: "flex-end",
