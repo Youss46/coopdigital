@@ -6,6 +6,7 @@ import PDFDocument from "pdfkit";
 import {
   db,
   membresTable,
+  fournisseursTable,
   livraisonsTable,
   avancesTable,
   avancesDeleguesTable,
@@ -94,6 +95,16 @@ function libelleStatutPaiement(statut: string | null | undefined): string {
     DIFFÉRÉ: "Différé",
   };
   return statuts[statut?.trim().toUpperCase() ?? ""] ?? statut?.replace(/_/g, " ") ?? "Non enregistré";
+}
+
+function libelleCertificationCacao(certification: string | null | undefined): string {
+  const labels: Record<string, string> = {
+    RA: "Rainforest Alliance",
+    FAIRTRADE: "Fairtrade",
+    ASR_1000: "ASR 1000",
+    ORDINAIRE: "Cacao ordinaire",
+  };
+  return labels[certification ?? ""] ?? "Cacao ordinaire";
 }
 
 function ligneTableau(doc: InstanceType<typeof PDFDocument>, colonnes: string[], widths: number[], x: number, y: number, fond?: string) {
@@ -823,11 +834,16 @@ export async function generateRecuLivraison(livraisonId: number, cooperativeId: 
     statutPaiement: livraisonsTable.statutPaiement,
     sectionLivraison: livraisonsTable.sectionLivraison,
     planAvanceType: livraisonsTable.planAvanceType,
+    certificationCacao: livraisonsTable.certificationCacao,
     membreNom: membresTable.nom,
     membrePrenoms: membresTable.prenoms,
     membreCni: membresTable.numeroCni,
     membreGroupement: membresTable.groupement,
     membreTel: membresTable.telephone,
+    fournisseurNom: fournisseursTable.nom,
+    fournisseurPrenoms: fournisseursTable.prenoms,
+    fournisseurTel: fournisseursTable.telephone,
+    fournisseurSection: fournisseursTable.section,
     agentId: livraisonsTable.agentId,
     agentNom: agentUserAlias.nom,
     agentPrenoms: agentUserAlias.prenoms,
@@ -838,6 +854,7 @@ export async function generateRecuLivraison(livraisonId: number, cooperativeId: 
     createdAt: livraisonsTable.createdAt,
   }).from(livraisonsTable)
     .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+    .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
     .leftJoin(agentUserAlias, eq(livraisonsTable.agentId, agentUserAlias.id))
     .leftJoin(peseurUserAlias, eq(livraisonsTable.peseurId, peseurUserAlias.id))
     .where(eq(livraisonsTable.id, livraisonId));
@@ -845,7 +862,9 @@ export async function generateRecuLivraison(livraisonId: number, cooperativeId: 
 
   const [campagne, mentionCertif] = await Promise.all([
     getCampagneEnCours(cooperativeId),
-    getMentionCertification(row.membreId, cooperativeId),
+    row.membreId
+      ? getMentionCertification(row.membreId, cooperativeId)
+      : Promise.resolve(libelleCertificationCacao(row.certificationCacao)),
   ]);
   const { doc, endPromise } = makePdfDoc();
   const ref = row.codeAchat ?? `LIV-${String(row.id).padStart(5, "0")}`;
@@ -853,12 +872,20 @@ export async function generateRecuLivraison(livraisonId: number, cooperativeId: 
 
   let y = doc.y;
   doc.rect(MARGIN, y, PAGE_W - MARGIN * 2, 52).fill("#f0fdf4").stroke("#bbf7d0");
-  doc.fontSize(8).fillColor(GRIS).font("Helvetica").text("PRODUCTEUR", MARGIN + 8, y + 5);
-  doc.fontSize(11).fillColor(VERT).font("Helvetica-Bold")
-    .text(`${row.membrePrenoms ?? ""} ${row.membreNom ?? "—"}`, MARGIN + 8, y + 16);
+  const isFournisseurExterne = row.fournisseurNom != null;
+  const nomTiers = isFournisseurExterne
+    ? `${row.fournisseurPrenoms ?? ""} ${row.fournisseurNom ?? ""}`.trim()
+    : `${row.membrePrenoms ?? ""} ${row.membreNom ?? "—"}`.trim();
   doc.fontSize(8).fillColor(GRIS).font("Helvetica")
-    .text(`CNI : ${row.membreCni ?? "—"}   |   Groupement : ${row.membreGroupement ?? "—"}   |   Tél : ${row.membreTel ?? "—"}`, MARGIN + 8, y + 30);
-  if (row.sectionLivraison) doc.text(`Section : ${row.sectionLivraison}`, MARGIN + 8, y + 40);
+    .text(isFournisseurExterne ? "FOURNISSEUR EXTERNE" : "PRODUCTEUR", MARGIN + 8, y + 5);
+  doc.fontSize(11).fillColor(VERT).font("Helvetica-Bold")
+    .text(nomTiers || "—", MARGIN + 8, y + 16);
+  doc.fontSize(8).fillColor(GRIS).font("Helvetica")
+    .text(isFournisseurExterne
+      ? `CNI : —   |   Statut : Fournisseur externe   |   Tél : ${row.fournisseurTel ?? "—"}`
+      : `CNI : ${row.membreCni ?? "—"}   |   Groupement : ${row.membreGroupement ?? "—"}   |   Tél : ${row.membreTel ?? "—"}`, MARGIN + 8, y + 30);
+  const sectionTiers = row.sectionLivraison ?? (isFournisseurExterne ? row.fournisseurSection : null);
+  if (sectionTiers) doc.text(`Section : ${sectionTiers}`, MARGIN + 8, y + 40);
   y += 60;
 
   doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold").text("DÉTAILS DE LA LIVRAISON", MARGIN, y);
