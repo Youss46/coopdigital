@@ -3,6 +3,7 @@ import {
   db,
   campagnesTable, bilansCampagneTable,
   livraisonsTable, membresTable, fournisseursTable,
+  transfertsStockTable,
   avancesTable,
   ventesExportateursTable, exportateursTable,
   empruntsTable, echeancierEmpruntsTable, preteursTable,
@@ -109,6 +110,7 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
       [tonnageJourRow],
       [tonnageSemaineRow],
       [tonnageCampagneRow],
+      [tonnageTransfertsCampagneRow],
       historique30jRows,
       hypotheseRows,
     ] = await Promise.all([
@@ -126,6 +128,16 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
         ? db.select({ t: sql<number>`coalesce(sum(poids_kg::numeric),0)::float` })
             .from(livraisonsTable)
             .where(eq(livraisonsTable.campagneId, campagneId))
+        : Promise.resolve([{ t: 0 }]),
+
+      campagneId
+        ? db.select({ t: sql<number>`coalesce(sum(poids_arrivee_kg::numeric),0)::float` })
+            .from(transfertsStockTable)
+            .where(and(
+              eq(transfertsStockTable.campagneId, campagneId),
+              eq(transfertsStockTable.cooperativeId, cooperativeId),
+              eq(transfertsStockTable.statut, "confirme"),
+            ))
         : Promise.resolve([{ t: 0 }]),
 
       db.select({
@@ -147,7 +159,7 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
         : Promise.resolve([]),
     ]);
 
-    const tonnageCampagne = tonnageCampagneRow?.t ?? 0;
+    const tonnageCampagne = (tonnageCampagneRow?.t ?? 0) + (tonnageTransfertsCampagneRow?.t ?? 0);
     const objectifCampagne = hypotheseRows[0]?.tonnagePrev ? Number(hypotheseRows[0].tonnagePrev) * 1000 : 0;
 
     // 3. Financier (parallel)
@@ -648,13 +660,26 @@ export async function getComparaisonCampagnesPca(req: Request, res: Response): P
         // Le tonnage doit rester synchronisé avec la carte de synthèse :
         // contrairement aux indicateurs financiers, il est calculé en direct
         // pour inclure les livraisons ajoutées depuis le dernier bilan.
-        const [tonnageActuelRow] = await db
-          .select({ tonnageKg: sql<number>`coalesce(sum(${livraisonsTable.poidsKg}::numeric), 0)::float` })
-          .from(livraisonsTable)
-          .where(eq(livraisonsTable.campagneId, c.id));
+        const [[tonnageActuelRow], [tonnageTransfertsRow]] = await Promise.all([
+          db
+            .select({ tonnageKg: sql<number>`coalesce(sum(${livraisonsTable.poidsKg}::numeric), 0)::float` })
+            .from(livraisonsTable)
+            .where(eq(livraisonsTable.campagneId, c.id)),
+          db
+            .select({ tonnageKg: sql<number>`coalesce(sum(${transfertsStockTable.poidsArrivee_kg}::numeric), 0)::float` })
+            .from(transfertsStockTable)
+            .where(and(
+              eq(transfertsStockTable.campagneId, c.id),
+              eq(transfertsStockTable.cooperativeId, cooperativeId),
+              eq(transfertsStockTable.statut, "confirme"),
+            )),
+        ]);
 
         if (bilan) {
-          const tonnageT = Number(tonnageActuelRow?.tonnageKg ?? 0) / 1000;
+          const tonnageT = (
+            Number(tonnageActuelRow?.tonnageKg ?? 0) +
+            Number(tonnageTransfertsRow?.tonnageKg ?? 0)
+          ) / 1000;
           const margeNette = Number(bilan.margeNetteFcfa ?? 0);
           const margeKg = tonnageT > 0 ? Math.round(margeNette / tonnageT) : 0;
           const avOctroyees = Number(bilan.avancesOctroYeesFcfa ?? 0);
