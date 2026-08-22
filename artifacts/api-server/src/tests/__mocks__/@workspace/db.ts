@@ -2,7 +2,18 @@ import { vi } from "vitest";
 
 const makeTable = (name: string) => ({ _: { name } });
 
-export const db = { select: vi.fn(), insert: vi.fn(), update: vi.fn(), delete: vi.fn(), execute: vi.fn() };
+export const db = {
+  select: vi.fn(),
+  insert: vi.fn(),
+  update: vi.fn(),
+  delete: vi.fn(),
+  execute: vi.fn(),
+  transaction: vi.fn(),
+};
+
+// Keep transaction-based services compatible with the same chainable mock
+// methods configured by individual tests.
+db.transaction.mockImplementation(async (callback: (tx: typeof db) => unknown) => callback(db));
 export const membresTable = makeTable("membres");
 export const avancesTable = makeTable("avances");
 export const campagnesTable = makeTable("campagnes");

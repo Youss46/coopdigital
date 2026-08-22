@@ -46,6 +46,9 @@ describe("payerCommissionsMembreDelegue", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     updates = [];
+    vi.mocked(db.insert).mockImplementation(() => ({
+      values: vi.fn().mockResolvedValue(undefined),
+    }) as never);
     vi.mocked(db.update).mockImplementation(() => {
       const chain = updateChain();
       updates.push(chain);
