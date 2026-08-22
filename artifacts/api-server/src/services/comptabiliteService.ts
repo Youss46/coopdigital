@@ -916,3 +916,30 @@ export async function generateEcrituresPrimePaiement(
     tiersId: params.membreId, tiersType: "membre",
   });
 }
+
+/** Variante atomique du paiement de prime : aucune écriture ne sort de tx. */
+export async function generateEcrituresPrimePaiementDansTransaction(
+  tx: ComptabiliteTransaction,
+  cooperativeId: number,
+  params: Parameters<typeof generateEcrituresPrimePaiement>[1],
+): Promise<void> {
+  const { primeMembreId, membreNom, montantFcfa, modePaiement, date } = params;
+  const mode = modePaiement.toLowerCase();
+  const compteCredit = MODES_MOBILE_MARCHAND.has(mode) ? "554"
+    : MODES_CAISSE.has(mode) ? "571"
+    : "521";
+  const compteDebit = await resolveCompteDebit(cooperativeId, "primes", "paiement_prime", "6018");
+
+  await proposerEcrituresDansTransaction(tx, cooperativeId, [{
+    source: "prime_paiement",
+    sourceId: primeMembreId,
+    libelle: `Prime producteur – ${membreNom}`,
+    compteDebit,
+    compteCredit,
+    montantFcfa,
+    date,
+    numeroPiece: `PRM-PAY-${primeMembreId}`,
+    tiersId: params.membreId,
+    tiersType: "membre",
+  }]);
+}

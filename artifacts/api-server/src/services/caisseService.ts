@@ -3,6 +3,7 @@ import { eq, and, sql } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import PDFDocument from "pdfkit";
 import { proposerEcriture } from "./comptabiliteService.js";
+import type { ComptabiliteTransaction } from "./comptabiliteService.js";
 import { drawHeader, drawFooter } from "./pdfHeaderService.js";
 
 
@@ -925,11 +926,13 @@ export async function debiterCompteMobilePourPrime(
   montantFcfa: number,
   primeMembreId: number,
   userId: number,
+  tx?: ComptabiliteTransaction,
 ): Promise<{ nouveauSolde: number; alerte?: string }> {
   const LABELS: Record<string, string> = { orange_money: "Orange Money", mtn_momo: "MTN MoMo", wave: "Wave" };
   const label = LABELS[operateur] ?? operateur;
 
-  const [compte] = await db
+  const executor = tx ?? db;
+  const [compte] = await executor
     .select()
     .from(comptesMobilesMarchandsTable)
     .where(and(
@@ -953,8 +956,8 @@ export async function debiterCompteMobilePourPrime(
   const nouveauSolde = soldeActuel - Math.round(montantFcfa);
   const today = new Date().toISOString().slice(0, 10);
 
-  await db.transaction(async (tx) => {
-    await tx.insert(mouvementsMobileMarchandTable).values({
+  const enregistrer = async (executor: typeof db | ComptabiliteTransaction) => {
+    await executor.insert(mouvementsMobileMarchandTable).values({
       compteId:       compte.id,
       cooperativeId,
       type:           "debit",
@@ -966,11 +969,13 @@ export async function debiterCompteMobilePourPrime(
       soldeApresFcfa: nouveauSolde.toString(),
       enregistrePar:  userId,
     });
-    await tx
+    await executor
       .update(comptesMobilesMarchandsTable)
       .set({ soldeActuelFcfa: nouveauSolde.toString() })
       .where(eq(comptesMobilesMarchandsTable.id, compte.id));
-  });
+  };
+  if (tx) await enregistrer(tx);
+  else await db.transaction(enregistrer);
 
   logger.info({ cooperativeId, operateur, primeMembreId, montantFcfa, nouveauSolde }, "Compte Mobile Marchand débité (prime membre)");
 
@@ -992,8 +997,10 @@ export async function debiterCaissePourPrimeMembre(
   cooperativeId: number,
   montantFcfa: number,
   primeMembreId: number,
+  tx?: ComptabiliteTransaction,
 ): Promise<{ nouveauSolde: number; alerte?: string }> {
-  const [caisse] = await db
+  const executor = tx ?? db;
+  const [caisse] = await executor
     .select()
     .from(caissesTable)
     .where(and(
@@ -1007,20 +1014,33 @@ export async function debiterCaissePourPrimeMembre(
     throw new Error("Aucune caisse centrale n'est configurée pour cette coopérative. Créez une caisse centrale dans la page Caisse.");
   }
 
-  const result = await enregistrerMouvement(caisse.id, {
-    type: "sortie",
-    motif: "paiement_prime",
-    montantFcfa,
+  const [session] = await executor
+    .select()
+    .from(sessionsCaisseTable)
+    .where(and(eq(sessionsCaisseTable.caisseId, caisse.id), eq(sessionsCaisseTable.statut, "ouverte"), sql`${sessionsCaisseTable.dateSession} = CURRENT_DATE`))
+    .limit(1);
+  if (!session) throw new Error("Aucune session ouverte pour la caisse centrale. Ouvrez d'abord une session.");
+  const soldeActuel = parseFloat(caisse.soldeActuelFcfa as string);
+  const montant = Math.round(montantFcfa);
+  if (soldeActuel < montant) throw new Error(`Solde insuffisant en caisse. Disponible : ${soldeActuel.toLocaleString("fr-FR")} FCFA`);
+  const nouveauSolde = soldeActuel - montant;
+  const [mouvement] = await executor.insert(mouvementsCaisseTable).values({
+    caisseId: caisse.id, sessionId: session.id, cooperativeId,
+    type: "sortie", motif: "paiement_prime", montantFcfa: montant.toString(),
     libelle: `Prime producteur PRM-PAY-${primeMembreId}`,
     referenceOperation: `PRM-PAY-${primeMembreId}`,
-    userId,
-  });
+    soldeApresFcfa: nouveauSolde.toString(), enregistrePar: userId,
+  }).returning();
+  await executor.update(caissesTable).set({ soldeActuelFcfa: nouveauSolde.toString() }).where(eq(caissesTable.id, caisse.id));
+  const fondMin = parseFloat(caisse.fondCaisseMinimumFcfa as string);
+  const alerte = fondMin > 0 && nouveauSolde < fondMin
+    ? `⚠️ Solde caisse sous le fond minimum (${fondMin.toLocaleString("fr-FR")} FCFA)` : undefined;
 
   logger.info(
-    { userId, primeMembreId, montantFcfa, caisseId: caisse.id, nouveauSolde: result.soldeActuel },
+    { userId, primeMembreId, montantFcfa, caisseId: caisse.id, nouveauSolde },
     "Caisse centrale débitée (prime membre)",
   );
-  return { nouveauSolde: result.soldeActuel, alerte: result.alerte };
+  return { nouveauSolde, alerte };
 }
 
 export async function debitCaisseForSalaire(

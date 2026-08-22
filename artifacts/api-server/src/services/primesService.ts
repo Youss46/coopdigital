@@ -2,8 +2,10 @@ import { db, primesReceptionsTable, primesDistributionsTable, primesMembresTable
 // Note: campagnesTable.cooperativeId and exportateursTable.cooperativeId are validated in creerDistribution and createReception
 import { eq, and, desc, sql, sum, inArray, lt } from "drizzle-orm";
 import { logger } from "../lib/logger";
-import { generateEcrituresPrimeReception, generateEcrituresPrimePaiement } from "./comptabiliteService";
+import { generateEcrituresPrimeReception, generateEcrituresPrimePaiementDansTransaction, type ComptabiliteTransaction } from "./comptabiliteService";
 import { verifierCaisseCentrale, debiterCaissePourPrimeMembre, verifierCompteMobilePourPrime, debiterCompteMobilePourPrime } from "./caisseService";
+
+type PrimeDbExecutor = typeof db | ComptabiliteTransaction;
 
 /** Modes qui déclenchent un débit de la caisse centrale physique. */
 const MODES_ESPECES = new Set(["especes", "espèces", "caisse"]);
@@ -492,52 +494,35 @@ export async function payerMembre(cooperativeId: number, primeMembreId: number, 
     if (modeEstMobile)  await verifierCompteMobilePourPrime(cooperativeId, modeNorm, pm.montantNetFcfa);
   }
 
-  // ── 2. Débits AVANT le changement de statut ───────────────────────────────
-  if (pm.montantNetFcfa > 0) {
-    if (modeEstEspeces) {
-      const { alerte } = await debiterCaissePourPrimeMembre(userId, cooperativeId, pm.montantNetFcfa, pm.id);
-      if (alerte) logger.warn({ primeMembreId: pm.id, alerte }, "Alerte caisse après paiement prime");
+  return db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(primesMembresTable)
+      .set({
+        statut: "paye",
+        modePaiement: data.modePaiement,
+        datePaiement: data.datePaiement,
+        referencePaiement: data.referencePaiement ?? null,
+        notes: data.notes ?? null,
+        payePar: userId,
+        updatedAt: new Date(),
+      })
+      .where(eq(primesMembresTable.id, primeMembreId))
+      .returning();
+
+    if (pm.deductionAvancesFcfa > 0) {
+      await reduireAvances(pm.membreId, pm.deductionAvancesFcfa, tx);
     }
-    if (modeEstMobile) {
-      const { alerte } = await debiterCompteMobilePourPrime(cooperativeId, modeNorm, pm.montantNetFcfa, pm.id, userId);
-      if (alerte) logger.warn({ primeMembreId: pm.id, alerte }, "Alerte compte mobile après paiement prime");
+    if (pm.montantNetFcfa > 0) {
+      if (modeEstEspeces) await debiterCaissePourPrimeMembre(userId, cooperativeId, pm.montantNetFcfa, pm.id, tx);
+      if (modeEstMobile) await debiterCompteMobilePourPrime(cooperativeId, modeNorm, pm.montantNetFcfa, pm.id, userId, tx);
+      await generateEcrituresPrimePaiementDansTransaction(tx, cooperativeId, {
+        primeMembreId: pm.id, membreId: pm.membreId, membreNom: membre?.nom ?? `Membre #${pm.membreId}`,
+        montantFcfa: pm.montantNetFcfa, modePaiement: data.modePaiement, date: data.datePaiement,
+      });
     }
-  }
-
-  // ── 3. Marquer le membre comme payé ───────────────────────────────────────
-  const [updated] = await db
-    .update(primesMembresTable)
-    .set({
-      statut: "paye",
-      modePaiement: data.modePaiement,
-      datePaiement: data.datePaiement,
-      referencePaiement: data.referencePaiement ?? null,
-      notes: data.notes ?? null,
-      payePar: userId,
-      updatedAt: new Date(),
-    })
-    .where(eq(primesMembresTable.id, primeMembreId))
-    .returning();
-
-  // ── 4. Réduire les avances (après paiement effectif) ──────────────────────
-  if (pm.deductionAvancesFcfa > 0) {
-    await reduireAvances(pm.membreId, pm.deductionAvancesFcfa);
-  }
-
-  // ── 5. Écriture OHADA : Débit 6018 / Crédit 554/571/521 (fire-and-forget) ─
-  if (pm.montantNetFcfa > 0) {
-    generateEcrituresPrimePaiement(cooperativeId, {
-      primeMembreId: pm.id,
-      membreNom: membre?.nom ?? `Membre #${pm.membreId}`,
-      montantFcfa: pm.montantNetFcfa,
-      modePaiement: data.modePaiement,
-      date: data.datePaiement,
-    }).catch(err => logger.error({ err }, "Erreur écriture prime paiement"));
-  }
-
-  // Si tous les membres sont payés → distribution = payee
-  await syncStatutDistribution(pm.distributionId);
-  return updated;
+    await syncStatutDistribution(pm.distributionId, tx);
+    return updated;
+  });
 }
 
 export async function payerBulk(
@@ -577,69 +562,24 @@ export async function payerBulk(
     if (modeEstMobile)  await verifierCompteMobilePourPrime(cooperativeId, modeNormBulk, totalNet);
   }
 
-  // Paiement en masse
-  await db
-    .update(primesMembresTable)
-    .set({
-      statut: "paye",
-      modePaiement: data.modePaiement,
-      datePaiement: data.datePaiement,
-      payePar: userId,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(primesMembresTable.distributionId, distributionId),
-        eq(primesMembresTable.statut, "en_attente"),
-      )
-    );
+  await db.transaction(async (tx) => {
+    await tx.update(primesMembresTable).set({
+      statut: "paye", modePaiement: data.modePaiement, datePaiement: data.datePaiement,
+      payePar: userId, updatedAt: new Date(),
+    }).where(and(eq(primesMembresTable.distributionId, distributionId), eq(primesMembresTable.statut, "en_attente")));
 
-  // ── Effets financiers : séquentiels et awaités ────────────────────────────
-  // Avances + débit caisse : opérations financières → awaited, erreur loguée.
-  // Écritures OHADA : fire-and-forget (comptabilité non bloquante).
-  for (const { pm, membreNom } of membresEnAttente) {
-    // 1. Réduire les avances
-    if (pm.deductionAvancesFcfa > 0) {
-      await reduireAvances(pm.membreId, pm.deductionAvancesFcfa).catch(err =>
-        logger.error({ err, primeMembreId: pm.id }, "Erreur réduction avance bulk"),
-      );
+    for (const { pm, membreNom } of membresEnAttente) {
+      if (pm.deductionAvancesFcfa > 0) await reduireAvances(pm.membreId, pm.deductionAvancesFcfa, tx);
+      if (pm.montantNetFcfa <= 0) continue;
+      if (modeEstEspeces) await debiterCaissePourPrimeMembre(userId, cooperativeId, pm.montantNetFcfa, pm.id, tx);
+      if (modeEstMobile) await debiterCompteMobilePourPrime(cooperativeId, modeNormBulk, pm.montantNetFcfa, pm.id, userId, tx);
+      await generateEcrituresPrimePaiementDansTransaction(tx, cooperativeId, {
+        primeMembreId: pm.id, membreId: pm.membreId, membreNom: membreNom ?? `Membre #${pm.membreId}`,
+        montantFcfa: pm.montantNetFcfa, modePaiement: data.modePaiement, date: data.datePaiement,
+      });
     }
-
-    if (pm.montantNetFcfa > 0) {
-      // 2. Débit caisse (espèces uniquement) — la vérification totale a déjà eu lieu
-      if (modeEstEspeces) {
-        await debiterCaissePourPrimeMembre(userId, cooperativeId, pm.montantNetFcfa, pm.id)
-          .then(({ alerte }) => {
-            if (alerte) logger.warn({ primeMembreId: pm.id, alerte }, "Alerte caisse bulk");
-          })
-          .catch(err =>
-            logger.error({ err, primeMembreId: pm.id }, "Erreur débit caisse bulk"),
-          );
-      }
-
-      // 2b. Débit compte Mobile Marchand
-      if (modeEstMobile) {
-        await debiterCompteMobilePourPrime(cooperativeId, modeNormBulk, pm.montantNetFcfa, pm.id, userId)
-          .then(({ alerte }) => {
-            if (alerte) logger.warn({ primeMembreId: pm.id, alerte }, "Alerte compte mobile bulk");
-          })
-          .catch(err =>
-            logger.error({ err, primeMembreId: pm.id }, "Erreur débit mobile bulk"),
-          );
-      }
-
-      // 3. Écriture OHADA (fire-and-forget)
-      generateEcrituresPrimePaiement(cooperativeId, {
-        primeMembreId: pm.id,
-        membreNom: membreNom ?? `Membre #${pm.membreId}`,
-        montantFcfa: pm.montantNetFcfa,
-        modePaiement: data.modePaiement,
-        date: data.datePaiement,
-      }).catch(err => logger.error({ err, primeMembreId: pm.id }, "Erreur écriture prime bulk"));
-    }
-  }
-
-  await syncStatutDistribution(distributionId);
+    await syncStatutDistribution(distributionId, tx);
+  });
 }
 
 /**
@@ -647,10 +587,10 @@ export async function payerBulk(
  * Appelé lors du paiement effectif pour refléter la déduction déjà calculée à la création
  * de la distribution.
  */
-async function reduireAvances(membreId: number, montantDeduction: number) {
+async function reduireAvances(membreId: number, montantDeduction: number, tx: PrimeDbExecutor = db) {
   if (montantDeduction <= 0) return;
 
-  const avancesActives = await db
+  const avancesActives = await tx
     .select({ id: avancesTable.id, solde: avancesTable.soldeRestantFcfa })
     .from(avancesTable)
     .where(and(
@@ -666,7 +606,7 @@ async function reduireAvances(membreId: number, montantDeduction: number) {
     const solde = avance.solde ?? 0;
     const reduction = Math.min(solde, restant);
     const nouveauSolde = solde - reduction;
-    await db
+    await tx
       .update(avancesTable)
       .set({
         soldeRestantFcfa: nouveauSolde,
@@ -677,8 +617,8 @@ async function reduireAvances(membreId: number, montantDeduction: number) {
   }
 }
 
-async function syncStatutDistribution(distributionId: number) {
-  const [counts] = await db
+async function syncStatutDistribution(distributionId: number, tx: PrimeDbExecutor = db) {
+  const [counts] = await tx
     .select({
       total: sql<number>`count(*)::int`,
       payes: sql<number>`count(*) filter (where ${primesMembresTable.statut} = 'paye')::int`,
@@ -687,7 +627,7 @@ async function syncStatutDistribution(distributionId: number) {
     .where(eq(primesMembresTable.distributionId, distributionId));
 
   if (counts && counts.total > 0 && counts.total === counts.payes) {
-    await db
+    await tx
       .update(primesDistributionsTable)
       .set({ statut: "payee", updatedAt: new Date() })
       .where(eq(primesDistributionsTable.id, distributionId));

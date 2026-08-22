@@ -70,3 +70,13 @@ export const commissionsMembresDelaguesTable = makeTable("commissions_membres_de
 export const bonsReceptionMembresDeleguesTable = makeTable("bons_reception_membres_delegues");
 export const certificationsTable = makeTable("certifications");
 export const certificationsMembresTable = makeTable("certifications_membres");
+export const primesDistributionsTable = {
+  _: { name: "primes_distributions" },
+  id: {}, cooperativeId: {}, statut: {},
+};
+export const primesMembresTable = {
+  _: { name: "primes_membres" },
+  id: {}, cooperativeId: {}, distributionId: {}, statut: {}, membreId: {},
+  montantNetFcfa: {}, deductionAvancesFcfa: {}, modePaiement: {}, datePaiement: {},
+  referencePaiement: {}, notes: {}, payePar: {}, updatedAt: {},
+};
