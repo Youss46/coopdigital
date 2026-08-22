@@ -137,19 +137,15 @@ export default function FournisseurSearch({
         </div>
       </div>
 
-      <div style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 10,
-        paddingRight: 16,
-        marginTop: 10,
-        position: "relative",
-        zIndex: 1,
-        background: "var(--t-bg)",
-      }}>
-        <div className="t-section-title" style={{ paddingRight: 0 }}>{title} ({loading ? "…" : `${filtered.length} résultats`})</div>
-        {user?.role === "peseur" && (
+      {user?.role === "peseur" && (
+        <div style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          padding: "10px 16px 0",
+          position: "relative",
+          zIndex: 1,
+          background: "var(--t-bg)",
+        }}>
           <button
             type="button"
             onClick={() => { setCreateError(""); setShowCreate(true); }}
@@ -157,14 +153,21 @@ export default function FournisseurSearch({
             title={isOnline ? "Créer un fournisseur externe" : "Connexion internet requise"}
             style={{
               display: "inline-flex", alignItems: "center", gap: 5, border: "none",
-              borderRadius: 8, padding: "8px 10px", background: isOnline ? "var(--t-peseur)" : "var(--t-border)",
-              color: isOnline ? "#fff" : "var(--t-muted)", fontSize: ".75rem", fontWeight: 700,
+              borderRadius: 8, padding: "9px 12px", background: isOnline ? "var(--t-peseur)" : "var(--t-border)",
+              color: isOnline ? "#fff" : "var(--t-muted)", fontSize: ".78rem", fontWeight: 700,
               cursor: isOnline ? "pointer" : "not-allowed", whiteSpace: "nowrap",
             }}
           >
             <UserPlus size={14} /> Nouveau externe
           </button>
-        )}
+        </div>
+      )}
+      <div style={{
+        position: "relative",
+        zIndex: 1,
+        background: "var(--t-bg)",
+      }}>
+        <div className="t-section-title">{title} ({loading ? "…" : `${filtered.length} résultats`})</div>
       </div>
 
       {loading && <div className="t-spinner" />}
