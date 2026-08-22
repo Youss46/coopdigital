@@ -622,7 +622,7 @@ export default function PcaDashboardPage() {
                 },
                 {
                   label: "CA ventes (FCFA)",
-                  key: (r: ComparaisonRow) => fmt(r.ca_fcfa),
+                  key: (r: ComparaisonRow) => fmtFull(r.ca_fcfa),
                 },
                 {
                   label: "Marge nette (FCFA)",
