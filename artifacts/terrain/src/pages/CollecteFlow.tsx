@@ -53,6 +53,7 @@ export default function CollecteFlow() {
   const [poidsBrut, setPoidsBrut] = useState("");
   const [retenueKg, setRetenueKg] = useState("0");
   const [certificationCacao, setCertificationCacao] = useState<"RA" | "FAIRTRADE" | "ASR_1000" | "ORDINAIRE" | "">("");
+  const [showCertification, setShowCertification] = useState(false);
 
   // Step 3 result
   const [result, setResult] = useState<CollecteResult | null>(null);
@@ -141,6 +142,7 @@ export default function CollecteFlow() {
     setNombreSacs("");
     setRetenueKg("0");
     setCertificationCacao("");
+    setShowCertification(false);
     setResult(null);
     setErreur("");
     setAvancePlan("integral");
@@ -155,6 +157,8 @@ export default function CollecteFlow() {
       return;
     }
     setFournisseur(f);
+    setCertificationCacao("");
+    setShowCertification(f.typeMembre === "externe");
     setStep(2);
   }
 
@@ -199,6 +203,48 @@ export default function CollecteFlow() {
 
         {/* STEP 2 : Saisir pesée */}
         {step === 2 && fournisseur && (
+          isExterne && showCertification ? (
+            <div className="t-form">
+              <div className="t-card" style={{ margin: "16px 0 18px", borderLeft: "4px solid #f59e0b" }}>
+                <div style={{ fontWeight: 800, fontSize: "1.05rem" }}>{fournisseur.nom} {fournisseur.prenoms}</div>
+                <div className="t-text-muted">{fournisseur.code} · Fournisseur externe</div>
+                <div style={{ marginTop: 6 }}>
+                  <span className="t-badge" style={{ background: "rgba(245,158,11,.15)", color: "#f59e0b" }}>🏷️ Pisteur / Non-membre</span>
+                </div>
+              </div>
+              <div style={{ marginBottom: 20 }}>
+                <div className="t-label" style={{ marginBottom: 10 }}>Type de cacao</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  {(["RA", "FAIRTRADE", "ASR_1000", "ORDINAIRE"] as const).map((cert) => (
+                    <button
+                      key={cert}
+                      type="button"
+                      onClick={() => {
+                        setCertificationCacao(cert);
+                        setShowCertification(false);
+                      }}
+                      style={{
+                        padding: "16px 8px", borderRadius: 12,
+                        border: `2px solid ${certificationCacao === cert ? "var(--t-peseur)" : "var(--t-border)"}`,
+                        background: certificationCacao === cert ? "var(--t-peseur-bg)" : "var(--t-card)",
+                        color: certificationCacao === cert ? "var(--t-peseur-dark)" : "var(--t-text)",
+                        fontWeight: 700, fontSize: ".9rem", cursor: "pointer",
+                      }}
+                    >
+                      {cert}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="t-btn t-btn--ghost"
+                onClick={() => { setFournisseur(null); setShowCertification(false); setStep(1); }}
+              >
+                ← Changer de fournisseur
+              </button>
+            </div>
+          ) : (
           <>
             {/* Récap fournisseur */}
             <div className="t-card" style={{ margin: "16px 16px 0", borderLeft: `4px solid ${isExterne ? "#f59e0b" : "var(--t-primary)"}` }}>
@@ -271,30 +317,6 @@ export default function CollecteFlow() {
                 />
               </div>
 
-              {isExterne && (
-                <div style={{ marginTop: 6, marginBottom: 14 }}>
-                  <div className="t-label" style={{ marginBottom: 8 }}>Certification du cacao *</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                    {(["RA", "FAIRTRADE", "ASR_1000", "ORDINAIRE"] as const).map((cert) => (
-                      <button
-                        key={cert}
-                        type="button"
-                        onClick={() => setCertificationCacao(cert)}
-                        style={{
-                          padding: "12px 6px", borderRadius: 10,
-                          border: `2px solid ${certificationCacao === cert ? "var(--t-peseur)" : "var(--t-border)"}`,
-                          background: certificationCacao === cert ? "var(--t-peseur-bg)" : "var(--t-card)",
-                          color: certificationCacao === cert ? "var(--t-peseur-dark)" : "var(--t-text)",
-                          fontWeight: 700, fontSize: ".82rem", cursor: "pointer",
-                        }}
-                      >
-                        {cert}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {/* Aperçu calcul */}
               {poidsBrut && prix && (
                 <div className="t-recap">
@@ -335,6 +357,7 @@ export default function CollecteFlow() {
               </button>
             </div>
           </>
+          )
         )}
 
         {/* STEP 3 : Confirmation */}
