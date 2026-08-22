@@ -454,47 +454,39 @@ export async function validerDistribution(cooperativeId: number, id: number, use
 }
 
 export async function payerMembre(cooperativeId: number, primeMembreId: number, data: PayerMembreInput, userId: number) {
-  const [[pm], [membreRow]] = await Promise.all([
-    db.select()
+  return db.transaction(async (tx) => {
+    // Le verrou doit être acquis avant tout contrôle de solde ou décaissement.
+    // Une requête concurrente attend ici, puis relit le statut après commit.
+    const [pm] = await tx
+      .select()
       .from(primesMembresTable)
       .where(and(eq(primesMembresTable.id, primeMembreId), eq(primesMembresTable.cooperativeId, cooperativeId)))
-      .limit(1),
-    // Pré-chargé après la vérification pm, mais on fait les deux en parallèle
-    // (sera ignoré si pm est null)
-    db.select({ id: primesMembresTable.id, membreId: primesMembresTable.membreId })
-      .from(primesMembresTable)
-      .where(eq(primesMembresTable.id, primeMembreId))
-      .limit(1),
-  ]);
-  if (!pm) throw new Error("Allocation introuvable");
-  if (pm.statut === "paye") throw new Error("Déjà payé");
+      .for("update")
+      .limit(1);
+    if (!pm) throw new Error("Allocation introuvable");
+    if (pm.statut === "paye") throw new Error("Déjà payé");
 
-  // Vérifier que la distribution est validée
-  const [[dist], [membre]] = await Promise.all([
-    db.select({ statut: primesDistributionsTable.statut })
-      .from(primesDistributionsTable)
-      .where(eq(primesDistributionsTable.id, pm.distributionId))
-      .limit(1),
-    db.select({ nom: membresTable.nom })
-      .from(membresTable)
-      .where(eq(membresTable.id, pm.membreId))
-      .limit(1),
-  ]);
-  if (!dist || dist.statut === "brouillon") throw new Error("La distribution doit être validée avant paiement");
+    const [[dist], [membre]] = await Promise.all([
+      tx.select({ statut: primesDistributionsTable.statut })
+        .from(primesDistributionsTable)
+        .where(eq(primesDistributionsTable.id, pm.distributionId))
+        .limit(1),
+      tx.select({ nom: membresTable.nom })
+        .from(membresTable)
+        .where(eq(membresTable.id, pm.membreId))
+        .limit(1),
+    ]);
+    if (!dist || dist.statut === "brouillon") throw new Error("La distribution doit être validée avant paiement");
 
-  const modeNorm       = data.modePaiement.toLowerCase();
-  const modeEstEspeces = MODES_ESPECES.has(modeNorm);
-  const modeEstMobile  = MODES_MOBILE_MARCHAND.has(modeNorm);
+    const modeNorm       = data.modePaiement.toLowerCase();
+    const modeEstEspeces = MODES_ESPECES.has(modeNorm);
+    const modeEstMobile  = MODES_MOBILE_MARCHAND.has(modeNorm);
 
-  // ── 1. Guards AVANT toute modification ────────────────────────────────────
-  // Lève une exception immédiate si le compte/la caisse est absent(e) ou
-  // le solde insuffisant — le membre reste 'en_attente', aucune incohérence.
-  if (pm.montantNetFcfa > 0) {
-    if (modeEstEspeces) await verifierCaisseCentrale(cooperativeId, pm.montantNetFcfa);
-    if (modeEstMobile)  await verifierCompteMobilePourPrime(cooperativeId, modeNorm, pm.montantNetFcfa);
-  }
+    if (pm.montantNetFcfa > 0) {
+      if (modeEstEspeces) await verifierCaisseCentrale(cooperativeId, pm.montantNetFcfa);
+      if (modeEstMobile)  await verifierCompteMobilePourPrime(cooperativeId, modeNorm, pm.montantNetFcfa);
+    }
 
-  return db.transaction(async (tx) => {
     const [updated] = await tx
       .update(primesMembresTable)
       .set({
@@ -531,38 +523,40 @@ export async function payerBulk(
   data: { modePaiement: string; datePaiement: string },
   userId: number,
 ) {
-  const [dist] = await db
-    .select()
-    .from(primesDistributionsTable)
-    .where(and(eq(primesDistributionsTable.id, distributionId), eq(primesDistributionsTable.cooperativeId, cooperativeId)))
-    .limit(1);
-  if (!dist) throw new Error("Distribution introuvable");
-  if (dist.statut === "brouillon") throw new Error("Veuillez d'abord valider la distribution");
-
-  // Récupérer les membres non encore payés AVANT le bulk update (pour les effets de bord)
-  const membresEnAttente = await db
-    .select({
-      pm: primesMembresTable,
-      membreNom: membresTable.nom,
-    })
-    .from(primesMembresTable)
-    .innerJoin(membresTable, eq(membresTable.id, primesMembresTable.membreId))
-    .where(and(
-      eq(primesMembresTable.distributionId, distributionId),
-      eq(primesMembresTable.statut, "en_attente"),
-    ));
-
-  // Guards AVANT toute modification — vérifie compte + solde sur le total global
-  const modeNormBulk   = data.modePaiement.toLowerCase();
-  const modeEstEspeces = MODES_ESPECES.has(modeNormBulk);
-  const modeEstMobile  = MODES_MOBILE_MARCHAND.has(modeNormBulk);
-  const totalNet = membresEnAttente.reduce((s, { pm }) => s + pm.montantNetFcfa, 0);
-  if (totalNet > 0) {
-    if (modeEstEspeces) await verifierCaisseCentrale(cooperativeId, totalNet);
-    if (modeEstMobile)  await verifierCompteMobilePourPrime(cooperativeId, modeNormBulk, totalNet);
-  }
-
   await db.transaction(async (tx) => {
+    const [dist] = await tx
+      .select()
+      .from(primesDistributionsTable)
+      .where(and(eq(primesDistributionsTable.id, distributionId), eq(primesDistributionsTable.cooperativeId, cooperativeId)))
+      .limit(1);
+    if (!dist) throw new Error("Distribution introuvable");
+    if (dist.statut === "brouillon") throw new Error("Veuillez d'abord valider la distribution");
+
+    // Verrouiller les allocations avant de calculer le total : une seconde
+    // validation attendra ces verrous et ne récupérera ensuite aucune ligne.
+    const membresEnAttente = await tx
+      .select({
+        pm: primesMembresTable,
+        membreNom: membresTable.nom,
+      })
+      .from(primesMembresTable)
+      .innerJoin(membresTable, eq(membresTable.id, primesMembresTable.membreId))
+      .where(and(
+        eq(primesMembresTable.distributionId, distributionId),
+        eq(primesMembresTable.statut, "en_attente"),
+      ))
+      .for("update");
+    if (membresEnAttente.length === 0) throw new Error("Toutes les allocations de cette distribution sont déjà payées");
+
+    const modeNormBulk   = data.modePaiement.toLowerCase();
+    const modeEstEspeces = MODES_ESPECES.has(modeNormBulk);
+    const modeEstMobile  = MODES_MOBILE_MARCHAND.has(modeNormBulk);
+    const totalNet = membresEnAttente.reduce((s, { pm }) => s + pm.montantNetFcfa, 0);
+    if (totalNet > 0) {
+      if (modeEstEspeces) await verifierCaisseCentrale(cooperativeId, totalNet);
+      if (modeEstMobile)  await verifierCompteMobilePourPrime(cooperativeId, modeNormBulk, totalNet);
+    }
+
     await tx.update(primesMembresTable).set({
       statut: "paye", modePaiement: data.modePaiement, datePaiement: data.datePaiement,
       payePar: userId, updatedAt: new Date(),
