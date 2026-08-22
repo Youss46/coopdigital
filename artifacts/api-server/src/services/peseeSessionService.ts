@@ -1477,13 +1477,14 @@ export async function creerLivraisonDepuisSession(
   }
 
   // ── Entrée stock — fire-and-forget ──────────────────────────────────────
-  // Règle : peseur de la base centrale  → entrepôt central (mouvementsStockTable)
+  // Règle : fournisseur externe → entrepôt dédié pisteurs/fournisseurs externes
+  //         peseur de la base centrale → entrepôt central (mouvementsStockTable)
   //         peseur rattaché à un délégué → entrepôt du délégué (entrerStockSiDelegue)
   // Le discriminant est result.livraison.peseurId :
   //   - null  → peseur autonome de la base centrale
   //   - set   → peseur rattaché à un délégué (agentId = delegueId sur la livraison)
   const poidsKgNum = parseFloat(String(result.livraison.poidsKg));
-  if (result.livraison.peseurId) {
+  if (result.livraison.peseurId && !result.isFournisseur) {
     // Peseur rattaché à un délégué → stock entrepôt délégué
     void entrerStockSiDelegue(
       result.livraison.agentId,
@@ -1492,13 +1493,19 @@ export async function creerLivraisonDepuisSession(
       result.livraison.id,
     );
   } else {
-    // Peseur de la base centrale → stock entrepôt central
+    // Peseur de la base centrale → stock entrepôt central.
+    // Un fournisseur externe utilise toujours l'entrepôt dédié configuré dans Stocks.
     void (async () => {
       try {
         const [entrepotCentral] = await db
           .select({ id: entrepotsTable.id })
           .from(entrepotsTable)
-          .where(eq(entrepotsTable.cooperativeId, cooperativeId))
+          .where(result.isFournisseur
+            ? and(
+              eq(entrepotsTable.cooperativeId, cooperativeId),
+              eq(entrepotsTable.pourFournisseursExt, true),
+            )
+            : eq(entrepotsTable.cooperativeId, cooperativeId))
           .orderBy(entrepotsTable.id)
           .limit(1);
         if (entrepotCentral) {
