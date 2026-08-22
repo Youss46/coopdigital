@@ -3,7 +3,7 @@ import {
   usersTable, membresTable, fournisseursTable, avancesTable, livraisonsTable, paiementsTable,
   distributionsIntrantsTable, historiquePrixTable, campagnesTable,
   caissesTable, mouvementsCaisseTable, sessionsPeseeTable,
-  cooperativesTable, transfertsStockTable, entrepotsDeleguesTable, mouvementsStockTable,
+  cooperativesTable, transfertsStockTable, entrepotsTable, entrepotsDeleguesTable, mouvementsStockTable,
 } from "@workspace/db";
 import { and, eq, sql, desc, or, isNull, gte, lte } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
