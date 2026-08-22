@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { db } from "@workspace/db";
+import {
+  avancesTable,
+  commissionsMembresDelaguesTable,
+  db,
+  remboursementsAvancesMembresTable,
+} from "@workspace/db";
 
 const proposerEcriture = vi.fn();
 const generateEcrituresCommission = vi.fn();
@@ -165,5 +170,76 @@ describe("payerCommissionsMembreDelegue", () => {
     expect(updates).toHaveLength(2);
     await vi.waitFor(() => expect(proposerEcriture).toHaveBeenCalledOnce());
     expect(proposerEcriture).toHaveBeenCalledWith(3, expect.objectContaining({ montantFcfa: 300 }));
+  });
+
+  it("annule les avances et commissions si une écriture de commission échoue", async () => {
+    const state = {
+      avance: {
+        id: 4,
+        membreId: 17,
+        planType: "integral",
+        soldeRestantFcfa: 1_000,
+        montantRembourse_fcfa: 0,
+        statut: "en_cours",
+      },
+      commission: {
+        id: 92,
+        membreDelegueId: 17,
+        montantFcfa: 300,
+        statut: "en_attente",
+        sessionPeseeId: null,
+      },
+      remboursements: [] as unknown[],
+    };
+    const initialState = structuredClone(state);
+
+    const tx = {
+      select: vi.fn()
+        .mockImplementationOnce(() => selectWithLimit([
+          { id: 17, nom: "Konde", prenoms: "Kami" },
+        ]))
+        .mockImplementationOnce(() => selectWithOrder([state.commission]))
+        .mockImplementationOnce(() => selectWithOrder([state.avance])),
+      execute: vi.fn().mockResolvedValue(undefined),
+      update: vi.fn((table: unknown) => {
+        const chain = {
+          set: vi.fn((values: Record<string, unknown>) => {
+            if (table === commissionsMembresDelaguesTable) {
+              throw new Error("échec de mise à jour de la commission");
+            }
+            Object.assign(state.avance, values);
+            return chain;
+          }),
+          where: vi.fn().mockResolvedValue(undefined),
+        };
+        return chain;
+      }),
+      insert: vi.fn(() => ({
+        values: vi.fn((values: unknown[]) => {
+          state.remboursements.push(...values);
+          return Promise.resolve(undefined);
+        }),
+      })),
+    };
+
+    vi.mocked(db.transaction).mockImplementationOnce(async (callback) => {
+      try {
+        return await callback(tx as never);
+      } catch (error) {
+        Object.assign(state, structuredClone(initialState));
+        throw error;
+      }
+    });
+
+    await expect(
+      payerCommissionsMembreDelegue(17, 3, { modePaiement: "especes" }),
+    ).rejects.toThrow("échec de mise à jour de la commission");
+
+    expect(state).toEqual(initialState);
+    expect(tx.update).toHaveBeenCalledWith(avancesTable);
+    expect(tx.update).toHaveBeenCalledWith(commissionsMembresDelaguesTable);
+    expect(tx.insert).toHaveBeenCalledWith(remboursementsAvancesMembresTable);
+    expect(generateEcrituresCommission).not.toHaveBeenCalled();
+    expect(proposerEcriture).not.toHaveBeenCalled();
   });
 });
