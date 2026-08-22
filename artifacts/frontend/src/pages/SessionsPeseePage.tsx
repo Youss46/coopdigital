@@ -38,10 +38,14 @@ const apiPut = (url: string, body?: unknown) =>
 
 interface SessionPesee {
   id: number;
+  type: "simple" | "groupée";
   numeroSession: string;
   membreId: number | null;
   membreNom: string | null;
   membrePrenoms: string | null;
+  fournisseurId: number | null;
+  fournisseurNom: string | null;
+  fournisseurPrenoms: string | null;
   produit: string;
   operation: string;
   statut: "en_cours" | "terminee" | "annulee";
@@ -145,7 +149,9 @@ function SessionDetailModal({ sessionId, onClose }: { sessionId: number; onClose
               {detail?.numeroSession ?? "…"}
             </div>
             <div style={{ fontSize: "1.1rem", fontWeight: 700 }}>
-              {detail ? `${detail.membreNom ?? ""} ${detail.membrePrenoms ?? ""}`.trim() || "—" : "Chargement…"}
+              {detail
+                ? `${detail.membreNom ?? detail.fournisseurNom ?? ""} ${detail.membrePrenoms ?? detail.fournisseurPrenoms ?? ""}`.trim() || "—"
+                : "Chargement…"}
             </div>
             {detail && <div style={{ marginTop: 4 }}><StatutBadge statut={detail.statut} /></div>}
           </div>
@@ -368,8 +374,8 @@ export default function SessionsPeseePage() {
   const filtered = sessions.filter((s) => {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
-    const membre = `${s.membreNom ?? ""} ${s.membrePrenoms ?? ""}`.toLowerCase();
-    return membre.includes(q) || s.numeroSession.toLowerCase().includes(q);
+    const tiers = `${s.membreNom ?? s.fournisseurNom ?? ""} ${s.membrePrenoms ?? s.fournisseurPrenoms ?? ""}`.toLowerCase();
+    return tiers.includes(q) || s.numeroSession.toLowerCase().includes(q);
   });
 
   // KPIs
@@ -388,7 +394,7 @@ export default function SessionsPeseePage() {
             <h1 style={{ margin: 0, fontSize: "1.35rem", fontWeight: 800 }}>Sessions de pesée</h1>
           </div>
           <p style={{ margin: 0, color: "#64748b", fontSize: ".88rem" }}>
-            Suivi des sessions de pesée groupée enregistrées par les peseurs
+            Suivi de toutes les pesées simples et groupées réalisées par les peseurs
           </p>
         </div>
 
@@ -528,10 +534,10 @@ export default function SessionsPeseePage() {
                 return (
                   <div
                     key={s.id}
-                    onClick={() => setSelectedId(s.id)}
+                    onClick={() => s.type === "groupée" && setSelectedId(s.id)}
                     style={{
                       display: "grid", gridTemplateColumns: "160px 1fr 110px 90px 80px 100px 40px",
-                      padding: "12px 16px", cursor: "pointer", alignItems: "center",
+                      padding: "12px 16px", cursor: s.type === "groupée" ? "pointer" : "default", alignItems: "center",
                       borderTop: idx === 0 ? "none" : "1px solid #f1f5f9",
                       transition: "background .12s",
                       background: stale ? "#fffbeb" : undefined,
@@ -542,12 +548,17 @@ export default function SessionsPeseePage() {
                     {/* N° session */}
                     <div style={{ fontFamily: "monospace", fontSize: ".78rem", color: "#374151", fontWeight: 600 }}>
                       {s.numeroSession}
+                      <div style={{ fontFamily: "inherit", fontSize: ".68rem", color: s.type === "simple" ? "#7c3aed" : "#64748b", marginTop: 3 }}>
+                        {s.type === "simple" ? "Pesée simple" : "Pesée groupée"}
+                      </div>
                     </div>
 
                     {/* Membre */}
                     <div>
                       <div style={{ fontWeight: 600, fontSize: ".88rem" }}>
-                        {s.membreNom ? `${s.membreNom} ${s.membrePrenoms ?? ""}` : <span style={{ color: "#94a3b8" }}>—</span>}
+                        {s.membreNom || s.fournisseurNom
+                          ? `${s.membreNom ?? s.fournisseurNom} ${s.membrePrenoms ?? s.fournisseurPrenoms ?? ""}`
+                          : <span style={{ color: "#94a3b8" }}>—</span>}
                       </div>
                       <div style={{ fontSize: ".72rem", color: "#94a3b8", marginTop: 1 }}>{s.produit}</div>
                       <div className="sessions-pesee-mobile-sacs">
