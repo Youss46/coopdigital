@@ -29,7 +29,7 @@ import {
 } from "@workspace/db";
 import { and, eq, isNull, or, desc, inArray, sql } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
-import { generateEcrituresCommission } from "./comptabiliteService.js";
+import { generateEcrituresCommissionDansTransaction } from "./comptabiliteService.js";
 
 function toNum(v: unknown): number {
   return Number(v ?? 0);
@@ -501,20 +501,16 @@ export async function payerCommissions(
         note:         `Retenue automatique — paiement commissions du ${today}`,
       });
     }
-  }); // fin transaction
 
-  // ── Écriture comptable OHADA (fire-and-forget, hors transaction) ──────────
-  // 6625 Commissions versées / 571 Caisse | 554 Mobile | 521 Banque
-  generateEcrituresCommission(cooperativeId, {
-    delegueId,
-    delegueNom,
-    montantFcfa: montantTotal,
-    modePaiement,
-    date: today,
-    nbCommissions: commissions.length,
-  }).catch((err) =>
-    logger.error({ err, delegueId, cooperativeId }, "Erreur écriture comptable commission délégué")
-  );
+    await generateEcrituresCommissionDansTransaction(tx, cooperativeId, {
+      delegueId,
+      delegueNom,
+      montantFcfa: montantTotal,
+      modePaiement,
+      date: today,
+      nbCommissions: commissions.length,
+    });
+  }); // fin transaction
 
   return { montantTotal, nb: commissions.length };
 }

@@ -165,6 +165,8 @@ export interface MouvementInput {
   userId?: number;
   /** Remplace le compte débit calculé depuis le motif (ex: dette producteur configurée ou 6042) */
   compteDebitOverride?: string;
+  /** Le parent fournit l'écriture dans sa propre transaction. */
+  skipAccounting?: boolean;
 }
 
 export async function enregistrerMouvement(
@@ -214,15 +216,17 @@ export async function enregistrerMouvement(
 
   // Écriture comptable
   const comptes = comptesForMouvement(data.type, data.motif);
-  proposerEcriture(caisse.cooperativeId, {
-    source:      "caisse",
-    sourceId:    mouvement?.id ?? undefined,
-    libelle:     data.libelle ?? `Caisse — ${data.motif}`,
-    compteDebit: data.compteDebitOverride ?? comptes.debit,
-    compteCredit:comptes.credit,
-    montantFcfa: montant,
-    date:        today(),
-  }).catch((err) => logger.warn({ err }, "Écriture comptable caisse non enregistrée"));
+  if (!data.skipAccounting) {
+    proposerEcriture(caisse.cooperativeId, {
+      source:      "caisse",
+      sourceId:    mouvement?.id ?? undefined,
+      libelle:     data.libelle ?? `Caisse — ${data.motif}`,
+      compteDebit: data.compteDebitOverride ?? comptes.debit,
+      compteCredit:comptes.credit,
+      montantFcfa: montant,
+      date:        today(),
+    }).catch((err) => logger.warn({ err }, "Écriture comptable caisse non enregistrée"));
+  }
 
   // Alerte fond minimum
   const fondMin = parseFloat(caisse.fondCaisseMinimumFcfa as string);

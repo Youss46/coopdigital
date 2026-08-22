@@ -3,7 +3,7 @@ import { db, paiementsTable, membresTable, livraisonsTable, fournisseursTable, u
 import { eq, desc, and, or, sql, gte, lt, lte, inArray, isNull, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { envoyerPushGroupePortail, envoyerPushGroupe } from "../services/pushService";
-import { proposerEcriture, resolveCompteDetteProducteur } from "../services/comptabiliteService.js";
+import { proposerEcrituresDansTransaction, resolveCompteDetteProducteur } from "../services/comptabiliteService.js";
 import { verifierCaisseEspeces, debiterCaisseParResponsable, enregistrerMouvement, getSessionActive } from "../services/caisseService.js";
 import { notifierParRole } from "../services/notificationService.js";
 import { logger } from "../lib/logger.js";
@@ -678,6 +678,30 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
           .where(eq(livraisonsTable.id, row.paiement.livraisonId));
 
       }
+
+      // L'écriture liée au paiement doit être créée avant le commit métier.
+      // Une erreur ici rollbacke donc le statut du paiement et de la livraison.
+      {
+        const isBonCarburant = !!row.paiement.bonCarburantId;
+        const isMobile = mode === "orange_money" || mode === "mtn_momo" || mode === "wave";
+        const compteDebitPaiement = isBonCarburant
+          ? "6042"
+          : await resolveCompteDetteProducteur(cooperativeId, row.compteDetteProducteur);
+        await proposerEcrituresDansTransaction(tx, cooperativeId, [{
+          source: "paiement",
+          sourceId: id,
+          libelle: isBonCarburant
+            ? `Carburant – Bon PAI-${id}`
+            : `Paiement producteur – ${`${row.nom ?? ""} ${row.prenoms ?? ""}`.trim() || `PAI-${id}`}`,
+          compteDebit: compteDebitPaiement,
+          compteCredit: isMobile ? "552" : mode === "especes" ? "571" : "521",
+          montantFcfa: row.paiement.montantFcfa,
+          date: new Date().toISOString().slice(0, 10),
+          numeroPiece: `PAI-${id}`,
+          tiersId: isBonCarburant ? undefined : (row.paiement.membreId ?? undefined),
+          tiersType: isBonCarburant ? undefined : "membre",
+        }]);
+      }
     });
 
     // 4–7. Déterminer si c'est un bon carburant (impacte les comptes OHADA)
@@ -686,8 +710,8 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
       ? "6042"
       : await resolveCompteDetteProducteur(cooperativeId, row.compteDetteProducteur);
     const caisseOpts = isBonCarburant
-      ? { compteDebitOverride: "6042", libelle: `Carburant — règlement #${id}` }
-      : { compteDebitOverride: compteDebitPaiement };
+      ? { compteDebitOverride: "6042", libelle: `Carburant — règlement #${id}`, skipAccounting: true }
+      : { compteDebitOverride: compteDebitPaiement, skipAccounting: true };
 
     // 4. Débiter la caisse principale du délégué si paiement espèces
     //    (hors tx DB car enregistrerMouvement gère sa propre cohérence interne)
@@ -725,32 +749,6 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
         userId,
         caisseOpts,
       );
-    }
-
-    // 7. Écriture comptable décaissement (mobile / chèque uniquement)
-    //    Espèces : enregistrerMouvement l'a déjà créée (avec compteDebitOverride si carburant)
-    //    Producteur mobile  → dette producteur/552
-    //    Producteur chèque  → dette producteur/521
-    //    Carburant mobile   → 6042/552 |  Carburant chèque  → 6042/521
-    if (mode !== "especes") {
-      const isMobile = mode === "orange_money" || mode === "mtn_momo" || mode === "wave";
-      const compteCredit = isMobile ? "552" : "521";
-      const dateStr = new Date().toISOString().slice(0, 10);
-      const libelle = isBonCarburant
-        ? `Carburant – Bon PAI-${id}`
-        : `Paiement producteur – ${`${row.nom ?? ""} ${row.prenoms ?? ""}`.trim() || `PAI-${id}`}`;
-      void proposerEcriture(cooperativeId, {
-        source: "paiement",
-        sourceId: id,
-        libelle,
-        compteDebit: compteDebitPaiement,
-        compteCredit,
-        montantFcfa: row.paiement.montantFcfa,
-        date: dateStr,
-        numeroPiece: `PAI-${id}`,
-        tiersId: isBonCarburant ? undefined : (row.paiement.membreId ?? undefined),
-        tiersType: isBonCarburant ? undefined : "membre",
-      });
     }
 
     // 8. Notifier le producteur (best-effort)
