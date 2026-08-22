@@ -84,6 +84,10 @@ export default function FournisseurSearch({
       setCreateError("Le nom du fournisseur est requis.");
       return;
     }
+    if (!/^\d{10}$/.test(createForm.telephone)) {
+      setCreateError("Le numéro de téléphone doit contenir exactement 10 chiffres.");
+      return;
+    }
 
     setCreating(true);
     setCreateError("");
@@ -300,8 +304,18 @@ export default function FournisseurSearch({
                   {labels[field]}
                   <input
                     required={field === "nom"}
+                    type={field === "telephone" ? "tel" : "text"}
+                    inputMode={field === "telephone" ? "numeric" : undefined}
+                    maxLength={field === "telephone" ? 10 : undefined}
+                    minLength={field === "telephone" ? 10 : undefined}
+                    pattern={field === "telephone" ? "[0-9]{10}" : undefined}
                     value={createForm[field]}
-                    onChange={(e) => setCreateForm({ ...createForm, [field]: e.target.value })}
+                    onChange={(e) => setCreateForm({
+                      ...createForm,
+                      [field]: field === "telephone"
+                        ? e.target.value.replace(/\D/g, "").slice(0, 10)
+                        : e.target.value,
+                    })}
                     placeholder={field === "nom" ? "Nom du fournisseur" : field === "prenoms" ? "Prénoms" : field === "telephone" ? "Numéro de téléphone" : "Section ou localité"}
                     style={{ display: "block", width: "100%", marginTop: 5, boxSizing: "border-box", border: "1px solid var(--t-border)", borderRadius: 9, padding: "11px 12px", fontSize: ".9rem", background: "var(--t-bg, #fff)", color: "var(--t-text)" }}
                   />
