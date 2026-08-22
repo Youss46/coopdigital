@@ -3,7 +3,7 @@ import {
   usersTable, membresTable, fournisseursTable, avancesTable, livraisonsTable, paiementsTable,
   distributionsIntrantsTable, historiquePrixTable, campagnesTable,
   caissesTable, mouvementsCaisseTable, sessionsPeseeTable,
-  cooperativesTable, transfertsStockTable, entrepotsDeleguesTable,
+  cooperativesTable, transfertsStockTable, entrepotsDeleguesTable, mouvementsStockTable,
 } from "@workspace/db";
 import { and, eq, sql, desc, or, isNull, gte, lte } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -489,6 +489,22 @@ export async function enregistrerCollecte(
   // Numéro de livraison séquentiel propre au délégué (ex: LIV-D01-0003)
   // L'agent terrain est toujours un délégué — on résout son entrepôt
   const entrepotDelegue = await getEntrepotDuDelegue(agentId, cooperativeId);
+  let entrepotFournisseurExt: { id: number } | undefined;
+  if (data.fournisseurId) {
+    const [dedie] = await db
+      .select({ id: entrepotsTable.id })
+      .from(entrepotsTable)
+      .where(and(
+        eq(entrepotsTable.cooperativeId, cooperativeId),
+        eq(entrepotsTable.pourFournisseursExt, true),
+      ))
+      .orderBy(entrepotsTable.id)
+      .limit(1);
+    if (!dedie) {
+      throw new Error("Aucun entrepôt dédié aux pisteurs et fournisseurs externes n'est configuré pour cette coopérative");
+    }
+    entrepotFournisseurExt = dedie;
+  }
   const numeroLivraison = entrepotDelegue
     ? await genererNumeroLivraison(entrepotDelegue.id)
     : null;
@@ -579,8 +595,19 @@ export async function enregistrerCollecte(
     membreNom = fourn ? `${fourn.nom} ${fourn.prenoms ?? ""}`.trim() : "";
   }
 
-  // Entrée stock entrepôt délégué — poids BRUT (fire-and-forget — non bloquant)
-  void entrerStockSiDelegue(agentId, cooperativeId, data.poidsBrutKg, livraison.id);
+  if (data.fournisseurId && entrepotFournisseurExt) {
+    await db.insert(mouvementsStockTable).values({
+      entrepotId: entrepotFournisseurExt.id,
+      type: "entree",
+      poidsKg: String(data.poidsBrutKg),
+      nombreSacs: data.nombreSacs,
+      motif: `Livraison fournisseur externe #${livraison.id}`,
+      agentId,
+    });
+  } else {
+    // Entrée stock entrepôt délégué — poids BRUT (non bloquant)
+    void entrerStockSiDelegue(agentId, cooperativeId, data.poidsBrutKg, livraison.id);
+  }
 
   // Commission délégué : désormais calculée sur le poids net après pesée physique
   // au magasin central (à la confirmation du transfert). Pas de commission à la collecte.
