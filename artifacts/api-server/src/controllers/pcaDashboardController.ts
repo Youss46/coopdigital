@@ -125,8 +125,15 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
       campagneId
         ? db.select({ t: sql<number>`coalesce(sum(poids_kg::numeric),0)::float` })
             .from(livraisonsTable)
-            .innerJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
-            .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(livraisonsTable.campagneId, campagneId)))
+            .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+            .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
+            .where(and(
+              eq(livraisonsTable.campagneId, campagneId),
+              or(
+                eq(membresTable.cooperativeId, cooperativeId),
+                eq(fournisseursTable.cooperativeId, cooperativeId),
+              ),
+            ))
         : Promise.resolve([{ t: 0 }]),
 
       db.select({
