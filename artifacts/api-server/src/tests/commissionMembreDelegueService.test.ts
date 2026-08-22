@@ -8,10 +8,14 @@ import {
 
 const proposerEcriture = vi.fn();
 const generateEcrituresCommission = vi.fn();
+const generateEcrituresCommissionDansTransaction = vi.fn();
+const proposerEcrituresDansTransaction = vi.fn();
 
 vi.mock("../services/comptabiliteService.js", () => ({
   proposerEcriture,
   generateEcrituresCommission,
+  generateEcrituresCommissionDansTransaction,
+  proposerEcrituresDansTransaction,
 }));
 
 vi.mock("../lib/logger.js", () => ({
@@ -97,16 +101,16 @@ describe("payerCommissionsMembreDelegue", () => {
       nb: 1,
     });
 
-    await vi.waitFor(() => expect(proposerEcriture).toHaveBeenCalledOnce());
-    expect(proposerEcriture).toHaveBeenCalledWith(3, expect.objectContaining({
+    expect(proposerEcrituresDansTransaction).toHaveBeenCalledOnce();
+    expect(proposerEcrituresDansTransaction).toHaveBeenCalledWith(expect.anything(), 3, expect.arrayContaining([expect.objectContaining({
       source: "avance",
       compteDebit: "401",
       compteCredit: "4091",
       montantFcfa: 300,
       tiersId: 17,
       tiersType: "membre",
-    }));
-    expect(generateEcrituresCommission).not.toHaveBeenCalled();
+    })]));
+    expect(generateEcrituresCommissionDansTransaction).not.toHaveBeenCalled();
   });
 
   it("ne rembourse qu'une partie de l'avance quand la commission est insuffisante", async () => {
@@ -139,8 +143,8 @@ describe("payerCommissionsMembreDelegue", () => {
     expect(updates[1]!.set).toHaveBeenCalledWith(expect.objectContaining({
       retenueAvancesFcfa: 300,
     }));
-    await vi.waitFor(() => expect(proposerEcriture).toHaveBeenCalledOnce());
-    expect(proposerEcriture).toHaveBeenCalledWith(3, expect.objectContaining({ montantFcfa: 300 }));
+    expect(proposerEcrituresDansTransaction).toHaveBeenCalledOnce();
+    expect(proposerEcrituresDansTransaction).toHaveBeenCalledWith(expect.anything(), 3, expect.arrayContaining([expect.objectContaining({ montantFcfa: 300 })]));
   });
 
   it("laisse intactes les avances suivantes une fois les commissions épuisées", async () => {
@@ -168,8 +172,8 @@ describe("payerCommissionsMembreDelegue", () => {
       retenueAvancesFcfa: 300,
     }));
     expect(updates).toHaveLength(2);
-    await vi.waitFor(() => expect(proposerEcriture).toHaveBeenCalledOnce());
-    expect(proposerEcriture).toHaveBeenCalledWith(3, expect.objectContaining({ montantFcfa: 300 }));
+    expect(proposerEcrituresDansTransaction).toHaveBeenCalledOnce();
+    expect(proposerEcrituresDansTransaction).toHaveBeenCalledWith(expect.anything(), 3, expect.arrayContaining([expect.objectContaining({ montantFcfa: 300 })]));
   });
 
   it("annule les avances et commissions si une écriture de commission échoue", async () => {
@@ -241,5 +245,55 @@ describe("payerCommissionsMembreDelegue", () => {
     expect(tx.insert).toHaveBeenCalledWith(remboursementsAvancesMembresTable);
     expect(generateEcrituresCommission).not.toHaveBeenCalled();
     expect(proposerEcriture).not.toHaveBeenCalled();
+  });
+
+  it("annule le paiement si une écriture échoue après la première", async () => {
+    const state = {
+      commission: {
+        id: 92,
+        membreDelegueId: 17,
+        montantFcfa: 300,
+        statut: "en_attente",
+        sessionPeseeId: null,
+      },
+    };
+    const initialState = structuredClone(state);
+    const tx = {
+      select: vi.fn()
+        .mockImplementationOnce(() => selectWithLimit([{ id: 17, nom: "Konde", prenoms: "Kami" }]))
+        .mockImplementationOnce(() => selectWithOrder([state.commission]))
+        .mockImplementationOnce(() => selectWithOrder([])),
+      execute: vi.fn().mockResolvedValue(undefined),
+      update: vi.fn(() => ({
+        set: vi.fn((values: Record<string, unknown>) => {
+          Object.assign(state.commission, values);
+          return { where: vi.fn().mockResolvedValue(undefined) };
+        }),
+      })),
+      insert: vi.fn(),
+    };
+
+    generateEcrituresCommissionDansTransaction.mockImplementationOnce(async () => {
+      // La première écriture est créée dans la transaction.
+    });
+    proposerEcrituresDansTransaction.mockImplementationOnce(async () => {
+      throw new Error("échec de la deuxième écriture");
+    });
+    vi.mocked(db.transaction).mockImplementationOnce(async (callback) => {
+      try {
+        return await callback(tx as never);
+      } catch (error) {
+        Object.assign(state, structuredClone(initialState));
+        throw error;
+      }
+    });
+
+    await expect(
+      payerCommissionsMembreDelegue(17, 3, { modePaiement: "especes" }),
+    ).rejects.toThrow("échec de la deuxième écriture");
+
+    expect(state).toEqual(initialState);
+    expect(generateEcrituresCommissionDansTransaction).toHaveBeenCalledOnce();
+    expect(proposerEcrituresDansTransaction).toHaveBeenCalledOnce();
   });
 });

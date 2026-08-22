@@ -12,6 +12,8 @@ import { logger } from "../lib/logger";
 import { assignerNumeroPiece } from "../lib/numeroPiece";
 import { getParamsEcriture } from "./planComptableService.js";
 
+export type ComptabiliteTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
 export type SourceEcriture =
   | "livraison" | "paiement" | "avance" | "vente"
   | "encaissement" | "salaire" | "stock" | "don"
@@ -93,15 +95,18 @@ const DB_SOURCE_MAP: Record<SourceEcriture, "livraison" | "vente" | "avance" | "
   charges_diverses:  "paiement",
 };
 
-async function getConfigComptable(cooperativeId: number) {
-  const rows = await db
+async function getConfigComptable(
+  cooperativeId: number,
+  executor: typeof db | ComptabiliteTransaction = db,
+) {
+  const rows = await executor
     .select()
     .from(configComptableTable)
     .where(eq(configComptableTable.cooperativeId, cooperativeId))
     .limit(1);
   if (rows.length === 0) {
-    await db.insert(configComptableTable).values({ cooperativeId }).onConflictDoNothing();
-    const rows2 = await db
+    await executor.insert(configComptableTable).values({ cooperativeId }).onConflictDoNothing();
+    const rows2 = await executor
       .select()
       .from(configComptableTable)
       .where(eq(configComptableTable.cooperativeId, cooperativeId))
@@ -157,6 +162,54 @@ export async function proposerEcriture(
   } catch (err) {
     logger.error({ err, payload }, "Erreur proposerEcriture");
     throw err;
+  }
+}
+
+/**
+ * Variante transactionnelle utilisée lorsqu'un événement métier produit
+ * plusieurs écritures. Aucun appel ne doit sortir de la transaction : une
+ * erreur sur une écriture annule également les précédentes.
+ */
+export async function proposerEcrituresDansTransaction(
+  tx: ComptabiliteTransaction,
+  cooperativeId: number,
+  payloads: ProposerEcriturePayload[],
+): Promise<void> {
+  const config = await getConfigComptable(cooperativeId, tx);
+
+  for (const payload of payloads) {
+    const cle = AUTO_KEY_MAP[payload.source];
+    const modeAuto = config[cle] === true;
+
+    if (modeAuto) {
+      const exercice = new Date(payload.date).getFullYear();
+      await tx.insert(ecrituresComptablesTable).values({
+        cooperativeId,
+        dateEcriture: payload.date,
+        numeroPiece: payload.numeroPiece ?? null,
+        libelle: payload.libelle,
+        compteDebit: payload.compteDebit,
+        compteCredit: payload.compteCredit,
+        montantFcfa: Math.round(payload.montantFcfa),
+        source: DB_SOURCE_MAP[payload.source],
+        sourceId: payload.sourceId ?? null,
+        tiersId: payload.tiersId ?? null,
+        tiersType: payload.tiersType ?? null,
+        exercice,
+      });
+    } else {
+      await tx.insert(ecrituresEnAttenteTable).values({
+        cooperativeId,
+        source: DB_SOURCE_MAP[payload.source],
+        sourceId: payload.sourceId ?? null,
+        libelleProppose: payload.libelle,
+        compteDebitPropose: payload.compteDebit,
+        compteCreditPropose: payload.compteCredit,
+        montantFcfa: Math.round(payload.montantFcfa),
+        dateProposee: payload.date,
+        statut: "en_attente",
+      });
+    }
   }
 }
 
@@ -753,6 +806,32 @@ export async function generateEcrituresCommission(
     date,
     tiersId: delegueId, tiersType: "delegue",
   });
+}
+
+export async function generateEcrituresCommissionDansTransaction(
+  tx: ComptabiliteTransaction,
+  cooperativeId: number,
+  params: Parameters<typeof generateEcrituresCommission>[1],
+): Promise<void> {
+  const { delegueId, delegueNom, montantFcfa, modePaiement, date, nbCommissions } = params;
+  const mode = modePaiement.toLowerCase();
+  const compteCredit = MODES_MOBILE_MARCHAND.has(mode) ? "554"
+    : MODES_CAISSE.has(mode) ? "571"
+    : "521";
+  const compteDebit = await resolveCompteDebit(cooperativeId, "commissions_delegues", "paiement_commission", "6322");
+
+  await proposerEcrituresDansTransaction(tx, cooperativeId, [{
+    source: "commission_delegue",
+    sourceId: delegueId,
+    libelle: `Commission délégué – ${delegueNom} (${nbCommissions} livraison${nbCommissions > 1 ? "s" : ""})`,
+    compteDebit,
+    compteCredit,
+    montantFcfa,
+    date,
+    numeroPiece: `COM-${delegueId}-${date}`,
+    tiersId: delegueId,
+    tiersType: "delegue",
+  }]);
 }
 
 /**
