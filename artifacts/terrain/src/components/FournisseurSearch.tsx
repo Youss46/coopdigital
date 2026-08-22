@@ -137,7 +137,17 @@ export default function FournisseurSearch({
         </div>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, paddingRight: 16 }}>
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 10,
+        paddingRight: 16,
+        marginTop: 10,
+        position: "relative",
+        zIndex: 1,
+        background: "var(--t-bg)",
+      }}>
         <div className="t-section-title" style={{ paddingRight: 0 }}>{title} ({loading ? "…" : `${filtered.length} résultats`})</div>
         {user?.role === "peseur" && (
           <button
