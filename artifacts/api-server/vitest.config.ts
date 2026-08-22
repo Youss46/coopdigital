@@ -6,6 +6,7 @@ export default defineConfig({
     globals: true,
     environment: "node",
     include: ["src/tests/**/*.test.ts"],
+    exclude: ["src/tests/**/*.integration.test.ts"],
     env: {
       JWT_SECRET: "test-secret-for-tenant-isolation-tests",
       DATABASE_URL: "postgresql://test:test@localhost:5432/test",
