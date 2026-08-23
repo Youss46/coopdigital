@@ -5,7 +5,7 @@ import {
   verificationsClotureCampagneTable,
   transfertsStockTable,
 } from "@workspace/db";
-import { eq, and, sql, desc, ne, inArray, isNull } from "drizzle-orm";
+import { eq, and, sql, desc, ne, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { recalculerTous } from "./scoringService";
 import { archiverCampagne } from "./archiveService";
@@ -253,9 +253,19 @@ export async function genererBilan(cooperativeId: number, campagneId: number, us
       COALESCE(AVG(prix_unitaire_fcfa), 0)                               AS prix_achat_moyen,
       COALESCE(SUM(montant_brut_fcfa), 0)                                AS cout_achat_total
     FROM livraisons
-    WHERE campagne_id = ${campagneId}
+     WHERE campagne_id = ${campagneId}
+       AND peseur_id IS NULL
   `);
   const p = prod.rows[0] as Record<string, string>;
+
+  const [transfertTonnageRow] = await db
+    .select({ t: sql<number>`coalesce(sum(${transfertsStockTable.poidsArrivee_kg}::numeric), 0)::float` })
+    .from(transfertsStockTable)
+    .where(and(
+      eq(transfertsStockTable.campagneId, campagneId),
+      eq(transfertsStockTable.cooperativeId, cooperativeId),
+      eq(transfertsStockTable.statut, "confirme"),
+    ));
 
   const ventes = await db.execute(sql`
     SELECT
@@ -321,7 +331,7 @@ export async function genererBilan(cooperativeId: number, campagneId: number, us
   `).catch(() => ({ rows: [{ total: "0" }] }));
   const ps = partsSociales.rows[0] as Record<string, string>;
 
-  const tonnageTotal = Number(p.tonnage_total ?? 0);
+  const tonnageTotal = Number(p.tonnage_total ?? 0) + Number(transfertTonnageRow?.t ?? 0);
   const caVentes = Number(v.ca_ventes ?? 0);
   const coutAchat = Number(p.cout_achat_total ?? 0);
   const chargesPersonnel = Number(sal.charges_personnel ?? 0);
