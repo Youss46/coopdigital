@@ -113,7 +113,7 @@ export default function CollecteFlow() {
           retenueKg: retenueNum,
           localId,
           ...(proxy ? { targetDelegueId: proxy.id } : {}),
-          ...(isExterne ? { certificationCacao } : {}),
+           ...(certificationCacao ? { certificationCacao } : {}),
           // Plan de déduction — transmis uniquement pour les membres avec avance
           ...(!isExterne && avanceDedMax > 0 ? {
             avancePlanType: avancePlan,
@@ -158,7 +158,7 @@ export default function CollecteFlow() {
     }
     setFournisseur(f);
     setCertificationCacao("");
-    setShowCertification(f.typeMembre === "externe");
+    setShowCertification(f.typeMembre === "externe" || !f.isMembreDelegue);
     setStep(2);
   }
 
@@ -203,13 +203,17 @@ export default function CollecteFlow() {
 
         {/* STEP 2 : Saisir pesée */}
         {step === 2 && fournisseur && (
-          isExterne && showCertification ? (
+          showCertification ? (
             <div className="t-form">
               <div className="t-card" style={{ margin: "16px 0 18px", borderLeft: "4px solid #f59e0b" }}>
                 <div style={{ fontWeight: 800, fontSize: "1.05rem" }}>{fournisseur.nom} {fournisseur.prenoms}</div>
-                <div className="t-text-muted">{fournisseur.code} · Fournisseur externe</div>
+                <div className="t-text-muted">
+                  {fournisseur.code} · {isExterne ? "Fournisseur externe" : "Membre ordinaire"}
+                </div>
                 <div style={{ marginTop: 6 }}>
-                  <span className="t-badge" style={{ background: "rgba(245,158,11,.15)", color: "#f59e0b" }}>🏷️ Pisteur / Non-membre</span>
+                  <span className="t-badge" style={{ background: "rgba(245,158,11,.15)", color: "#f59e0b" }}>
+                    🏷️ {isExterne ? "Pisteur / Non-membre" : "Certification cacao"}
+                  </span>
                 </div>
               </div>
               <div style={{ marginBottom: 20 }}>
@@ -350,7 +354,7 @@ export default function CollecteFlow() {
 
               <button
                 className="t-btn t-btn--primary"
-                disabled={!poidsBrut || parseFloat(poidsBrut) <= 0 || (isExterne && !certificationCacao)}
+                disabled={!poidsBrut || parseFloat(poidsBrut) <= 0 || !certificationCacao}
                 onClick={() => setStep(3)}
               >
                 Continuer →
