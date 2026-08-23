@@ -250,7 +250,7 @@ export async function getBilanPdf(req: Request, res: Response) {
   const ROUGE = "#dc2626";
 
   const fmt = (n: string | number | null | undefined) =>
-    Number(n ?? 0).toLocaleString("fr-FR");
+    Number(n ?? 0).toLocaleString("fr-FR").replace(/[\u202F\u00A0]/g, " ");
   const fmtPct = (n: string | number | null | undefined) => {
     const v = Number(n ?? 0);
     return `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
