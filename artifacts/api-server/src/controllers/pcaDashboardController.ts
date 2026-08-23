@@ -127,7 +127,10 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
       campagneId
         ? db.select({ t: sql<number>`coalesce(sum(poids_kg::numeric),0)::float` })
             .from(livraisonsTable)
-            .where(eq(livraisonsTable.campagneId, campagneId))
+            .where(and(
+              eq(livraisonsTable.campagneId, campagneId),
+              isNull(livraisonsTable.peseurId),
+            ))
         : Promise.resolve([{ t: 0 }]),
 
       campagneId
@@ -664,7 +667,10 @@ export async function getComparaisonCampagnesPca(req: Request, res: Response): P
           db
             .select({ tonnageKg: sql<number>`coalesce(sum(${livraisonsTable.poidsKg}::numeric), 0)::float` })
             .from(livraisonsTable)
-            .where(eq(livraisonsTable.campagneId, c.id)),
+            .where(and(
+              eq(livraisonsTable.campagneId, c.id),
+              isNull(livraisonsTable.peseurId),
+            )),
           db
             .select({ tonnageKg: sql<number>`coalesce(sum(${transfertsStockTable.poidsArrivee_kg}::numeric), 0)::float` })
             .from(transfertsStockTable)
@@ -704,7 +710,11 @@ export async function getComparaisonCampagnesPca(req: Request, res: Response): P
           db.select({ t: sql<number>`coalesce(sum(poids_kg::numeric),0)::float` })
             .from(livraisonsTable)
             .innerJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
-            .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(livraisonsTable.campagneId, c.id))),
+            .where(and(
+              eq(membresTable.cooperativeId, cooperativeId),
+              eq(livraisonsTable.campagneId, c.id),
+              isNull(livraisonsTable.peseurId),
+            )),
           db.select({ t: sql<number>`coalesce(sum(poids_arrivee_kg::numeric),0)::float` })
             .from(transfertsStockTable)
             .where(and(

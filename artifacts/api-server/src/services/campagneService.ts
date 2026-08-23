@@ -3,8 +3,9 @@ import {
   campagnesTable,
   bilansCampagneTable,
   verificationsClotureCampagneTable,
+  transfertsStockTable,
 } from "@workspace/db";
-import { eq, and, sql, desc, ne, inArray } from "drizzle-orm";
+import { eq, and, sql, desc, ne, inArray, isNull } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { recalculerTous } from "./scoringService";
 import { archiverCampagne } from "./archiveService";
