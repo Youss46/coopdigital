@@ -151,7 +151,10 @@ async function resolveEffectiveAgent(
     if (!cible) return null; // 403
     return { effectiveAgentId: cible.id, peseurId: agent.id };
   }
-  return { effectiveAgentId: agent.delegueId ?? agent.id, peseurId: agent.delegueId ? agent.id : undefined };
+  return {
+    effectiveAgentId: agent.delegueId ?? agent.id,
+    peseurId: agent.role === "peseur" ? agent.id : (agent.delegueId ? agent.id : undefined),
+  };
 }
 
 export async function postCollecteHandler(req: Request, res: Response): Promise<void> {
