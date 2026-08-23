@@ -65,3 +65,4 @@
 - [Typecheck sans cast d'échappement](typecheck-no-cast-escapes.md) — jamais de `as unknown as` pour un champ manquant; corriger le select Drizzle, la vraie colonne ou le schéma OpenAPI+Orval — la revue rejette les casts masquants.
 - [Carte tonnage certification](dashboard-tonnage-certification.md) — une erreur de jointure API peut être masquée comme liste vide; les détails doivent signaler l’échec plutôt que « aucune livraison ».
 - [Certification par livraison](delivery-certification-receipt.md) — le reçu doit privilégier la certification choisie pour la pesée, et non la certification permanente du profil membre.
+- [Peseur sur documents terrain](terrain-peseur-document-signature.md) — les pesées d’un peseur central doivent renseigner peseurId pour afficher son nom dans la zone de signature.

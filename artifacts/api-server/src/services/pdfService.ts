@@ -976,7 +976,9 @@ export async function generateRecuLivraison(livraisonId: number, cooperativeId: 
 
   y = 700;
   doc.fontSize(8).fillColor(GRIS).font("Helvetica")
-    .text("Agent réceptionnaire", MARGIN, y, { width: 150, align: "center" });
+    .text(row.peseurId && (row.peseurNom || row.peseurPrenoms)
+      ? `Peseur : ${`${row.peseurPrenoms ?? ""} ${row.peseurNom ?? ""}`.trim()}`
+      : "Agent réceptionnaire", MARGIN, y, { width: 150, align: "center" });
   doc.text("Producteur / Mandataire", PAGE_W - MARGIN - 170, y, { width: 160, align: "center" });
   doc.rect(MARGIN, y + 12, 150, 38).stroke("#d1d5db");
   doc.rect(PAGE_W - MARGIN - 170, y + 12, 160, 38).stroke("#d1d5db");
@@ -3993,6 +3995,7 @@ export async function generateBordereauAchatSession(
   sessionId: number,
   cooperativeId: number,
 ): Promise<Buffer> {
+  const peseurUserAlias = alias(usersTable, "bordereau_peseur_user");
   // 1. Session
   const [session] = await db
     .select({
@@ -4007,9 +4010,12 @@ export async function generateBordereauAchatSession(
       livraisonId:        sessionsPeseeTable.livraisonId,
       membreId:           sessionsPeseeTable.membreId,
       certificationCacao: sessionsPeseeTable.certificationCacao,
+      peseurNom:          peseurUserAlias.nom,
+      peseurPrenoms:      peseurUserAlias.prenoms,
       createdAt:          sessionsPeseeTable.createdAt,
     })
     .from(sessionsPeseeTable)
+    .leftJoin(peseurUserAlias, eq(sessionsPeseeTable.peseurId, peseurUserAlias.id))
     .where(and(
       eq(sessionsPeseeTable.id, sessionId),
       eq(sessionsPeseeTable.cooperativeId, cooperativeId),
@@ -4628,10 +4634,15 @@ export async function generateBordereauAchatSession(
   const sigBoxH    = 80;
   const sigW       = (BW - 16) / 3;
   const sigY       = footerSepY - 8 - sigBoxH - 14; // label au-dessus de la boîte
+  const peseurNom = `${session.peseurPrenoms ?? ""} ${session.peseurNom ?? ""}`.trim();
   ["PESEUR", "LIVREUR", "MAGASINIER"].forEach((lbl, i) => {
     const sx = M + i * (sigW + 8);
     doc.fontSize(9).fillColor(GRIS).font("Helvetica-Bold")
       .text(lbl, sx, sigY, { width: sigW, align: "center", lineBreak: false });
+    if (i === 0 && peseurNom) {
+      doc.fontSize(8).fillColor("black").font("Helvetica")
+        .text(peseurNom, sx, sigY + 10, { width: sigW, align: "center", lineBreak: false });
+    }
     doc.rect(sx, sigY + 14, sigW, sigBoxH).stroke("#d1d5db");
   });
 
