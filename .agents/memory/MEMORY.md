@@ -64,3 +64,4 @@
 - [Tables push sans migration CREATE](push-created-tables-missing-migrations.md) — tables créées via drizzle push n’ont pas de CREATE TABLE dans lib/db/drizzle; toute migration ALTER doit d’abord CREATE TABLE IF NOT EXISTS.
 - [Typecheck sans cast d'échappement](typecheck-no-cast-escapes.md) — jamais de `as unknown as` pour un champ manquant; corriger le select Drizzle, la vraie colonne ou le schéma OpenAPI+Orval — la revue rejette les casts masquants.
 - [Carte tonnage certification](dashboard-tonnage-certification.md) — une erreur de jointure API peut être masquée comme liste vide; les détails doivent signaler l’échec plutôt que « aucune livraison ».
+- [Certification par livraison](delivery-certification-receipt.md) — le reçu doit privilégier la certification choisie pour la pesée, et non la certification permanente du profil membre.

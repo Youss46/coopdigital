@@ -862,9 +862,11 @@ export async function generateRecuLivraison(livraisonId: number, cooperativeId: 
 
   const [campagne, mentionCertif] = await Promise.all([
     getCampagneEnCours(cooperativeId),
-    row.membreId
+    row.certificationCacao
+      ? Promise.resolve(libelleCertificationCacao(row.certificationCacao))
+      : row.membreId
       ? getMentionCertification(row.membreId, cooperativeId)
-      : Promise.resolve(libelleCertificationCacao(row.certificationCacao)),
+      : Promise.resolve("Cacao ordinaire"),
   ]);
   const { doc, endPromise } = makePdfDoc();
   const ref = row.codeAchat ?? `LIV-${String(row.id).padStart(5, "0")}`;
