@@ -15,6 +15,39 @@ export type CreateChargeInput = {
   referencePiece?: string | null;
 };
 
+export type ReglementPpsi = {
+  brut: number;
+  retenue: number;
+  net: number;
+};
+
+/**
+ * Calcule le règlement PPSI à partir du brut et du taux configuré.
+ * Les bornes sont appliquées ici plutôt que seulement à la configuration :
+ * des données historiques incohérentes ne doivent jamais générer un paiement
+ * supérieur à la dette constatée.
+ */
+export function calculerReglementPpsi(brutInput: number, tauxInput: number): ReglementPpsi {
+  const brut = Number.isFinite(brutInput) ? Math.max(0, Math.round(brutInput)) : 0;
+  const taux = Number.isFinite(tauxInput) ? Math.min(100, Math.max(0, tauxInput)) : 0;
+  const retenue = Math.min(brut, Math.max(0, Math.round(brut * taux / 100)));
+  return { brut, retenue, net: Math.max(0, brut - retenue) };
+}
+
+/**
+ * Répare les montants persistés d'un ancien règlement avant de produire les
+ * écritures : retenue + net reste toujours égal au brut, sans double déduction.
+ */
+export function securiserReglementPpsi(
+  brutInput: number,
+  retenueInput: number,
+  _netInput: number,
+): ReglementPpsi {
+  const brut = Number.isFinite(brutInput) ? Math.max(0, Math.round(brutInput)) : 0;
+  const retenue = Math.min(brut, Math.max(0, Math.round(Number.isFinite(retenueInput) ? retenueInput : 0)));
+  return { brut, retenue, net: Math.max(0, brut - retenue) };
+}
+
 export async function listChargesDiverses(
   cooperativeId: number,
   filters: { statut?: string; categorie?: string; dateDebut?: string; dateFin?: string; limit?: number; offset?: number } = {},
@@ -86,7 +119,7 @@ export async function validerChargeDiverses(
   const isPpsi = charge.categorie === "ppsi";
   const tauxPpsi = isPpsi ? await getTauxPpsi(cooperativeId) : null;
   const brut = Math.round(parseFloat(charge.montantFcfa));
-  const retenue = isPpsi ? Math.min(brut, Math.round(brut * tauxPpsi! / 100)) : 0;
+  const reglement = isPpsi ? calculerReglementPpsi(brut, tauxPpsi!) : null;
   const [row] = await db
     .update(chargesDiversesTable)
     .set({
@@ -96,8 +129,8 @@ export async function validerChargeDiverses(
       updatedAt: new Date(),
       ...(isPpsi ? {
         ppsiTauxPct: tauxPpsi!.toFixed(2),
-        retenuePpsiFcfa: retenue,
-        montantNetFcfa: brut - retenue,
+        retenuePpsiFcfa: reglement!.retenue,
+        montantNetFcfa: reglement!.net,
       } : {}),
     })
     .where(and(eq(chargesDiversesTable.id, id), eq(chargesDiversesTable.cooperativeId, cooperativeId), eq(chargesDiversesTable.statut, "brouillon")))

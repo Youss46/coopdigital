@@ -102,6 +102,13 @@ export async function getTauxPpsi(cooperativeId: number): Promise<number> {
   const taux = obligation?.tauxPct == null ? 2 : parseFloat(obligation.tauxPct);
   return Number.isFinite(taux) && taux >= 0 && taux <= 100 ? taux : 2;
 }
+
+/** Retenue PPSI bornée au brut, y compris pour une configuration historique. */
+export function calculerRetenuePpsi(brutInput: number, tauxPctInput: number): number {
+  const brut = Number.isFinite(brutInput) ? Math.max(0, Math.round(brutInput)) : 0;
+  const taux = Number.isFinite(tauxPctInput) ? Math.min(100, Math.max(0, tauxPctInput)) : 0;
+  return Math.min(brut, Math.max(0, Math.round(brut * taux / 100)));
+}
 export async function initObligationsCI(cooperativeId: number): Promise<{ creees: number; dejaPresentes: number }> {
   const existantes = await db.select({ typeTaxe: obligationsFiscalesTable.typeTaxe, libelle: obligationsFiscalesTable.libelle })
     .from(obligationsFiscalesTable)
@@ -287,7 +294,7 @@ export async function genererDeclarationsMensuelles(cooperativeId: number, mois:
       const brut = await getPrestationsPpsiMensuelles(cooperativeId, mois, annee);
       const taux = obl.tauxPct != null ? parseFloat(obl.tauxPct) / 100 : 0.02;
       baseImposable = brut;
-      montantCalcule = Math.round(brut * taux);
+      montantCalcule = calculerRetenuePpsi(brut, taux * 100);
     }
 
     const echeance = dateEcheanceMensuelle(mois, annee, obl.jourEcheance ?? 15);

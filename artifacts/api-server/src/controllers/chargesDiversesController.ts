@@ -8,6 +8,7 @@ import {
   validerChargeDiverses,
   deleteChargeDiverses,
   getStatsChargesDiverses,
+  securiserReglementPpsi,
 } from "../services/chargesDiversesService";
 
 // ── GET /charges-diverses ─────────────────────────────────────────────────────
@@ -131,14 +132,22 @@ export async function handleValiderChargeDiverses(req: Request, res: Response): 
     // la retenue la transfère vers la dette fiscale, et seul le net sort.
     const brut = Math.round(parseFloat(row.montantFcfa));
     if (row.categorie === "ppsi") {
-      const retenue = row.retenuePpsiFcfa ?? 0;
-      const net = row.montantNetFcfa ?? brut - retenue;
+      // Reborner aussi les anciennes lignes : validation ne garantit pas que
+      // les montants persistés avant ce garde-fou soient cohérents.
+      const reglement = securiserReglementPpsi(
+        brut,
+        row.retenuePpsiFcfa ?? 0,
+        row.montantNetFcfa ?? brut - (row.retenuePpsiFcfa ?? 0),
+      );
+      const montantBrut = reglement.brut;
+      const retenue = reglement.retenue;
+      const net = reglement.net;
       const piece = row.referencePiece ?? `PPSI-${row.id}`;
       const compteTresorerie = row.modePaiement === "mobile_money" ? "552"
         : row.modePaiement === "virement" || row.modePaiement === "cheque" ? "521"
         : "571";
       const entries = [
-        { compteDebit: row.compteDebit, compteCredit: "401", montantFcfa: brut, libelle: `Prestation brute — ${row.libelle}` },
+        { compteDebit: row.compteDebit, compteCredit: "401", montantFcfa: montantBrut, libelle: `Prestation brute — ${row.libelle}` },
         ...(retenue > 0 ? [{ compteDebit: "401", compteCredit: "447", montantFcfa: retenue, libelle: `Retenue PPSI — ${row.libelle}` }] : []),
         ...(net > 0 ? [{ compteDebit: "401", compteCredit: compteTresorerie, montantFcfa: net, libelle: `Règlement net prestataire — ${row.libelle}` }] : []),
       ];
