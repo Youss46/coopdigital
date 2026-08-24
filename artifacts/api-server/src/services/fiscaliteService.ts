@@ -580,6 +580,7 @@ export async function genererPpsiPdf(cooperativeId: number, mois: number, annee:
   )).orderBy(chargesDiversesTable.dateCharge);
 
   const chunks: Buffer[] = [];
+  const fmtFcfa = (n: number) => `${new Intl.NumberFormat("fr-FR").format(n)} FCFA`;
   const doc = new PDFDocument({ size: "A4", margin: 45 });
   doc.on("data", (chunk: Buffer) => chunks.push(chunk));
   await drawHeader(doc, cooperativeId, {
@@ -603,14 +604,14 @@ export async function genererPpsiPdf(cooperativeId: number, mois: number, annee:
     const retenue = Math.round(brut * 0.02);
     const net = brut - retenue;
     totalBrut += brut; totalRetenue += retenue; totalNet += net;
-    [String(row.date ?? ""), String(row.prestataire ?? "—"), FCFA(brut), FCFA(retenue), FCFA(net)]
+    [String(row.date ?? ""), String(row.prestataire ?? "—"), fmtFcfa(brut), fmtFcfa(retenue), fmtFcfa(net)]
       .forEach((v, i) => doc.text(v, cols[i]!, y, { width: (cols[i + 1] ?? 550) - cols[i]! - 5 }));
     y += 16;
     if (y > 750) { doc.addPage(); y = 55; }
   }
   doc.moveTo(45, y).lineTo(550, y).strokeColor("#d1d5db").stroke();
   doc.font("Helvetica-Bold").fontSize(8).fillColor("#166534");
-  [["TOTAL", 45, 225], [FCFA(totalBrut), 270, 110], [FCFA(totalRetenue), 385, 90], [FCFA(totalNet), 475, 75]]
+  [["TOTAL", 45, 225], [fmtFcfa(totalBrut), 270, 110], [fmtFcfa(totalRetenue), 385, 90], [fmtFcfa(totalNet), 475, 75]]
     .forEach(([v, x, w]) => doc.text(String(v), Number(x), y + 8, { width: Number(w) }));
   doc.font("Helvetica-Oblique").fontSize(7.5).fillColor("#777")
     .text("Document préparatoire à la déclaration PPSSI sur e-impôts (formulaire unique G n°50).", 45, 780, { width: 505 });
