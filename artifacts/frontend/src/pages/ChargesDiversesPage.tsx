@@ -73,6 +73,7 @@ const CATEGORIES: Array<{ value: string; label: string; compte: string }> = [
   { value: "reception",       label: "Réceptions et hébergement",    compte: "627"  },
   { value: "entretien",       label: "Entretien et réparations",     compte: "624"  },
   { value: "honoraires",      label: "Honoraires et consultants",    compte: "632"  },
+  { value: "ppsi",            label: "Prestation informelle — PPSSI", compte: "632"  },
   { value: "publicite",       label: "Publicité et marketing",       compte: "627"  },
   { value: "autre",           label: "Autres charges",               compte: "658"  },
 ];
@@ -437,6 +438,11 @@ export default function ChargesDiversesPage() {
               <div className="space-y-1">
                 <Label>Montant (FCFA) *</Label>
                 <Input type="number" min="0" step="1" placeholder="Ex: 50000" value={form.montant_fcfa} onChange={e => setForm(f => ({ ...f, montant_fcfa: e.target.value }))} />
+                {form.categorie === "ppsi" && parseFloat(form.montant_fcfa) > 0 && (
+                  <p className="text-xs text-amber-700 mt-1">
+                    Retenue PPSSI estimée (2 %) : {fmtFcfa(parseFloat(form.montant_fcfa) * 0.02)} · Net prestataire : {fmtFcfa(parseFloat(form.montant_fcfa) * 0.98)}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -490,7 +496,7 @@ export default function ChargesDiversesPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <Label>Tiers / Fournisseur</Label>
+                <Label>Tiers / Fournisseur{form.categorie === "ppsi" ? " *" : ""}</Label>
                 <Input placeholder="Nom du prestataire" value={form.tiers} onChange={e => setForm(f => ({ ...f, tiers: e.target.value }))} />
               </div>
               <div className="space-y-1">

@@ -43,8 +43,12 @@ export async function handleCreateChargeDiverses(req: Request, res: Response): P
       compte_debit: string; compte_credit: string;
       mode_paiement: string; tiers?: string; reference_piece?: string;
     };
-    if (!body.date_charge || !body.libelle || !body.montant_fcfa || !body.categorie) {
+    if (!body.date_charge || !body.libelle || !body.montant_fcfa || body.montant_fcfa <= 0 || !body.categorie) {
       res.status(400).json({ erreur: "date_charge, libelle, montant_fcfa et categorie requis" });
+      return;
+    }
+    if (body.categorie === "ppsi" && !body.tiers?.trim()) {
+      res.status(400).json({ erreur: "Le nom du prestataire est requis pour une prestation soumise à la PPSSI" });
       return;
     }
     const row = await createChargeDiverses(cooperativeId, userId, {
@@ -208,4 +212,5 @@ const COMPTE_DEBIT_DEFAUT: Record<string, string> = {
   honoraires:       "632",
   publicite:        "627",
   autre:            "658",
+  ppsi:             "632",
 };

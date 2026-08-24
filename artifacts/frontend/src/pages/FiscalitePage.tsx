@@ -344,6 +344,7 @@ const TYPE_TAXE_OPTIONS = [
   { value: "taxe_apprentissage", label: "Taxe d'apprentissage (TA)" },
   { value: "fpc",                label: "FPC" },
   { value: "tse",                label: "TSE — Taxe Spéciale d'Équipement" },
+  { value: "ppsi",               label: "PPSI — Retenue secteur informel" },
   { value: "autre",              label: "Autre" },
 ];
 function TableauBordFiscal() {

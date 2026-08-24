@@ -14,6 +14,7 @@ import {
   lignesBulletinTable,
   personnelTable,
   configPaieTable,
+  chargesDiversesTable,
 } from "@workspace/db";
 import { eq, and, sql, gte, lte, or, inArray } from "drizzle-orm";
 import { assignerNumeroPiece } from "../lib/numeroPiece.js";
@@ -31,6 +32,7 @@ const COMPTE_DEBIT: Record<string, string> = {
   taxe_apprentissage: "447",
   fpc:                "447",
   autre:              "447",
+  ppsi:               "447",
 };
 
 type ModePaiementFiscal = "especes" | "mobile_marchand" | "virement" | "cheque";
@@ -84,6 +86,7 @@ const OBLIGATIONS_CI = [
   { typeTaxe: "fpc",               libelle: "Formation Professionnelle Continue (FPC)", periodicite: "annuel", jourEcheance: 31, tauxPct: "0.60", baseCalcul: "Masse salariale annuelle brute" },
   { typeTaxe: "impot_societes",    libelle: "Impôt sur les Sociétés (IS)",        periodicite: "annuel",  jourEcheance: 30, tauxPct: "25.00", baseCalcul: "Bénéfice net imposable" },
   { typeTaxe: "tse",               libelle: "TSE — Taxe Spéciale d'Équipement",   periodicite: "mensuel", jourEcheance: 20, tauxPct: "0.10", baseCalcul: "Chiffre d'affaires mensuel" },
+  { typeTaxe: "ppsi",              libelle: "PPSI — Retenue sur prestations du secteur informel", periodicite: "mensuel", jourEcheance: 20, tauxPct: "2.00", baseCalcul: "Montant brut des prestations informelles validées" },
 ] as const;
 
 export async function initObligationsCI(cooperativeId: number): Promise<{ creees: number; dejaPresentes: number }> {
@@ -211,6 +214,22 @@ async function getChiffreAffairesMensuel(cooperativeId: number, mois: number, an
   return parseFloat(result.rows[0]?.chiffre_affaires ?? "0") || 0;
 }
 
+async function getPrestationsPpsiMensuelles(cooperativeId: number, mois: number, annee: number): Promise<number> {
+  const debut = `${annee}-${String(mois).padStart(2, "0")}-01`;
+  const finDate = new Date(annee, mois, 1);
+  const fin = `${finDate.getFullYear()}-${String(finDate.getMonth() + 1).padStart(2, "0")}-01`;
+  const [row] = await db.select({ total: sql<string>`COALESCE(SUM(${chargesDiversesTable.montantFcfa}), 0)` })
+    .from(chargesDiversesTable)
+    .where(and(
+      eq(chargesDiversesTable.cooperativeId, cooperativeId),
+      eq(chargesDiversesTable.categorie, "ppsi"),
+      eq(chargesDiversesTable.statut, "valide"),
+      gte(chargesDiversesTable.dateCharge, debut),
+      sql`${chargesDiversesTable.dateCharge} < ${fin}`,
+    ));
+  return parseFloat(String(row?.total ?? "0")) || 0;
+}
+
 // ─── Génération déclarations mensuelles ───────────────────────────────────────
 
 export async function genererDeclarationsMensuelles(cooperativeId: number, mois: number, annee: number) {
@@ -251,6 +270,11 @@ export async function genererDeclarationsMensuelles(cooperativeId: number, mois:
       const taux = obl.tauxPct != null ? parseFloat(obl.tauxPct) / 100 : 0.001;
       baseImposable  = chiffreAffaires;
       montantCalcule = Math.round(chiffreAffaires * taux);
+    } else if (obl.typeTaxe === "ppsi") {
+      const brut = await getPrestationsPpsiMensuelles(cooperativeId, mois, annee);
+      const taux = obl.tauxPct != null ? parseFloat(obl.tauxPct) / 100 : 0.02;
+      baseImposable = brut;
+      montantCalcule = Math.round(brut * taux);
     }
 
     const echeance = dateEcheanceMensuelle(mois, annee, obl.jourEcheance ?? 15);
@@ -432,6 +456,8 @@ export async function recalculerDeclaration(cooperativeId: number, id: number): 
       const taux = obl.tauxPct != null ? parseFloat(obl.tauxPct) / 100 : 0.001;
       baseImposable  = chiffreAffaires;
       montantCalcule = Math.round(chiffreAffaires * taux);
+    } else if (obl.typeTaxe === "ppsi") {
+      throw new Error("La PPSI est une obligation mensuelle");
     }
   } else {
     // Période annuelle : "2026"
