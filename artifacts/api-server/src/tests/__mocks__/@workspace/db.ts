@@ -59,6 +59,23 @@ export const entrepotsDeleguesTable = makeTable("entrepots_delegues");
 export const bulletinsPaieTable = makeTable("bulletins_paie");
 export const lignesBulletinTable = makeTable("lignes_bulletin");
 export const personnelTable = makeTable("personnel");
+export const obligationsFiscalesTable = {
+  ...makeTable("obligations_fiscales"),
+  cooperativeId: {}, typeTaxe: {}, actif: {}, tauxPct: {}, id: {},
+  periodicite: {}, libelle: {}, jourEcheance: {}, baseCalcul: {},
+};
+export const declarationsFiscalesTable = {
+  ...makeTable("declarations_fiscales"),
+  id: {}, cooperativeId: {}, obligationId: {}, periode: {}, statut: {},
+  baseImposableFcfa: {}, montantCalculeFcfa: {}, montantPayeFcfa: {},
+  dateEcheance: {}, datePaiement: {}, referencePaiement: {},
+  penaliteRetardFcfa: {}, documentUrl: {}, updatedAt: {},
+};
+export const chargesDiversesTable = {
+  ...makeTable("charges_diverses"),
+  cooperativeId: {}, categorie: {}, statut: {}, dateCharge: {},
+  tiers: {}, montantFcfa: {}, referencePiece: {},
+};
 export const liberationsPartsTable = makeTable("liberations_parts");
 export const configPartsSocialesTable = makeTable("config_parts_sociales");
 export const expeditionsTable = makeTable("expeditions");
