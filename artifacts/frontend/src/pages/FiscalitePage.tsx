@@ -77,24 +77,30 @@ function ModalPaiement({ decl, onClose, onDone }: { decl: Declaration; onClose: 
   const [montant, setMontant] = useState(String(Math.round(parseFloat(decl.montant_calcule_fcfa) + parseFloat(decl.penalite_retard_fcfa || "0"))));
   const [reference, setReference] = useState("");
   const [datePaiement, setDatePaiement] = useState(new Date().toISOString().slice(0, 10));
-  const [modePaiement, setModePaiement] = useState<"especes" | "mobile_marchand">("especes");
+  const [modePaiement, setModePaiement] = useState<"especes" | "mobile_marchand" | "virement" | "cheque">("especes");
   const [caisseId, setCaisseId] = useState("");
   const [mobileCompteId, setMobileCompteId] = useState("");
+  const [banqueId, setBanqueId] = useState("");
   const [caisses, setCaisses] = useState<TresorerieOption[]>([]);
   const [mobiles, setMobiles] = useState<TresorerieOption[]>([]);
+  const [banques, setBanques] = useState<TresorerieOption[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     void Promise.all([
       fetch(`${BASE}/api/mobile-marchand/caisses`, { headers: { Authorization: `Bearer ${tok()}` } }).then(r => r.ok ? r.json() : []),
       fetch(`${BASE}/api/mobile-marchand`, { headers: { Authorization: `Bearer ${tok()}` } }).then(r => r.ok ? r.json() : []),
-    ]).then(([caissesData, mobilesData]) => {
+      fetch(`${BASE}/api/mobile-marchand/comptes-bancaires`, { headers: { Authorization: `Bearer ${tok()}` } }).then(r => r.ok ? r.json() : []),
+    ]).then(([caissesData, mobilesData, banquesData]) => {
       const nextCaisses = caissesData as TresorerieOption[];
       const nextMobiles = mobilesData as TresorerieOption[];
+      const nextBanques = banquesData as TresorerieOption[];
       setCaisses(nextCaisses);
       setMobiles(nextMobiles);
+      setBanques(nextBanques);
       if (nextCaisses[0]) setCaisseId(String(nextCaisses[0].id));
       if (nextMobiles[0]) setMobileCompteId(String(nextMobiles[0].id));
+      if (nextBanques[0]) setBanqueId(String(nextBanques[0].id));
     }).catch(() => undefined);
   }, []);
 
@@ -102,6 +108,7 @@ function ModalPaiement({ decl, onClose, onDone }: { decl: Declaration; onClose: 
     if (!montant || parseInt(montant) <= 0) { toast({ title: "Montant invalide", variant: "destructive" }); return; }
     if (modePaiement === "especes" && !caisseId) { toast({ title: "Caisse requise", description: "Sélectionnez la caisse qui règle la TSE.", variant: "destructive" }); return; }
     if (modePaiement === "mobile_marchand" && !mobileCompteId) { toast({ title: "Compte requis", description: "Sélectionnez le compte Mobile Marchand.", variant: "destructive" }); return; }
+    if ((modePaiement === "virement" || modePaiement === "cheque") && !banqueId) { toast({ title: "Compte bancaire requis", description: "Sélectionnez le compte bancaire.", variant: "destructive" }); return; }
     setLoading(true);
     try {
       const r = await fetch(`${BASE}/api/fiscalite/declarations/${decl.id}/payer`, {
@@ -110,7 +117,7 @@ function ModalPaiement({ decl, onClose, onDone }: { decl: Declaration; onClose: 
         body: JSON.stringify({
           montantPaye: parseInt(montant), reference, datePaiement, modePaiement,
           caisseId: modePaiement === "especes" ? Number(caisseId) : undefined,
-          mobileCompteId: modePaiement === "mobile_marchand" ? Number(mobileCompteId) : undefined,
+          mobileCompteId: modePaiement === "mobile_marchand" ? Number(mobileCompteId) : (modePaiement === "virement" || modePaiement === "cheque" ? Number(banqueId) : undefined),
         }),
       });
       const json = await r.json();
@@ -142,10 +149,12 @@ function ModalPaiement({ decl, onClose, onDone }: { decl: Declaration; onClose: 
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Mode de paiement *</label>
-            <select value={modePaiement} onChange={e => setModePaiement(e.target.value as "especes" | "mobile_marchand")}
+            <select value={modePaiement} onChange={e => setModePaiement(e.target.value as "especes" | "mobile_marchand" | "virement" | "cheque")}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
               <option value="especes">Espèces</option>
               <option value="mobile_marchand">Mobile Marchand</option>
+              <option value="virement">Virement bancaire</option>
+              <option value="cheque">Chèque</option>
             </select>
           </div>
           {modePaiement === "especes" ? (
@@ -157,13 +166,22 @@ function ModalPaiement({ decl, onClose, onDone }: { decl: Declaration; onClose: 
                 {caisses.map(c => <option key={c.id} value={c.id}>{c.nom} — {FCFA(c.solde_actuel_fcfa)}</option>)}
               </select>
             </div>
-          ) : (
+          ) : modePaiement === "mobile_marchand" ? (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Compte Mobile Marchand *</label>
               <select value={mobileCompteId} onChange={e => setMobileCompteId(e.target.value)}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
                 <option value="">Sélectionner un compte</option>
                 {mobiles.map(m => <option key={m.id} value={m.id}>{m.nom}{m.operateur ? ` (${m.operateur})` : ""} — {FCFA(m.solde_actuel_fcfa)}</option>)}
+              </select>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Compte bancaire *</label>
+              <select value={banqueId} onChange={e => setBanqueId(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                <option value="">Sélectionner un compte</option>
+                {banques.map(b => <option key={b.id} value={b.id}>{b.nom} — {FCFA(b.solde_actuel_fcfa)}</option>)}
               </select>
             </div>
           )}

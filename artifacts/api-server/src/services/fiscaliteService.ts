@@ -5,6 +5,8 @@ import {
   ecrituresComptablesTable,
   comptesMobilesMarchandsTable,
   mouvementsMobileMarchandTable,
+  comptesBancairesTable,
+  mouvementsBanqueTable,
   caissesTable,
   sessionsCaisseTable,
   mouvementsCaisseTable,
@@ -31,7 +33,7 @@ const COMPTE_DEBIT: Record<string, string> = {
   autre:              "447",
 };
 
-type ModePaiementFiscal = "especes" | "mobile_marchand";
+type ModePaiementFiscal = "especes" | "mobile_marchand" | "virement" | "cheque";
 
 function nomMois(m: number): string {
   return ["Janvier","Février","Mars","Avril","Mai","Juin",
@@ -525,7 +527,7 @@ export async function enregistrerPaiement(cooperativeId: number, id: number, dat
   const statut = data.montantPaye >= montantTotal ? "paye" : "a_payer";
   const montant = Math.round(data.montantPaye);
   if (!obl) throw new Error("Obligation introuvable");
-  if (data.modePaiement !== "especes" && data.modePaiement !== "mobile_marchand") {
+    if (!["especes", "mobile_marchand", "virement", "cheque"].includes(data.modePaiement)) {
     throw new Error("Mode de paiement invalide");
   }
 
@@ -554,7 +556,7 @@ export async function enregistrerPaiement(cooperativeId: number, id: number, dat
         soldeApresFcfa: nouveauSolde.toString(), enregistrePar: data.userId ?? null,
       });
       await tx.update(caissesTable).set({ soldeActuelFcfa: nouveauSolde.toString() }).where(eq(caissesTable.id, caisse.id));
-    } else {
+    } else if (data.modePaiement === "mobile_marchand") {
       if (!data.mobileCompteId) throw new Error("Un compte Mobile Marchand est requis");
       const [mobile] = await tx.select().from(comptesMobilesMarchandsTable)
         .where(and(eq(comptesMobilesMarchandsTable.id, data.mobileCompteId), eq(comptesMobilesMarchandsTable.cooperativeId, cooperativeId), eq(comptesMobilesMarchandsTable.actif, true)))
@@ -571,6 +573,23 @@ export async function enregistrerPaiement(cooperativeId: number, id: number, dat
       });
       await tx.update(comptesMobilesMarchandsTable).set({ soldeActuelFcfa: nouveauSolde.toString() }).where(eq(comptesMobilesMarchandsTable.id, mobile.id));
       compteCredit = "552";
+    } else {
+      if (!data.mobileCompteId) throw new Error("Un compte bancaire est requis");
+      const [banque] = await tx.select().from(comptesBancairesTable)
+        .where(and(eq(comptesBancairesTable.id, data.mobileCompteId), eq(comptesBancairesTable.cooperativeId, cooperativeId), eq(comptesBancairesTable.actif, true)))
+        .for("update").limit(1);
+      if (!banque) throw new Error("Compte bancaire introuvable ou inactif");
+      const solde = parseFloat(String(banque.soldeActuelFcfa));
+      if (solde < montant) throw new Error(`Solde bancaire insuffisant (${solde.toLocaleString("fr-FR")} FCFA disponible)`);
+      const nouveauSolde = solde - montant;
+      await tx.insert(mouvementsBanqueTable).values({
+        compteId: banque.id, cooperativeId, type: "debit", motif: "paiement_fiscal",
+        montantFcfa: montant.toString(), libelle: `Paiement ${obl.libelle} — ${decl.periode}`,
+        reference: data.reference ?? `FISC-${id}`, dateOperation,
+        dateValeur: null, soldeApresFcfa: nouveauSolde.toString(), enregistrePar: data.userId ?? null,
+      });
+      await tx.update(comptesBancairesTable).set({ soldeActuelFcfa: nouveauSolde.toString() }).where(eq(comptesBancairesTable.id, banque.id));
+      compteCredit = "521";
     }
 
     const exo = new Date(dateOperation).getFullYear();

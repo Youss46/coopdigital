@@ -102,7 +102,7 @@ export async function putPayer(req: Request, res: Response): Promise<void> {
     const id = parseInt(String(req.params["id"]), 10);
     const { montantPaye, reference, datePaiement, modePaiement, caisseId, mobileCompteId } = req.body as {
       montantPaye: number; reference?: string; datePaiement?: string;
-      modePaiement?: "especes" | "mobile_marchand"; caisseId?: number; mobileCompteId?: number;
+      modePaiement?: "especes" | "mobile_marchand" | "virement" | "cheque"; caisseId?: number; mobileCompteId?: number;
     };
     if (!montantPaye) { res.status(400).json({ error: "montantPaye requis" }); return; }
     res.json(await svc.enregistrerPaiement(cooperativeId, id, {
