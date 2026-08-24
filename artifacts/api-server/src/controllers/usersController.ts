@@ -192,7 +192,9 @@ export async function updateUser(req: Request, res: Response): Promise<void> {
       updateData.prenoms = parse.data.prenoms.trim();
     }
     if (parse.data.email !== undefined) updateData.email = parse.data.email;
-    if (parse.data.telephone !== undefined) updateData.telephone = parse.data.telephone;
+    if (parse.data.telephone !== undefined) {
+      updateData.telephone = parse.data.telephone.trim() || null;
+    }
     const rawUpdateBody = req.body as Record<string, unknown>;
     if (rawUpdateBody["modeGestion"] !== undefined && existing.role === "delegue") {
       updateData.modeGestion = (rawUpdateBody["modeGestion"] as "autonome" | "central") ?? null;

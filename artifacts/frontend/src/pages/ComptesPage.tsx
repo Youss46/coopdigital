@@ -651,14 +651,15 @@ interface EditIdentityModalProps {
   userId: number;
   nom: string;
   prenoms: string;
+  telephone?: string | null;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-function EditIdentityModal({ userId, nom, prenoms, onClose, onSuccess }: EditIdentityModalProps) {
+function EditIdentityModal({ userId, nom, prenoms, telephone, onClose, onSuccess }: EditIdentityModalProps) {
   const { toast } = useToast();
   const updateMutation = useUpdateUser();
-  const [form, setForm] = useState({ nom, prenoms });
+  const [form, setForm] = useState({ nom, prenoms, telephone: telephone ?? "" });
 
   function handleSave() {
     const nomTrimmed = form.nom.trim();
@@ -672,8 +673,16 @@ function EditIdentityModal({ userId, nom, prenoms, onClose, onSuccess }: EditIde
       return;
     }
 
+    const telephoneTrimmed = form.telephone.trim();
     updateMutation.mutate(
-      { id: userId, data: { nom: nomTrimmed, prenoms: prenomsTrimmed } },
+      {
+        id: userId,
+        data: {
+          nom: nomTrimmed,
+          prenoms: prenomsTrimmed,
+          ...(telephoneTrimmed ? { telephone: telephoneTrimmed } : {}),
+        },
+      },
       {
         onSuccess: () => {
           toast({ title: "Identité mise à jour" });
@@ -715,6 +724,17 @@ function EditIdentityModal({ userId, nom, prenoms, onClose, onSuccess }: EditIde
               onChange={(e) => setForm((current) => ({ ...current, nom: e.target.value }))}
               className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
             />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Numéro de téléphone</label>
+            <input
+              type="tel"
+              value={form.telephone}
+              onChange={(e) => setForm((current) => ({ ...current, telephone: e.target.value }))}
+              placeholder="Ex. 07 00 00 00 00"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
+            />
+            <p className="text-xs text-gray-400 mt-1">Laissez vide pour conserver le numéro actuel.</p>
           </div>
         </div>
         <div className="px-6 pb-5 flex gap-3">
@@ -1052,6 +1072,7 @@ export default function ComptesPage() {
     id: number;
     nom: string;
     prenoms: string;
+    telephone?: string | null;
   } | null>(null);
 
   // Accès refusé si pas PCA / Directeur
@@ -1200,6 +1221,7 @@ export default function ComptesPage() {
                                 id: compte.id,
                                 nom: compte.nom,
                                 prenoms: compte.prenoms,
+                                telephone: compte.telephone,
                               })
                             }
                             title="Modifier le nom et le prénom"
@@ -1340,6 +1362,7 @@ export default function ComptesPage() {
           userId={editIdentityTarget.id}
           nom={editIdentityTarget.nom}
           prenoms={editIdentityTarget.prenoms}
+          telephone={editIdentityTarget.telephone}
           onClose={() => setEditIdentityTarget(null)}
           onSuccess={() => void refetch()}
         />
