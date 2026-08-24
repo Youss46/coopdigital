@@ -266,6 +266,7 @@ const TYPE_TAXE_OPTIONS = [
   { value: "impot_societes",     label: "Impôt sur les sociétés (IS)" },
   { value: "taxe_apprentissage", label: "Taxe d'apprentissage (TA)" },
   { value: "fpc",                label: "FPC" },
+  { value: "tse",                label: "TSE — Taxe Spéciale d'Équipement" },
   { value: "autre",              label: "Autre" },
 ];
 function TableauBordFiscal() {
@@ -884,7 +885,7 @@ export default function FiscalitePage() {
         </div>
         <div>
           <h1 className="text-xl font-bold text-gray-900">Fiscalité</h1>
-          <p className="text-sm text-gray-400">CNPS, ITS, TA, FPC — obligations ivoiriennes</p>
+             <p className="text-sm text-gray-400">CNPS, ITS, TA, FPC, TSE — obligations ivoiriennes</p>
         </div>
       </div>
 

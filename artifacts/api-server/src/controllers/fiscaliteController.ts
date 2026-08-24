@@ -201,7 +201,7 @@ export async function patchObligationToggle(req: Request, res: Response): Promis
   }
 }
 
-const VALID_TYPE_TAXE   = ["cnps","its","tva","impot_societes","taxe_apprentissage","fpc","autre"];
+const VALID_TYPE_TAXE   = ["cnps","its","tva","impot_societes","taxe_apprentissage","fpc","tse","autre"];
 const VALID_PERIODICITE = ["mensuel","trimestriel","annuel"];
 
 function validateObligationFields(body: Record<string, unknown>): string | null {
