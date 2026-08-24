@@ -3,6 +3,11 @@ import {
   obligationsFiscalesTable,
   declarationsFiscalesTable,
   ecrituresComptablesTable,
+  comptesMobilesMarchandsTable,
+  mouvementsMobileMarchandTable,
+  caissesTable,
+  sessionsCaisseTable,
+  mouvementsCaisseTable,
   bulletinsPaieTable,
   lignesBulletinTable,
   personnelTable,
@@ -25,6 +30,8 @@ const COMPTE_DEBIT: Record<string, string> = {
   fpc:                "447",
   autre:              "447",
 };
+
+type ModePaiementFiscal = "especes" | "mobile_marchand";
 
 function nomMois(m: number): string {
   return ["Janvier","Février","Mars","Avril","Mai","Juin",
@@ -500,6 +507,10 @@ export async function enregistrerPaiement(cooperativeId: number, id: number, dat
   montantPaye: number;
   reference?: string;
   datePaiement?: string;
+  modePaiement: ModePaiementFiscal;
+  caisseId?: number;
+  mobileCompteId?: number;
+  userId?: number;
 }) {
   const today = new Date().toISOString().slice(0, 10);
   const [decl] = await db.select().from(declarationsFiscalesTable)
@@ -507,40 +518,81 @@ export async function enregistrerPaiement(cooperativeId: number, id: number, dat
                eq(declarationsFiscalesTable.cooperativeId, cooperativeId))).limit(1);
   if (!decl) throw new Error("Déclaration introuvable");
 
-  // Écriture comptable
   const oblResult = await db.select().from(obligationsFiscalesTable)
     .where(eq(obligationsFiscalesTable.id, decl.obligationId)).limit(1);
   const obl = oblResult[0];
-  if (obl) {
-    try {
-      const exo = new Date(data.datePaiement ?? today).getFullYear();
-      const [fscInserted] = await db.insert(ecrituresComptablesTable).values({
-        cooperativeId: cooperativeId,
-        dateEcriture:  data.datePaiement ?? today,
-        libelle:       `Paiement ${obl.libelle} — ${decl.periode}`,
-        compteDebit:   COMPTE_DEBIT[obl.typeTaxe] ?? "447",
-        compteCredit:  "521",
-        montantFcfa:   Math.round(data.montantPaye),
-        source:        "manuel" as "livraison" | "vente" | "avance" | "paiement" | "manuel" | "encaissement" | "salaire" | "stock",
-        sourceId:      id,
-        exercice:      exo,
-      }).returning({ id: ecrituresComptablesTable.id });
-      if (fscInserted) await assignerNumeroPiece(fscInserted.id, "manuel", exo);
-    } catch (err) { logger.warn({ err }, "Écriture comptable fiscalite"); }
-  }
-
   const montantTotal = parseFloat(decl.montantCalculeFcfa as string) + parseFloat(decl.penaliteRetardFcfa as string);
   const statut = data.montantPaye >= montantTotal ? "paye" : "a_payer";
+  const montant = Math.round(data.montantPaye);
+  if (!obl) throw new Error("Obligation introuvable");
+  if (data.modePaiement !== "especes" && data.modePaiement !== "mobile_marchand") {
+    throw new Error("Mode de paiement invalide");
+  }
 
-  const [updated] = await db.update(declarationsFiscalesTable).set({
-    montantPayeFcfa:  data.montantPaye.toString(),
-    referencePaiement: data.reference ?? null,
-    datePaiement:     data.datePaiement ?? today,
-    statut,
-    updatedAt:        new Date(),
-  }).where(eq(declarationsFiscalesTable.id, id)).returning();
+  const result = await db.transaction(async (tx) => {
+    const dateOperation = data.datePaiement ?? today;
+    let compteCredit = "571";
 
-  return updated;
+    if (data.modePaiement === "especes") {
+      if (!data.caisseId) throw new Error("Une caisse est requise pour un paiement en espèces");
+      const [caisse] = await tx.select().from(caissesTable)
+        .where(and(eq(caissesTable.id, data.caisseId), eq(caissesTable.cooperativeId, cooperativeId)))
+        .for("update").limit(1);
+      if (!caisse) throw new Error("Caisse introuvable");
+      const [session] = await tx.select({ id: sessionsCaisseTable.id }).from(sessionsCaisseTable)
+        .where(and(eq(sessionsCaisseTable.caisseId, caisse.id), eq(sessionsCaisseTable.dateSession, new Date().toISOString().slice(0, 10)), eq(sessionsCaisseTable.statut, "ouverte")))
+        .limit(1);
+      if (!session) throw new Error(`Aucune session ouverte sur la caisse "${caisse.nom}"`);
+      const solde = parseFloat(String(caisse.soldeActuelFcfa));
+      if (solde < montant) throw new Error(`Solde insuffisant en caisse (${solde.toLocaleString("fr-FR")} FCFA disponible)`);
+      const nouveauSolde = solde - montant;
+      await tx.insert(mouvementsCaisseTable).values({
+        caisseId: caisse.id, sessionId: session.id, cooperativeId,
+        type: "sortie", motif: "paiement_fiscal",
+        montantFcfa: montant.toString(), libelle: `Paiement ${obl.libelle} — ${decl.periode}`,
+        referenceOperation: data.reference ?? `FISC-${id}`,
+        soldeApresFcfa: nouveauSolde.toString(), enregistrePar: data.userId ?? null,
+      });
+      await tx.update(caissesTable).set({ soldeActuelFcfa: nouveauSolde.toString() }).where(eq(caissesTable.id, caisse.id));
+    } else {
+      if (!data.mobileCompteId) throw new Error("Un compte Mobile Marchand est requis");
+      const [mobile] = await tx.select().from(comptesMobilesMarchandsTable)
+        .where(and(eq(comptesMobilesMarchandsTable.id, data.mobileCompteId), eq(comptesMobilesMarchandsTable.cooperativeId, cooperativeId), eq(comptesMobilesMarchandsTable.actif, true)))
+        .for("update").limit(1);
+      if (!mobile) throw new Error("Compte Mobile Marchand introuvable ou inactif");
+      const solde = parseFloat(String(mobile.soldeActuelFcfa));
+      if (solde < montant) throw new Error(`Solde Mobile Marchand insuffisant (${solde.toLocaleString("fr-FR")} FCFA disponible)`);
+      const nouveauSolde = solde - montant;
+      await tx.insert(mouvementsMobileMarchandTable).values({
+        compteId: mobile.id, cooperativeId, type: "debit", motif: "paiement_fiscal",
+        montantFcfa: montant.toString(), libelle: `Paiement ${obl.libelle} — ${decl.periode}`,
+        reference: data.reference ?? `FISC-${id}`, dateOperation,
+        soldeApresFcfa: nouveauSolde.toString(), enregistrePar: data.userId ?? null,
+      });
+      await tx.update(comptesMobilesMarchandsTable).set({ soldeActuelFcfa: nouveauSolde.toString() }).where(eq(comptesMobilesMarchandsTable.id, mobile.id));
+      compteCredit = "572";
+    }
+
+    const exo = new Date(dateOperation).getFullYear();
+    const [ecriture] = await tx.insert(ecrituresComptablesTable).values({
+      cooperativeId, dateEcriture: dateOperation,
+      libelle: `Paiement ${obl.libelle} — ${decl.periode}`,
+      compteDebit: COMPTE_DEBIT[obl.typeTaxe] ?? "447",
+      compteCredit,
+      montantFcfa: montant,
+      source: "manuel" as "livraison" | "vente" | "avance" | "paiement" | "manuel" | "encaissement" | "salaire" | "stock",
+      sourceId: id, exercice: exo,
+    }).returning({ id: ecrituresComptablesTable.id });
+    const [updated] = await tx.update(declarationsFiscalesTable).set({
+      montantPayeFcfa: montant.toString(), referencePaiement: data.reference ?? null,
+      datePaiement: dateOperation, statut, updatedAt: new Date(),
+    }).where(eq(declarationsFiscalesTable.id, id)).returning();
+    return { updated, ecritureId: ecriture?.id, exercice: exo };
+  });
+  if (result.ecritureId) {
+    await assignerNumeroPiece(result.ecritureId, "manuel", result.exercice, cooperativeId);
+  }
+  return result.updated;
 }
 
 // ─── Calendrier 3 mois ────────────────────────────────────────────────────────

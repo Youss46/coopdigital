@@ -33,6 +33,13 @@ interface Declaration {
   type_taxe: string; libelle: string; periodicite: string;
   jours_retard: number | null;
 }
+interface TresorerieOption {
+  id: number;
+  nom: string;
+  operateur?: string;
+  solde_actuel_fcfa: string | number;
+  session_ouverte?: boolean;
+}
 
 interface CalendrierItem {
   id: number; periode: string; montant_calcule_fcfa: string;
@@ -70,16 +77,41 @@ function ModalPaiement({ decl, onClose, onDone }: { decl: Declaration; onClose: 
   const [montant, setMontant] = useState(String(Math.round(parseFloat(decl.montant_calcule_fcfa) + parseFloat(decl.penalite_retard_fcfa || "0"))));
   const [reference, setReference] = useState("");
   const [datePaiement, setDatePaiement] = useState(new Date().toISOString().slice(0, 10));
+  const [modePaiement, setModePaiement] = useState<"especes" | "mobile_marchand">("especes");
+  const [caisseId, setCaisseId] = useState("");
+  const [mobileCompteId, setMobileCompteId] = useState("");
+  const [caisses, setCaisses] = useState<TresorerieOption[]>([]);
+  const [mobiles, setMobiles] = useState<TresorerieOption[]>([]);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    void Promise.all([
+      fetch(`${BASE}/api/mobile-marchand/caisses`, { headers: { Authorization: `Bearer ${tok()}` } }).then(r => r.ok ? r.json() : []),
+      fetch(`${BASE}/api/mobile-marchand`, { headers: { Authorization: `Bearer ${tok()}` } }).then(r => r.ok ? r.json() : []),
+    ]).then(([caissesData, mobilesData]) => {
+      const nextCaisses = caissesData as TresorerieOption[];
+      const nextMobiles = mobilesData as TresorerieOption[];
+      setCaisses(nextCaisses);
+      setMobiles(nextMobiles);
+      if (nextCaisses[0]) setCaisseId(String(nextCaisses[0].id));
+      if (nextMobiles[0]) setMobileCompteId(String(nextMobiles[0].id));
+    }).catch(() => undefined);
+  }, []);
 
   const submit = async () => {
     if (!montant || parseInt(montant) <= 0) { toast({ title: "Montant invalide", variant: "destructive" }); return; }
+    if (modePaiement === "especes" && !caisseId) { toast({ title: "Caisse requise", description: "Sélectionnez la caisse qui règle la TSE.", variant: "destructive" }); return; }
+    if (modePaiement === "mobile_marchand" && !mobileCompteId) { toast({ title: "Compte requis", description: "Sélectionnez le compte Mobile Marchand.", variant: "destructive" }); return; }
     setLoading(true);
     try {
       const r = await fetch(`${BASE}/api/fiscalite/declarations/${decl.id}/payer`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok()}` },
-        body: JSON.stringify({ montantPaye: parseInt(montant), reference, datePaiement }),
+        body: JSON.stringify({
+          montantPaye: parseInt(montant), reference, datePaiement, modePaiement,
+          caisseId: modePaiement === "especes" ? Number(caisseId) : undefined,
+          mobileCompteId: modePaiement === "mobile_marchand" ? Number(mobileCompteId) : undefined,
+        }),
       });
       const json = await r.json();
       if (!r.ok) throw new Error(json.error ?? "Erreur");
@@ -108,6 +140,33 @@ function ModalPaiement({ decl, onClose, onDone }: { decl: Declaration; onClose: 
             )}
             <p className="font-semibold text-gray-800 mt-1 border-t pt-1">Total : {FCFA(total)}</p>
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Mode de paiement *</label>
+            <select value={modePaiement} onChange={e => setModePaiement(e.target.value as "especes" | "mobile_marchand")}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+              <option value="especes">Espèces</option>
+              <option value="mobile_marchand">Mobile Marchand</option>
+            </select>
+          </div>
+          {modePaiement === "especes" ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Caisse *</label>
+              <select value={caisseId} onChange={e => setCaisseId(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                <option value="">Sélectionner une caisse</option>
+                {caisses.map(c => <option key={c.id} value={c.id}>{c.nom} — {FCFA(c.solde_actuel_fcfa)}</option>)}
+              </select>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Compte Mobile Marchand *</label>
+              <select value={mobileCompteId} onChange={e => setMobileCompteId(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                <option value="">Sélectionner un compte</option>
+                {mobiles.map(m => <option key={m.id} value={m.id}>{m.nom}{m.operateur ? ` (${m.operateur})` : ""} — {FCFA(m.solde_actuel_fcfa)}</option>)}
+              </select>
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Montant payé (FCFA) *</label>
             <MoneyInput value={montant} onChange={(raw) => setMontant(raw)}

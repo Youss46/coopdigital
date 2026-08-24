@@ -100,11 +100,15 @@ export async function putPayer(req: Request, res: Response): Promise<void> {
     const cooperativeId = req.user?.cooperativeId;
     if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const id = parseInt(String(req.params["id"]), 10);
-    const { montantPaye, reference, datePaiement } = req.body as {
+    const { montantPaye, reference, datePaiement, modePaiement, caisseId, mobileCompteId } = req.body as {
       montantPaye: number; reference?: string; datePaiement?: string;
+      modePaiement?: "especes" | "mobile_marchand"; caisseId?: number; mobileCompteId?: number;
     };
     if (!montantPaye) { res.status(400).json({ error: "montantPaye requis" }); return; }
-    res.json(await svc.enregistrerPaiement(cooperativeId, id, { montantPaye: Math.round(montantPaye), reference, datePaiement }));
+    res.json(await svc.enregistrerPaiement(cooperativeId, id, {
+      montantPaye: Math.round(montantPaye), reference, datePaiement,
+      modePaiement: modePaiement ?? "especes", caisseId, mobileCompteId, userId: req.user?.id,
+    }));
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Erreur serveur";
     req.log.error({ err }, "putPayer");
