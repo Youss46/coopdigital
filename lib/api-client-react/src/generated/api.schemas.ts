@@ -792,6 +792,8 @@ export interface LivraisonDetail {
   id: number;
   membreId: number;
   poidsKg: string;
+  /** @nullable */
+  produitBrutKg?: string | null;
   prixUnitaireFcfa: number;
   montantBrutFcfa: number;
   avanceDeduiteFcfa: number;
@@ -2057,6 +2059,7 @@ export type CampagneStatut = typeof CampagneStatut[keyof typeof CampagneStatut];
 
 
 export const CampagneStatut = {
+  programmee: 'programmee',
   ouverte: 'ouverte',
   fermee: 'fermee',
   archivee: 'archivee',

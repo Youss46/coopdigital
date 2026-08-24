@@ -269,6 +269,7 @@ export const GetMembreHistoriqueResponse = zod.object({
   "id": zod.number(),
   "membreId": zod.number(),
   "poidsKg": zod.string(),
+  "produitBrutKg": zod.string().nullish(),
   "prixUnitaireFcfa": zod.number(),
   "montantBrutFcfa": zod.number(),
   "avanceDeduiteFcfa": zod.number(),
@@ -438,6 +439,7 @@ export const GetLivraisonsResponseItem = zod.object({
   "id": zod.number(),
   "membreId": zod.number(),
   "poidsKg": zod.string(),
+  "produitBrutKg": zod.string().nullish(),
   "prixUnitaireFcfa": zod.number(),
   "montantBrutFcfa": zod.number(),
   "avanceDeduiteFcfa": zod.number(),
@@ -479,6 +481,7 @@ export const GetLivraisonsNonLoteesResponseItem = zod.object({
   "id": zod.number(),
   "membreId": zod.number(),
   "poidsKg": zod.string(),
+  "produitBrutKg": zod.string().nullish(),
   "prixUnitaireFcfa": zod.number(),
   "montantBrutFcfa": zod.number(),
   "avanceDeduiteFcfa": zod.number(),
@@ -519,6 +522,7 @@ export const GetDashboardLivraisonsResponseItem = zod.object({
   "id": zod.number(),
   "membreId": zod.number(),
   "poidsKg": zod.string(),
+  "produitBrutKg": zod.string().nullish(),
   "prixUnitaireFcfa": zod.number(),
   "montantBrutFcfa": zod.number(),
   "avanceDeduiteFcfa": zod.number(),
@@ -719,6 +723,7 @@ export const GetLotTracabiliteResponse = zod.object({
   "id": zod.number(),
   "membreId": zod.number(),
   "poidsKg": zod.string(),
+  "produitBrutKg": zod.string().nullish(),
   "prixUnitaireFcfa": zod.number(),
   "montantBrutFcfa": zod.number(),
   "avanceDeduiteFcfa": zod.number(),
@@ -2198,7 +2203,7 @@ export const GetCampagneActiveResponse = zod.object({
   "anneeFin": zod.number(),
   "dateOuverture": zod.coerce.date(),
   "dateFermeture": zod.coerce.date().nullish(),
-  "statut": zod.enum(['ouverte', 'fermee', 'archivee']),
+  "statut": zod.enum(['programmee', 'ouverte', 'fermee', 'archivee']),
   "tonnageCibleKg": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 })
@@ -2220,7 +2225,7 @@ export const GetComparaisonCampagnesResponseItem = zod.object({
   "anneeFin": zod.number(),
   "dateOuverture": zod.coerce.date(),
   "dateFermeture": zod.coerce.date().nullish(),
-  "statut": zod.enum(['ouverte', 'fermee', 'archivee']),
+  "statut": zod.enum(['programmee', 'ouverte', 'fermee', 'archivee']),
   "tonnageCibleKg": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 }),
@@ -2274,7 +2279,7 @@ export const ListCampagnesResponseItem = zod.object({
   "anneeFin": zod.number(),
   "dateOuverture": zod.coerce.date(),
   "dateFermeture": zod.coerce.date().nullish(),
-  "statut": zod.enum(['ouverte', 'fermee', 'archivee']),
+  "statut": zod.enum(['programmee', 'ouverte', 'fermee', 'archivee']),
   "tonnageCibleKg": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 })
@@ -2309,7 +2314,7 @@ export const GetCampagneResponse = zod.object({
   "anneeFin": zod.number(),
   "dateOuverture": zod.coerce.date(),
   "dateFermeture": zod.coerce.date().nullish(),
-  "statut": zod.enum(['ouverte', 'fermee', 'archivee']),
+  "statut": zod.enum(['programmee', 'ouverte', 'fermee', 'archivee']),
   "tonnageCibleKg": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 })
@@ -2334,7 +2339,7 @@ export const FermerCampagneResponse = zod.object({
   "anneeFin": zod.number(),
   "dateOuverture": zod.coerce.date(),
   "dateFermeture": zod.coerce.date().nullish(),
-  "statut": zod.enum(['ouverte', 'fermee', 'archivee']),
+  "statut": zod.enum(['programmee', 'ouverte', 'fermee', 'archivee']),
   "tonnageCibleKg": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 })
@@ -2399,7 +2404,7 @@ export const CloturerCampagneResponse = zod.object({
   "anneeFin": zod.number(),
   "dateOuverture": zod.coerce.date(),
   "dateFermeture": zod.coerce.date().nullish(),
-  "statut": zod.enum(['ouverte', 'fermee', 'archivee']),
+  "statut": zod.enum(['programmee', 'ouverte', 'fermee', 'archivee']),
   "tonnageCibleKg": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 }),
@@ -2457,7 +2462,7 @@ export const GetBilanCampagneResponse = zod.object({
   "anneeFin": zod.number(),
   "dateOuverture": zod.coerce.date(),
   "dateFermeture": zod.coerce.date().nullish(),
-  "statut": zod.enum(['ouverte', 'fermee', 'archivee']),
+  "statut": zod.enum(['programmee', 'ouverte', 'fermee', 'archivee']),
   "tonnageCibleKg": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 }),
@@ -7338,7 +7343,7 @@ export const ListPrevisionsCampagnesResponseItem = zod.object({
   "anneeFin": zod.number(),
   "dateOuverture": zod.coerce.date(),
   "dateFermeture": zod.coerce.date().nullish(),
-  "statut": zod.enum(['ouverte', 'fermee', 'archivee']),
+  "statut": zod.enum(['programmee', 'ouverte', 'fermee', 'archivee']),
   "tonnageCibleKg": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 })

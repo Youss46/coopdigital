@@ -7485,6 +7485,8 @@ components:
           type: integer
         poidsKg:
           type: string
+        produitBrutKg:
+          type: ["string", "null"]
         prixUnitaireFcfa:
           type: integer
         montantBrutFcfa:
@@ -8807,7 +8809,7 @@ components:
           format: date
         statut:
           type: string
-          enum: [ouverte, fermee, archivee]
+          enum: [programmee, ouverte, fermee, archivee]
         tonnageCibleKg:
           type: ["string", "null"]
         createdAt:

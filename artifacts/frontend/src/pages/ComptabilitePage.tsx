@@ -2931,7 +2931,7 @@ function OngletCloture() {
 
   // ── Régularisations ────────────────────────────────────────────────────────
   const [rType,      setRType]      = useState<TypeRegul>("408");
-  const [rCompteRegul, setRCompteRegul] = useState(TYPES_REGUL[0].defaultRegul);
+  const [rCompteRegul, setRCompteRegul] = useState<string>(TYPES_REGUL[0].defaultRegul);
   const [rCompte,    setRCompte]    = useState("");
   const [rLibelle,   setRLibelle]   = useState("");
   const [rMontant,   setRMontant]   = useState(0);
@@ -2980,7 +2980,7 @@ function OngletCloture() {
   const handleDeleteRegul = async (id: number) => {
     setDeletingId(id);
     try {
-      await apiFetch(`/api/comptabilite/regularisations/${id}`, { method: "DELETE" });
+      await apiDelete(`/api/comptabilite/regularisations/${id}`);
       toast({ title: "Régularisation supprimée" });
       void regulQuery.refetch();
       void apercu.refetch();
@@ -3137,7 +3137,7 @@ function OngletCloture() {
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">IS / Impôt résultat (FCFA)</label>
-            <MoneyInput value={impot} onChange={setImpot} className="w-44" placeholder="0" />
+            <MoneyInput value={impot} onChange={(raw) => setImpot(Number(raw) || 0)} className="w-44" placeholder="0" />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Stock final cacao (FCFA) <span className="text-gray-400">— optionnel</span></label>
@@ -3232,7 +3232,7 @@ function OngletCloture() {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Montant (FCFA)</label>
-              <MoneyInput value={rMontant} onChange={setRMontant} className="w-full" placeholder="0" />
+              <MoneyInput value={rMontant} onChange={(raw) => setRMontant(Number(raw) || 0)} className="w-full" placeholder="0" />
             </div>
             <div className="flex items-end">
               <button onClick={() => void handleAddRegul()} disabled={rLoading}
@@ -3628,18 +3628,18 @@ function OngletCloture() {
                 <label className="block text-xs font-medium text-gray-500 mb-1">
                   Réserve légale (1061) <span className="text-gray-400">— min. 5&nbsp;% recommandé</span>
                 </label>
-                <MoneyInput value={reserveLegale} onChange={setReserveLegale} className="w-full" placeholder="0" />
+                <MoneyInput value={reserveLegale} onChange={(raw) => setReserveLegale(Number(raw) || 0)} className="w-full" placeholder="0" />
                 {reserveLegale > 0 && reserveLegale < reserveMin && (
                   <p className="text-xs text-amber-600 mt-1">⚠ Minimum OHADA recommandé : {FCFA(reserveMin)}</p>
                 )}
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Report à nouveau (110)</label>
-                <MoneyInput value={reportANouveau} onChange={setReportANouveau} className="w-full" placeholder="0" />
+                <MoneyInput value={reportANouveau} onChange={(raw) => setReportANouveau(Number(raw) || 0)} className="w-full" placeholder="0" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Ristournes membres (4461)</label>
-                <MoneyInput value={ristournes} onChange={setRistournes} className="w-full" placeholder="0" />
+                <MoneyInput value={ristournes} onChange={(raw) => setRistournes(Number(raw) || 0)} className="w-full" placeholder="0" />
               </div>
             </div>
 

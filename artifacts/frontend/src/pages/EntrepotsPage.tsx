@@ -8,7 +8,12 @@ import {
   RefreshCw, Eye, Pencil, Power, PowerOff, SlidersHorizontal, ChevronDown, ChevronUp, FileDown,
 } from "lucide-react";
 import { usePermission } from "@/hooks/usePermission";
-import { useGetVehicules, useGetChauffeurs } from "@workspace/api-client-react";
+import {
+  useGetVehicules,
+  useGetChauffeurs,
+  getGetVehiculesQueryKey,
+  getGetChauffeursQueryKey,
+} from "@workspace/api-client-react";
 
 const API = import.meta.env.VITE_API_URL ?? "";
 const tok = () => localStorage.getItem("coop_token") ?? "";
@@ -202,8 +207,12 @@ export default function EntrepotsPage() {
     enabled: onglet === "transferts" || !!showDetail,
   });
 
-  const { data: vehiculesData } = useGetVehicules({ query: { enabled: !!showTransfert } });
-  const { data: chauffeursData } = useGetChauffeurs({ query: { enabled: !!showTransfert } });
+  const { data: vehiculesData } = useGetVehicules({
+    query: { enabled: !!showTransfert, queryKey: getGetVehiculesQueryKey() },
+  });
+  const { data: chauffeursData } = useGetChauffeurs({
+    query: { enabled: !!showTransfert, queryKey: getGetChauffeursQueryKey() },
+  });
   const vehiculesCoop = (vehiculesData?.vehicules ?? []).filter((v: { statut?: string }) => v.statut === "disponible" || v.statut === "en_mission");
   const chauffeursCoop = (chauffeursData?.chauffeurs ?? []).filter((c: { statut?: string }) => c.statut === "actif");
 

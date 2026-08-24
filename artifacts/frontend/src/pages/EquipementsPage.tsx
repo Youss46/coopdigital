@@ -540,7 +540,7 @@ function OngletAmortissements() {
             <Button
               className="bg-green-700 hover:bg-green-800 text-white"
               disabled={dotMut.isPending}
-              onClick={() => dotMut.mutate({ data: { annee } })}
+        onClick={() => dotMut.mutate({ data: { annee, mois: 12 } })}
             >
               <RefreshCw className={`w-4 h-4 mr-2 ${dotMut.isPending ? "animate-spin" : ""}`} />
               Générer les dotations {annee}

@@ -13,6 +13,7 @@ import {
   ListPaiementsStatut,
   ListPaiementsPeriode,
   type PaiementListItem,
+  type ValiderPaiementInputModePaiement,
   getListPaiementsQueryKey,
   getGetPaiementsStatsQueryKey,
 } from "@workspace/api-client-react";
@@ -602,7 +603,7 @@ export default function ReglementsPage() {
     qc.invalidateQueries({ queryKey: getGetPaiementsStatsQueryKey() });
   }
 
-  async function handleValider(ref: string, telephone: string, mode?: string) {
+  async function handleValider(ref: string, telephone: string, mode?: ValiderPaiementInputModePaiement) {
     if (modal?.type !== "valider") return;
     // Le backend n'accepte modePaiement que si : (a) pas de mode pré-sélectionné, ou (b) bon carburant
     const hasPresetMode = !!modal.paiement.modePaiement;
@@ -962,7 +963,7 @@ export default function ReglementsPage() {
         <ModalValidation
           paiement={modal.paiement}
           onClose={() => setModal(null)}
-          onConfirm={handleValider}
+          onConfirm={(ref, telephone, mode) => void handleValider(ref, telephone, mode as ValiderPaiementInputModePaiement | undefined)}
           loading={validerMut.isPending}
           sessionCaisseOuverte={isDelegue ? sessionDelegueOuverte : sessionCentraleOuverte}
           isDelegue={isDelegue}
