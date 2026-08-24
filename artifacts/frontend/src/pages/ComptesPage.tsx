@@ -646,6 +646,100 @@ function EditModeGestionModal({ userId, nom, prenoms, modeGestionActuel, onClose
   );
 }
 
+// ——— Modal édition identité ———
+interface EditIdentityModalProps {
+  userId: number;
+  nom: string;
+  prenoms: string;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+function EditIdentityModal({ userId, nom, prenoms, onClose, onSuccess }: EditIdentityModalProps) {
+  const { toast } = useToast();
+  const updateMutation = useUpdateUser();
+  const [form, setForm] = useState({ nom, prenoms });
+
+  function handleSave() {
+    const nomTrimmed = form.nom.trim();
+    const prenomsTrimmed = form.prenoms.trim();
+    if (!nomTrimmed || !prenomsTrimmed) {
+      toast({
+        title: "Champs obligatoires",
+        description: "Le nom et le prénom sont obligatoires.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    updateMutation.mutate(
+      { id: userId, data: { nom: nomTrimmed, prenoms: prenomsTrimmed } },
+      {
+        onSuccess: () => {
+          toast({ title: "Identité mise à jour" });
+          onSuccess();
+          onClose();
+        },
+        onError: (err: unknown) => {
+          toast({
+            title: "Erreur",
+            description: err instanceof Error ? err.message : "Impossible de mettre à jour l'identité",
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+        <div className="px-6 py-5 border-b border-gray-100">
+          <h3 className="font-bold text-gray-900">Modifier l’identité</h3>
+          <p className="text-xs text-gray-500 mt-0.5">Mettez à jour le nom et le prénom de l’individu.</p>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Prénom(s)</label>
+            <input
+              value={form.prenoms}
+              onChange={(e) => setForm((current) => ({ ...current, prenoms: e.target.value }))}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Nom</label>
+            <input
+              value={form.nom}
+              onChange={(e) => setForm((current) => ({ ...current, nom: e.target.value }))}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
+            />
+          </div>
+        </div>
+        <div className="px-6 pb-5 flex gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Annuler
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={updateMutation.isPending}
+            className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-60"
+            style={{ backgroundColor: "#1a4731" }}
+          >
+            {updateMutation.isPending ? "Enregistrement…" : "Enregistrer"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ——— Modal confirmation suppression ———
 interface DeleteModalProps {
   nom: string;
@@ -954,6 +1048,11 @@ export default function ComptesPage() {
     prenoms: string;
     modeGestion: "autonome" | "central";
   } | null>(null);
+  const [editIdentityTarget, setEditIdentityTarget] = useState<{
+    id: number;
+    nom: string;
+    prenoms: string;
+  } | null>(null);
 
   // Accès refusé si pas PCA / Directeur
   if (!["pca", "directeur"].includes(requesterRole)) {
@@ -1094,6 +1193,21 @@ export default function ComptesPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
+                          {/* Modifier le nom et le prénom */}
+                          <button
+                            onClick={() =>
+                              setEditIdentityTarget({
+                                id: compte.id,
+                                nom: compte.nom,
+                                prenoms: compte.prenoms,
+                              })
+                            }
+                            title="Modifier le nom et le prénom"
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-green-700 hover:bg-green-50 transition-colors"
+                          >
+                            <Pencil size={15} />
+                          </button>
+
                           {/* Modifier le mode de gestion — délégués uniquement */}
                           {(compte.role as string) === "delegue" && !isOwn && (
                             <button
@@ -1216,6 +1330,17 @@ export default function ComptesPage() {
           prenoms={editModeGestionTarget.prenoms}
           modeGestionActuel={editModeGestionTarget.modeGestion}
           onClose={() => setEditModeGestionTarget(null)}
+          onSuccess={() => void refetch()}
+        />
+      )}
+
+      {/* Modal édition identité */}
+      {editIdentityTarget && (
+        <EditIdentityModal
+          userId={editIdentityTarget.id}
+          nom={editIdentityTarget.nom}
+          prenoms={editIdentityTarget.prenoms}
+          onClose={() => setEditIdentityTarget(null)}
           onSuccess={() => void refetch()}
         />
       )}

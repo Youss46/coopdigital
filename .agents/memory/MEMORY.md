@@ -67,3 +67,4 @@
 - [Certification par livraison](delivery-certification-receipt.md) — le reçu doit privilégier la certification choisie pour la pesée, et non la certification permanente du profil membre.
 - [Peseur sur documents terrain](terrain-peseur-document-signature.md) — les pesées d’un peseur central doivent renseigner peseurId pour afficher son nom dans la zone de signature.
 - [Création des livraisons par pesée uniquement](livraisons-creation-pesee-only.md) — la page Livraisons consulte; seules les parcours dédiés de pesée créent une livraison.
+- [Modification de l’identité des comptes](admin-identity-editing.md) — PCA et Directeur peuvent modifier nom/prénoms depuis Administration, avec contrôle serveur.

@@ -157,6 +157,11 @@ export async function updateUser(req: Request, res: Response): Promise<void> {
   const id = parseInt(String(req.params["id"] ?? "0"), 10);
   if (!id) { res.status(400).json({ erreur: "ID invalide" }); return; }
 
+  if (!ROLES_ALLOWED_TO_MANAGE.includes(req.user?.role ?? "")) {
+    res.status(403).json({ erreur: "Accès réservé au PCA et au Directeur" });
+    return;
+  }
+
   const cooperativeId = getCoopId(req);
   if (!cooperativeId) {
     res.status(401).json({ erreur: "Coopérative non associée au compte" });
@@ -178,8 +183,14 @@ export async function updateUser(req: Request, res: Response): Promise<void> {
     if (!existing) { res.status(404).json({ erreur: "Compte introuvable" }); return; }
 
     const updateData: Partial<typeof usersTable.$inferInsert> = {};
-    if (parse.data.nom !== undefined) updateData.nom = parse.data.nom;
-    if (parse.data.prenoms !== undefined) updateData.prenoms = parse.data.prenoms;
+    if (parse.data.nom !== undefined) {
+      if (!parse.data.nom.trim()) { res.status(400).json({ erreur: "Le nom ne peut pas être vide" }); return; }
+      updateData.nom = parse.data.nom.trim();
+    }
+    if (parse.data.prenoms !== undefined) {
+      if (!parse.data.prenoms.trim()) { res.status(400).json({ erreur: "Le prénom ne peut pas être vide" }); return; }
+      updateData.prenoms = parse.data.prenoms.trim();
+    }
     if (parse.data.email !== undefined) updateData.email = parse.data.email;
     if (parse.data.telephone !== undefined) updateData.telephone = parse.data.telephone;
     const rawUpdateBody = req.body as Record<string, unknown>;
