@@ -570,7 +570,7 @@ export async function enregistrerPaiement(cooperativeId: number, id: number, dat
         soldeApresFcfa: nouveauSolde.toString(), enregistrePar: data.userId ?? null,
       });
       await tx.update(comptesMobilesMarchandsTable).set({ soldeActuelFcfa: nouveauSolde.toString() }).where(eq(comptesMobilesMarchandsTable.id, mobile.id));
-      compteCredit = "572";
+      compteCredit = "552";
     }
 
     const exo = new Date(dateOperation).getFullYear();
