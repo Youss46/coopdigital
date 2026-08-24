@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  Package, Search, Plus, Loader2, ChevronRight, Calendar,
+  Package, Search, Loader2, ChevronRight, Calendar,
   Scale, Banknote, TrendingDown, ArrowDownCircle, FileDown,
   Warehouse, ChevronDown, MapPin, User, Printer, ClipboardList,
   ArrowRight, CheckCircle2, AlertCircle,
@@ -11,7 +11,6 @@ import {
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 
-const ROLES_CREER = ["pca", "directeur", "delegue"];
 const ROLES_VOIR_DELEGUES = ["pca", "directeur", "magasinier", "comptable", "auditeur"];
 const ROLES_VOIR_SESSIONS = ["pca", "directeur", "magasinier", "comptable", "caissier", "auditeur"];
 
@@ -302,7 +301,6 @@ function SessionsPeseeSection() {
 
 export default function LivraisonsPage() {
   const { utilisateur } = useAuth();
-  const peutCreer = ROLES_CREER.includes(utilisateur?.role ?? "");
   const voitDelegues = ROLES_VOIR_DELEGUES.includes(utilisateur?.role ?? "");
   const voitSessions = ROLES_VOIR_SESSIONS.includes(utilisateur?.role ?? "");
   const [recherche, setRecherche] = useState("");
@@ -347,15 +345,6 @@ export default function LivraisonsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Livraisons</h1>
           <p className="text-gray-500 text-sm mt-0.5">Historique des pesées de cacao</p>
         </div>
-        {peutCreer && (
-          <Link href="/livraisons/nouvelle">
-            <a className="flex items-center gap-2 text-sm font-medium text-white px-4 py-2.5 rounded-xl"
-               style={{ backgroundColor: "#1a4731" }}>
-              <Plus size={15} />
-              Nouvelle livraison
-            </a>
-          </Link>
-        )}
       </div>
 
       {/* KPIs résumé */}
@@ -442,15 +431,6 @@ export default function LivraisonsPage() {
             titre={recherche ? "Aucun résultat pour cette recherche" : "Aucune livraison enregistrée"}
             description={!recherche ? "Les livraisons pesées apparaîtront ici." : undefined}
           />
-          {!recherche && peutCreer && (
-            <Link href="/livraisons/nouvelle">
-              <a className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-white px-4 py-2 rounded-lg"
-                 style={{ backgroundColor: "#1a4731" }}>
-                <Plus size={14} />
-                Enregistrer une livraison
-              </a>
-            </Link>
-          )}
         </div>
       ) : (
         <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-100 overflow-hidden">

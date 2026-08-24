@@ -52,7 +52,9 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
 
   livraisons: {
     lire:      ["pca", "directeur", "comptable", "caissier", "responsable_tracabilite", "delegue", "magasinier", "auditeur"],
-    creer:     ["pca", "directeur", "delegue"],
+    // Les livraisons sont créées exclusivement par les parcours de pesée
+    // dédiés (terrain/session), jamais depuis la page Livraisons.
+    creer:     [],
     modifier:  ["pca", "directeur"],
     supprimer: ["pca", "directeur"],
   },

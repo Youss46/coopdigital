@@ -659,9 +659,8 @@ export default function DashboardDelegue() {
       </div>
 
       {/* Actions rapides */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         {[
-          { label: "Nouvelle livraison", path: "/livraisons/nouvelle", color: "bg-amber-500" },
           { label: "Octroyer une avance", path: "/avances", color: "bg-indigo-500" },
           { label: "Mes membres", path: "/membres", color: "bg-emerald-500" },
         ].map((a) => (

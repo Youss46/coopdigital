@@ -15,7 +15,6 @@ import MissionDetailPage from "@/pages/MissionDetailPage";
 import MembreFiche from "@/pages/MembreFiche";
 import Avances from "@/pages/Avances";
 import PrimesPage from "@/pages/PrimesPage";
-import NouvelleLivraison from "@/pages/NouvelleLivraison";
 import LivraisonsPage from "@/pages/LivraisonsPage";
 import SessionsPeseePage from "@/pages/SessionsPeseePage";
 import BonsReceptionMembresDeleguesPage from "@/pages/BonsReceptionMembresDeleguesPage";
@@ -147,7 +146,7 @@ function AppRoutes() {
         <ProtectedRoute component={Avances} />
       </Route>
       <Route path="/livraisons/nouvelle">
-        <ProtectedRoute component={NouvelleLivraison} roles={["pca", "directeur", "delegue"]} />
+        <Redirect to="/livraisons" />
       </Route>
       <Route path="/livraisons">
         <ProtectedRoute component={LivraisonsPage} />
