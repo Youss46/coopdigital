@@ -325,7 +325,7 @@ export function getFaq() {
     {
       categorie: "Livraisons",
       questions: [
-        { q: "Comment saisir une livraison ?", a: "Livraisons > Nouvelle livraison. Scanner le QR du membre ou chercher par nom. Saisir le poids brut." },
+        { q: "Comment saisir une livraison ?", a: "Une livraison est enregistrée exclusivement depuis le parcours de pesée dédié. La page Livraisons sert uniquement à consulter l'historique." },
         { q: "L'avance est-elle déduite automatiquement ?", a: "Oui, si le membre a une avance en cours, elle est déduite automatiquement du montant net à payer." },
       ],
     },

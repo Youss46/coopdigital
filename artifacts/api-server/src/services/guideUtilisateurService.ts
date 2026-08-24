@@ -301,15 +301,14 @@ function generateGuideContent(doc: PdfDoc) {
 
   // ══ 5. LIVRAISONS ════════════════════════════════════════════════════════════
   newPage(doc, "5. Livraisons de cacao");
-  sectionTitle(doc, "Saisir une livraison");
-  step(doc, 1, "Cliquez sur « + Nouvelle livraison ».");
-  step(doc, 2, "Recherchez le membre par nom/code ou scannez son QR code.");
-  step(doc, 3, "Saisissez le poids brut en kg et le type de produit.");
+  sectionTitle(doc, "Enregistrer une livraison");
+  step(doc, 1, "La livraison doit être enregistrée par le peseur depuis le parcours de pesée dédié.");
+  step(doc, 2, "Le peseur recherche le membre par nom/code ou scanne son QR code.");
+  step(doc, 3, "Il saisit le poids brut en kg, le type de produit et valide la pesée.");
   step(doc, 4, "Le montant brut est calculé automatiquement (poids × prix unitaire).");
   step(doc, 5, "Les déductions d'avance et d'intrants s'affichent automatiquement.");
-  step(doc, 6, "Vérifiez le montant net payable, puis validez.");
-  step(doc, 7, "Téléchargez le reçu PDF si besoin.");
-  tip(doc, "La déduction d'avance est automatique et irréversible — vérifiez le montant net avant de valider.");
+  step(doc, 6, "La page Livraisons est réservée à la consultation de l'historique et au suivi des pesées.");
+  tip(doc, "La déduction d'avance est automatique et irréversible — le peseur doit vérifier le montant net avant de valider.");
   sectionTitle(doc, "Règlements");
   step(doc, 1, "Sélectionnez les livraisons à régler.");
   step(doc, 2, "Choisissez le mode : espèces, Mobile Money ou virement.");
