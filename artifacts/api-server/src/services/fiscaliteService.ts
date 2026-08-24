@@ -568,14 +568,15 @@ export async function exporterPpsi(cooperativeId: number, mois: number, annee: n
     ))
     .orderBy(chargesDiversesTable.dateCharge);
 
-  const taux = 0.02;
+  const taux = await getTauxPpsi(cooperativeId);
+  const tauxLibelle = taux.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
   const csvCell = (value: string | number | null | undefined) =>
     `"${String(value ?? "").replaceAll('"', '""')}"`;
   const lines = [
-    ["Période", "Date prestation", "Prestataire", "Montant brut (FCFA)", "Retenue PPSSI (2 %) (FCFA)", "Net prestataire (FCFA)", "Référence"].map(csvCell).join(";"),
+    ["Période", "Date prestation", "Prestataire", "Montant brut (FCFA)", `Retenue PPSSI (${tauxLibelle} %) (FCFA)`, "Net prestataire (FCFA)", "Référence"].map(csvCell).join(";"),
     ...rows.map(row => {
       const brut = parseFloat(String(row.brut ?? 0)) || 0;
-      const retenue = Math.round(brut * taux);
+      const retenue = calculerRetenuePpsi(brut, taux);
       return [
         `${nomMois(mois)} ${annee}`, row.date, row.prestataire, Math.round(brut), retenue, Math.round(brut - retenue), row.reference,
       ].map(csvCell).join(";");
@@ -599,6 +600,8 @@ export async function genererPpsiPdf(cooperativeId: number, mois: number, annee:
     sql`${chargesDiversesTable.dateCharge} < ${fin}`,
   )).orderBy(chargesDiversesTable.dateCharge);
 
+  const taux = await getTauxPpsi(cooperativeId);
+  const tauxLibelle = taux.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
   const chunks: Buffer[] = [];
   const fmtFcfa = (n: number) => `${new Intl.NumberFormat("fr-FR").format(n)} FCFA`;
   const doc = new PDFDocument({ size: "A4", margin: 45 });
@@ -610,10 +613,10 @@ export async function genererPpsiPdf(cooperativeId: number, mois: number, annee:
   doc.font("Helvetica-Bold").fontSize(15).fillColor("#1a4731")
     .text(`Retenue PPSSI — ${nomMois(mois)} ${annee}`);
   doc.moveDown(0.4).font("Helvetica").fontSize(9).fillColor("#555")
-    .text("Prestations du secteur informel validées — taux de retenue : 2 %");
+    .text(`Prestations du secteur informel validées — taux de retenue : ${tauxLibelle} %`);
   let y = doc.y + 18;
   const cols = [45, 112, 270, 385, 475];
-  const heads = ["Date", "Prestataire", "Montant brut", "Retenue 2 %", "Net"];
+  const heads = ["Date", "Prestataire", "Montant brut", `Retenue ${tauxLibelle} %`, "Net"];
   doc.font("Helvetica-Bold").fontSize(8).fillColor("#166534");
   heads.forEach((h, i) => doc.text(h, cols[i]!, y, { width: (cols[i + 1] ?? 550) - cols[i]! - 5 }));
   y += 16;
@@ -621,7 +624,7 @@ export async function genererPpsiPdf(cooperativeId: number, mois: number, annee:
   doc.font("Helvetica").fontSize(8).fillColor("#222");
   for (const row of rows) {
     const brut = Math.round(parseFloat(String(row.brut ?? 0)) || 0);
-    const retenue = Math.round(brut * 0.02);
+    const retenue = calculerRetenuePpsi(brut, taux);
     const net = brut - retenue;
     totalBrut += brut; totalRetenue += retenue; totalNet += net;
     [String(row.date ?? ""), String(row.prestataire ?? "—"), fmtFcfa(brut), fmtFcfa(retenue), fmtFcfa(net)]
