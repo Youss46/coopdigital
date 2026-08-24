@@ -7,7 +7,7 @@ vi.mock("../services/pdfHeaderService.js", () => ({
   drawFooter: vi.fn().mockResolvedValue(undefined),
 }));
 
-const { exporterPpsi, genererPpsiPdf } = await import("../services/fiscaliteService.js");
+const { exporterPpsi, genererPpsiPdf, getTauxPpsi } = await import("../services/fiscaliteService.js");
 
 type PpsiRow = {
   date: string;
@@ -30,10 +30,16 @@ function selectChain<T>(rows: T[], withLimit = false) {
   return chain;
 }
 
-function mockPpsiQueries(rows: PpsiRow[], taux: string) {
+function mockPpsiQueries(rows: PpsiRow[], taux?: string | null) {
   vi.mocked(db.select)
     .mockReturnValueOnce(selectChain(rows) as never)
-    .mockReturnValueOnce(selectChain([{ tauxPct: taux }], true) as never);
+    .mockReturnValueOnce(selectChain(taux === undefined ? [] : [{ tauxPct: taux }], true) as never);
+}
+
+function mockTauxQuery(taux?: string | null) {
+  vi.mocked(db.select).mockReturnValueOnce(
+    selectChain(taux === undefined ? [] : [{ tauxPct: taux }], true) as never,
+  );
 }
 
 function csvFields(line: string): string[] {
@@ -127,5 +133,42 @@ describe("exports PPSI avec le taux configuré par coopérative", () => {
     expect(normalizedPdfText).toContain("26250 FCFA");
     expect(normalizedPdfText).toContain("323750 FCFA");
     expect(26_250 + 323_750).toBe(350_000);
+  });
+
+  it.each([
+    ["obligation absente", undefined],
+    ["taux nul", "0"],
+    ["taux négatif", "-1"],
+    ["taux supérieur à 100", "100.01"],
+    ["taux non numérique", "invalide"],
+  ])("utilise 2 % comme repli pour une configuration invalide (%s)", async (_cas, taux) => {
+    mockTauxQuery(taux);
+
+    await expect(getTauxPpsi(42)).resolves.toBe(2);
+  });
+
+  it("garde le taux de repli cohérent dans les montants CSV et PDF", async () => {
+    mockPpsiQueries(rows, "0");
+    const csv = await exporterPpsi(42, 8, 2026);
+    const lines = csv.replace("\uFEFF", "").trim().split("\r\n");
+    const header = csvFields(lines[0]!);
+    const values = lines.slice(1).map(csvFields);
+
+    expect(header[4]).toBe("Retenue PPSSI (2 %) (FCFA)");
+    expect(values.map(value => [value[4], value[5]])).toEqual([
+      ["2000", "98000"],
+      ["5000", "245000"],
+    ]);
+
+    mockPpsiQueries(rows, "0");
+    const pdfText = extractPdfText(await genererPpsiPdf(42, 8, 2026));
+    const normalizedPdfText = pdfText.replace(/(?<=\d)[ /]+(?=\d)/g, "");
+
+    expect(normalizedPdfText).toContain("taux de retenue : 2 %");
+    expect(normalizedPdfText).toContain("Retenue 2 %");
+    expect(normalizedPdfText).toContain("2000 FCFA");
+    expect(normalizedPdfText).toContain("5000 FCFA");
+    expect(normalizedPdfText).toContain("7000 FCFA");
+    expect(normalizedPdfText).toContain("343000 FCFA");
   });
 });

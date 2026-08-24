@@ -100,7 +100,9 @@ export async function getTauxPpsi(cooperativeId: number): Promise<number> {
     ))
     .limit(1);
   const taux = obligation?.tauxPct == null ? 2 : parseFloat(obligation.tauxPct);
-  return Number.isFinite(taux) && taux >= 0 && taux <= 100 ? taux : 2;
+  // Un taux nul ou hors bornes est une configuration invalide : ne jamais
+  // produire une retenue inattendue, utiliser le taux légal de repli.
+  return Number.isFinite(taux) && taux > 0 && taux <= 100 ? taux : 2;
 }
 
 /** Retenue PPSI bornée au brut, y compris pour une configuration historique. */
