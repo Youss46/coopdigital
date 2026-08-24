@@ -7,10 +7,10 @@ const router = Router();
 // ── Obligations (static routes before dynamic :id) ─────────────────────────
 router.get("/fiscalite/obligations/all",         checkPermission("fiscalite", "voir"),       ctrl.getAllObligations);
 router.get("/fiscalite/obligations",             checkPermission("fiscalite", "voir"),       ctrl.getObligations);
-router.post("/fiscalite/obligations/init-ci",    checkPermission("fiscalite", "generer"),    ctrl.postInitObligationsCI);
-router.post("/fiscalite/obligations",            checkPermission("fiscalite", "generer"),    ctrl.postObligation);
-router.put("/fiscalite/obligations/:id",         checkPermission("fiscalite", "generer"),    ctrl.putObligation);
-router.patch("/fiscalite/obligations/:id/toggle",checkPermission("fiscalite", "generer"),    ctrl.patchObligationToggle);
+router.post("/fiscalite/obligations/init-ci",    checkPermission("fiscalite", "configurer"),  ctrl.postInitObligationsCI);
+router.post("/fiscalite/obligations",            checkPermission("fiscalite", "configurer"),  ctrl.postObligation);
+router.put("/fiscalite/obligations/:id",         checkPermission("fiscalite", "configurer"),  ctrl.putObligation);
+router.patch("/fiscalite/obligations/:id/toggle",checkPermission("fiscalite", "configurer"),  ctrl.patchObligationToggle);
 
 // ── Déclarations ───────────────────────────────────────────────────────────
 router.post("/fiscalite/generer/:mois/:annee",   checkPermission("fiscalite", "generer"),    ctrl.postGenererMensuel);

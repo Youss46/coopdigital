@@ -1133,6 +1133,10 @@ function SectionObligations({ onObligationsChange }: { onObligationsChange?: () 
           </button>
         </div>
       </div>
+      <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+        Si votre coopérative n’est pas assujettie à la TSE, utilisez le bouton d’activation situé sur sa ligne pour la désactiver.
+        Les déclarations déjà créées restent conservées ; aucune nouvelle TSE ne sera générée tant qu’elle est inactive.
+      </div>
 
       {loading && (
         <div className="flex items-center justify-center h-24">
