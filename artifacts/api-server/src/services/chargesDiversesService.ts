@@ -1,5 +1,6 @@
 import { db, chargesDiversesTable } from "@workspace/db";
 import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
+import { getTauxPpsi } from "./fiscaliteService.js";
 
 export type CreateChargeInput = {
   dateCharge: string;
@@ -74,9 +75,31 @@ export async function validerChargeDiverses(
   id: number,
   approvedBy: number,
 ) {
+  const [charge] = await db.select().from(chargesDiversesTable)
+    .where(and(
+      eq(chargesDiversesTable.id, id),
+      eq(chargesDiversesTable.cooperativeId, cooperativeId),
+      eq(chargesDiversesTable.statut, "brouillon"),
+    )).limit(1);
+  if (!charge) return null;
+
+  const isPpsi = charge.categorie === "ppsi";
+  const tauxPpsi = isPpsi ? await getTauxPpsi(cooperativeId) : null;
+  const brut = Math.round(parseFloat(charge.montantFcfa));
+  const retenue = isPpsi ? Math.min(brut, Math.round(brut * tauxPpsi! / 100)) : 0;
   const [row] = await db
     .update(chargesDiversesTable)
-    .set({ statut: "valide", approvedBy, approvedAt: new Date(), updatedAt: new Date() })
+    .set({
+      statut: "valide",
+      approvedBy,
+      approvedAt: new Date(),
+      updatedAt: new Date(),
+      ...(isPpsi ? {
+        ppsiTauxPct: tauxPpsi!.toFixed(2),
+        retenuePpsiFcfa: retenue,
+        montantNetFcfa: brut - retenue,
+      } : {}),
+    })
     .where(and(eq(chargesDiversesTable.id, id), eq(chargesDiversesTable.cooperativeId, cooperativeId), eq(chargesDiversesTable.statut, "brouillon")))
     .returning();
   return row ?? null;

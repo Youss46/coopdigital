@@ -47,6 +47,9 @@ interface Charge {
   libelle: string;
   description: string | null;
   montant_fcfa: number;
+  ppsi_taux_pct: number | null;
+  retenue_ppsi_fcfa: number;
+  montant_net_fcfa: number | null;
   categorie: string;
   compte_debit: string;
   compte_credit: string;
@@ -364,7 +367,8 @@ export default function ChargesDiversesPage() {
                   <TableHead>Libellé</TableHead>
                   <TableHead>Catégorie</TableHead>
                   <TableHead>Tiers / Fournisseur</TableHead>
-                  <TableHead className="text-right">Montant</TableHead>
+                   <TableHead className="text-right">Montant brut</TableHead>
+                   <TableHead className="text-right">Net prestataire</TableHead>
                   <TableHead>Compte (D/C)</TableHead>
                   <TableHead>Statut</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -380,9 +384,17 @@ export default function ChargesDiversesPage() {
                     </TableCell>
                     <TableCell className="text-sm text-gray-600">{catLabel(c.categorie)}</TableCell>
                     <TableCell className="text-sm text-gray-600">{c.tiers ?? "—"}</TableCell>
-                    <TableCell className="text-right font-semibold text-sm">
+                     <TableCell className="text-right font-semibold text-sm">
                       {fmtFcfa(c.montant_fcfa)}
                     </TableCell>
+                     <TableCell className="text-right text-sm">
+                       {c.categorie === "ppsi" ? (
+                         <div>
+                           <span className="font-semibold">{fmtFcfa(c.montant_net_fcfa ?? c.montant_fcfa - c.retenue_ppsi_fcfa)}</span>
+                           <p className="text-xs text-amber-700">Retenue {fmtFcfa(c.retenue_ppsi_fcfa)}</p>
+                         </div>
+                       ) : "—"}
+                     </TableCell>
                     <TableCell className="text-xs text-gray-500 font-mono">{c.compte_debit} / {c.compte_credit}</TableCell>
                     <TableCell>
                       <Badge className={STATUT_BADGE[c.statut] ?? "bg-gray-100 text-gray-600"}>

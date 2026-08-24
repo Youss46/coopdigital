@@ -127,17 +127,40 @@ export async function handleValiderChargeDiverses(req: Request, res: Response): 
     const row = await validerChargeDiverses(cooperativeId, id, userId);
     if (!row) { res.status(404).json({ erreur: "Charge introuvable ou déjà validée" }); return; }
 
-    // Écriture comptable OHADA — respecte le toggle auto/manuel de la coopérative
-    void proposerEcriture(cooperativeId, {
-      source:       "charges_diverses",
-      sourceId:     row.id,
-      libelle:      row.libelle,
-      compteDebit:  row.compteDebit,
-      compteCredit: row.compteCredit,
-      montantFcfa:  Math.round(parseFloat(row.montantFcfa)),
-      date:         row.dateCharge,
-      numeroPiece:  row.referencePiece ?? undefined,
-    });
+    // Pour une prestation informelle, le brut crée la dette prestataire,
+    // la retenue la transfère vers la dette fiscale, et seul le net sort.
+    const brut = Math.round(parseFloat(row.montantFcfa));
+    if (row.categorie === "ppsi") {
+      const retenue = row.retenuePpsiFcfa ?? 0;
+      const net = row.montantNetFcfa ?? brut - retenue;
+      const piece = row.referencePiece ?? `PPSI-${row.id}`;
+      const compteTresorerie = row.modePaiement === "mobile_money" ? "552"
+        : row.modePaiement === "virement" || row.modePaiement === "cheque" ? "521"
+        : "571";
+      const entries = [
+        { compteDebit: row.compteDebit, compteCredit: "401", montantFcfa: brut, libelle: `Prestation brute — ${row.libelle}` },
+        ...(retenue > 0 ? [{ compteDebit: "401", compteCredit: "447", montantFcfa: retenue, libelle: `Retenue PPSI — ${row.libelle}` }] : []),
+        ...(net > 0 ? [{ compteDebit: "401", compteCredit: compteTresorerie, montantFcfa: net, libelle: `Règlement net prestataire — ${row.libelle}` }] : []),
+      ];
+      await Promise.all(entries.map(entry => proposerEcriture(cooperativeId, {
+        source: "charges_diverses",
+        sourceId: row.id,
+        ...entry,
+        date: row.dateCharge,
+        numeroPiece: piece,
+      })));
+    } else {
+      await proposerEcriture(cooperativeId, {
+        source: "charges_diverses",
+        sourceId: row.id,
+        libelle: row.libelle,
+        compteDebit: row.compteDebit,
+        compteCredit: row.compteCredit,
+        montantFcfa: brut,
+        date: row.dateCharge,
+        numeroPiece: row.referencePiece ?? undefined,
+      });
+    }
 
     res.json(mapCharge(row));
   } catch (err) {
@@ -185,6 +208,9 @@ function mapCharge(r: Awaited<ReturnType<typeof getChargeDiverses>>) {
     libelle:          r.libelle,
     description:      r.description ?? null,
     montant_fcfa:     parseFloat(r.montantFcfa),
+    ppsi_taux_pct:    r.ppsiTauxPct == null ? null : parseFloat(r.ppsiTauxPct),
+    retenue_ppsi_fcfa: r.retenuePpsiFcfa ?? 0,
+    montant_net_fcfa: r.montantNetFcfa ?? null,
     categorie:        r.categorie,
     compte_debit:     r.compteDebit,
     compte_credit:    r.compteCredit,

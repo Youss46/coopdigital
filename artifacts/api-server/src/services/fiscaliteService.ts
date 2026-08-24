@@ -89,6 +89,19 @@ const OBLIGATIONS_CI = [
   { typeTaxe: "ppsi",              libelle: "PPSI — Retenue sur prestations du secteur informel", periodicite: "mensuel", jourEcheance: 20, tauxPct: "2.00", baseCalcul: "Montant brut des prestations informelles validées" },
 ] as const;
 
+/** Taux courant de retenue PPSI, configuré par coopérative (défaut légal 2%). */
+export async function getTauxPpsi(cooperativeId: number): Promise<number> {
+  const [obligation] = await db.select({ tauxPct: obligationsFiscalesTable.tauxPct })
+    .from(obligationsFiscalesTable)
+    .where(and(
+      eq(obligationsFiscalesTable.cooperativeId, cooperativeId),
+      eq(obligationsFiscalesTable.typeTaxe, "ppsi"),
+      eq(obligationsFiscalesTable.actif, true),
+    ))
+    .limit(1);
+  const taux = obligation?.tauxPct == null ? 2 : parseFloat(obligation.tauxPct);
+  return Number.isFinite(taux) && taux >= 0 && taux <= 100 ? taux : 2;
+}
 export async function initObligationsCI(cooperativeId: number): Promise<{ creees: number; dejaPresentes: number }> {
   const existantes = await db.select({ typeTaxe: obligationsFiscalesTable.typeTaxe, libelle: obligationsFiscalesTable.libelle })
     .from(obligationsFiscalesTable)
