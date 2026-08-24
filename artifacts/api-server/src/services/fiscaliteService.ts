@@ -74,7 +74,7 @@ const OBLIGATIONS_CI = [
   { typeTaxe: "taxe_apprentissage",libelle: "Taxe d'Apprentissage (TA)",          periodicite: "annuel",  jourEcheance: 30, tauxPct: "0.50", baseCalcul: "Masse salariale annuelle brute" },
   { typeTaxe: "fpc",               libelle: "Formation Professionnelle Continue (FPC)", periodicite: "annuel", jourEcheance: 31, tauxPct: "0.60", baseCalcul: "Masse salariale annuelle brute" },
   { typeTaxe: "impot_societes",    libelle: "Impôt sur les Sociétés (IS)",        periodicite: "annuel",  jourEcheance: 30, tauxPct: "25.00", baseCalcul: "Bénéfice net imposable" },
-  { typeTaxe: "tse",               libelle: "TSE — Taxe Spéciale d'Équipement",   periodicite: "annuel",  jourEcheance: 31, tauxPct: "0.10", baseCalcul: "Chiffre d'affaires annuel" },
+  { typeTaxe: "tse",               libelle: "TSE — Taxe Spéciale d'Équipement",   periodicite: "mensuel", jourEcheance: 20, tauxPct: "0.10", baseCalcul: "Chiffre d'affaires mensuel" },
 ] as const;
 
 export async function initObligationsCI(cooperativeId: number): Promise<{ creees: number; dejaPresentes: number }> {
@@ -190,6 +190,18 @@ async function getChiffreAffairesAnnuel(cooperativeId: number, annee: number): P
   return parseFloat(result.rows[0]?.chiffre_affaires ?? "0") || 0;
 }
 
+async function getChiffreAffairesMensuel(cooperativeId: number, mois: number, annee: number): Promise<number> {
+  const result = await db.execute<{ chiffre_affaires: string }>(sql`
+    SELECT COALESCE(SUM(montant_fcfa), 0)::text AS chiffre_affaires
+    FROM ecritures_comptables
+    WHERE cooperative_id = ${cooperativeId}
+      AND date_ecriture >= make_date(${annee}, ${mois}, 1)
+      AND date_ecriture < (make_date(${annee}, ${mois}, 1) + INTERVAL '1 month')::date
+      AND compte_credit = '701'
+  `);
+  return parseFloat(result.rows[0]?.chiffre_affaires ?? "0") || 0;
+}
+
 // ─── Génération déclarations mensuelles ───────────────────────────────────────
 
 export async function genererDeclarationsMensuelles(cooperativeId: number, mois: number, annee: number) {
@@ -225,6 +237,11 @@ export async function genererDeclarationsMensuelles(cooperativeId: number, mois:
     } else if (obl.typeTaxe === "its") {
       baseImposable  = bases.totalBrut;
       montantCalcule = bases.totalIts;
+    } else if (obl.typeTaxe === "tse") {
+      const chiffreAffaires = await getChiffreAffairesMensuel(cooperativeId, mois, annee);
+      const taux = obl.tauxPct != null ? parseFloat(obl.tauxPct) / 100 : 0.001;
+      baseImposable  = chiffreAffaires;
+      montantCalcule = Math.round(chiffreAffaires * taux);
     }
 
     const echeance = dateEcheanceMensuelle(mois, annee, obl.jourEcheance ?? 15);
@@ -280,9 +297,6 @@ export async function genererDeclarationsAnnuelles(cooperativeId: number, annee:
   const obligations = await listObligations(cooperativeId);
   const annuelles = obligations.filter(o => o.periodicite === "annuel");
   const bases = await getBasesAnnuelles(cooperativeId, annee);
-  const chiffreAffaires = annuelles.some(o => o.typeTaxe === "tse")
-    ? await getChiffreAffairesAnnuel(cooperativeId, annee)
-    : 0;
   const generees: typeof declarationsFiscalesTable.$inferSelect[] = [];
 
   for (const obl of annuelles) {
@@ -310,10 +324,6 @@ export async function genererDeclarationsAnnuelles(cooperativeId: number, annee:
     } else if (obl.typeTaxe === "impot_societes") {
       baseImposable  = 0;
       montantCalcule = 0; // calculé manuellement par le comptable
-    } else if (obl.typeTaxe === "tse") {
-      const taux = obl.tauxPct != null ? parseFloat(obl.tauxPct) / 100 : 0.001;
-      baseImposable  = chiffreAffaires;
-      montantCalcule = Math.round(chiffreAffaires * taux);
     }
 
     const echeance = dateEcheanceAnnuelle(annee, obl.jourEcheance ?? 31, obl.typeTaxe);
@@ -408,6 +418,11 @@ export async function recalculerDeclaration(cooperativeId: number, id: number): 
     } else if (obl.typeTaxe === "its") {
       baseImposable  = bases.totalBrut;
       montantCalcule = bases.totalIts;
+    } else if (obl.typeTaxe === "tse") {
+      const chiffreAffaires = await getChiffreAffairesMensuel(cooperativeId, mois, annee);
+      const taux = obl.tauxPct != null ? parseFloat(obl.tauxPct) / 100 : 0.001;
+      baseImposable  = chiffreAffaires;
+      montantCalcule = Math.round(chiffreAffaires * taux);
     }
   } else {
     // Période annuelle : "2026"
