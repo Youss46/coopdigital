@@ -651,6 +651,51 @@ function Declarations() {
     }
   };
 
+  const getPpsiPeriod = (d: Declaration) => {
+    const [moisNom, anneeStr] = d.periode.trim().split(/\s+/);
+    return { mois: MOIS_EXPORT[(moisNom ?? "").toLowerCase()], annee: Number(anneeStr) };
+  };
+
+  const handleExportPpsiPdf = async (d: Declaration) => {
+    const { mois, annee } = getPpsiPeriod(d);
+    if (!mois || !annee) return;
+    try {
+      const r = await fetch(`${BASE}/api/fiscalite/ppsi/export-pdf/${mois}/${annee}`, { headers: { Authorization: `Bearer ${tok()}` } });
+      if (!r.ok) throw new Error("Erreur lors de la génération du PDF");
+      const url = URL.createObjectURL(await r.blob());
+      openPdfViewer(url, `ppsi-${annee}-${String(mois).padStart(2, "0")}.pdf`);
+    } catch (e) {
+      toast({ title: "Export PDF impossible", description: e instanceof Error ? e.message : "Erreur", variant: "destructive" });
+    }
+  };
+
+  const handleExportPpsiExcel = async (d: Declaration) => {
+    const { mois, annee } = getPpsiPeriod(d);
+    if (!mois || !annee) return;
+    try {
+      const r = await fetch(`${BASE}/api/fiscalite/ppsi/export/${mois}/${annee}`, { headers: { Authorization: `Bearer ${tok()}` } });
+      if (!r.ok) throw new Error("Erreur lors de la récupération des données");
+      const csv = await r.text();
+      const ExcelJS = (await import("exceljs")).default;
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet("PPSSI");
+      csv.replace(/^\uFEFF/, "").trim().split(/\r?\n/).forEach(line => {
+        const cells: string[] = [];
+        line.replace(/"((?:""|[^"])*)"(?:;|$)/g, (_match, value: string) => { cells.push(value.replaceAll('""', '"')); return ""; });
+        ws.addRow(cells);
+      });
+      ws.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+      ws.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF166534" } };
+      ws.columns.forEach(col => { col.width = Math.min(Math.max((col.header?.toString().length ?? 12) + 4, 14), 35); });
+      const buffer = await wb.xlsx.writeBuffer();
+      const url = URL.createObjectURL(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+      const link = document.createElement("a"); link.href = url; link.download = `ppsi-${annee}-${String(mois).padStart(2, "0")}.xlsx`; link.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      toast({ title: "Export Excel impossible", description: e instanceof Error ? e.message : "Erreur", variant: "destructive" });
+    }
+  };
+
   return (
     <div>
       {/* Barre actions */}
@@ -749,13 +794,16 @@ function Declarations() {
                             </button>
                           )}
                           {d.type_taxe === "ppsi" && (
-                            <button
-                              onClick={() => void handleExportPpsi(d)}
-                              title="Exporter la déclaration PPSSI"
-                              className="p-1 rounded text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors"
-                            >
-                              <Download size={13} />
-                            </button>
+                            <>
+                              <button onClick={() => void handleExportPpsiPdf(d)} title="Télécharger la PPSSI en PDF"
+                                className="p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors">
+                                <span className="text-[10px] font-bold">PDF</span>
+                              </button>
+                              <button onClick={() => void handleExportPpsiExcel(d)} title="Télécharger la PPSSI en Excel"
+                                className="p-1 rounded text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors">
+                                <span className="text-[10px] font-bold">XLSX</span>
+                              </button>
+                            </>
                           )}
                           {d.statut === "paye" && (
                             <span className="flex items-center gap-1 text-xs text-green-600">

@@ -564,6 +564,60 @@ export async function exporterPpsi(cooperativeId: number, mois: number, annee: n
   return `\uFEFF${lines.join("\r\n")}\r\n`;
 }
 
+export async function genererPpsiPdf(cooperativeId: number, mois: number, annee: number): Promise<Buffer> {
+  const debut = `${annee}-${String(mois).padStart(2, "0")}-01`;
+  const finDate = new Date(annee, mois, 1);
+  const fin = `${finDate.getFullYear()}-${String(finDate.getMonth() + 1).padStart(2, "0")}-01`;
+  const rows = await db.select({
+    date: chargesDiversesTable.dateCharge, prestataire: chargesDiversesTable.tiers,
+    brut: chargesDiversesTable.montantFcfa, reference: chargesDiversesTable.referencePiece,
+  }).from(chargesDiversesTable).where(and(
+    eq(chargesDiversesTable.cooperativeId, cooperativeId),
+    eq(chargesDiversesTable.categorie, "ppsi"),
+    eq(chargesDiversesTable.statut, "valide"),
+    gte(chargesDiversesTable.dateCharge, debut),
+    sql`${chargesDiversesTable.dateCharge} < ${fin}`,
+  )).orderBy(chargesDiversesTable.dateCharge);
+
+  const chunks: Buffer[] = [];
+  const doc = new PDFDocument({ size: "A4", margin: 45 });
+  doc.on("data", (chunk: Buffer) => chunks.push(chunk));
+  await drawHeader(doc, cooperativeId, {
+    titre_document: "État récapitulatif PPSSI",
+    reference: `PPSI-${annee}-${String(mois).padStart(2, "0")}`,
+  });
+  doc.font("Helvetica-Bold").fontSize(15).fillColor("#1a4731")
+    .text(`Retenue PPSSI — ${nomMois(mois)} ${annee}`);
+  doc.moveDown(0.4).font("Helvetica").fontSize(9).fillColor("#555")
+    .text("Prestations du secteur informel validées — taux de retenue : 2 %");
+  let y = doc.y + 18;
+  const cols = [45, 112, 270, 385, 475];
+  const heads = ["Date", "Prestataire", "Montant brut", "Retenue 2 %", "Net"];
+  doc.font("Helvetica-Bold").fontSize(8).fillColor("#166534");
+  heads.forEach((h, i) => doc.text(h, cols[i]!, y, { width: (cols[i + 1] ?? 550) - cols[i]! - 5 }));
+  y += 16;
+  let totalBrut = 0, totalRetenue = 0, totalNet = 0;
+  doc.font("Helvetica").fontSize(8).fillColor("#222");
+  for (const row of rows) {
+    const brut = Math.round(parseFloat(String(row.brut ?? 0)) || 0);
+    const retenue = Math.round(brut * 0.02);
+    const net = brut - retenue;
+    totalBrut += brut; totalRetenue += retenue; totalNet += net;
+    [String(row.date ?? ""), String(row.prestataire ?? "—"), FCFA(brut), FCFA(retenue), FCFA(net)]
+      .forEach((v, i) => doc.text(v, cols[i]!, y, { width: (cols[i + 1] ?? 550) - cols[i]! - 5 }));
+    y += 16;
+    if (y > 750) { doc.addPage(); y = 55; }
+  }
+  doc.moveTo(45, y).lineTo(550, y).strokeColor("#d1d5db").stroke();
+  doc.font("Helvetica-Bold").fontSize(8).fillColor("#166534");
+  [["TOTAL", 45, 225], [FCFA(totalBrut), 270, 110], [FCFA(totalRetenue), 385, 90], [FCFA(totalNet), 475, 75]]
+    .forEach(([v, x, w]) => doc.text(String(v), Number(x), y + 8, { width: Number(w) }));
+  doc.font("Helvetica-Oblique").fontSize(7.5).fillColor("#777")
+    .text("Document préparatoire à la déclaration PPSSI sur e-impôts (formulaire unique G n°50).", 45, 780, { width: 505 });
+  doc.end();
+  return new Promise(resolve => doc.on("end", () => resolve(Buffer.concat(chunks))));
+}
+
 // ─── Enregistrer paiement ─────────────────────────────────────────────────────
 
 export async function enregistrerPaiement(cooperativeId: number, id: number, data: {
