@@ -67,11 +67,11 @@ export async function listObligations(cooperativeId: number) {
 export async function listObligationsAll(cooperativeId: number) {
   const result = await db.execute<{
     id: number; cooperative_id: number; type_taxe: string; libelle: string;
-    base_calcul: string | null; taux_pct: string | null; periodicite: string;
+    base_calcul: string | null; taux_pct: string | null; taux_modifie_annee: number | null; periodicite: string;
     jour_echeance: number | null; actif: boolean; created_at: string;
   }>(sql`
-    SELECT id, cooperative_id, type_taxe, libelle, base_calcul, taux_pct::text,
-           periodicite, jour_echeance, actif, created_at::text
+     SELECT id, cooperative_id, type_taxe, libelle, base_calcul, taux_pct::text,
+            taux_modifie_annee, periodicite, jour_echeance, actif, created_at::text
     FROM obligations_fiscales
     WHERE cooperative_id = ${cooperativeId}
     ORDER BY periodicite, type_taxe, id
@@ -1238,12 +1238,21 @@ export async function updateObligation(cooperativeId: number, id: number, data: 
     .limit(1);
   if (!existing) throw new Error("Obligation introuvable");
 
+  const tauxChange = data.tauxPct !== undefined && String(data.tauxPct ?? "") !== String(existing.tauxPct ?? "");
+  if (existing.typeTaxe === "ppsi" && tauxChange) {
+    const anneeCourante = new Date().getFullYear();
+    if (existing.tauxModifieAnnee === anneeCourante) {
+      throw new Error(`Le taux PPSSI a déjà été modifié en ${anneeCourante}. Il pourra être modifié à nouveau l'année prochaine.`);
+    }
+  }
+
   const [updated] = await db.update(obligationsFiscalesTable).set({
     ...(data.libelle     !== undefined && { libelle:      data.libelle }),
     ...(data.typeTaxe    !== undefined && { typeTaxe:     data.typeTaxe }),
     ...(data.periodicite !== undefined && { periodicite:  data.periodicite }),
     ...(data.jourEcheance !== undefined && { jourEcheance: data.jourEcheance }),
     ...(data.tauxPct     !== undefined && { tauxPct:      data.tauxPct }),
+    ...(tauxChange && existing.typeTaxe === "ppsi" && { tauxModifieAnnee: new Date().getFullYear() }),
     ...(data.baseCalcul  !== undefined && { baseCalcul:   data.baseCalcul }),
   }).where(eq(obligationsFiscalesTable.id, id)).returning();
   return updated;

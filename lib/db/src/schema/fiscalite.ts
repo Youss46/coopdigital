@@ -7,6 +7,7 @@ export const obligationsFiscalesTable = pgTable("obligations_fiscales", {
   libelle:       varchar("libelle", { length: 200 }).notNull(),
   baseCalcul:    text("base_calcul"),
   tauxPct:       numeric("taux_pct"),
+  tauxModifieAnnee: integer("taux_modifie_annee"),
   periodicite:   varchar("periodicite", { length: 20 }).notNull().default("mensuel"),
   jourEcheance:  integer("jour_echeance"),
   actif:         boolean("actif").notNull().default(true),

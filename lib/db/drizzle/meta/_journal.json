@@ -862,6 +862,13 @@
       "when": 1788481900000,
       "tag": "0122_ppsi_prestataire_net",
       "breakpoints": true
+    },
+    {
+      "idx": 123,
+      "version": "7",
+      "when": 1788482000000,
+      "tag": "0123_ppsi_taux_annuel",
+      "breakpoints": true
     }
   ]
 }

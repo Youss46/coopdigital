@@ -19,6 +19,7 @@ interface Obligation {
   libelle: string;
   base_calcul: string | null;
   taux_pct: string | null;
+  taux_modifie_annee?: number | null;
   periodicite: string;
   jour_echeance: number | null;
   actif: boolean;
@@ -1084,6 +1085,8 @@ function ModalObligationForm({
   const [tauxPct,     setTauxPct]     = useState(obligation?.taux_pct ?? "");
   const [baseCalcul,  setBaseCalcul]  = useState(obligation?.base_calcul ?? "");
   const [loading, setLoading] = useState(false);
+  const tauxPpsiBloque = obligation?.type_taxe === "ppsi"
+    && obligation.taux_modifie_annee === new Date().getFullYear();
 
   const submit = async () => {
     if (!libelle.trim()) { toast({ title: "Libellé requis", variant: "destructive" }); return; }
@@ -1164,13 +1167,20 @@ function ModalObligationForm({
                 type="number"
                 value={tauxPct}
                 onChange={e => setTauxPct(e.target.value)}
+                disabled={tauxPpsiBloque}
                 step="0.01"
                 min="0"
                 max="100"
                 placeholder="Ex: 3.20"
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               />
-              <p className="text-xs text-gray-400 mt-0.5">Laisser vide si calculé manuellement</p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {typeTaxe === "ppsi"
+                  ? tauxPpsiBloque
+                    ? `Taux déjà modifié en ${new Date().getFullYear()} — prochaine modification possible l'année prochaine.`
+                    : "Le taux PPSSI est modifiable une seule fois par année civile."
+                  : "Laisser vide si calculé manuellement"}
+              </p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Jour d'échéance</label>
