@@ -16,6 +16,7 @@ router.patch("/fiscalite/obligations/:id/toggle",checkPermission("fiscalite", "c
 router.post("/fiscalite/generer/:mois/:annee",   checkPermission("fiscalite", "generer"),    ctrl.postGenererMensuel);
 router.post("/fiscalite/generer-annuel/:annee",  checkPermission("fiscalite", "generer"),    ctrl.postGenererAnnuel);
 router.get("/fiscalite/declarations",            checkPermission("fiscalite", "voir"),       ctrl.getDeclarations);
+router.get("/fiscalite/ppsi/export/:mois/:annee",checkPermission("fiscalite", "voir"),       ctrl.getExportPpsi);
 router.put("/fiscalite/declarations/:id/payer",      checkPermission("fiscalite", "payer"),    ctrl.putPayer);
 router.put("/fiscalite/declarations/:id/recalculer", checkPermission("fiscalite", "generer"), ctrl.putRecalculer);
 router.delete("/fiscalite/declarations/:id",         checkPermission("fiscalite", "generer"), ctrl.deleteDeclaration);

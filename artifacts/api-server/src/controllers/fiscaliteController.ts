@@ -57,6 +57,25 @@ export async function getDeclarations(req: Request, res: Response): Promise<void
   } catch (err) { req.log.error({ err }, "getDeclarations"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
+export async function getExportPpsi(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
+    const mois = parseInt(String(req.params["mois"]), 10);
+    const annee = parseInt(String(req.params["annee"]), 10);
+    if (mois < 1 || mois > 12 || annee < 2000) {
+      res.status(400).json({ error: "mois et annee valides requis" }); return;
+    }
+    const csv = await svc.exporterPpsi(cooperativeId, mois, annee);
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="ppsi-${annee}-${String(mois).padStart(2, "0")}.csv"`);
+    res.send(csv);
+  } catch (err) {
+    req.log.error({ err }, "getExportPpsi");
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+}
+
 export async function deleteDeclaration(req: Request, res: Response): Promise<void> {
   try {
     const cooperativeId = req.user?.cooperativeId;

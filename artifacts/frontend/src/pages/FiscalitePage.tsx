@@ -626,6 +626,31 @@ function Declarations() {
     } finally { setActionLoading(null); }
   };
 
+  const handleExportPpsi = async (d: Declaration) => {
+    const [moisNom, anneeStr] = d.periode.trim().split(/\s+/);
+    const mois = MOIS_EXPORT[(moisNom ?? "").toLowerCase()];
+    const annee = Number(anneeStr);
+    if (!mois || !annee) {
+      toast({ title: "Période invalide", description: "Impossible de préparer l'export PPSSI.", variant: "destructive" });
+      return;
+    }
+    try {
+      const r = await fetch(`${BASE}/api/fiscalite/ppsi/export/${mois}/${annee}`, {
+        headers: { Authorization: `Bearer ${tok()}` },
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? "Erreur lors de l'export");
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `ppsi-${annee}-${String(mois).padStart(2, "0")}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      toast({ title: "Export impossible", description: e instanceof Error ? e.message : "Erreur", variant: "destructive" });
+    }
+  };
+
   return (
     <div>
       {/* Barre actions */}
@@ -721,6 +746,15 @@ function Declarations() {
                             <button onClick={() => setModalPayer(d)}
                               className="flex items-center gap-1 text-xs text-green-600 hover:text-green-800 font-medium whitespace-nowrap">
                               <CheckCircle2 size={12} /> Payer
+                            </button>
+                          )}
+                          {d.type_taxe === "ppsi" && (
+                            <button
+                              onClick={() => void handleExportPpsi(d)}
+                              title="Exporter la déclaration PPSSI"
+                              className="p-1 rounded text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors"
+                            >
+                              <Download size={13} />
                             </button>
                           )}
                           {d.statut === "paye" && (
@@ -1364,3 +1398,8 @@ function SectionObligations({ onObligationsChange }: { onObligationsChange?: () 
 }
 
 const typeTaxeLabel = (t: string) => TYPE_TAXE_OPTIONS.find(o => o.value === t)?.label ?? t;
+
+const MOIS_EXPORT: Record<string, number> = {
+  janvier: 1, février: 2, fevrier: 2, mars: 3, avril: 4, mai: 5, juin: 6,
+  juillet: 7, août: 8, aout: 8, septembre: 9, octobre: 10, novembre: 11, décembre: 12, decembre: 12,
+};

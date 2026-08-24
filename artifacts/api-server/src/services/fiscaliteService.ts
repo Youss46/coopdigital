@@ -529,6 +529,41 @@ export async function listDeclarations(cooperativeId: number, opts?: {
   return result.rows;
 }
 
+export async function exporterPpsi(cooperativeId: number, mois: number, annee: number): Promise<string> {
+  const debut = `${annee}-${String(mois).padStart(2, "0")}-01`;
+  const finDate = new Date(annee, mois, 1);
+  const fin = `${finDate.getFullYear()}-${String(finDate.getMonth() + 1).padStart(2, "0")}-01`;
+  const rows = await db.select({
+    date: chargesDiversesTable.dateCharge,
+    prestataire: chargesDiversesTable.tiers,
+    brut: chargesDiversesTable.montantFcfa,
+    reference: chargesDiversesTable.referencePiece,
+  }).from(chargesDiversesTable)
+    .where(and(
+      eq(chargesDiversesTable.cooperativeId, cooperativeId),
+      eq(chargesDiversesTable.categorie, "ppsi"),
+      eq(chargesDiversesTable.statut, "valide"),
+      gte(chargesDiversesTable.dateCharge, debut),
+      sql`${chargesDiversesTable.dateCharge} < ${fin}`,
+    ))
+    .orderBy(chargesDiversesTable.dateCharge);
+
+  const taux = 0.02;
+  const csvCell = (value: string | number | null | undefined) =>
+    `"${String(value ?? "").replaceAll('"', '""')}"`;
+  const lines = [
+    ["Période", "Date prestation", "Prestataire", "Montant brut (FCFA)", "Retenue PPSSI (2 %) (FCFA)", "Net prestataire (FCFA)", "Référence"].map(csvCell).join(";"),
+    ...rows.map(row => {
+      const brut = parseFloat(String(row.brut ?? 0)) || 0;
+      const retenue = Math.round(brut * taux);
+      return [
+        `${nomMois(mois)} ${annee}`, row.date, row.prestataire, Math.round(brut), retenue, Math.round(brut - retenue), row.reference,
+      ].map(csvCell).join(";");
+    }),
+  ];
+  return `\uFEFF${lines.join("\r\n")}\r\n`;
+}
+
 // ─── Enregistrer paiement ─────────────────────────────────────────────────────
 
 export async function enregistrerPaiement(cooperativeId: number, id: number, data: {
