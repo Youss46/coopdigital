@@ -29,7 +29,19 @@ function fmtHa(ha: number): string {
   return ha.toFixed(2).replace(".", ",") + " ha";
 }
 
-function PolygonSvg({ points, currentPos }: { points: GpsPoint[]; currentPos: GpsPoint | null }) {
+function PolygonSvg({
+  points,
+  currentPos,
+  selectedIndex,
+  onSelectPoint,
+  onMovePoint,
+}: {
+  points: GpsPoint[];
+  currentPos: GpsPoint | null;
+  selectedIndex: number | null;
+  onSelectPoint: (index: number) => void;
+  onMovePoint: (index: number, point: GpsPoint) => void;
+}) {
   const W = 280;
   const H = 180;
   const allPts = [...points, ...(currentPos ? [currentPos] : [])];
@@ -63,9 +75,41 @@ function PolygonSvg({ points, currentPos }: { points: GpsPoint[]; currentPos: Gp
   const svgPts = points.map((p) => toSvg(p.lat, p.lon));
   const currSvg = currentPos ? toSvg(currentPos.lat, currentPos.lon) : null;
   const polygonStr = svgPts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+  const svgRef = useRef<SVGSVGElement>(null);
+  const draggingIndexRef = useRef<number | null>(null);
+
+  const pointFromEvent = (event: React.PointerEvent<SVGSVGElement>): GpsPoint | null => {
+    const svg = svgRef.current;
+    if (!svg) return null;
+    const rect = svg.getBoundingClientRect();
+    const x = Math.max(pad, Math.min(W - pad, event.clientX - rect.left));
+    const y = Math.max(pad, Math.min(H - pad, event.clientY - rect.top));
+    const latR = maxLat - minLat || 0.00005;
+    const lonR = maxLon - minLon || 0.00005;
+    return {
+      lat: maxLat - ((y - pad) / (H - pad * 2)) * latR,
+      lon: minLon + ((x - pad) / (W - pad * 2)) * lonR,
+      accuracy: undefined,
+      ts: Date.now(),
+    };
+  };
 
   return (
-    <svg width={W} height={H} style={{ background: "#0f172a", borderRadius: 12, display: "block" }}>
+    <svg
+      ref={svgRef}
+      width={W}
+      height={H}
+      onPointerMove={(event) => {
+        if (draggingIndexRef.current !== null) {
+          const point = pointFromEvent(event);
+          if (point) onMovePoint(draggingIndexRef.current, point);
+        }
+      }}
+      onPointerUp={() => { draggingIndexRef.current = null; }}
+      onPointerCancel={() => { draggingIndexRef.current = null; }}
+      style={{ background: "#0f172a", borderRadius: 12, display: "block", touchAction: "none" }}
+      aria-label="Aperçu interactif du polygone GPS"
+    >
       {svgPts.length >= 3 && (
         <polygon points={polygonStr} fill="rgba(34,197,94,0.18)" stroke="#22c55e" strokeWidth="2" />
       )}
@@ -73,9 +117,21 @@ function PolygonSvg({ points, currentPos }: { points: GpsPoint[]; currentPos: Gp
         <polyline points={polygonStr} fill="none" stroke="#22c55e" strokeWidth="2" strokeDasharray="5,4" />
       )}
       {svgPts.map((p, i) => (
-        <g key={i}>
-          <circle cx={p.x} cy={p.y} r={5} fill="#22c55e" stroke="#0f172a" strokeWidth={1.5} />
-          <text x={p.x + 7} y={p.y + 4} fill="#22c55e" fontSize="9" fontWeight="bold">P{i + 1}</text>
+        <g key={i} onClick={() => onSelectPoint(i)} style={{ cursor: "pointer" }}>
+          <circle cx={p.x} cy={p.y} r={selectedIndex === i ? 9 : 7} fill={selectedIndex === i ? "#f59e0b" : "#22c55e"} stroke="#0f172a" strokeWidth={1.5} />
+          <text x={p.x + 9} y={p.y + 4} fill={selectedIndex === i ? "#f59e0b" : "#22c55e"} fontSize="9" fontWeight="bold">P{i + 1}</text>
+          <circle
+            cx={p.x}
+            cy={p.y}
+            r={16}
+            fill="transparent"
+            onPointerDown={(event) => {
+              event.stopPropagation();
+              draggingIndexRef.current = i;
+              onSelectPoint(i);
+              event.currentTarget.setPointerCapture(event.pointerId);
+            }}
+          />
         </g>
       ))}
       {currSvg && (
@@ -120,6 +176,7 @@ export default function CollecteGps() {
   const [gpsErreurPoints, setGpsErreurPoints] = useState<string | null>(null);
   const [autoMode, setAutoMode] = useState(false);
   const [autoPaused, setAutoPaused] = useState(false);
+  const [selectedPointIndex, setSelectedPointIndex] = useState<number | null>(null);
 
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const currentPosRef = useRef<GpsPoint | null>(null);
@@ -208,9 +265,34 @@ export default function CollecteGps() {
       return;
     }
     setAutoPaused(true);
+    setSelectedPointIndex(null);
     setGpsErreurPoints(null);
     setShowGpsRecap(true);
   }, [gps.points.length]);
+
+  const handleMovePoint = useCallback((index: number, point: GpsPoint) => {
+    gps.replacePoint(index, point);
+    setSelectedPointIndex(index);
+  }, [gps.replacePoint]);
+
+  const handleDeleteSelectedPoint = useCallback(() => {
+    if (selectedPointIndex === null) return;
+    gps.removePoint(selectedPointIndex);
+    setSelectedPointIndex(null);
+    setGpsErreurPoints(null);
+  }, [gps.removePoint, selectedPointIndex]);
+
+  const handleAddManualPoint = useCallback(() => {
+    const point = currentPosRef.current;
+    if (!point) {
+      setGpsErreurPoints("Position GPS indisponible. Attendez l'acquisition du signal.");
+      return;
+    }
+    const insertAt = selectedPointIndex === null ? gps.points.length : selectedPointIndex + 1;
+    gps.insertPoint(insertAt, point);
+    setSelectedPointIndex(insertAt);
+    setGpsErreurPoints(null);
+  }, [gps.insertPoint, gps.points.length, selectedPointIndex]);
 
   // Mode automatique : on conserve un point tous les quelques mètres, uniquement
   // lorsque la précision GPS est suffisante. Cela évite les zigzags du signal.
@@ -239,6 +321,7 @@ export default function CollecteGps() {
 
   const handleRecapValidate = useCallback(() => {
     setShowGpsRecap(false);
+    setSelectedPointIndex(null);
     setGpsFinalized(true);
     setTimeout(() => {
       photosRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -249,6 +332,7 @@ export default function CollecteGps() {
     gps.clearPoints();
     setGpsFinalized(false);
     setShowGpsRecap(false);
+    setSelectedPointIndex(null);
     setGpsErreurPoints(null);
     setAutoPaused(false);
     autoLastPointRef.current = null;
@@ -339,6 +423,7 @@ export default function CollecteGps() {
     : null;
   const imprecisPoints = gps.points.filter((p) => (p.accuracy ?? Infinity) > PRECISION_SEUIL).length;
   const canSubmit = gps.points.length >= 3 && photos.length >= MIN_PHOTOS;
+  const selectedPoint = selectedPointIndex === null ? null : gps.points[selectedPointIndex] ?? null;
 
   return (
     <div className="t-app">
@@ -372,6 +457,33 @@ export default function CollecteGps() {
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.8)", zIndex: 100, display: "flex", alignItems: "flex-end" }}>
           <div style={{ background: "#1e293b", borderRadius: "18px 18px 0 0", padding: "20px 20px 36px", width: "100%", maxWidth: 480, margin: "0 auto", maxHeight: "85vh", overflowY: "auto" }}>
             <div style={{ fontWeight: 800, fontSize: "1.05rem", marginBottom: 16, color: "#22c55e" }}>POLYGONE FINALISÉ ✅</div>
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
+              <PolygonSvg
+                points={gps.points}
+                currentPos={null}
+                selectedIndex={selectedPointIndex}
+                onSelectPoint={setSelectedPointIndex}
+                onMovePoint={handleMovePoint}
+              />
+            </div>
+            <div style={{ background: "#0f172a", borderRadius: 8, padding: "8px 10px", marginBottom: 12, fontSize: ".76rem", color: "#94a3b8", lineHeight: 1.5 }}>
+              Touchez un point pour le sélectionner, puis faites-le glisser pour corriger sa position.
+            </div>
+            {selectedPointIndex !== null && (
+              <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                <button onClick={handleDeleteSelectedPoint} className="t-btn t-btn--ghost" style={{ flex: 1, padding: "9px", color: "#f87171", borderColor: "#ef444466" }}>
+                  Supprimer P{selectedPointIndex + 1}
+                </button>
+                <button onClick={handleAddManualPoint} className="t-btn" style={{ flex: 1, padding: "9px", color: "#60a5fa", background: "#2563eb22", border: "1px solid #2563eb66" }}>
+                  + Ajouter après
+                </button>
+              </div>
+            )}
+            {selectedPoint && (
+              <div style={{ color: "#64748b", fontSize: ".72rem", marginBottom: 12 }}>
+                P{selectedPointIndex! + 1} sélectionné · {selectedPoint.lat.toFixed(6)}, {selectedPoint.lon.toFixed(6)}
+              </div>
+            )}
             {membre && (
               <div style={{ fontSize: ".85rem", color: "#94a3b8", marginBottom: 14, lineHeight: 1.8 }}>
                 <div><strong style={{ color: "#e2e8f0" }}>Membre :</strong> {membre.membreNom} {membre.membrePrenoms}</div>
@@ -502,8 +614,29 @@ export default function CollecteGps() {
             </div>
 
             <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
-              <PolygonSvg points={gps.points} currentPos={gps.currentPos} />
+               <PolygonSvg
+                 points={gps.points}
+                 currentPos={gps.currentPos}
+                 selectedIndex={selectedPointIndex}
+                 onSelectPoint={setSelectedPointIndex}
+                 onMovePoint={handleMovePoint}
+               />
             </div>
+             {gps.points.length > 0 && (
+               <div style={{ background: "#0f172a", borderRadius: 8, padding: "8px 10px", marginBottom: 10, fontSize: ".76rem", color: "#94a3b8", lineHeight: 1.5 }}>
+                 Touchez un point pour le sélectionner, puis faites-le glisser pour le déplacer. Les corrections restent locales et disponibles hors ligne.
+               </div>
+             )}
+             {selectedPointIndex !== null && (
+               <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                 <button onClick={handleDeleteSelectedPoint} className="t-btn t-btn--ghost" style={{ flex: 1, padding: "9px", color: "#f87171", borderColor: "#ef444466", fontSize: ".78rem" }}>
+                   Supprimer P{selectedPointIndex + 1}
+                 </button>
+                 <button onClick={handleAddManualPoint} className="t-btn" style={{ flex: 1, padding: "9px", color: "#60a5fa", background: "#2563eb22", border: "1px solid #2563eb66", fontSize: ".78rem" }}>
+                   + Ajouter après
+                 </button>
+               </div>
+             )}
 
             {gps.error && (
               <div style={{ color: "#ef4444", fontSize: ".82rem", marginBottom: 8, textAlign: "center" }}>{gps.error}</div>

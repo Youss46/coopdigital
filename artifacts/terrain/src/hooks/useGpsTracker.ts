@@ -131,6 +131,27 @@ export function useGpsTracker() {
     setState((s) => ({ ...s, points: [...s.points, point] }));
   }, []);
 
+  const insertPoint = useCallback((index: number, point: GpsPoint) => {
+    setState((s) => {
+      const points = [...s.points];
+      points.splice(Math.max(0, Math.min(index, points.length)), 0, point);
+      return { ...s, points };
+    });
+  }, []);
+
+  const replacePoint = useCallback((index: number, point: GpsPoint) => {
+    setState((s) => {
+      if (index < 0 || index >= s.points.length) return s;
+      const points = [...s.points];
+      points[index] = point;
+      return { ...s, points };
+    });
+  }, []);
+
+  const removePoint = useCallback((index: number) => {
+    setState((s) => ({ ...s, points: s.points.filter((_, pointIndex) => pointIndex !== index) }));
+  }, []);
+
   const undoLastPoint = useCallback(() => {
     setState((s) => ({ ...s, points: s.points.slice(0, -1) }));
   }, []);
@@ -144,6 +165,9 @@ export function useGpsTracker() {
     startTracking,
     stopTracking,
     addPoint,
+    insertPoint,
+    replacePoint,
+    removePoint,
     undoLastPoint,
     clearPoints,
   };
