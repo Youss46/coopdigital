@@ -3,13 +3,15 @@ import { useLocation } from "wouter";
 import { getAllOps } from "../lib/idb";
 import { useOffline } from "../contexts/OfflineContext";
 import OfflineBanner from "../components/OfflineBanner";
-import type { PendingOp } from "../lib/types";
+import type { SyncHistoryOp } from "../lib/types";
 
 const TYPE_LABELS: Record<string, string> = {
   collecte: "⚖️ Collecte",
   paiement: "💵 Paiement",
   avance:   "💰 Avance",
   gps_collecte: "📍 Collecte GPS",
+  enquete: "📝 Enquête",
+  pesee_brouillon: "⚖️ Brouillon pesée",
 };
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
@@ -25,19 +27,27 @@ function formatTs(ts: number) {
   });
 }
 
-function opLabel(op: PendingOp): string {
-  const d = op.data as unknown as Record<string, unknown>;
+function opLabel(op: SyncHistoryOp): string {
+  const d = op.data;
   if (op.type === "collecte") return `${d.poidsBrutKg ?? "?"}kg — membre #${d.membreId ?? "?"}`;
   if (op.type === "paiement") return `Livraison #${d.livraisonId ?? "?"} — membre #${d.membreId ?? "?"}`;
   if (op.type === "avance")   return `${Number(d.montantFcfa ?? 0).toLocaleString("fr-FR")} FCFA — membre #${d.membreId ?? "?"}`;
   if (op.type === "gps_collecte") return `${op.localId} — mission #${d.missionId ?? "?"} — membre #${d.membreId ?? "?"}`;
+  if (op.type === "enquete") {
+    const reponses = d.reponses as Record<string, unknown> | undefined;
+    return `Mission #${d.missionId ?? "?"} — membre #${d.membreId ?? "?"} — ${Object.keys(reponses ?? {}).length} réponse(s)`;
+  }
+  if (op.type === "pesee_brouillon") {
+    const nom = [d.membreNom, d.membrePrenoms].filter(Boolean).join(" ");
+    return `${nom || `membre #${d.membreId ?? "?"}`} — ${d.poidsTotalKg ?? 0} kg — ${d.nbSacsTotal ?? 0} sac(s)`;
+  }
   return op.localId;
 }
 
 export default function SyncHistorique() {
   const [, setLocation] = useLocation();
   const { pendingCount, triggerSync, isOnline, syncStatus } = useOffline();
-  const [ops, setOps]       = useState<PendingOp[]>([]);
+  const [ops, setOps]       = useState<SyncHistoryOp[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter]   = useState<"all" | "pending" | "synced" | "error">("all");
 
@@ -59,7 +69,7 @@ export default function SyncHistorique() {
 
   // Une erreur GPS reste pending dans IndexedDB pour pouvoir être relancée,
   // mais doit apparaître dans la catégorie « Échecs » de l'historique.
-  const displayStatus = (op: PendingOp) => op.errorMsg ? "error" : op.status;
+  const displayStatus = (op: SyncHistoryOp) => op.errorMsg ? "error" : op.status;
   const filtered = filter === "all" ? ops : ops.filter((o) => displayStatus(o) === filter);
 
   const nbPending = ops.filter((o) => displayStatus(o) === "pending").length;
@@ -154,6 +164,9 @@ export default function SyncHistorique() {
                     </div>
                     <div className="t-text-muted" style={{ fontSize: ".8rem", marginTop: 2 }}>
                       {opLabel(op)}
+                    </div>
+                    <div className="t-text-muted" style={{ fontSize: ".7rem", marginTop: 3, wordBreak: "break-all" }}>
+                      localId : {op.localId}
                     </div>
                     <div style={{ fontSize: ".75rem", color: "var(--t-muted)", marginTop: 4 }}>
                       {formatTs(op.timestamp)}

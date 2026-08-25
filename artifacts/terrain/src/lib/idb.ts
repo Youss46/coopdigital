@@ -1,4 +1,4 @@
-import type { PendingOp, CollecteInput, PaiementInput, AvanceInput, GpsCollecteInput, PrixActuel, Fournisseur, MissionTerrain, MissionDetail, EnqueteOp, BrouillonLigne, BrouillonPesee } from "./types";
+import type { PendingOp, SyncHistoryOp, CollecteInput, PaiementInput, AvanceInput, GpsCollecteInput, PrixActuel, Fournisseur, MissionTerrain, MissionDetail, EnqueteOp, BrouillonLigne, BrouillonPesee } from "./types";
 
 export interface GpsOp {
   localId: string;
@@ -263,14 +263,29 @@ export async function markOpSyncedWithTs(localId: string): Promise<void> {
   });
 }
 
-export async function getAllOps(): Promise<PendingOp[]> {
+export async function getAllOps(): Promise<SyncHistoryOp[]> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
-    const transaction = db.transaction(["pending_ops", "pending_gps"], "readonly");
+    const transaction = db.transaction(
+      ["pending_ops", "pending_gps", "pending_enquetes", "pesee_brouillons"],
+      "readonly",
+    );
     const regularReq = transaction.objectStore("pending_ops").getAll();
     const gpsReq = transaction.objectStore("pending_gps").getAll();
+    const enqueteReq = transaction.objectStore("pending_enquetes").getAll();
+    const brouillonReq = transaction.objectStore("pesee_brouillons").getAll();
     transaction.oncomplete = () => {
-      const gpsOps = (gpsReq.result as GpsOp[]).map((op): PendingOp => ({
+      const regularOps = (regularReq.result as PendingOp[]).map((op): SyncHistoryOp => ({
+        localId: op.localId,
+        type: op.type,
+        data: { ...op.data },
+        timestamp: op.timestamp,
+        status: op.status,
+        errorMsg: op.errorMsg,
+        tentatives: op.tentatives,
+        syncedAt: op.syncedAt,
+      }));
+      const gpsOps = (gpsReq.result as GpsOp[]).map((op): SyncHistoryOp => ({
         localId: op.localId,
         type: "gps_collecte",
         data: {
@@ -285,7 +300,49 @@ export async function getAllOps(): Promise<PendingOp[]> {
         tentatives: op.tentatives,
         syncedAt: op.syncedAt,
       }));
-      const results = [...(regularReq.result as PendingOp[]), ...gpsOps]
+      const enqueteOps = (enqueteReq.result as EnqueteOp[]).map((op): SyncHistoryOp => ({
+        localId: op.localId,
+        type: "enquete",
+        data: {
+          missionId: op.missionId,
+          membreId: op.membreId,
+          reponses: op.reponses,
+          notesAgent: op.notesAgent,
+        },
+        timestamp: op.timestamp,
+        status: op.status,
+        errorMsg: op.errorMsg,
+        tentatives: op.tentatives,
+        syncedAt: op.syncedAt,
+      }));
+      const brouillonOps = (brouillonReq.result as BrouillonPesee[]).map((brouillon): SyncHistoryOp => ({
+        localId: brouillon.localId,
+        type: "pesee_brouillon",
+        data: {
+          membreId: brouillon.membreId,
+          membreNom: brouillon.membreNom,
+          membrePrenoms: brouillon.membrePrenoms,
+          membreCode: brouillon.membreCode,
+          produit: brouillon.produit,
+          operation: brouillon.operation,
+          statut: brouillon.statut,
+          poidsTotalKg: brouillon.poidsTotalKg,
+          nbSacsTotal: brouillon.nbSacsTotal,
+          serverId: brouillon.serverId,
+          numeroSession: brouillon.numeroSession,
+        },
+        timestamp: brouillon.createdAt,
+        status: brouillon.syncStatus === "synced"
+          ? "synced"
+          : brouillon.syncStatus === "error" ? "error" : "pending",
+        errorMsg: brouillon.errorMsg,
+      }));
+      const results: SyncHistoryOp[] = [
+        ...regularOps,
+        ...gpsOps,
+        ...enqueteOps,
+        ...brouillonOps,
+      ]
         .sort((a, b) => b.timestamp - a.timestamp);
       resolve(results.slice(0, 50));
     };

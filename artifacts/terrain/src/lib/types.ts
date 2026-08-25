@@ -289,6 +289,18 @@ export interface PendingOp {
   syncedAt?: number;
 }
 
+/** Format commun utilisé par l'historique de synchronisation. */
+export interface SyncHistoryOp {
+  localId: string;
+  type: PendingOp["type"] | "enquete" | "pesee_brouillon";
+  data: Record<string, unknown>;
+  timestamp: number;
+  status: "pending" | "synced" | "error";
+  errorMsg?: string;
+  tentatives?: number;
+  syncedAt?: number;
+}
+
 export interface PrixActuel {
   prixBordChampFcfa: number;
   campagneId: number | null;
