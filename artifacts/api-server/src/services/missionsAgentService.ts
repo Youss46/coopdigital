@@ -4,6 +4,56 @@ import {
 } from "@workspace/db";
 import { and, eq, sql, desc } from "drizzle-orm";
 
+type GpsPoint = { lat: number; lon: number; accuracy?: number };
+
+function orientation(a: GpsPoint, b: GpsPoint, c: GpsPoint): number {
+  return (b.lon - a.lon) * (c.lat - a.lat) - (b.lat - a.lat) * (c.lon - a.lon);
+}
+
+function hasSelfIntersection(points: GpsPoint[]): boolean {
+  if (points.length < 4) return false;
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i]!, b = points[(i + 1) % points.length]!;
+    for (let j = i + 1; j < points.length; j++) {
+      if (j === i + 1 || (i === 0 && j === points.length - 1)) continue;
+      const c = points[j]!, d = points[(j + 1) % points.length]!;
+      const o1 = orientation(a, b, c), o2 = orientation(a, b, d);
+      const o3 = orientation(c, d, a), o4 = orientation(c, d, b);
+      if (((o1 > 1e-10 && o2 < -1e-10) || (o1 < -1e-10 && o2 > 1e-10))
+        && ((o3 > 1e-10 && o4 < -1e-10) || (o3 < -1e-10 && o4 > 1e-10))) return true;
+    }
+  }
+  return false;
+}
+
+function polygonAreaHa(points: GpsPoint[]): number {
+  if (points.length < 3) return 0;
+  const R = 6371000;
+  const lat0 = points[0]!.lat * Math.PI / 180;
+  const xy = points.map(p => ({
+    x: (p.lon - points[0]!.lon) * Math.PI / 180 * R * Math.cos(lat0),
+    y: (p.lat - points[0]!.lat) * Math.PI / 180 * R,
+  }));
+  let area = 0;
+  for (let i = 0; i < xy.length; i++) {
+    const j = (i + 1) % xy.length;
+    area += xy[i]!.x * xy[j]!.y - xy[j]!.x * xy[i]!.y;
+  }
+  return Math.abs(area) / 2 / 10000;
+}
+
+function validatePolygon(raw: unknown): GpsPoint[] {
+  if (!Array.isArray(raw) || raw.length < 3) throw new Error("Le contour GPS doit comporter au moins 3 points");
+  const points = raw as GpsPoint[];
+  if (points.some(p => !p || !Number.isFinite(p.lat) || !Number.isFinite(p.lon) || p.lat < -90 || p.lat > 90 || p.lon < -180 || p.lon > 180)) {
+    throw new Error("Le contour GPS contient une coordonnée invalide");
+  }
+  if (hasSelfIntersection(points)) throw new Error("Le contour GPS se croise. Corrigez les points avant validation.");
+  const areaHa = polygonAreaHa(points);
+  if (!Number.isFinite(areaHa) || areaHa < 0.0001) throw new Error("La superficie calculée est trop faible ou nulle. Vérifiez le contour GPS.");
+  return points;
+}
+
 export async function getMissionsAgent(agentId: number, cooperativeId: number) {
   const missions = await db
     .select()
@@ -119,6 +169,14 @@ export async function collecterParcelleAgent(
     );
 
   if (!missionMembre) throw new Error("Membre non trouvé dans cette mission");
+  const polygoneGps = validatePolygon(data.polygoneGps);
+  const [membre] = await db.select({ superficieHa: membresTable.superficieHa })
+    .from(membresTable).where(eq(membresTable.id, membreId)).limit(1);
+  const areaHa = polygonAreaHa(polygoneGps);
+  const declaredHa = membre?.superficieHa ? Number(membre.superficieHa) : 0;
+  if (declaredHa > 0 && Math.abs(areaHa - declaredHa) / declaredHa > 0.75 && !data.probleme) {
+    throw new Error("La superficie GPS est très éloignée de la superficie déclarée. Vérifiez les points ou indiquez un problème terrain.");
+  }
   if (!data.photos || data.photos.length < 2) {
     throw new Error("Au moins 2 photos requises pour documenter la parcelle");
   }
@@ -127,7 +185,7 @@ export async function collecterParcelleAgent(
     .update(missionsMembresTable)
     .set({
       statut: "collecte",
-      gpsCollecte: data.polygoneGps,
+       gpsCollecte: polygoneGps,
       photosCollectees: data.photos,
       notesAgent: data.notes ?? null,
       dateCollecte: new Date(),
@@ -155,7 +213,7 @@ export async function collecterParcelleAgent(
 
   await db
     .update(membresTable)
-    .set({ polygoneGps: data.polygoneGps, gpsParcelles: data.polygoneGps })
+     .set({ polygoneGps, gpsParcelles: polygoneGps })
     .where(eq(membresTable.id, membreId));
 
   if (data.probleme) {

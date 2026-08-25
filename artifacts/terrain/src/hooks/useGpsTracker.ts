@@ -47,6 +47,36 @@ export function polygonPerimeterM(points: GpsPoint[], closed = false): number {
   return total;
 }
 
+function orientation(a: GpsPoint, b: GpsPoint, c: GpsPoint): number {
+  return (b.lon - a.lon) * (c.lat - a.lat) - (b.lat - a.lat) * (c.lon - a.lon);
+}
+
+function segmentsIntersect(a: GpsPoint, b: GpsPoint, c: GpsPoint, d: GpsPoint): boolean {
+  const o1 = orientation(a, b, c);
+  const o2 = orientation(a, b, d);
+  const o3 = orientation(c, d, a);
+  const o4 = orientation(c, d, b);
+  const eps = 1e-10;
+  return ((o1 > eps && o2 < -eps) || (o1 < -eps && o2 > eps))
+    && ((o3 > eps && o4 < -eps) || (o3 < -eps && o4 > eps);
+}
+
+/** Détecte un contour qui se croise, en ignorant les côtés voisins. */
+export function hasSelfIntersection(points: GpsPoint[]): boolean {
+  if (points.length < 4) return false;
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i]!;
+    const b = points[(i + 1) % points.length]!;
+    for (let j = i + 1; j < points.length; j++) {
+      if (j === i || j === i + 1 || (i === 0 && j === points.length - 1)) continue;
+      const c = points[j]!;
+      const d = points[(j + 1) % points.length]!;
+      if (segmentsIntersect(a, b, c, d)) return true;
+    }
+  }
+  return false;
+}
+
 interface GpsTrackerState {
   points: GpsPoint[];
   currentPos: GpsPoint | null;
