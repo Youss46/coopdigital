@@ -46,13 +46,20 @@ export default function OfflineBanner() {
 
   // Erreur de synchronisation
   if (syncStatus === "error") {
+    const operationErrors = syncResult?.operationErrors ?? [];
     return (
       <div className="t-offline-banner t-offline-banner--error">
         <span>
           ❌ {syncResult?.echecs ?? 1} erreur{(syncResult?.echecs ?? 1) !== 1 ? "s" : ""} de synchronisation
-          {syncResult?.erreurs?.[0] && (
-            <small style={{ display: "block", marginTop: 3, maxWidth: 280 }}>{syncResult.erreurs[0]}</small>
-          )}
+          {operationErrors.length > 0
+            ? operationErrors.map(({ localId, erreur }) => (
+                <small key={localId} style={{ display: "block", marginTop: 3, maxWidth: 280 }}>
+                  {erreur}
+                </small>
+              ))
+            : syncResult?.erreurs?.[0] && (
+                <small style={{ display: "block", marginTop: 3, maxWidth: 280 }}>{syncResult.erreurs[0]}</small>
+              )}
         </span>
         <button className="t-banner-btn" onClick={() => void triggerSync()}>
           Réessayer

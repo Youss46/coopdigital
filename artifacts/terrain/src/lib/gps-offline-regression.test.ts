@@ -206,6 +206,48 @@ describe("régression collecte GPS hors ligne", () => {
     await act(async () => root!.unmount());
     container.remove();
   });
+
+  it("réhydrate les détails de plusieurs erreurs GPS après remontage du contexte", async () => {
+    Object.defineProperty(navigator, "onLine", { configurable: true, value: false });
+    fakeState.gpsOps.push(
+      {
+        localId: "gps-error-a",
+        missionId: 12,
+        membreId: 34,
+        data: { polygoneGps: points, photos: [] },
+        timestamp: 1,
+        status: "pending",
+        errorMsg: "Précision GPS insuffisante",
+      },
+      {
+        localId: "gps-error-b",
+        missionId: 12,
+        membreId: 35,
+        data: { polygoneGps: points, photos: [] },
+        timestamp: 2,
+        status: "pending",
+        errorMsg: "Position hors de la parcelle",
+      },
+    );
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    let root: Root;
+    await act(async () => {
+      root = createRoot(container);
+      root!.render(createElement(OfflineProvider, null, createElement(OfflineBanner)));
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(container.textContent).toContain("Précision GPS insuffisante");
+      expect(container.textContent).toContain("Position hors de la parcelle");
+    });
+    expect(container.textContent).toContain("2 erreurs de synchronisation");
+
+    await act(async () => root!.unmount());
+    container.remove();
+  });
 });
 
 async function waitFor(assertion: () => void, timeoutMs = 1000): Promise<void> {

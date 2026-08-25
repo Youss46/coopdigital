@@ -15,6 +15,8 @@ export interface SyncResult {
   succes: number;
   echecs: number;
   erreurs: string[];
+  /** Erreurs conservées par opération GPS, y compris après rechargement. */
+  operationErrors: Array<{ localId: string; erreur: string }>;
   /** Collectes enregistrées en mode proxy avec le nom du délégué concerné */
   collectesProxy: Array<{ localId: string; saisiePour: string }>;
 }
@@ -62,6 +64,7 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
     let nbSucces = 0;
     let nbEchecs = 0;
     const erreurs: string[] = [];
+    const operationErrors: Array<{ localId: string; erreur: string }> = [];
     const allCollectesProxy: Array<{ localId: string; saisiePour: string }> = [];
 
     try {
@@ -85,6 +88,7 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
           await markGpsOpError(localId, erreur);
           nbEchecs++;
           erreurs.push(erreur);
+          operationErrors.push({ localId, erreur });
         }
       }
 
@@ -114,7 +118,7 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
       }
 
       await refreshCount();
-      setSyncResult({ succes: nbSucces, echecs: nbEchecs, erreurs, collectesProxy: allCollectesProxy });
+      setSyncResult({ succes: nbSucces, echecs: nbEchecs, erreurs, operationErrors, collectesProxy: allCollectesProxy });
       setSyncStatus(nbEchecs > 0 ? "error" : "done");
       clearTimerRef.current = setTimeout(() => {
         setSyncStatus("idle");
@@ -161,8 +165,21 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
 
   // ── Initialisation : compteur + sync immédiate si nécessaire ────────────────
   useEffect(() => {
-    getPendingCount().then((count) => {
+    Promise.all([getPendingCount(), getPendingGpsOps()]).then(([count, gpsOps]) => {
       setPendingCount(count);
+      const operationErrors = gpsOps
+        .filter((op) => Boolean(op.errorMsg))
+        .map((op) => ({ localId: op.localId, erreur: op.errorMsg! }));
+      if (operationErrors.length > 0) {
+        setSyncResult({
+          succes: 0,
+          echecs: operationErrors.length,
+          erreurs: operationErrors.map(({ erreur }) => erreur),
+          operationErrors,
+          collectesProxy: [],
+        });
+        setSyncStatus("error");
+      }
       if (count > 0 && navigator.onLine) triggerSync();
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
