@@ -200,7 +200,7 @@ export default function CollecteGps() {
       }).catch(() => {}),
       getGpsDraft(missionId, membreId).then((draft) => {
         if (!active || !draft) return;
-        draft.points.forEach((point) => gps.addPoint(point));
+        gps.restore(draft.points, draft.history ?? []);
         // Points restored from the local draft are the starting state, not corrections.
         gps.clearHistory();
         setGpsFinalized(draft.finalized);
@@ -219,7 +219,7 @@ export default function CollecteGps() {
       if (lastCaptureTimerRef.current) clearTimeout(lastCaptureTimerRef.current);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [missionId, membreId, gps.addPoint, gps.startTracking, gps.stopTracking]);
+  }, [missionId, membreId, gps.restore, gps.startTracking, gps.stopTracking]);
 
   useEffect(() => {
     if (!draftLoaded) return;
@@ -228,11 +228,12 @@ export default function CollecteGps() {
       missionId,
       membreId,
       points: gps.points,
+      history: gps.history,
       finalized: gpsFinalized,
       autoMode,
       autoPaused,
     }).catch(() => {});
-  }, [draftLoaded, missionId, membreId, gps.points, gpsFinalized, autoMode, autoPaused]);
+  }, [draftLoaded, missionId, membreId, gps.points, gps.historyLength, gpsFinalized, autoMode, autoPaused]);
 
   const doCapture = useCallback((pos: GpsPoint) => {
     const newIdx = gps.points.length + 1;

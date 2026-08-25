@@ -188,6 +188,15 @@ export function useGpsTracker() {
     setHistoryLength(0);
   }, []);
 
+  const restore = useCallback((points: GpsPoint[], history: GpsPoint[][] = []) => {
+    const restoredPoints = points.map((point) => ({ ...point }));
+    const restoredHistory = history.map((snapshot) => snapshot.map((point) => ({ ...point })));
+    pointsRef.current = restoredPoints;
+    historyRef.current = restoredHistory;
+    setHistoryLength(restoredHistory.length);
+    setState((s) => ({ ...s, points: restoredPoints }));
+  }, []);
+
   return {
     ...state,
     startTracking,
@@ -202,5 +211,8 @@ export function useGpsTracker() {
     canUndo: historyLength > 0,
     clearHistory,
     clearPoints,
+    restore,
+    history: historyRef.current,
+    historyLength,
   };
 }

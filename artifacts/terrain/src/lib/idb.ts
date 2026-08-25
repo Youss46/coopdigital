@@ -16,6 +16,8 @@ export interface GpsDraft {
   missionId: number;
   membreId: number;
   points: import("./types").GpsPoint[];
+  /** États précédant chaque correction, absent dans les anciens brouillons. */
+  history?: import("./types").GpsPoint[][];
   finalized: boolean;
   autoMode: boolean;
   autoPaused: boolean;
