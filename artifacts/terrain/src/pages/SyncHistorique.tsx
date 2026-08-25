@@ -9,6 +9,7 @@ const TYPE_LABELS: Record<string, string> = {
   collecte: "⚖️ Collecte",
   paiement: "💵 Paiement",
   avance:   "💰 Avance",
+  gps_collecte: "📍 Collecte GPS",
 };
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
@@ -29,6 +30,7 @@ function opLabel(op: PendingOp): string {
   if (op.type === "collecte") return `${d.poidsBrutKg ?? "?"}kg — membre #${d.membreId ?? "?"}`;
   if (op.type === "paiement") return `Livraison #${d.livraisonId ?? "?"} — membre #${d.membreId ?? "?"}`;
   if (op.type === "avance")   return `${Number(d.montantFcfa ?? 0).toLocaleString("fr-FR")} FCFA — membre #${d.membreId ?? "?"}`;
+  if (op.type === "gps_collecte") return `${op.localId} — mission #${d.missionId ?? "?"} — membre #${d.membreId ?? "?"}`;
   return op.localId;
 }
 
@@ -55,11 +57,14 @@ export default function SyncHistorique() {
     if (syncStatus === "done") void reload();
   }, [syncStatus]);
 
-  const filtered = filter === "all" ? ops : ops.filter((o) => o.status === filter);
+  // Une erreur GPS reste pending dans IndexedDB pour pouvoir être relancée,
+  // mais doit apparaître dans la catégorie « Échecs » de l'historique.
+  const displayStatus = (op: PendingOp) => op.errorMsg ? "error" : op.status;
+  const filtered = filter === "all" ? ops : ops.filter((o) => displayStatus(o) === filter);
 
-  const nbPending = ops.filter((o) => o.status === "pending").length;
+  const nbPending = ops.filter((o) => displayStatus(o) === "pending").length;
   const nbSynced  = ops.filter((o) => o.status === "synced").length;
-  const nbError   = ops.filter((o) => o.status === "error").length;
+  const nbError   = ops.filter((o) => displayStatus(o) === "error").length;
 
   return (
     <div className="t-app">
@@ -136,7 +141,7 @@ export default function SyncHistorique() {
 
         <div style={{ padding: "12px 16px 0" }}>
           {filtered.map((op) => {
-            const st = STATUS_LABELS[op.status] ?? STATUS_LABELS.pending;
+            const st = STATUS_LABELS[displayStatus(op)] ?? STATUS_LABELS.pending;
             return (
               <div key={op.localId} className="t-card" style={{ marginBottom: 10 }}>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>

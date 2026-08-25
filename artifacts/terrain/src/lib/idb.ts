@@ -9,6 +9,7 @@ export interface GpsOp {
   status: "pending" | "synced" | "error";
   tentatives?: number;
   errorMsg?: string;
+  syncedAt?: number;
 }
 
 export interface GpsDraft {
@@ -265,13 +266,30 @@ export async function markOpSyncedWithTs(localId: string): Promise<void> {
 export async function getAllOps(): Promise<PendingOp[]> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
-    const store = tx("pending_ops", "readonly", db);
-    const req = store.getAll();
-    req.onsuccess = () => {
-      const results = (req.result as PendingOp[]).sort((a, b) => b.timestamp - a.timestamp);
+    const transaction = db.transaction(["pending_ops", "pending_gps"], "readonly");
+    const regularReq = transaction.objectStore("pending_ops").getAll();
+    const gpsReq = transaction.objectStore("pending_gps").getAll();
+    transaction.oncomplete = () => {
+      const gpsOps = (gpsReq.result as GpsOp[]).map((op): PendingOp => ({
+        localId: op.localId,
+        type: "gps_collecte",
+        data: {
+          ...op.data,
+          missionId: op.missionId,
+          membreId: op.membreId,
+          localId: op.localId,
+        },
+        timestamp: op.timestamp,
+        status: op.status,
+        errorMsg: op.errorMsg,
+        tentatives: op.tentatives,
+        syncedAt: op.syncedAt,
+      }));
+      const results = [...(regularReq.result as PendingOp[]), ...gpsOps]
+        .sort((a, b) => b.timestamp - a.timestamp);
       resolve(results.slice(0, 50));
     };
-    req.onerror = () => reject(req.error);
+    transaction.onerror = () => reject(transaction.error);
   });
 }
 
@@ -304,7 +322,13 @@ export async function markGpsOpSynced(localId: string): Promise<void> {
     const getReq = store.get(localId);
     getReq.onsuccess = () => {
       const op = getReq.result as GpsOp;
-      if (op) { op.status = "synced"; const p = store.put(op); p.onsuccess = () => resolve(); p.onerror = () => reject(p.error); }
+      if (op) {
+        op.status = "synced";
+        op.syncedAt = Date.now();
+        const p = store.put(op);
+        p.onsuccess = () => resolve();
+        p.onerror = () => reject(p.error);
+      }
       else resolve();
     };
     getReq.onerror = () => reject(getReq.error);
