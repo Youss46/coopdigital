@@ -16,6 +16,8 @@ const MAX_PHOTOS = 3;
 const MIN_PHOTOS = 2;
 const STABILISATION_SEC = 3;
 const PRECISION_SEUIL = 10;
+const AUTO_PRECISION_SEUIL = 15;
+const AUTO_DISTANCE_MIN = 8;
 const PROBLEME_TYPES = ["Accès difficile", "Conflit foncier", "Parcelle inexistante", "Membre absent", "Autre"];
 
 function fmtDist(m: number): string {
@@ -115,11 +117,14 @@ export default function CollecteGps() {
   const [countdown, setCountdown] = useState(STABILISATION_SEC);
   const [lastCapture, setLastCapture] = useState<{ idx: number; acc: number } | null>(null);
   const [gpsErreurPoints, setGpsErreurPoints] = useState<string | null>(null);
+  const [autoMode, setAutoMode] = useState(false);
+  const [autoPaused, setAutoPaused] = useState(false);
 
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const currentPosRef = useRef<GpsPoint | null>(null);
   const accuracyRef = useRef<number | null>(null);
   const lastCaptureTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoLastPointRef = useRef<GpsPoint | null>(null);
 
   useEffect(() => { currentPosRef.current = gps.currentPos; }, [gps.currentPos]);
   useEffect(() => { accuracyRef.current = gps.accuracy; }, [gps.accuracy]);
@@ -193,8 +198,34 @@ export default function CollecteGps() {
       setGpsErreurPoints(`Minimum 3 points requis. Ajoutez encore ${manquants} point${manquants > 1 ? "s" : ""}.`);
       return;
     }
+    setAutoPaused(true);
     setGpsErreurPoints(null);
     setShowGpsRecap(true);
+  }, [gps.points.length]);
+
+  // Mode automatique : on conserve un point tous les quelques mètres, uniquement
+  // lorsque la précision GPS est suffisante. Cela évite les zigzags du signal.
+  useEffect(() => {
+    if (!autoMode || autoPaused || gpsFinalized || !gps.currentPos) return;
+    const pos = gps.currentPos;
+    if ((pos.accuracy ?? Infinity) > AUTO_PRECISION_SEUIL) return;
+    const previous = autoLastPointRef.current;
+    if (previous && haversineDistance(previous.lat, previous.lon, pos.lat, pos.lon) < AUTO_DISTANCE_MIN) return;
+    autoLastPointRef.current = pos;
+    gps.addPoint(pos);
+    setLastCapture({ idx: gps.points.length + 1, acc: Math.round(pos.accuracy ?? 0) });
+    if (lastCaptureTimerRef.current) clearTimeout(lastCaptureTimerRef.current);
+    lastCaptureTimerRef.current = setTimeout(() => setLastCapture(null), 1800);
+  }, [autoMode, autoPaused, gpsFinalized, gps.currentPos, gps.points.length, gps.addPoint]);
+
+  const toggleAutoMode = useCallback(() => {
+    if (gps.points.length > 0) {
+      setGpsErreurPoints("Le mode automatique se choisit avant le premier point. Recommencez le contour pour changer de mode.");
+      return;
+    }
+    setAutoMode((current) => !current);
+    setAutoPaused(false);
+    autoLastPointRef.current = null;
   }, [gps.points.length]);
 
   const handleRecapValidate = useCallback(() => {
@@ -210,6 +241,8 @@ export default function CollecteGps() {
     setGpsFinalized(false);
     setShowGpsRecap(false);
     setGpsErreurPoints(null);
+    setAutoPaused(false);
+    autoLastPointRef.current = null;
   }, [gps]);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -298,14 +331,13 @@ export default function CollecteGps() {
           <div style={{ background: "#1e293b", borderRadius: "18px 18px 0 0", padding: "24px 20px 36px", width: "100%", maxWidth: 480, margin: "0 auto" }}>
             <div style={{ fontWeight: 800, fontSize: "1.1rem", marginBottom: 16, color: "#f1f5f9" }}>📍 Comment mapper une parcelle</div>
             <ol style={{ paddingLeft: 20, color: "#cbd5e1", fontSize: ".9rem", lineHeight: 1.9, margin: "0 0 16px" }}>
-              <li>Allez à l'angle 1 de la parcelle</li>
-              <li>Arrêtez-vous complètement</li>
-              <li>Appuyez sur <strong style={{ color: "#22c55e" }}>[+ Point]</strong> et attendez la stabilisation</li>
-              <li>Répétez pour chaque angle</li>
-              <li>Appuyez sur <strong style={{ color: "#f59e0b" }}>[Arrêter]</strong> pour finaliser</li>
+              <li>Choisissez le mode <strong style={{ color: "#60a5fa" }}>Automatique</strong> ou Manuel</li>
+              <li>En automatique, marchez simplement autour de la parcelle</li>
+              <li>En manuel, arrêtez-vous à chaque angle et appuyez sur <strong style={{ color: "#22c55e" }}>+ Point</strong></li>
+              <li>Appuyez sur <strong style={{ color: "#f59e0b" }}>Arrêter</strong> pour finaliser</li>
             </ol>
             <div style={{ background: "#0f172a", borderRadius: 10, padding: "10px 14px", fontSize: ".8rem", color: "#94a3b8", marginBottom: 20, lineHeight: 1.7 }}>
-              💡 <strong>Conseils :</strong> Minimum 4 angles · Téléphone sorti de la poche · Restez immobile à la capture · Précision idéale ≤ 5 m
+               💡 <strong>Conseils :</strong> Téléphone sorti de la poche · En automatique, marchez lentement · Précision idéale ≤ 10 m
             </div>
             <button
               onClick={() => setShowGuide(false)}
@@ -522,6 +554,30 @@ export default function CollecteGps() {
               </button>
             )}
 
+            {gps.points.length === 0 && (
+              <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                <button
+                  onClick={toggleAutoMode}
+                  className="t-btn"
+                  style={{ flex: 1, padding: "9px", fontSize: ".8rem", background: autoMode ? "#2563eb22" : "#0f172a", color: autoMode ? "#60a5fa" : "#94a3b8", border: `1px solid ${autoMode ? "#2563eb66" : "#334155"}`, fontWeight: 700 }}
+                >
+                  {autoMode ? "✓ Automatique" : "Automatique"}
+                </button>
+                <button
+                  onClick={toggleAutoMode}
+                  className="t-btn"
+                  style={{ flex: 1, padding: "9px", fontSize: ".8rem", background: !autoMode ? "#22c55e22" : "#0f172a", color: !autoMode ? "#22c55e" : "#94a3b8", border: `1px solid ${!autoMode ? "#22c55e66" : "#334155"}`, fontWeight: 700 }}
+                >
+                  {!autoMode ? "✓ Manuel" : "Manuel"}
+                </button>
+              </div>
+            )}
+            {autoMode && gps.points.length > 0 && (
+              <div style={{ background: "#2563eb18", border: "1px solid #2563eb44", borderRadius: 8, padding: "8px 10px", fontSize: ".78rem", color: "#60a5fa", marginBottom: 10 }}>
+                🛰️ Tracé automatique actif — marchez autour de la parcelle. Un point est ajouté tous les {AUTO_DISTANCE_MIN} m environ.
+              </div>
+            )}
+
             {/* Boutons principaux */}
             <div style={{ display: "flex", gap: 10 }}>
               <button
@@ -532,7 +588,15 @@ export default function CollecteGps() {
                 ⏹ Arrêter
               </button>
 
-              {capturePhase === "stabilizing" ? (
+              {autoMode && gps.points.length > 0 ? (
+                <button
+                  onClick={() => setAutoPaused((paused) => !paused)}
+                  className="t-btn"
+                  style={{ flex: 2, padding: "12px", background: autoPaused ? "#22c55e22" : "#2563eb22", color: autoPaused ? "#22c55e" : "#60a5fa", border: `1px solid ${autoPaused ? "#22c55e44" : "#2563eb44"}`, fontWeight: 700 }}
+                >
+                  {autoPaused ? "▶ Reprendre le tracé" : "Ⅱ Pause"}
+                </button>
+              ) : capturePhase === "stabilizing" ? (
                 <button
                   disabled
                   className="t-btn"

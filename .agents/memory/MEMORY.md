@@ -71,3 +71,4 @@
 - [Paiement TSE et trésorerie](tse-payment-treasury.md) — espèces 571, Mobile Marchand 552, banque 521; le solde est diminué avec mouvement atomique.
 - [Règlement prestataire PPSSI](ppsi-prestataire-reglement.md) — le brut crée la dette 401, la retenue solde 401 vers 447, et seul le net est porté en sortie de trésorerie.
 - [Taux PPSSI annuel](ppsi-taux-annuel.md) — le taux est modifiable une fois par année civile et doit piloter calculs, règlements et exports.
+- [Cartographie automatique terrain](terrain-auto-mapping.md) — le mode automatique filtre les positions GPS par précision et distance, avec pause/reprise et validation finale.
