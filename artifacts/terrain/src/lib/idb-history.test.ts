@@ -5,8 +5,11 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   createBrouillon,
   getAllOps,
+  incrementGpsTentatives,
   markBrouillonError,
   markEnqueteOpError,
+  markGpsOpError,
+  queueGpsOp,
   queueEnqueteOp,
   queueOp,
 } from "./idb";
@@ -114,6 +117,41 @@ describe("historique offline multi-files", () => {
     } finally {
       Date.now = dateNow;
     }
+  });
+
+  it("agrège une opération GPS avec son statut, son erreur et ses tentatives", async () => {
+    await queueGpsOp({
+      localId: "gps-historique-1",
+      missionId: 42,
+      membreId: 73,
+      data: {
+        polygoneGps: [
+          { lat: 5.31, lon: -4.02, accuracy: 7, ts: 1 },
+          { lat: 5.311, lon: -4.02, accuracy: 6, ts: 2 },
+        ],
+        photos: [],
+      },
+    });
+
+    await incrementGpsTentatives("gps-historique-1");
+    await incrementGpsTentatives("gps-historique-1");
+    await markGpsOpError("gps-historique-1", "Réseau indisponible");
+
+    const historique = await getAllOps();
+    const operationGps = historique.find((op) => op.localId === "gps-historique-1");
+
+    expect(operationGps).toMatchObject({
+      localId: "gps-historique-1",
+      type: "gps_collecte",
+      status: "pending",
+      errorMsg: "Réseau indisponible",
+      tentatives: 2,
+      data: expect.objectContaining({
+        missionId: 42,
+        membreId: 73,
+        localId: "gps-historique-1",
+      }),
+    });
   });
 });
 
