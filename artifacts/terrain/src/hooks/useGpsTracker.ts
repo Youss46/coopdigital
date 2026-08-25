@@ -58,7 +58,7 @@ function segmentsIntersect(a: GpsPoint, b: GpsPoint, c: GpsPoint, d: GpsPoint): 
   const o4 = orientation(c, d, b);
   const eps = 1e-10;
   return ((o1 > eps && o2 < -eps) || (o1 < -eps && o2 > eps))
-    && ((o3 > eps && o4 < -eps) || (o3 < -eps && o4 > eps);
+    && ((o3 > eps && o4 < -eps) || (o3 < -eps && o4 > eps));
 }
 
 /** Détecte un contour qui se croise, en ignorant les côtés voisins. */
