@@ -95,6 +95,14 @@ export function useGpsTracker() {
   });
 
   const watchIdRef = useRef<number | null>(null);
+  const pointsRef = useRef<GpsPoint[]>([]);
+  const historyRef = useRef<GpsPoint[][]>([]);
+  const [historyLength, setHistoryLength] = useState(0);
+
+  const recordBeforeChange = useCallback((points: GpsPoint[]) => {
+    historyRef.current.push(points);
+    setHistoryLength(historyRef.current.length);
+  }, []);
 
   const startTracking = useCallback(() => {
     if (!navigator.geolocation) {
@@ -128,36 +136,56 @@ export function useGpsTracker() {
   }, []);
 
   const addPoint = useCallback((point: GpsPoint) => {
-    setState((s) => ({ ...s, points: [...s.points, point] }));
-  }, []);
+    const nextPoints = [...pointsRef.current, point];
+    recordBeforeChange(pointsRef.current);
+    pointsRef.current = nextPoints;
+    setState((s) => ({ ...s, points: nextPoints }));
+  }, [recordBeforeChange]);
 
   const insertPoint = useCallback((index: number, point: GpsPoint) => {
-    setState((s) => {
-      const points = [...s.points];
-      points.splice(Math.max(0, Math.min(index, points.length)), 0, point);
-      return { ...s, points };
-    });
-  }, []);
+    const points = [...pointsRef.current];
+    recordBeforeChange(pointsRef.current);
+    points.splice(Math.max(0, Math.min(index, points.length)), 0, point);
+    pointsRef.current = points;
+    setState((s) => ({ ...s, points }));
+  }, [recordBeforeChange]);
 
   const replacePoint = useCallback((index: number, point: GpsPoint) => {
-    setState((s) => {
-      if (index < 0 || index >= s.points.length) return s;
-      const points = [...s.points];
-      points[index] = point;
-      return { ...s, points };
-    });
-  }, []);
+    if (index < 0 || index >= pointsRef.current.length) return;
+    const points = [...pointsRef.current];
+    recordBeforeChange(pointsRef.current);
+    points[index] = point;
+    pointsRef.current = points;
+    setState((s) => ({ ...s, points }));
+  }, [recordBeforeChange]);
 
   const removePoint = useCallback((index: number) => {
-    setState((s) => ({ ...s, points: s.points.filter((_, pointIndex) => pointIndex !== index) }));
-  }, []);
+    if (index < 0 || index >= pointsRef.current.length) return;
+    recordBeforeChange(pointsRef.current);
+    const points = pointsRef.current.filter((_, pointIndex) => pointIndex !== index);
+    pointsRef.current = points;
+    setState((s) => ({ ...s, points }));
+  }, [recordBeforeChange]);
 
-  const undoLastPoint = useCallback(() => {
-    setState((s) => ({ ...s, points: s.points.slice(0, -1) }));
+  const undoLastCorrection = useCallback(() => {
+    const previousPoints = historyRef.current.pop();
+    if (!previousPoints) return false;
+    setHistoryLength(historyRef.current.length);
+    pointsRef.current = previousPoints;
+    setState((s) => ({ ...s, points: previousPoints }));
+    return true;
   }, []);
 
   const clearPoints = useCallback(() => {
+    historyRef.current = [];
+    setHistoryLength(0);
+    pointsRef.current = [];
     setState((s) => ({ ...s, points: [] }));
+  }, []);
+
+  const clearHistory = useCallback(() => {
+    historyRef.current = [];
+    setHistoryLength(0);
   }, []);
 
   return {
@@ -168,7 +196,11 @@ export function useGpsTracker() {
     insertPoint,
     replacePoint,
     removePoint,
-    undoLastPoint,
+    undoLastCorrection,
+    // Kept as an alias for callers that only need to remove the last captured point.
+    undoLastPoint: undoLastCorrection,
+    canUndo: historyLength > 0,
+    clearHistory,
     clearPoints,
   };
 }

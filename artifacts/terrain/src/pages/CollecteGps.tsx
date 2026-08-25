@@ -201,6 +201,8 @@ export default function CollecteGps() {
       getGpsDraft(missionId, membreId).then((draft) => {
         if (!active || !draft) return;
         draft.points.forEach((point) => gps.addPoint(point));
+        // Points restored from the local draft are the starting state, not corrections.
+        gps.clearHistory();
         setGpsFinalized(draft.finalized);
         setAutoMode(draft.autoMode);
         setAutoPaused(draft.autoPaused);
@@ -321,6 +323,13 @@ export default function CollecteGps() {
     setSelectedPointIndex(insertAt);
     setGpsErreurPoints(null);
   }, [gps.insertPoint, gps.points.length, selectedPointIndex]);
+
+  const handleUndoCorrection = useCallback(() => {
+    if (!gps.undoLastCorrection()) return;
+    setSelectedPointIndex(null);
+    setLastCapture(null);
+    setGpsErreurPoints(null);
+  }, [gps.undoLastCorrection]);
 
   // Mode automatique : on conserve un point tous les quelques mètres, uniquement
   // lorsque la précision GPS est suffisante. Cela évite les zigzags du signal.
@@ -508,11 +517,20 @@ export default function CollecteGps() {
                 </button>
               </div>
             )}
-            {selectedPoint && (
+             {selectedPoint && (
               <div style={{ color: "#64748b", fontSize: ".72rem", marginBottom: 12 }}>
                 P{selectedPointIndex! + 1} sélectionné · {selectedPoint.lat.toFixed(6)}, {selectedPoint.lon.toFixed(6)}
               </div>
             )}
+             {gps.canUndo && (
+               <button
+                 onClick={handleUndoCorrection}
+                 className="t-btn t-btn--ghost"
+                 style={{ width: "100%", padding: "9px", fontSize: ".82rem", marginBottom: 14, color: "#fbbf24", borderColor: "#f59e0b66" }}
+               >
+                 ↩ Annuler la dernière correction
+               </button>
+             )}
             {membre && (
               <div style={{ fontSize: ".85rem", color: "#94a3b8", marginBottom: 14, lineHeight: 1.8 }}>
                 <div><strong style={{ color: "#e2e8f0" }}>Membre :</strong> {membre.membreNom} {membre.membrePrenoms}</div>
@@ -733,14 +751,14 @@ export default function CollecteGps() {
               </div>
             )}
 
-            {/* Annuler dernier point */}
-            {gps.points.length > 0 && (
+             {/* Annuler la dernière action de tracé */}
+             {gps.canUndo && (
               <button
-                onClick={() => { gps.undoLastPoint(); setLastCapture(null); }}
+                 onClick={handleUndoCorrection}
                 className="t-btn t-btn--ghost"
                 style={{ width: "100%", padding: "9px", fontSize: ".82rem", marginBottom: 10 }}
               >
-                ⬅ Annuler dernier point
+                 ↩ Annuler la dernière correction
               </button>
             )}
 
