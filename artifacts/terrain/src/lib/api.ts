@@ -195,6 +195,7 @@ export async function syncGpsOps(ops: GpsOp[]): Promise<{ succes: string[]; eche
   const operations = ops.map((op) => ({
     type: "gps_collecte",
     localId: op.localId,
+    timestamp: op.timestamp,
     data: { missionId: op.missionId, membreId: op.membreId, ...op.data },
   }));
   return apiPost<{ succes: string[]; echecs: Array<{ localId: string; erreur: string }> }>("/sync", { operations });

@@ -8,6 +8,18 @@ export interface GpsOp {
   timestamp: number;
   status: "pending" | "synced" | "error";
   tentatives?: number;
+  errorMsg?: string;
+}
+
+export interface GpsDraft {
+  key: string;
+  missionId: number;
+  membreId: number;
+  points: import("./types").GpsPoint[];
+  finalized: boolean;
+  autoMode: boolean;
+  autoPaused: boolean;
+  updatedAt: number;
 }
 
 export type PendingOpType = "collecte" | "paiement" | "avance" | "gps_collecte";
@@ -169,6 +181,27 @@ export async function getCache<T>(key: string): Promise<T | null> {
   });
 }
 
+export async function deleteCache(key: string): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const req = tx("cache", "readwrite", db).delete(key);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function saveGpsDraft(draft: Omit<GpsDraft, "updatedAt">): Promise<void> {
+  await setCache(draft.key, { ...draft, updatedAt: Date.now() });
+}
+
+export async function getGpsDraft(missionId: number, membreId: number): Promise<GpsDraft | null> {
+  return getCache<GpsDraft>(`gps_draft_${missionId}_${membreId}`);
+}
+
+export async function deleteGpsDraft(missionId: number, membreId: number): Promise<void> {
+  await deleteCache(`gps_draft_${missionId}_${membreId}`);
+}
+
 export async function cacheFournisseurs(fournisseurs: Fournisseur[]): Promise<void> {
   await setCache("fournisseurs", fournisseurs);
 }
@@ -276,14 +309,20 @@ export async function markGpsOpSynced(localId: string): Promise<void> {
   });
 }
 
-export async function markGpsOpError(localId: string): Promise<void> {
+export async function markGpsOpError(localId: string, errorMsg?: string): Promise<void> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const store = tx("pending_gps", "readwrite", db);
     const getReq = store.get(localId);
     getReq.onsuccess = () => {
       const op = getReq.result as GpsOp;
-      if (op) { op.status = "error"; const p = store.put(op); p.onsuccess = () => resolve(); p.onerror = () => reject(p.error); }
+      if (op) {
+        op.status = "pending";
+        if (errorMsg) op.errorMsg = errorMsg;
+        const p = store.put(op);
+        p.onsuccess = () => resolve();
+        p.onerror = () => reject(p.error);
+      }
       else resolve();
     };
     getReq.onerror = () => reject(getReq.error);

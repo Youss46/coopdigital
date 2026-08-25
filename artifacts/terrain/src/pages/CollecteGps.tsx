@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useLocation } from "wouter";
 import { getMissionDetail, collecterParcelle } from "../lib/api";
+import { deleteGpsDraft, getGpsDraft, saveGpsDraft } from "../lib/idb";
 import { useOffline } from "../contexts/OfflineContext";
 import {
   useGpsTracker,
@@ -177,6 +178,7 @@ export default function CollecteGps() {
   const [autoMode, setAutoMode] = useState(false);
   const [autoPaused, setAutoPaused] = useState(false);
   const [selectedPointIndex, setSelectedPointIndex] = useState<number | null>(null);
+  const [draftLoaded, setDraftLoaded] = useState(false);
 
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const currentPosRef = useRef<GpsPoint | null>(null);
@@ -188,21 +190,47 @@ export default function CollecteGps() {
   useEffect(() => { accuracyRef.current = gps.accuracy; }, [gps.accuracy]);
 
   useEffect(() => {
-    getMissionDetail(missionId)
-      .then((d) => {
-        const m = d.membres.find((mb) => mb.membreId === membreId);
-        setMembre(m ?? null);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    let active = true;
+    Promise.all([
+      getMissionDetail(missionId).then((d) => {
+        if (active) {
+          const m = d.membres.find((mb) => mb.membreId === membreId);
+          setMembre(m ?? null);
+        }
+      }).catch(() => {}),
+      getGpsDraft(missionId, membreId).then((draft) => {
+        if (!active || !draft) return;
+        draft.points.forEach((point) => gps.addPoint(point));
+        setGpsFinalized(draft.finalized);
+        setAutoMode(draft.autoMode);
+        setAutoPaused(draft.autoPaused);
+        autoLastPointRef.current = draft.points.at(-1) ?? null;
+      }).catch(() => {}).finally(() => {
+        if (active) setDraftLoaded(true);
+      }),
+    ]).finally(() => { if (active) setLoading(false); });
     gps.startTracking();
     return () => {
+      active = false;
       gps.stopTracking();
       if (countdownRef.current) clearInterval(countdownRef.current);
       if (lastCaptureTimerRef.current) clearTimeout(lastCaptureTimerRef.current);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [missionId, membreId]);
+  }, [missionId, membreId, gps.addPoint, gps.startTracking, gps.stopTracking]);
+
+  useEffect(() => {
+    if (!draftLoaded) return;
+    void saveGpsDraft({
+      key: `gps_draft_${missionId}_${membreId}`,
+      missionId,
+      membreId,
+      points: gps.points,
+      finalized: gpsFinalized,
+      autoMode,
+      autoPaused,
+    }).catch(() => {});
+  }, [draftLoaded, missionId, membreId, gps.points, gpsFinalized, autoMode, autoPaused]);
 
   const doCapture = useCallback((pos: GpsPoint) => {
     const newIdx = gps.points.length + 1;
@@ -382,6 +410,7 @@ export default function CollecteGps() {
         superficieCalculeeHa: areaHa > 0 ? areaHa : undefined,
         probleme: showProbleme && probleme?.type ? probleme : undefined,
       }, isOnline);
+      await deleteGpsDraft(missionId, membreId);
       gps.stopTracking();
       setSubmitted(true);
       setTimeout(() => navigate(`/missions/${missionId}`), 1800);

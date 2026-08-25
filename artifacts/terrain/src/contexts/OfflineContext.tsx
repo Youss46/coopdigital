@@ -14,6 +14,7 @@ import { syncOps, syncGpsOps, syncEnqueteOps, batchSyncBrouillon } from "../lib/
 export interface SyncResult {
   succes: number;
   echecs: number;
+  erreurs: string[];
   /** Collectes enregistrées en mode proxy avec le nom du délégué concerné */
   collectesProxy: Array<{ localId: string; saisiePour: string }>;
 }
@@ -60,6 +61,7 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
 
     let nbSucces = 0;
     let nbEchecs = 0;
+    const erreurs: string[] = [];
     const allCollectesProxy: Array<{ localId: string; saisiePour: string }> = [];
 
     try {
@@ -70,6 +72,7 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
           const t = await incrementTentatives(localId);
           if (t >= 3) await markOpError(localId, `Échec définitif (${t} tentatives) : ${erreur}`);
           nbEchecs++;
+          erreurs.push(erreur);
         }
         allCollectesProxy.push(...(result.collectesProxy ?? []));
       }
@@ -77,10 +80,11 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
       if (gpsOps.length > 0) {
         const gpsResult = await syncGpsOps(gpsOps);
         for (const localId of gpsResult.succes) { await markGpsOpSynced(localId); nbSucces++; }
-        for (const { localId } of gpsResult.echecs) {
-          const t = await incrementGpsTentatives(localId);
-          if (t >= 3) await markGpsOpError(localId);
+        for (const { localId, erreur } of gpsResult.echecs) {
+          await incrementGpsTentatives(localId);
+          await markGpsOpError(localId, erreur);
           nbEchecs++;
+          erreurs.push(erreur);
         }
       }
 
@@ -91,6 +95,7 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
           const t = await incrementEnqueteTentatives(localId);
           if (t >= 3) await markEnqueteOpError(localId, `Échec définitif (${t} tentatives) : ${erreur}`);
           nbEchecs++;
+          erreurs.push(erreur);
         }
       }
 
@@ -109,8 +114,8 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
       }
 
       await refreshCount();
-      setSyncResult({ succes: nbSucces, echecs: nbEchecs, collectesProxy: allCollectesProxy });
-      setSyncStatus("done");
+      setSyncResult({ succes: nbSucces, echecs: nbEchecs, erreurs, collectesProxy: allCollectesProxy });
+      setSyncStatus(nbEchecs > 0 ? "error" : "done");
       clearTimerRef.current = setTimeout(() => {
         setSyncStatus("idle");
         setSyncResult(null);
