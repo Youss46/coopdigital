@@ -8,3 +8,9 @@ Le mode automatique du relevé de parcelle ajoute un point GPS lorsque la préci
 **Why:** les parcelles irrégulières sont difficiles à relever par seuls angles manuels, mais le bruit GPS rend nécessaire un filtrage par précision et distance.
 
 **How to apply:** conserver une validation manuelle finale, le calcul de superficie et le stockage hors ligne; ne pas ajouter chaque position GPS brute au polygone final.
+
+Le contrat de collecte doit exiger `crs = EPSG:4326`; les anciennes opérations hors ligne peuvent être complétées à la synchronisation avant leur envoi.
+
+**Why:** un relevé sans CRS explicite est ambigu pour les échanges SIG, tandis que les files locales historiques doivent rester synchronisables sans doublon.
+
+**How to apply:** valider le CRS côté contrôleur et service, puis enregistrer la métadonnée avec le polygone.
