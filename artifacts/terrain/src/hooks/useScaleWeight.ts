@@ -61,6 +61,11 @@ export function useScaleWeight() {
 
       ws.onopen = () => {
         attemptsRef.current = 0;
+        setState((s) => ({
+          ...s,
+          isConnected: true,
+          error: null,
+        }));
       };
 
       ws.onmessage = (ev) => {

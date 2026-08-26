@@ -134,6 +134,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
   // Formulaire nouvelle pesée
   const [nbSacs, setNbSacs] = useState("");
   const [poidsBrut, setPoidsBrut] = useState("");
+  const [scaleConnected, setScaleConnected] = useState(false);
   const [tare, setTare] = useState("0");
   const [notesLigne, setNotesLigne] = useState("");
   const [certificationCacao, setCertificationCacao] = useState<string>("");
@@ -170,6 +171,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
   const [activeSessions, setActiveSessions] = useState<Map<number, number>>(new Map());
   const sessionMembreDelegueIncomplete = isIncompleteMemberDelegateSession(session);
   const sessionSaisissable = session?.statut === "en_cours";
+  const poidsSaisieVerrouillee = machinePeseeObligatoire || scaleConnected;
 
   // Une session peut changer de statut après son chargement (annulation depuis
   // un autre appareil, cron d'expiration, etc.). Ne jamais laisser le
@@ -1201,11 +1203,12 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
               {/* Lecture automatique depuis la balance RS232 (service local) */}
               <ScaleWeightDisplay
                 onUse={(kg) => setPoidsBrut(kg.toFixed(3))}
+                onConnectionChange={setScaleConnected}
               />
 
               <div className="t-field" style={{ marginBottom: 8 }}>
                 <label className="t-label">Poids brut (kg) *</label>
-                {machinePeseeObligatoire && (
+                {poidsSaisieVerrouillee && (
                   <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: ".75rem", color: "#64748b", marginBottom: 4 }}>
                     <span>🔒</span>
                     <span>Saisie manuelle désactivée — utilisez la balance</span>
@@ -1215,13 +1218,13 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
                   type="number"
                   className="t-input t-input--lg"
                   value={poidsBrut}
-                  onChange={(e) => { if (!machinePeseeObligatoire) setPoidsBrut(e.target.value); }}
+                  onChange={(e) => { if (!poidsSaisieVerrouillee) setPoidsBrut(e.target.value); }}
                   inputMode="decimal"
                   step="0.001"
                   min="0"
-                  placeholder={machinePeseeObligatoire ? "Poids depuis la balance" : "Ex : 247.500"}
-                  readOnly={machinePeseeObligatoire}
-                  style={machinePeseeObligatoire ? { background: "#f1f5f9", color: "#94a3b8", cursor: "not-allowed" } : undefined}
+                  placeholder={poidsSaisieVerrouillee ? "Poids depuis la balance" : "Ex : 247.500"}
+                  disabled={poidsSaisieVerrouillee}
+                  style={poidsSaisieVerrouillee ? { background: "#f1f5f9", color: "#94a3b8", cursor: "not-allowed", opacity: 0.85 } : undefined}
                 />
               </div>
 

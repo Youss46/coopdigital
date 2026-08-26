@@ -51,6 +51,7 @@ export default function CollecteFlow() {
   // Step 2 fields
   const [nombreSacs, setNombreSacs] = useState("");
   const [poidsBrut, setPoidsBrut] = useState("");
+  const [scaleConnected, setScaleConnected] = useState(false);
   const [retenueKg, setRetenueKg] = useState("0");
   const [certificationCacao, setCertificationCacao] = useState<"RA" | "FAIRTRADE" | "ASR_1000" | "ORDINAIRE" | "">("");
   const [showCertification, setShowCertification] = useState(false);
@@ -81,6 +82,7 @@ export default function CollecteFlow() {
   }, [isOnline]);
 
   const isExterne = fournisseur?.typeMembre === "externe";
+  const poidsSaisieVerrouillee = machinePeseeObligatoire || scaleConnected;
 
   const poidsBrutNum = parseFloat(poidsBrut) || 0;
   const retenueNum = parseFloat(retenueKg) || 0;
@@ -283,11 +285,12 @@ export default function CollecteFlow() {
               {/* Lecture automatique depuis la balance RS232 (service local) */}
               <ScaleWeightDisplay
                 onUse={(kg) => setPoidsBrut(kg.toFixed(1))}
+                onConnectionChange={setScaleConnected}
               />
 
               <div className="t-field">
                 <label className="t-label">Poids brut (kg)</label>
-                {machinePeseeObligatoire && (
+                {poidsSaisieVerrouillee && (
                   <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: ".75rem", color: "#64748b", marginBottom: 4 }}>
                     <span>🔒</span>
                     <span>Saisie manuelle désactivée — utilisez la balance</span>
@@ -297,13 +300,13 @@ export default function CollecteFlow() {
                   type="number"
                   className="t-input t-input--lg"
                   value={poidsBrut}
-                  onChange={(e) => { if (!machinePeseeObligatoire) setPoidsBrut(e.target.value); }}
+                  onChange={(e) => { if (!poidsSaisieVerrouillee) setPoidsBrut(e.target.value); }}
                   inputMode="decimal"
                   step="0.1"
                   min="0"
-                  placeholder={machinePeseeObligatoire ? "Poids depuis la balance" : "Ex: 125.5"}
-                  readOnly={machinePeseeObligatoire}
-                  style={machinePeseeObligatoire ? { background: "#f1f5f9", color: "#94a3b8", cursor: "not-allowed" } : undefined}
+                  placeholder={poidsSaisieVerrouillee ? "Poids depuis la balance" : "Ex: 125.5"}
+                  disabled={poidsSaisieVerrouillee}
+                  style={poidsSaisieVerrouillee ? { background: "#f1f5f9", color: "#94a3b8", cursor: "not-allowed", opacity: 0.85 } : undefined}
                 />
               </div>
 

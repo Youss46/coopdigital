@@ -11,15 +11,21 @@
  *  onUse(weightKg: number) — appelé quand le peseur clique "Utiliser ce poids"
  */
 
+import { useEffect } from "react";
 import { Scale, CheckCheck, Wifi, WifiOff, Activity } from "lucide-react";
 import { useScaleWeight } from "../hooks/useScaleWeight";
 
 interface Props {
   onUse: (weightKg: number) => void;
+  onConnectionChange?: (connected: boolean) => void;
 }
 
-export default function ScaleWeightDisplay({ onUse }: Props) {
+export default function ScaleWeightDisplay({ onUse, onConnectionChange }: Props) {
   const { weightKg, isStable, isConnected, error } = useScaleWeight();
+
+  useEffect(() => {
+    onConnectionChange?.(isConnected);
+  }, [isConnected, onConnectionChange]);
 
   // ── Service inaccessible ─────────────────────────────────────────────────
   if (!isConnected) {
