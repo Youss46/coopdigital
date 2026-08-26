@@ -27,6 +27,7 @@ vi.mock("../services/notificationService.js", () => ({
 }));
 vi.mock("../services/recuService.js", () => ({
   genererNumeroRecu: vi.fn(),
+  reserverNumeroPesee: vi.fn().mockResolvedValue({ numero: 1, annee: 2026 }),
 }));
 vi.mock("../services/commissionService.js", () => ({
   creerCommissionTransfert: vi.fn(),

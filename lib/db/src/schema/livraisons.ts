@@ -49,6 +49,8 @@ export const livraisonsTable = pgTable("livraisons", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 
   // Pesée enrichie (migration 026)
+  /** Rang de la pesée dans la coopérative pour l'année civile. */
+  numeroPesee:             integer("numero_pesee"),
   balanceId:             integer("balance_id").references(() => balancesTable.id),
   peseurId:              integer("peseur_id").references(() => usersTable.id),
   poidsBrut1erePeseeKg:  numeric("poids_brut_1ere_pesee_kg", { precision: 10, scale: 3 }),

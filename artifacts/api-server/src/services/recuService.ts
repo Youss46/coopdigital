@@ -1,5 +1,27 @@
-import { db, entrepotsDeleguesTable } from "@workspace/db";
+import { db, entrepotsDeleguesTable, sequencesPeseeTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
+
+/**
+ * Réserve atomiquement le prochain rang de pesée pour une coopérative et une
+ * année civile. Les gaps sont acceptables si la création parente est annulée.
+ */
+export async function reserverNumeroPesee(cooperativeId: number): Promise<{ numero: number; annee: number }> {
+  const annee = new Date().getFullYear();
+  const [row] = await db
+    .insert(sequencesPeseeTable)
+    .values({ cooperativeId, annee, compteur: 1 })
+    .onConflictDoUpdate({
+      target: [sequencesPeseeTable.cooperativeId, sequencesPeseeTable.annee],
+      set: { compteur: sql`${sequencesPeseeTable.compteur} + 1` },
+    })
+    .returning({ numero: sequencesPeseeTable.compteur });
+
+  const numero = row?.numero;
+  if (!Number.isInteger(numero) || numero < 1) {
+    throw new Error("Impossible de générer un numéro de pesée");
+  }
+  return { numero, annee };
+}
 
 /**
  * Génère un numéro de reçu séquentiel global, format REC-YYYY-NNNNN.

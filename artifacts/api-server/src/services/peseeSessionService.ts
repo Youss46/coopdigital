@@ -22,7 +22,7 @@ import { generateEcrituresLivraison } from "./comptabiliteService.js";
 import { getMontantAlimentationsCaisseDelegue } from "./delegueService.js";
 import { getEncoursMembreTx, enregistrerRemboursementParLivraison } from "./intrantsService.js";
 import { creerNotification, notifierParRole } from "./notificationService.js";
-import { genererNumeroRecu } from "./recuService.js";
+import { genererNumeroRecu, reserverNumeroPesee } from "./recuService.js";
 import { creerCommissionTransfert, deduireAvancesApresCommission } from "./commissionService.js";
 import { creerCommissionMembreSiTaux } from "./commissionMembreDelegueService.js";
 import { entrerStockSiDelegue } from "./entrepotDelegueService.js";
@@ -138,20 +138,12 @@ export async function creerSessionBatch(
 }
 
 // ─── Génération numéro de session ─────────────────────────────────────────────
-async function generateNumeroSession(cooperativeId: number): Promise<string> {
-  const year = new Date().getFullYear();
-  const prefix = `PSE-${year}-`;
-  const [row] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(sessionsPeseeTable)
-    .where(
-      and(
-        eq(sessionsPeseeTable.cooperativeId, cooperativeId),
-        sql`to_char(${sessionsPeseeTable.createdAt}, 'YYYY') = ${String(year)}`,
-      ),
-    );
-  const seq = (row?.count ?? 0) + 1;
-  return `${prefix}${String(seq).padStart(5, "0")}`;
+async function generateNumeroSession(cooperativeId: number): Promise<{ numeroSession: string; numeroPesee: number }> {
+  const { numero, annee } = await reserverNumeroPesee(cooperativeId);
+  return {
+    numeroPesee: numero,
+    numeroSession: `PSE-${annee}-${String(numero).padStart(5, "0")}`,
+  };
 }
 
 // ─── Créer une session ────────────────────────────────────────────────────────
@@ -216,7 +208,7 @@ export async function createSession(
   // ── Cas 0 : session liée à un bon de réception membre délégué ────────────
   if (data.bonReceptionId) {
     const bonId = data.bonReceptionId;
-    const numeroSession = await generateNumeroSession(cooperativeId);
+    const { numeroSession, numeroPesee } = await generateNumeroSession(cooperativeId);
     const session = await db.transaction(async (tx: any) => {
       const [bon] = await tx
         .select({
@@ -284,6 +276,7 @@ export async function createSession(
         .values({
           cooperativeId,
           numeroSession,
+          numeroPesee,
           membreId: bon.membreDelegueId,
           fournisseurId: null,
           produit: data.produit ?? "cacao",
@@ -345,7 +338,7 @@ export async function createSession(
       logger.info({ cooperativeId }, "Config pesée par défaut créée automatiquement");
     }
 
-    const numeroSession = await generateNumeroSession(cooperativeId);
+    const { numeroSession, numeroPesee } = await generateNumeroSession(cooperativeId);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const session = await db.transaction(async (tx: any) => {
@@ -368,6 +361,7 @@ export async function createSession(
         .values({
           cooperativeId,
           numeroSession,
+          numeroPesee,
           membreId: null,
           produit: data.produit ?? "cacao",
           operation: "reception_transfert",
@@ -435,13 +429,14 @@ export async function createSession(
     }
   }
 
-  const numeroSession = await generateNumeroSession(cooperativeId);
+  const { numeroSession, numeroPesee } = await generateNumeroSession(cooperativeId);
   try {
     const [session] = await db
       .insert(sessionsPeseeTable)
       .values({
         cooperativeId,
         numeroSession,
+        numeroPesee,
         membreId:      data.membreId      ?? null,
         fournisseurId: data.fournisseurId ?? null,
         produit:   data.produit   ?? "cacao",
@@ -518,6 +513,7 @@ export async function getSessions(
       cooperativeId: sessionsPeseeTable.cooperativeId,
       peseurId: sessionsPeseeTable.peseurId,
       numeroSession: sessionsPeseeTable.numeroSession,
+      numeroPesee: sessionsPeseeTable.numeroPesee,
       membreId: sessionsPeseeTable.membreId,
       membreNom: membresTable.nom,
       membrePrenoms: membresTable.prenoms,
@@ -580,7 +576,11 @@ export async function getSessions(
       type: sql<"simple">`'simple'`,
       cooperativeId: sql<number>`${cooperativeId}`,
       peseurId: livraisonsTable.peseurId,
-      numeroSession: sql<string>`concat('PES-S-', ${livraisonsTable.id})`,
+      numeroSession: sql<string>`CASE
+        WHEN ${livraisonsTable.numeroPesee} IS NOT NULL
+          THEN concat('PES-S-', ${livraisonsTable.numeroPesee})
+        ELSE concat('PES-S-', ${livraisonsTable.id})
+      END`,
       membreId: livraisonsTable.membreId,
       membreNom: membresTable.nom,
       membrePrenoms: membresTable.prenoms,
@@ -590,6 +590,7 @@ export async function getSessions(
       produit: livraisonsTable.produit,
       operation: sql<string>`'pesee_simple'`,
       statut: sql<"terminee">`'terminee'`,
+      numeroPesee: livraisonsTable.numeroPesee,
       poidsTotalKg: sql<string>`coalesce(${livraisonsTable.poidsNetKg}, ${livraisonsTable.poidsKg})`,
       nbSacsTotal: livraisonsTable.nombreSacs,
       nbLignes: sql<number>`1`,
@@ -620,6 +621,7 @@ export async function getSessionDetail(cooperativeId: number, sessionId: number)
       cooperativeId: sessionsPeseeTable.cooperativeId,
       peseurId: sessionsPeseeTable.peseurId,
       numeroSession: sessionsPeseeTable.numeroSession,
+      numeroPesee: sessionsPeseeTable.numeroPesee,
       membreId: sessionsPeseeTable.membreId,
       membreNom: membresTable.nom,
       membrePrenoms: membresTable.prenoms,
@@ -1049,12 +1051,14 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
               .from(lignesPeseeTable)
               .where(eq(lignesPeseeTable.sessionId, sessionId));
             const poidsBrutKg = (lignesBrut?.total ?? 0) > 0 ? lignesBrut!.total : null;
+            const numeroPesee = detail.numeroPesee ?? (await reserverNumeroPesee(cooperativeId)).numero;
 
             const [livraison] = await db
               .insert(livraisonsTable)
               .values({
                 membreId:            detail.membreId,
                 campagneId,
+                numeroPesee,
                 poidsKg:             String(poidsKg),
                 produitBrutKg:       poidsBrutKg != null ? String(poidsBrutKg) : undefined,
                 prixUnitaireFcfa:    prixBordChampFcfa,
@@ -1362,6 +1366,7 @@ export async function creerLivraisonDepuisSession(
         nbSacsTotal: sessionsPeseeTable.nbSacsTotal,
         produit: sessionsPeseeTable.produit,
         certificationCacao: sessionsPeseeTable.certificationCacao,
+        numeroPesee: sessionsPeseeTable.numeroPesee,
         livraisonId: sessionsPeseeTable.livraisonId,
         dateFin: sessionsPeseeTable.dateFin,
         bonReceptionId: sessionsPeseeTable.bonReceptionId,
@@ -1406,6 +1411,7 @@ export async function creerLivraisonDepuisSession(
     const dateStr = session.dateFin
       ? (typeof session.dateFin === "string" ? session.dateFin : (session.dateFin as Date).toISOString().split("T")[0]!)
       : new Date().toISOString().split("T")[0]!;
+    const numeroPesee = session.numeroPesee ?? (await reserverNumeroPesee(cooperativeId)).numero;
 
     // ── Avances & intrants deductions — membres seulement (pas de déductions pour fournisseurs) ──
     let avanceEnCours: typeof avancesTable.$inferSelect | undefined;
@@ -1441,6 +1447,7 @@ export async function creerLivraisonDepuisSession(
         membreId:           isFournisseur ? null : session.membreId,
         fournisseurId:      isFournisseur ? session.fournisseurId : null,
         campagneId,
+        numeroPesee,
         poidsKg:            String(poidsKg),
         produitBrutKg:      poidsBrutKgSession != null ? String(poidsBrutKgSession) : undefined,
         prixUnitaireFcfa:   prixBordChampFcfa,

@@ -16,7 +16,7 @@ import { getMontantAlimentationsCaisseDelegue } from "../services/delegueService
 import { getEncoursMembre, enregistrerRemboursementParLivraison } from "../services/intrantsService";
 import { envoyerPushGroupePortail } from "../services/pushService";
 import { entrerStockSiDelegue, entrerStockLivraison } from "../services/entrepotDelegueService";
-import { genererNumeroRecu, genererNumeroLivraison } from "../services/recuService.js";
+import { genererNumeroRecu, genererNumeroLivraison, reserverNumeroPesee } from "../services/recuService.js";
 
 export async function listLivraisons(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
@@ -61,6 +61,7 @@ export async function listLivraisons(req: Request, res: Response): Promise<void>
     const livraisons = await db
       .select({
         id: livraisonsTable.id,
+        numeroPesee: livraisonsTable.numeroPesee,
         membreId: livraisonsTable.membreId,
         fournisseurId: livraisonsTable.fournisseurId,
         poidsKg: livraisonsTable.poidsKg,
@@ -201,6 +202,7 @@ export async function createLivraison(req: Request, res: Response): Promise<void
 
     // Numéro de réçu attribué avant la transaction (gap acceptable si tx rollback)
     const numeroRecu = await genererNumeroRecu(cooperativeId);
+    const { numero: numeroPesee } = await reserverNumeroPesee(cooperativeId);
     // Numéro de livraison délégué — uniquement quand l'entrepôt délégué est précisé
     const numeroLivraison = entrepotDelegueId
       ? await genererNumeroLivraison(entrepotDelegueId)
@@ -258,6 +260,7 @@ export async function createLivraison(req: Request, res: Response): Promise<void
           membreId: membreId ?? null,
           fournisseurId: fournisseurId ?? null,
           campagneId: campagneIdResolu,
+          numeroPesee,
           poidsKg: String(poidsKg),
           prixUnitaireFcfa,
           montantBrutFcfa: montantBrut,

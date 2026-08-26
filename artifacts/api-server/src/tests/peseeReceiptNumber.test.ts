@@ -20,6 +20,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 /** Values captured from the paiementsTable.insert() call inside creerLivraisonDepuisSession */
 let capturedPaiementInsert: Record<string, unknown> | null = null;
+let capturedLivraisonInsert: Record<string, unknown> | null = null;
 
 // ─── Fixture data ─────────────────────────────────────────────────────────────
 
@@ -95,6 +96,8 @@ vi.mock("@workspace/db", async (importOriginal) => {
         values: vi.fn((vals: unknown) => {
           if (vals && typeof vals === "object" && "numeroRecu" in (vals as object)) {
             capturedPaiementInsert = vals as Record<string, unknown>;
+          } else if (vals && typeof vals === "object" && "poidsKg" in (vals as object)) {
+            capturedLivraisonInsert = vals as Record<string, unknown>;
           }
           return {
             returning: vi.fn().mockResolvedValue(
@@ -137,8 +140,10 @@ vi.mock("../services/terrainService.js", () => ({
 }));
 
 const mockGenererNumeroRecu = vi.fn().mockResolvedValue(FAKE_RECU);
+const mockReserverNumeroPesee = vi.fn().mockResolvedValue({ numero: 1, annee: 2026 });
 vi.mock("../services/recuService.js", () => ({
   genererNumeroRecu: (...args: unknown[]) => mockGenererNumeroRecu(...args),
+  reserverNumeroPesee: (...args: unknown[]) => mockReserverNumeroPesee(...args),
 }));
 
 vi.mock("../services/intrantsService.js", () => ({
@@ -172,7 +177,9 @@ const { creerLivraisonDepuisSession } = await import(
 describe("creerLivraisonDepuisSession — stores REC receipt number on paiement", () => {
   beforeEach(() => {
     capturedPaiementInsert = null;
+    capturedLivraisonInsert = null;
     mockGenererNumeroRecu.mockClear();
+    mockReserverNumeroPesee.mockClear();
   });
 
   it("calls genererNumeroRecu with the correct cooperative ID", async () => {
@@ -192,5 +199,11 @@ describe("creerLivraisonDepuisSession — stores REC receipt number on paiement"
   it("returns the paiement with the correct numeroRecu", async () => {
     const result = await creerLivraisonDepuisSession(COOPERATIVE_ID, SESSION_ID, {});
     expect(result.paiement.numeroRecu).toBe(FAKE_RECU);
+  });
+
+  it("stores the cooperative-local weighing number on the generated delivery", async () => {
+    await creerLivraisonDepuisSession(COOPERATIVE_ID, SESSION_ID, {});
+    expect(mockReserverNumeroPesee).toHaveBeenCalledWith(COOPERATIVE_ID);
+    expect(capturedLivraisonInsert?.numeroPesee).toBe(1);
   });
 });

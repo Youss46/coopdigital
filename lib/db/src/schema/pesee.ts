@@ -1,6 +1,6 @@
 import {
   pgTable, serial, integer, numeric, text, boolean,
-  date, timestamp, varchar, pgEnum,
+  date, timestamp, varchar, pgEnum, unique,
 } from "drizzle-orm/pg-core";
 import { cooperativesTable } from "./cooperatives";
 import { usersTable } from "./users";
@@ -11,10 +11,22 @@ import { fournisseursTable } from "./fournisseurs";
 
 export const sessionPeseeStatutEnum = pgEnum("session_pesee_statut", ["en_cours", "terminee", "annulee"]);
 
+/** Compteur des pesées par coopérative et année civile. */
+export const sequencesPeseeTable = pgTable("sequences_pesee", {
+  id:            serial("id").primaryKey(),
+  cooperativeId: integer("cooperative_id").notNull().references(() => cooperativesTable.id, { onDelete: "cascade" }),
+  annee:         integer("annee").notNull(),
+  compteur:      integer("compteur").notNull().default(0),
+}, (table) => [
+  unique("sequences_pesee_cooperative_annee_unique").on(table.cooperativeId, table.annee),
+]);
+
 export const sessionsPeseeTable = pgTable("sessions_pesee", {
   id:             serial("id").primaryKey(),
   cooperativeId:  integer("cooperative_id").notNull().references(() => cooperativesTable.id),
   numeroSession:  varchar("numero_session", { length: 30 }).notNull(),
+  /** Rang de la pesée dans la coopérative pour l'année civile. */
+  numeroPesee:    integer("numero_pesee"),
   membreId:       integer("membre_id").references(() => membresTable.id),
   fournisseurId:  integer("fournisseur_id").references(() => fournisseursTable.id),
   produit:        varchar("produit", { length: 100 }).notNull().default("cacao"),

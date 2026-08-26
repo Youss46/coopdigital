@@ -75,3 +75,4 @@
 - [Tests React du terrain](terrain-react-tests.md) — les tests de rendu utilisent jsdom uniquement au niveau du fichier et le plugin React dans la config Vitest.
 - [Assets Vite du terrain](terrain-vite-base-assets.md) — les assets publics doivent utiliser BASE_URL, car Terrain est servi sous le préfixe /terrain/.
 - [Numérotation globale des reçus](receipt-sequence-global-uniqueness.md) — `paiements.numero_recu` est globalement unique; utiliser une séquence commune à toutes les coopératives.
+- [Numérotation locale des pesées](local-weighing-sequence.md) — le rang métier est atomique par coopérative et année; `livraisons.id` reste un identifiant SQL global.

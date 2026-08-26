@@ -8,7 +8,7 @@ import {
 import { and, eq, sql, desc, or, isNull, gte, lte } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 // commissionService — creerCommissionSiTaux retiré : commissions calculées à la pesée centrale
-import { genererNumeroRecu, genererNumeroLivraison } from "./recuService.js";
+import { genererNumeroRecu, genererNumeroLivraison, reserverNumeroPesee } from "./recuService.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { logger } from "../lib/logger.js";
@@ -518,11 +518,13 @@ export async function enregistrerCollecte(
   const numeroLivraison = entrepotDelegue
     ? await genererNumeroLivraison(entrepotDelegue.id)
     : null;
+  const { numero: numeroPesee } = await reserverNumeroPesee(cooperativeId);
 
   const [livraison] = await db.insert(livraisonsTable).values({
     membreId: membreId ?? null,
     fournisseurId: fournisseurId ?? null,
     campagneId: prix.campagneId ?? undefined,
+    numeroPesee,
     nombreSacs: data.nombreSacs,
     produitBrutKg: String(data.poidsBrutKg),
     retenueKg: String(data.retenueKg),
