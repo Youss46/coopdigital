@@ -6,6 +6,7 @@ import {
   getPendingOps, getPendingCount,
   markOpSyncedWithTs, markOpError, incrementTentatives,
   getPendingGpsOps, markGpsOpSynced, markGpsOpError, incrementGpsTentatives,
+  retryGpsOp,
   getPendingEnqueteOps, markEnqueteOpSynced, markEnqueteOpError, incrementEnqueteTentatives,
   getPendingBrouillons, markBrouillonSynced, markBrouillonError,
 } from "../lib/idb";
@@ -27,6 +28,7 @@ interface OfflineContextValue {
   syncStatus: "idle" | "syncing" | "done" | "error";
   syncResult: SyncResult | null;
   triggerSync: () => Promise<void>;
+  retryGpsOperation: (localId: string) => Promise<void>;
 }
 
 const OfflineContext = createContext<OfflineContextValue>({
@@ -35,6 +37,7 @@ const OfflineContext = createContext<OfflineContextValue>({
   syncStatus: "idle",
   syncResult: null,
   triggerSync: async () => {},
+  retryGpsOperation: async () => {},
 });
 
 export function OfflineProvider({ children }: { children: ReactNode }) {
@@ -132,6 +135,12 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
     }
   }, [refreshCount]);
 
+  const retryGpsOperation = useCallback(async (localId: string) => {
+    await retryGpsOp(localId);
+    if (navigator.onLine) await triggerSync();
+    else await refreshCount();
+  }, [refreshCount, triggerSync]);
+
   // ── Événements réseau ───────────────────────────────────────────────────────
   useEffect(() => {
     function onOnline() { setIsOnline(true); triggerSync(); }
@@ -187,7 +196,7 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
 
   return (
     <OfflineContext.Provider
-      value={{ isOnline, pendingCount, syncStatus, syncResult, triggerSync }}
+      value={{ isOnline, pendingCount, syncStatus, syncResult, triggerSync, retryGpsOperation }}
     >
       {children}
     </OfflineContext.Provider>

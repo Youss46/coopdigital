@@ -46,10 +46,11 @@ function opLabel(op: SyncHistoryOp): string {
 
 export default function SyncHistorique() {
   const [, setLocation] = useLocation();
-  const { pendingCount, triggerSync, isOnline, syncStatus } = useOffline();
+  const { pendingCount, triggerSync, retryGpsOperation, isOnline, syncStatus } = useOffline();
   const [ops, setOps]       = useState<SyncHistoryOp[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter]   = useState<"all" | "pending" | "synced" | "error">("all");
+  const [retryingId, setRetryingId] = useState<string | null>(null);
 
   async function reload() {
     setLoading(true);
@@ -75,6 +76,17 @@ export default function SyncHistorique() {
   const nbPending = ops.filter((o) => displayStatus(o) === "pending").length;
   const nbSynced  = ops.filter((o) => o.status === "synced").length;
   const nbError   = ops.filter((o) => displayStatus(o) === "error").length;
+
+  async function retry(op: SyncHistoryOp) {
+    if (op.type !== "gps_collecte" || retryingId) return;
+    setRetryingId(op.localId);
+    try {
+      await retryGpsOperation(op.localId);
+      await reload();
+    } finally {
+      setRetryingId(null);
+    }
+  }
 
   return (
     <div className="t-app">
@@ -187,6 +199,22 @@ export default function SyncHistorique() {
                     {st.label}
                   </span>
                 </div>
+                 {op.type === "gps_collecte" && displayStatus(op) === "error" && (
+                   <button
+                     type="button"
+                     onClick={() => void retry(op)}
+                     disabled={retryingId !== null}
+                     aria-label={`Relancer l'opération GPS ${op.localId}`}
+                     style={{
+                       marginTop: 10, width: "100%", padding: "8px 12px", border: "none",
+                       borderRadius: 7, background: "var(--t-danger)", color: "#fff",
+                       fontSize: ".8rem", fontWeight: 700, cursor: retryingId ? "wait" : "pointer",
+                       opacity: retryingId && retryingId !== op.localId ? .55 : 1,
+                     }}
+                   >
+                     {retryingId === op.localId ? "⏳ Relance…" : "↻ Relancer"}
+                   </button>
+                 )}
               </div>
             );
           })}

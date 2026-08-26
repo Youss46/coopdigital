@@ -9,9 +9,11 @@ import {
   markBrouillonError,
   markEnqueteOpError,
   markGpsOpError,
+  markGpsOpSynced,
   queueGpsOp,
   queueEnqueteOp,
   queueOp,
+  retryGpsOp,
 } from "./idb";
 
 const DB_NAME = "coopdigital-terrain";
@@ -152,6 +154,32 @@ describe("historique offline multi-files", () => {
         localId: "gps-historique-1",
       }),
     });
+  });
+
+  it("réutilise le localId et incrémente les tentatives lors d'une relance GPS", async () => {
+    await queueGpsOp({
+      localId: "gps-retry-history-1",
+      missionId: 9,
+      membreId: 11,
+      data: { polygoneGps: [], photos: [] },
+    });
+    await markGpsOpError("gps-retry-history-1", "Réseau indisponible");
+
+    const tentatives = await retryGpsOp("gps-retry-history-1");
+    const operation = (await getAllOps()).find((op) => op.localId === "gps-retry-history-1");
+
+    expect(tentatives).toBe(1);
+    expect(operation).toMatchObject({
+      localId: "gps-retry-history-1",
+      status: "pending",
+      errorMsg: "Réseau indisponible",
+      tentatives: 1,
+    });
+
+    await markGpsOpSynced("gps-retry-history-1");
+    const synchronisee = (await getAllOps()).find((op) => op.localId === "gps-retry-history-1");
+    expect(synchronisee).toMatchObject({ status: "synced" });
+    expect(synchronisee?.errorMsg).toBeUndefined();
   });
 });
 

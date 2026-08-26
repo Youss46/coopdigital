@@ -251,6 +251,7 @@ export async function markOpSyncedWithTs(localId: string): Promise<void> {
       const op = getReq.result as PendingOp;
       if (op) {
         op.status = "synced";
+        delete op.errorMsg;
         op.syncedAt = Date.now();
         const putReq = store.put(op);
         putReq.onsuccess = () => resolve();
@@ -381,6 +382,7 @@ export async function markGpsOpSynced(localId: string): Promise<void> {
       const op = getReq.result as GpsOp;
       if (op) {
         op.status = "synced";
+        delete op.errorMsg;
         op.syncedAt = Date.now();
         const p = store.put(op);
         p.onsuccess = () => resolve();
@@ -427,6 +429,11 @@ export async function incrementGpsTentatives(localId: string): Promise<number> {
     };
     getReq.onerror = () => reject(getReq.error);
   });
+}
+
+/** Prépare une opération GPS en échec pour une nouvelle tentative sans effacer son erreur. */
+export async function retryGpsOp(localId: string): Promise<number> {
+  return incrementGpsTentatives(localId);
 }
 
 export async function cacheMissionDetail(detail: MissionDetail): Promise<void> {
