@@ -37,6 +37,9 @@ interface SessionPesee {
   membreId: number | null;
   membreNom: string | null;
   membrePrenoms: string | null;
+  fournisseurId: number | null;
+  fournisseurNom: string | null;
+  fournisseurPrenoms: string | null;
   produit: string;
   statut: "en_cours" | "terminee" | "annulee";
   poidsTotalKg: string;
@@ -216,7 +219,7 @@ function SessionsPeseeSection() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold text-gray-900">
-                              {s.membrePrenoms} {s.membreNom ?? "—"}
+                              {s.membrePrenoms ?? s.fournisseurPrenoms ?? ""} {s.membreNom ?? s.fournisseurNom ?? "—"}
                             </p>
                             <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
                               <span className="text-xs text-gray-400 flex items-center gap-1">
@@ -272,7 +275,7 @@ function SessionsPeseeSection() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-700 truncate">
-                            {s.membrePrenoms} {s.membreNom ?? "—"}
+                            {s.membrePrenoms ?? s.fournisseurPrenoms ?? ""} {s.membreNom ?? s.fournisseurNom ?? "—"}
                           </p>
                           <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
                             <span className="text-xs text-gray-400 flex items-center gap-1">
