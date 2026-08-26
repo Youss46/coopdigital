@@ -434,8 +434,18 @@ export async function enregistrerCollecte(
   /** Utilisateur réellement connecté (mode proxy) — différent de agentId si saisie pour un délégué */
   agentSaisiseurId?: number,
 ) {
+  const normaliserId = (value: unknown): number | undefined => {
+    const id = Number(value);
+    return Number.isInteger(id) && id > 0 ? id : undefined;
+  };
+  const membreId = normaliserId(data.membreId);
+  const fournisseurId = normaliserId(data.fournisseurId);
+  if ((membreId && fournisseurId) || (!membreId && !fournisseurId)) {
+    throw new Error("Un membre ou un fournisseur externe doit être sélectionné, mais pas les deux");
+  }
+
   const prix = await getPrixActuel(cooperativeId);
-  if (data.fournisseurId && !isCertificationCacao(data.certificationCacao)) {
+  if (fournisseurId && !isCertificationCacao(data.certificationCacao)) {
     throw new Error("La certification du cacao est requise pour un fournisseur externe");
   }
   const prixUnitaire = prix.prixBordChampFcfa;
@@ -448,11 +458,11 @@ export async function enregistrerCollecte(
   let avanceDeduite = 0;
   let intrantsDed = 0;
 
-  if (data.membreId) {
+  if (membreId) {
     const [av] = await db
       .select()
       .from(avancesTable)
-      .where(and(eq(avancesTable.membreId, data.membreId), eq(avancesTable.statut, "en_cours")))
+      .where(and(eq(avancesTable.membreId, membreId), eq(avancesTable.statut, "en_cours")))
       .orderBy(desc(avancesTable.createdAt))
       .limit(1);
     avance = av;
@@ -474,7 +484,7 @@ export async function enregistrerCollecte(
         total: sql<string>`COALESCE(SUM(${distributionsIntrantsTable.montantMembreFcfa} - ${distributionsIntrantsTable.montantRembourse_fcfa}), 0)`,
       })
       .from(distributionsIntrantsTable)
-      .where(eq(distributionsIntrantsTable.membreId, data.membreId));
+      .where(eq(distributionsIntrantsTable.membreId, membreId));
     intrantsDed = Math.max(0, Math.min(toNum(intrantsDus?.total), montantBrut - avanceDeduite));
   }
 
@@ -490,7 +500,7 @@ export async function enregistrerCollecte(
   // L'agent terrain est toujours un délégué — on résout son entrepôt
   const entrepotDelegue = await getEntrepotDuDelegue(agentId, cooperativeId);
   let entrepotFournisseurExt: { id: number } | undefined;
-  if (data.fournisseurId) {
+  if (fournisseurId) {
     const [dedie] = await db
       .select({ id: entrepotsTable.id })
       .from(entrepotsTable)
@@ -510,8 +520,8 @@ export async function enregistrerCollecte(
     : null;
 
   const [livraison] = await db.insert(livraisonsTable).values({
-    membreId: data.membreId ?? null,
-    fournisseurId: data.fournisseurId ?? null,
+    membreId: membreId ?? null,
+    fournisseurId: fournisseurId ?? null,
     campagneId: prix.campagneId ?? undefined,
     nombreSacs: data.nombreSacs,
     produitBrutKg: String(data.poidsBrutKg),
@@ -566,7 +576,7 @@ export async function enregistrerCollecte(
   // Créer le paiement en_attente — le mode sera choisi lors du règlement
   await db.insert(paiementsTable).values({
     livraisonId: livraison.id,
-    membreId: data.membreId ?? null,
+    membreId: membreId ?? null,
     campagneId: prix.campagneId ?? undefined,
     montantFcfa: montantNet,
     statut: "en_attente",
@@ -575,27 +585,27 @@ export async function enregistrerCollecte(
 
   // Résolution du nom et push portail (uniquement pour les membres)
   let membreNom = "";
-  if (data.membreId) {
+  if (membreId) {
     const [membre] = await db
       .select({ nom: membresTable.nom, prenoms: membresTable.prenoms })
       .from(membresTable)
-      .where(eq(membresTable.id, data.membreId));
+      .where(eq(membresTable.id, membreId));
     membreNom = membre ? `${membre.nom} ${membre.prenoms}` : "";
 
-    void envoyerPushGroupePortail([data.membreId], {
+    void envoyerPushGroupePortail([membreId], {
       title: "Livraison enregistrée",
       body: `${poidsNet.toLocaleString("fr-FR")} kg — ${montantNet.toLocaleString("fr-FR")} FCFA net`,
       url: "/portail/livraisons",
     });
-  } else if (data.fournisseurId) {
+  } else if (fournisseurId) {
     const [fourn] = await db
       .select({ nom: fournisseursTable.nom, prenoms: fournisseursTable.prenoms })
       .from(fournisseursTable)
-      .where(eq(fournisseursTable.id, data.fournisseurId));
+      .where(eq(fournisseursTable.id, fournisseurId));
     membreNom = fourn ? `${fourn.nom} ${fourn.prenoms ?? ""}`.trim() : "";
   }
 
-  if (data.fournisseurId && entrepotFournisseurExt) {
+  if (fournisseurId && entrepotFournisseurExt) {
     await db.insert(mouvementsStockTable).values({
       entrepotId: entrepotFournisseurExt.id,
       type: "entree",
