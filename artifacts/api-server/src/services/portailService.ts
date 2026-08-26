@@ -169,6 +169,7 @@ export async function getLivraisonsMembre(membreId: number) {
   const rows = await db
     .select({
       id: livraisonsTable.id,
+      numeroPesee: livraisonsTable.numeroPesee,
       codeAchat: livraisonsTable.codeAchat,
       dateLivraison: livraisonsTable.dateLivraison,
       produit: livraisonsTable.produit,
@@ -342,6 +343,7 @@ export async function generateRecuLivraison(cooperativeId: number, membreId: num
   const [liv] = await db
     .select({
       id: livraisonsTable.id,
+      numeroPesee: livraisonsTable.numeroPesee,
       codeAchat: livraisonsTable.codeAchat,
       dateLivraison: livraisonsTable.dateLivraison,
       produit: livraisonsTable.produit,
@@ -419,7 +421,7 @@ export async function generateRecuLivraison(cooperativeId: number, membreId: num
 
   const rows: [string, string][] = [
     ["Date de livraison", fmtDate(liv.dateLivraison)],
-    ["Référence", liv.codeAchat ?? `LIV-${liv.id}`],
+    ["Référence", liv.numeroPesee != null ? `PES-S-${liv.numeroPesee}` : (liv.codeAchat ?? `LIV-${liv.id}`)],
     ["Produit", liv.produit ?? "Cacao"],
     ["Poids net (kg)", `${Number(liv.poidsKg).toLocaleString("fr-FR").replace(/[\u202F\u00A0]/g, " ")} kg`],
     ["Prix unitaire", fmtFCFA(liv.prixUnitaireFcfa) + "/kg"],

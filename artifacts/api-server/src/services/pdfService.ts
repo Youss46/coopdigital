@@ -62,6 +62,10 @@ const MARGIN  = 50;
 const COL1    = MARGIN;
 const COL2    = PAGE_W / 2;
 
+function formatNumeroPesee(numeroPesee: number | null | undefined): string | null {
+  return numeroPesee == null ? null : `PES-S-${numeroPesee}`;
+}
+
 function formaterFCFA(n: number): string {
   // Intl en Node.js utilise U+202F (espace insécable étroit) comme séparateur de milliers
   // en locale fr-FR. PDFKit ne supporte pas ce caractère et l'affiche comme "¬" ou "|".
@@ -819,6 +823,7 @@ export async function generateRecuLivraison(livraisonId: number, cooperativeId: 
   const [row] = await db.select({
     id: livraisonsTable.id,
     membreId: livraisonsTable.membreId,
+    numeroPesee: livraisonsTable.numeroPesee,
     codeAchat: livraisonsTable.codeAchat,
     dateLivraison: livraisonsTable.dateLivraison,
     produit: livraisonsTable.produit,
@@ -869,7 +874,9 @@ export async function generateRecuLivraison(livraisonId: number, cooperativeId: 
       : Promise.resolve("Cacao ordinaire"),
   ]);
   const { doc, endPromise } = makePdfDoc();
-  const ref = row.codeAchat ?? `LIV-${String(row.id).padStart(5, "0")}`;
+  const ref = formatNumeroPesee(row.numeroPesee)
+    ?? row.codeAchat
+    ?? `LIV-${String(row.id).padStart(5, "0")}`;
   await drawHeader(doc, cooperativeId, { titre_document: "Reçu de Livraison", reference: ref });
 
   let y = doc.y;
@@ -1013,6 +1020,7 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
     membreCni: membresTable.numeroCni,
     membreTel: membresTable.telephone,
     livraisonDate: livraisonsTable.dateLivraison,
+    livraisonNumeroPesee: livraisonsTable.numeroPesee,
     livraisonRef: livraisonsTable.codeAchat,
     // Agent validateur
     validateurNom: validateurAlias.nom,
@@ -1055,7 +1063,9 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
     ["Mode de paiement",     payModeLabel[(row.modeReglement ?? row.modePaiement) ?? ""] ?? row.modePaiement ?? "—"],
     ["Référence transaction",row.referenceTransaction ?? "—"],
     ["Libellé",              row.libelle ?? "Paiement livraison cacao"],
-    ["Livraison associée",   row.livraisonRef ?? (row.livraisonId ? `LIV-${String(row.livraisonId).padStart(5,"0")}` : "—")],
+    ["Livraison associée",   formatNumeroPesee(row.livraisonNumeroPesee)
+      ?? row.livraisonRef
+      ?? (row.livraisonId ? `LIV-${String(row.livraisonId).padStart(5,"0")}` : "—")],
     ["Date livraison",       row.livraisonDate ? formaterDate(row.livraisonDate) : "—"],
   ];
   for (const [i, [label, val]] of payDetails.entries()) {
@@ -1399,6 +1409,7 @@ export async function generateBulletinsPaieGroupes(bulletinIds: number[], cooper
 export async function generateBordereauPesee(livraisonId: number, cooperativeId: number): Promise<Buffer> {
   const [row] = await db.select({
     id: livraisonsTable.id,
+    numeroPesee: livraisonsTable.numeroPesee,
     codeAchat: livraisonsTable.codeAchat,
     dateLivraison: livraisonsTable.dateLivraison,
     produit: livraisonsTable.produit,
@@ -1428,7 +1439,9 @@ export async function generateBordereauPesee(livraisonId: number, cooperativeId:
     getMentionCertification(row.membreId, cooperativeId),
   ]);
   const { doc, endPromise } = makePdfDoc();
-  const ref = row.codeAchat ?? `PES-${String(row.id).padStart(5,"0")}`;
+  const ref = formatNumeroPesee(row.numeroPesee)
+    ?? row.codeAchat
+    ?? `PES-${String(row.id).padStart(5,"0")}`;
   await drawHeader(doc, cooperativeId, { titre_document: "Bordereau de Pesée", reference: ref });
 
   let y = doc.y;
@@ -4001,6 +4014,7 @@ export async function generateBordereauAchatSession(
     .select({
       id:                 sessionsPeseeTable.id,
       numeroSession:      sessionsPeseeTable.numeroSession,
+      numeroPesee:        sessionsPeseeTable.numeroPesee,
       produit:            sessionsPeseeTable.produit,
       poidsTotalKg:       sessionsPeseeTable.poidsTotalKg,
       nbSacsTotal:        sessionsPeseeTable.nbSacsTotal,
@@ -4417,7 +4431,8 @@ export async function generateBordereauAchatSession(
   // M=40 aligne avec les marges internes de drawHeader (marginLeft=40/marginRight=40)
   const M  = 40;
   const BW = PAGE_W - M * 2;             // 515.28 pt utilisables = toute la largeur utile
-  await drawHeader(doc, cooperativeId, { titre_document: "BORDEREAU D'ACHAT", reference: session.numeroSession });
+  const referencePesee = formatNumeroPesee(session.numeroPesee) ?? session.numeroSession;
+  await drawHeader(doc, cooperativeId, { titre_document: "BORDEREAU D'ACHAT", reference: referencePesee });
 
   // Bandeau Campagne / Date
   let y = doc.y + 4;
