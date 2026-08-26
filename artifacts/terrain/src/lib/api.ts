@@ -1,5 +1,10 @@
 import { getToken, clearAuth } from "./auth";
 import { queueOp, queueGpsOp, queueEnqueteOp, type PendingOpType, type GpsOp } from "./idb";
+import {
+  GPS_CRS,
+  normalizeGpsPoint,
+  type GpsPoint,
+} from "./types";
 import type {
   CollecteInput, PaiementInput, AvanceInput,
   MissionTerrain, MissionDetail, StatsAgent, GpsCollecteInput, MessageMission, EnqueteOp,
@@ -184,10 +189,23 @@ export async function collecterParcelle(
 ): Promise<{ ok: boolean } | null> {
   if (!online) {
     const localId = crypto.randomUUID();
-    await queueGpsOp({ localId, missionId, membreId, data });
+    await queueGpsOp({
+      localId,
+      missionId,
+      membreId,
+      data: {
+        ...data,
+        crs: GPS_CRS,
+        polygoneGps: data.polygoneGps.map(normalizeGpsPoint),
+      },
+    });
     return null;
   }
-  return apiPost<{ ok: boolean }>(`/missions/${missionId}/parcelle/${membreId}`, data);
+  return apiPost<{ ok: boolean }>(`/missions/${missionId}/parcelle/${membreId}`, {
+    ...data,
+    crs: GPS_CRS,
+    polygoneGps: data.polygoneGps.map(normalizeGpsPoint),
+  });
 }
 
 export async function syncGpsOps(ops: GpsOp[]): Promise<{ succes: string[]; echecs: Array<{ localId: string; erreur: string }> }> {
@@ -196,7 +214,13 @@ export async function syncGpsOps(ops: GpsOp[]): Promise<{ succes: string[]; eche
     type: "gps_collecte",
     localId: op.localId,
     timestamp: op.timestamp,
-    data: { missionId: op.missionId, membreId: op.membreId, ...op.data },
+    data: {
+      missionId: op.missionId,
+      membreId: op.membreId,
+      ...op.data,
+      crs: GPS_CRS,
+      polygoneGps: (op.data.polygoneGps as GpsPoint[]).map(normalizeGpsPoint),
+    },
   }));
   return apiPost<{ succes: string[]; echecs: Array<{ localId: string; erreur: string }> }>("/sync", { operations });
 }

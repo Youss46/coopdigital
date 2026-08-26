@@ -44,8 +44,9 @@ export async function collecterParcelleHandler(req: Request, res: Response): Pro
   const membreId = Number(req.params["membreId"]);
   if (isNaN(missionId) || isNaN(membreId)) { res.status(400).json({ erreur: "ID invalide" }); return; }
 
-  const { polygoneGps, photos, notes, superficieCalculeeHa, probleme } = req.body as {
+  const { polygoneGps, crs, photos, notes, superficieCalculeeHa, probleme } = req.body as {
     polygoneGps?: object;
+    crs?: string;
     photos?: string[];
     notes?: string;
     superficieCalculeeHa?: number;
@@ -60,6 +61,7 @@ export async function collecterParcelleHandler(req: Request, res: Response): Pro
   try {
     const result = await svc.collecterParcelleAgent(missionId, membreId, id, {
       polygoneGps,
+      crs,
       photos,
       notes,
       superficieCalculeeHa,

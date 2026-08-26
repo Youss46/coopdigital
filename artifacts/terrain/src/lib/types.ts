@@ -185,9 +185,20 @@ export interface GpsPoint {
   ts: number;
 }
 
+export const GPS_CRS = "EPSG:4326" as const;
+
+export function normalizeGpsPoint(point: GpsPoint): GpsPoint {
+  return {
+    ...point,
+    lat: Number(point.lat.toFixed(6)),
+    lon: Number(point.lon.toFixed(6)),
+  };
+}
+
 export interface GpsCollecteInput {
   missionId: number;
   membreId: number;
+  crs: typeof GPS_CRS;
   polygoneGps: GpsPoint[];
   photos: string[];
   notes?: string;

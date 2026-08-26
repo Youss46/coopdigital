@@ -31,6 +31,7 @@ export const missionsMembresTable = pgTable("missions_membres", {
   statut: varchar("statut", { length: 20 }).default("a_faire"),
   // 'a_faire' | 'collecte' | 'valide' | 'rejete'
   gpsCollecte: jsonb("gps_collecte"),
+  gpsCrs: varchar("gps_crs", { length: 20 }),
   photosCollectees: jsonb("photos_collectees"),
   notesAgent: text("notes_agent"),
   dateCollecte: timestamp("date_collecte", { withTimezone: true }),

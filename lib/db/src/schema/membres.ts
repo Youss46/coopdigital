@@ -76,6 +76,7 @@ export const membresTable = pgTable("membres", {
   // [{ parcelle: 1, lat: x, lng: y, superficie: z, polygone: [...], photos: [...] }]
   culturePrincipale: varchar("culture_principale", { length: 50 }),
   polygoneGps: jsonb("polygone_gps"),
+  gpsCrs: varchar("gps_crs", { length: 20 }),
 
   // ── EUDR / Traçabilité ──────────────────────────────────────────────────────
   certification: varchar("certification", { length: 50 }),

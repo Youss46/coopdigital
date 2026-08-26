@@ -869,6 +869,13 @@
       "when": 1788482000000,
       "tag": "0123_ppsi_taux_annuel",
       "breakpoints": true
+    },
+    {
+      "idx": 124,
+      "version": "7",
+      "when": 1788482100000,
+      "tag": "0124_gps_wgs84",
+      "breakpoints": true
     }
   ]
 }

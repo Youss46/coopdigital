@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import type { GpsPoint } from "../lib/types";
+import { normalizeGpsPoint, type GpsPoint } from "../lib/types";
 
 export function haversineDistance(
   lat1: number, lon1: number,
@@ -136,8 +136,10 @@ export function useGpsTracker() {
   }, []);
 
   const addPoint = useCallback((point: GpsPoint) => {
+    const normalizedPoint = normalizeGpsPoint(point);
     const nextPoints = [...pointsRef.current, point];
     recordBeforeChange(pointsRef.current);
+    nextPoints[nextPoints.length - 1] = normalizedPoint;
     pointsRef.current = nextPoints;
     setState((s) => ({ ...s, points: nextPoints }));
   }, [recordBeforeChange]);
@@ -145,7 +147,7 @@ export function useGpsTracker() {
   const insertPoint = useCallback((index: number, point: GpsPoint) => {
     const points = [...pointsRef.current];
     recordBeforeChange(pointsRef.current);
-    points.splice(Math.max(0, Math.min(index, points.length)), 0, point);
+    points.splice(Math.max(0, Math.min(index, points.length)), 0, normalizeGpsPoint(point));
     pointsRef.current = points;
     setState((s) => ({ ...s, points }));
   }, [recordBeforeChange]);
@@ -154,7 +156,7 @@ export function useGpsTracker() {
     if (index < 0 || index >= pointsRef.current.length) return;
     const points = [...pointsRef.current];
     recordBeforeChange(pointsRef.current);
-    points[index] = point;
+    points[index] = normalizeGpsPoint(point);
     pointsRef.current = points;
     setState((s) => ({ ...s, points }));
   }, [recordBeforeChange]);
@@ -189,8 +191,8 @@ export function useGpsTracker() {
   }, []);
 
   const restore = useCallback((points: GpsPoint[], history: GpsPoint[][] = []) => {
-    const restoredPoints = points.map((point) => ({ ...point }));
-    const restoredHistory = history.map((snapshot) => snapshot.map((point) => ({ ...point })));
+    const restoredPoints = points.map(normalizeGpsPoint);
+    const restoredHistory = history.map((snapshot) => snapshot.map(normalizeGpsPoint));
     pointsRef.current = restoredPoints;
     historyRef.current = restoredHistory;
     setHistoryLength(restoredHistory.length);

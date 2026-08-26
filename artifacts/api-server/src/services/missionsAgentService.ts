@@ -4,7 +4,8 @@ import {
 } from "@workspace/db";
 import { and, eq, sql, desc } from "drizzle-orm";
 
-type GpsPoint = { lat: number; lon: number; accuracy?: number };
+type GpsPoint = { lat: number; lon: number; accuracy?: number; ts?: number };
+const GPS_CRS = "EPSG:4326";
 
 function orientation(a: GpsPoint, b: GpsPoint, c: GpsPoint): number {
   return (b.lon - a.lon) * (c.lat - a.lat) - (b.lat - a.lat) * (c.lon - a.lon);
@@ -42,16 +43,24 @@ function polygonAreaHa(points: GpsPoint[]): number {
   return Math.abs(area) / 2 / 10000;
 }
 
-function validatePolygon(raw: unknown): GpsPoint[] {
+function validatePolygon(raw: unknown, crs?: string): GpsPoint[] {
+  if (crs !== undefined && crs !== GPS_CRS) {
+    throw new Error(`Système de coordonnées non supporté : ${crs}. Utilisez ${GPS_CRS}.`);
+  }
   if (!Array.isArray(raw) || raw.length < 3) throw new Error("Le contour GPS doit comporter au moins 3 points");
   const points = raw as GpsPoint[];
   if (points.some(p => !p || !Number.isFinite(p.lat) || !Number.isFinite(p.lon) || p.lat < -90 || p.lat > 90 || p.lon < -180 || p.lon > 180)) {
     throw new Error("Le contour GPS contient une coordonnée invalide");
   }
-  if (hasSelfIntersection(points)) throw new Error("Le contour GPS se croise. Corrigez les points avant validation.");
-  const areaHa = polygonAreaHa(points);
+  const normalizedPoints = points.map((point) => ({
+    ...point,
+    lat: Number(point.lat.toFixed(6)),
+    lon: Number(point.lon.toFixed(6)),
+  }));
+  if (hasSelfIntersection(normalizedPoints)) throw new Error("Le contour GPS se croise. Corrigez les points avant validation.");
+  const areaHa = polygonAreaHa(normalizedPoints);
   if (!Number.isFinite(areaHa) || areaHa < 0.0001) throw new Error("La superficie calculée est trop faible ou nulle. Vérifiez le contour GPS.");
-  return points;
+  return normalizedPoints;
 }
 
 export async function getMissionsAgent(agentId: number, cooperativeId: number) {
@@ -145,6 +154,7 @@ export async function collecterParcelleAgent(
   agentId: number,
   data: {
     polygoneGps: object;
+    crs?: string;
     photos: string[];
     notes?: string;
     superficieCalculeeHa?: number;
@@ -169,7 +179,7 @@ export async function collecterParcelleAgent(
     );
 
   if (!missionMembre) throw new Error("Membre non trouvé dans cette mission");
-  const polygoneGps = validatePolygon(data.polygoneGps);
+  const polygoneGps = validatePolygon(data.polygoneGps, data.crs);
   const [membre] = await db.select({ superficieHa: membresTable.superficieHa })
     .from(membresTable).where(eq(membresTable.id, membreId)).limit(1);
   const areaHa = polygonAreaHa(polygoneGps);
@@ -186,6 +196,7 @@ export async function collecterParcelleAgent(
     .set({
       statut: "collecte",
        gpsCollecte: polygoneGps,
+       gpsCrs: GPS_CRS,
       photosCollectees: data.photos,
       notesAgent: data.notes ?? null,
       dateCollecte: new Date(),
@@ -213,7 +224,7 @@ export async function collecterParcelleAgent(
 
   await db
     .update(membresTable)
-     .set({ polygoneGps, gpsParcelles: polygoneGps })
+     .set({ polygoneGps, gpsParcelles: polygoneGps, gpsCrs: GPS_CRS })
     .where(eq(membresTable.id, membreId));
 
   if (data.probleme) {

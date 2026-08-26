@@ -12,7 +12,7 @@ import {
 } from "../hooks/useGpsTracker";
 import OfflineBanner from "../components/OfflineBanner";
 import type { MissionMembre } from "../lib/types";
-import type { GpsPoint } from "../lib/types";
+import { GPS_CRS, type GpsPoint } from "../lib/types";
 
 const MAX_PHOTOS = 3;
 const MIN_PHOTOS = 2;
@@ -414,6 +414,7 @@ export default function CollecteGps() {
     try {
       const areaHa = polygonAreaHa(gps.points);
       await collecterParcelle(missionId, membreId, {
+        crs: GPS_CRS,
         polygoneGps: gps.points,
         photos,
         notes: notes || undefined,
