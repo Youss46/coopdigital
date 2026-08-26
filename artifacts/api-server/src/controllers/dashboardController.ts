@@ -81,8 +81,12 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
         .select({ tonnage: sql<number>`coalesce(sum(poids_kg::numeric),0)::float` })
         .from(livraisonsTable)
         .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+        .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
         .where(and(
-          eq(membresTable.cooperativeId, cooperativeId),
+          or(
+            eq(membresTable.cooperativeId, cooperativeId),
+            eq(fournisseursTable.cooperativeId, cooperativeId),
+          ),
           filtreLivraisonsPeriode,
         )),
       db
@@ -104,8 +108,12 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
         .select({ sacs: sql<number>`coalesce(sum(nombre_sacs),0)::int` })
         .from(livraisonsTable)
         .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+        .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
         .where(and(
-          eq(membresTable.cooperativeId, cooperativeId),
+          or(
+            eq(membresTable.cooperativeId, cooperativeId),
+            eq(fournisseursTable.cooperativeId, cooperativeId),
+          ),
           filtreLivraisonsPeriode,
         )),
     ]);
@@ -138,6 +146,7 @@ export async function getDashboardLivraisons(req: Request, res: Response): Promi
       .select({
         id: livraisonsTable.id,
         membreId: livraisonsTable.membreId,
+        fournisseurId: livraisonsTable.fournisseurId,
         poidsKg: livraisonsTable.poidsKg,
         prixUnitaireFcfa: livraisonsTable.prixUnitaireFcfa,
         montantBrutFcfa: livraisonsTable.montantBrutFcfa,
@@ -149,10 +158,16 @@ export async function getDashboardLivraisons(req: Request, res: Response): Promi
         nombreSacs: livraisonsTable.nombreSacs,
         membreNom: membresTable.nom,
         membrePrenoms: membresTable.prenoms,
+        fournisseurNom: fournisseursTable.nom,
+        fournisseurPrenoms: fournisseursTable.prenoms,
       })
       .from(livraisonsTable)
       .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
-      .where(eq(membresTable.cooperativeId, cooperativeId))
+      .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
+      .where(or(
+        eq(membresTable.cooperativeId, cooperativeId),
+        eq(fournisseursTable.cooperativeId, cooperativeId),
+      ))
       .orderBy(desc(livraisonsTable.createdAt))
       .limit(5);
 
@@ -632,7 +647,8 @@ export async function getDashboardTonnageCertif(req: Request, res: Response): Pr
         FROM livraisons l
         LEFT JOIN sessions_pesee sp ON sp.livraison_id = l.id
         LEFT JOIN membres m ON m.id = l.membre_id
-        WHERE m.cooperative_id = ${cooperativeId}
+        LEFT JOIN fournisseurs f ON f.id = l.fournisseur_id
+        WHERE (m.cooperative_id = ${cooperativeId} OR f.cooperative_id = ${cooperativeId})
           AND ${filtreDate}
       )
       SELECT

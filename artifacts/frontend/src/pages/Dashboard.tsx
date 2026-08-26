@@ -811,7 +811,7 @@ export default function Dashboard() {
                 <div key={l.id} className="px-5 py-3 flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-900">
-                      {l.membreNom} {l.membrePrenoms}
+                      {l.membreNom ?? l.fournisseurNom ?? ""} {l.membrePrenoms ?? l.fournisseurPrenoms ?? ""}
                     </p>
                     <p className="text-xs text-gray-400">
                       {formaterDate(l.dateLivraison)} · {Number(l.poidsKg).toFixed(1)} kg

@@ -1093,6 +1093,36 @@ export interface RejeterPaiementInput {
   motifRejet: string;
 }
 
+export interface DashboardLivraison {
+  id: number;
+  /** @nullable */
+  membreId?: number | null;
+  /** @nullable */
+  fournisseurId?: number | null;
+  poidsKg: string;
+  /** @nullable */
+  produitBrutKg?: string | null;
+  prixUnitaireFcfa: number;
+  montantBrutFcfa: number;
+  avanceDeduiteFcfa: number;
+  intrantsDeduitsFcfa?: number;
+  montantNetFcfa: number;
+  dateLivraison: string;
+  /** @nullable */
+  agentId?: number | null;
+  createdAt: string;
+  /** @nullable */
+  nombreSacs?: number | null;
+  /** @nullable */
+  membreNom?: string | null;
+  /** @nullable */
+  membrePrenoms?: string | null;
+  /** @nullable */
+  fournisseurNom?: string | null;
+  /** @nullable */
+  fournisseurPrenoms?: string | null;
+}
+
 export interface LivraisonResult {
   livraison: LivraisonDetail;
   paiement: Paiement;

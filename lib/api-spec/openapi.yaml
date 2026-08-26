@@ -455,7 +455,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/LivraisonDetail"
+                  $ref: "#/components/schemas/DashboardLivraison"
 
   /dashboard/avances-retard:
     get:
@@ -7506,6 +7506,47 @@ components:
         membreNom:
           type: ["string", "null"]
         membrePrenoms:
+          type: ["string", "null"]
+
+    DashboardLivraison:
+      type: object
+      required: [id, poidsKg, prixUnitaireFcfa, montantBrutFcfa, avanceDeduiteFcfa, montantNetFcfa, dateLivraison, createdAt]
+      properties:
+        id:
+          type: integer
+        membreId:
+          type: ["integer", "null"]
+        fournisseurId:
+          type: ["integer", "null"]
+        poidsKg:
+          type: string
+        produitBrutKg:
+          type: ["string", "null"]
+        prixUnitaireFcfa:
+          type: integer
+        montantBrutFcfa:
+          type: integer
+        avanceDeduiteFcfa:
+          type: integer
+        intrantsDeduitsFcfa:
+          type: integer
+        montantNetFcfa:
+          type: integer
+        dateLivraison:
+          type: string
+        agentId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+        nombreSacs:
+          type: ["integer", "null"]
+        membreNom:
+          type: ["string", "null"]
+        membrePrenoms:
+          type: ["string", "null"]
+        fournisseurNom:
+          type: ["string", "null"]
+        fournisseurPrenoms:
           type: ["string", "null"]
 
     LivraisonResult:

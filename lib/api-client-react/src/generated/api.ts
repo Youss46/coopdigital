@@ -109,6 +109,7 @@ import type {
   CreateVerificationBalance201,
   CreateVerificationBody,
   DashboardKpi,
+  DashboardLivraison,
   DeleteDepenseVehicule200,
   DeleteEquipement200,
   DepenseVehicule,
@@ -1754,9 +1755,9 @@ export const getGetDashboardLivraisonsUrl = () => {
 /**
  * @summary Dernières livraisons (5)
  */
-export const getDashboardLivraisons = async ( options?: RequestInit): Promise<LivraisonDetail[]> => {
+export const getDashboardLivraisons = async ( options?: RequestInit): Promise<DashboardLivraison[]> => {
 
-  return customFetch<LivraisonDetail[]>(getGetDashboardLivraisonsUrl(),
+  return customFetch<DashboardLivraison[]>(getGetDashboardLivraisonsUrl(),
   {
     ...options,
     method: 'GET'

@@ -520,7 +520,8 @@ export const GetDashboardResponse = zod.object({
  */
 export const GetDashboardLivraisonsResponseItem = zod.object({
   "id": zod.number(),
-  "membreId": zod.number(),
+  "membreId": zod.number().nullish(),
+  "fournisseurId": zod.number().nullish(),
   "poidsKg": zod.string(),
   "produitBrutKg": zod.string().nullish(),
   "prixUnitaireFcfa": zod.number(),
@@ -531,8 +532,11 @@ export const GetDashboardLivraisonsResponseItem = zod.object({
   "dateLivraison": zod.string(),
   "agentId": zod.number().nullish(),
   "createdAt": zod.string(),
+  "nombreSacs": zod.number().nullish(),
   "membreNom": zod.string().nullish(),
-  "membrePrenoms": zod.string().nullish()
+  "membrePrenoms": zod.string().nullish(),
+  "fournisseurNom": zod.string().nullish(),
+  "fournisseurPrenoms": zod.string().nullish()
 })
 export const GetDashboardLivraisonsResponse = zod.array(GetDashboardLivraisonsResponseItem)
 
