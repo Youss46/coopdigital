@@ -16,6 +16,7 @@ import { Warehouse, TrendingUp, TrendingDown, AlertTriangle, PlusCircle, Package
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { usePermission } from "@/hooks/usePermission";
+import { MoneyInput } from "@/components/ui/money-input";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok = () => localStorage.getItem("coop_token") ?? "";
@@ -931,23 +932,23 @@ export default function StocksPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Capacité (kg) *</label>
-                  <input type="number" value={formEntrepot.capaciteKg}
-                    onChange={(e) => setFormEntrepot((f) => ({ ...f, capaciteKg: e.target.value }))}
+                  <MoneyInput value={formEntrepot.capaciteKg}
+                    onChange={(raw) => setFormEntrepot((f) => ({ ...f, capaciteKg: raw }))}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
                     placeholder="ex. 50000" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Capacité (sacs)</label>
-                  <input type="number" value={formEntrepot.capaciteSacs}
-                    onChange={(e) => setFormEntrepot((f) => ({ ...f, capaciteSacs: e.target.value }))}
+                  <MoneyInput value={formEntrepot.capaciteSacs}
+                    onChange={(raw) => setFormEntrepot((f) => ({ ...f, capaciteSacs: raw }))}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
                     placeholder="ex. 500" />
                 </div>
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Seuil alerte (kg)</label>
-                <input type="number" value={formEntrepot.seuilAlerteKg}
-                  onChange={(e) => setFormEntrepot((f) => ({ ...f, seuilAlerteKg: e.target.value }))}
+                <MoneyInput value={formEntrepot.seuilAlerteKg}
+                  onChange={(raw) => setFormEntrepot((f) => ({ ...f, seuilAlerteKg: raw }))}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
                   placeholder="ex. 5000" />
               </div>
@@ -1002,21 +1003,21 @@ export default function StocksPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Capacité (kg) *</label>
-                  <input type="number" value={formEntrepot.capaciteKg}
-                    onChange={(e) => setFormEntrepot((f) => ({ ...f, capaciteKg: e.target.value }))}
+                  <MoneyInput value={formEntrepot.capaciteKg}
+                    onChange={(raw) => setFormEntrepot((f) => ({ ...f, capaciteKg: raw }))}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Capacité (sacs)</label>
-                  <input type="number" value={formEntrepot.capaciteSacs}
-                    onChange={(e) => setFormEntrepot((f) => ({ ...f, capaciteSacs: e.target.value }))}
+                  <MoneyInput value={formEntrepot.capaciteSacs}
+                    onChange={(raw) => setFormEntrepot((f) => ({ ...f, capaciteSacs: raw }))}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
                 </div>
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Seuil alerte (kg)</label>
-                <input type="number" value={formEntrepot.seuilAlerteKg}
-                  onChange={(e) => setFormEntrepot((f) => ({ ...f, seuilAlerteKg: e.target.value }))}
+                <MoneyInput value={formEntrepot.seuilAlerteKg}
+                  onChange={(raw) => setFormEntrepot((f) => ({ ...f, seuilAlerteKg: raw }))}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
               </div>
               <label className="flex items-center gap-2 cursor-pointer">
