@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { MoneyInput } from "@/components/ui/money-input";
+import { NumericInput } from "@/components/ui/numeric-input";
 import {
   useListIntrants,
   useListCategoriesIntrants,
@@ -141,7 +142,7 @@ function ModalNouvelIntrant({ onClose, categorieOptions }: { onClose: () => void
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Stock minimum</label>
-              <input type="number" min="0" step="0.001" value={form.stockMinimum} onChange={(e) => setForm({ ...form, stockMinimum: e.target.value })}
+              <NumericInput min="0" step="0.001" value={form.stockMinimum} onChange={(v) => setForm({ ...form, stockMinimum: v })}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" placeholder="0" />
             </div>
           </div>
@@ -154,7 +155,7 @@ function ModalNouvelIntrant({ onClose, categorieOptions }: { onClose: () => void
                   Quantité en stock ({form.unite || "unité"})
                   <span className="ml-1 text-gray-400 font-normal">— optionnel</span>
                 </label>
-                <input type="number" min="0" step="0.001" value={form.stockInitial} onChange={(e) => setForm({ ...form, stockInitial: e.target.value })}
+                <NumericInput min="0" step="0.001" value={form.stockInitial} onChange={(v) => setForm({ ...form, stockInitial: v })}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" placeholder="0" />
                 {form.stockInitial && parseFloat(form.stockInitial) > 0 && (
                   <p className="text-[11px] text-gray-400 mt-1">
@@ -297,7 +298,7 @@ function ModalModifierIntrant({
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Stock minimum</label>
-              <input type="number" min="0" step="0.001" value={form.stockMinimum} onChange={(e) => setForm({ ...form, stockMinimum: e.target.value })}
+              <NumericInput min="0" step="0.001" value={form.stockMinimum} onChange={(v) => setForm({ ...form, stockMinimum: v })}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" placeholder="0" />
             </div>
             <div>
@@ -379,7 +380,7 @@ function ModalAppro({ intrantId, intrantNom, unite, onClose }: { intrantId: numb
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Quantité ({unite}) *</label>
-              <input type="number" required min="0.001" step="0.001" value={form.quantite} onChange={(e) => setForm({ ...form, quantite: e.target.value })}
+              <NumericInput required min="0.001" step="0.001" value={form.quantite} onChange={(v) => setForm({ ...form, quantite: v })}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" placeholder="0" />
             </div>
             <div>
@@ -923,7 +924,7 @@ function OngletDistribution() {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Quantité {intrantSelectionne ? `(${intrantSelectionne.unite})` : ""} *</label>
-              <input type="number" required min="0.001" step="0.001" value={quantite} onChange={(e) => setQuantite(e.target.value)}
+              <NumericInput required min="0.001" step="0.001" value={quantite} onChange={setQuantite}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none" placeholder="0" />
             </div>
             <div>

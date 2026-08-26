@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { MoneyInput } from "@/components/ui/money-input";
+import { NumericInput } from "@/components/ui/numeric-input";
 import { useQuery } from "@tanstack/react-query";
 import {
   useGetBudgetCampagneId,
@@ -207,6 +208,14 @@ function OngletHypotheses({
               <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
               {money ? (
                 <MoneyInput
+                  value={form[key as keyof typeof form]}
+                  onChange={(v) => setForm((f) => ({ ...f, [key]: v }))}
+                  disabled={!peutModifier}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700 disabled:bg-gray-50"
+                  placeholder={placeholder}
+                />
+              ) : key === "tonnagePrevisionnelKg" ? (
+                <NumericInput
                   value={form[key as keyof typeof form]}
                   onChange={(v) => setForm((f) => ({ ...f, [key]: v }))}
                   disabled={!peutModifier}

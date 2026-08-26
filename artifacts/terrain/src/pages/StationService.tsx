@@ -16,6 +16,7 @@ import {
   Fuel, Search, CheckCircle2, XCircle, Camera,
   Car, User, Droplets, CalendarDays, Receipt, WifiOff, ShieldCheck, ShieldAlert,
 } from "lucide-react";
+import { NumericInput } from "@/components/ui/numeric-input";
 
 const BASE = `${import.meta.env.VITE_API_URL ?? ""}/api`;
 
@@ -662,18 +663,18 @@ export default function StationService() {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
                   <div className="t-field">
                     <label className="t-label">Quantité livrée (L) *</label>
-                    <input className="t-input" style={{ height: 48, fontSize: "1rem" }}
-                      type="number" step="0.1" min="0" max={bon.quantite_autorisee + 1}
+                    <NumericInput decimal className="t-input" style={{ height: 48, fontSize: "1rem" }}
+                      step="0.1" min="0" max={bon.quantite_autorisee + 1}
                       placeholder={`Max ${bon.quantite_autorisee} L`}
                       value={form.quantite_livree}
-                      onChange={e => setForm(f => ({ ...f, quantite_livree: e.target.value }))} />
+                      onChange={value => setForm(f => ({ ...f, quantite_livree: value }))} />
                   </div>
                   <div className="t-field">
                     <label className="t-label">Prix / litre (FCFA)</label>
-                    <input className="t-input" style={{ height: 48, fontSize: "1rem" }}
-                      type="number" min="0" placeholder="ex: 650"
+                    <NumericInput decimal className="t-input" style={{ height: 48, fontSize: "1rem" }}
+                      min="0" placeholder="ex: 650"
                       value={form.prix_litre_fcfa}
-                      onChange={e => setForm(f => ({ ...f, prix_litre_fcfa: e.target.value }))} />
+                      onChange={value => setForm(f => ({ ...f, prix_litre_fcfa: value }))} />
                   </div>
                 </div>
 

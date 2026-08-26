@@ -11,6 +11,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useProxy } from "../contexts/ProxyContext";
 import { getCachedPrix, cachePrix } from "../lib/idb";
 import type { Fournisseur, CollecteResult, PrixActuel } from "../lib/types";
+import { NumericInput } from "../components/ui/numeric-input";
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -271,12 +272,11 @@ export default function CollecteFlow() {
             <div className="t-form">
               <div className="t-field">
                 <label className="t-label">Nombre de sacs</label>
-                <input
-                  type="number"
+                <NumericInput
+                  decimal={false}
                   className="t-input t-input--lg"
                   value={nombreSacs}
-                  onChange={(e) => setNombreSacs(e.target.value)}
-                  inputMode="numeric"
+                  onChange={setNombreSacs}
                   min="1"
                   placeholder="Ex: 5"
                 />
@@ -296,12 +296,11 @@ export default function CollecteFlow() {
                     <span>Saisie manuelle désactivée — utilisez la balance</span>
                   </div>
                 )}
-                <input
-                  type="number"
+                <NumericInput
+                  decimal
                   className="t-input t-input--lg"
                   value={poidsBrut}
-                  onChange={(e) => { if (!poidsSaisieVerrouillee) setPoidsBrut(e.target.value); }}
-                  inputMode="decimal"
+                  onChange={(value) => { if (!poidsSaisieVerrouillee) setPoidsBrut(value); }}
                   step="0.1"
                   min="0"
                   placeholder={poidsSaisieVerrouillee ? "Poids depuis la balance" : "Ex: 125.5"}
@@ -312,12 +311,11 @@ export default function CollecteFlow() {
 
               <div className="t-field">
                 <label className="t-label">Retenue / tare (kg)</label>
-                <input
-                  type="number"
+                <NumericInput
+                  decimal
                   className="t-input"
                   value={retenueKg}
-                  onChange={(e) => setRetenueKg(e.target.value)}
-                  inputMode="decimal"
+                  onChange={setRetenueKg}
                   step="0.1"
                   min="0"
                   placeholder="0"
@@ -417,14 +415,13 @@ export default function CollecteFlow() {
                   <option value="reporte">Reporter — pas de déduction sur cette livraison</option>
                 </select>
                 {avancePlan === "partiel" && (
-                  <input
-                    type="number"
+                  <NumericInput
+                    decimal={false}
                     placeholder={`Montant à déduire (max ${avanceDedMax.toLocaleString("fr-FR")} FCFA)`}
                     value={avanceMontantPartiel}
-                    inputMode="numeric"
                     min={1}
                     max={avanceDedMax}
-                    onChange={(e) => setAvanceMontantPartiel(e.target.value)}
+                    onChange={setAvanceMontantPartiel}
                     style={{ width: "100%", padding: "9px 10px", borderRadius: 8, border: "1px solid #d97706", fontSize: ".85rem" }}
                   />
                 )}

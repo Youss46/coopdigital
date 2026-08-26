@@ -17,6 +17,7 @@ import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { usePermission } from "@/hooks/usePermission";
 import { MoneyInput } from "@/components/ui/money-input";
+import { NumericInput } from "@/components/ui/numeric-input";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok = () => localStorage.getItem("coop_token") ?? "";
@@ -855,23 +856,21 @@ export default function StocksPage() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Poids (kg)</label>
-                <input
-                  type="number"
+                <NumericInput
                   step="0.1"
                   value={form.poidsKg}
-                  onChange={(e) => setForm((f) => ({ ...f, poidsKg: e.target.value }))}
+                  onChange={(v) => setForm((f) => ({ ...f, poidsKg: v }))}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
                   placeholder="ex. 1500"
                 />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Quantité (nombre de sacs)</label>
-                <input
-                  type="number"
+                <NumericInput
                   step="1"
                   min="0"
                   value={form.nombreSacs}
-                  onChange={(e) => setForm((f) => ({ ...f, nombreSacs: e.target.value }))}
+                  onChange={(v) => setForm((f) => ({ ...f, nombreSacs: v }))}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
                   placeholder="ex. 50"
                 />

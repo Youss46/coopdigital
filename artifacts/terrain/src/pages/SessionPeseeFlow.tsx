@@ -9,6 +9,7 @@ import FournisseurSearch from "../components/FournisseurSearch";
 import OfflineBanner from "../components/OfflineBanner";
 import BottomNavPeseur from "../components/BottomNavPeseur";
 import ScaleWeightDisplay from "../components/ScaleWeightDisplay";
+import { NumericInput } from "../components/ui/numeric-input";
 import { useOffline } from "../contexts/OfflineContext";
 import { useAuth } from "../contexts/AuthContext";
 import {
@@ -1175,24 +1176,22 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
                 <div className="t-field">
                   <label className="t-label">Nb de sacs</label>
-                  <input
-                    type="number"
+                  <NumericInput
+                    decimal={false}
                     className="t-input t-input--lg"
                     value={nbSacs}
-                    onChange={(e) => setNbSacs(e.target.value)}
-                    inputMode="numeric"
+                    onChange={setNbSacs}
                     min="0"
                     placeholder="0"
                   />
                 </div>
                 <div className="t-field">
                   <label className="t-label">Tare (kg)</label>
-                  <input
-                    type="number"
+                  <NumericInput
+                    decimal
                     className="t-input"
                     value={tare}
-                    onChange={(e) => setTare(e.target.value)}
-                    inputMode="decimal"
+                    onChange={setTare}
                     step="0.1"
                     min="0"
                     placeholder="0"
@@ -1214,12 +1213,11 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
                     <span>Saisie manuelle désactivée — utilisez la balance</span>
                   </div>
                 )}
-                <input
-                  type="number"
+                <NumericInput
+                  decimal
                   className="t-input t-input--lg"
                   value={poidsBrut}
-                  onChange={(e) => { if (!poidsSaisieVerrouillee) setPoidsBrut(e.target.value); }}
-                  inputMode="decimal"
+                  onChange={(value) => { if (!poidsSaisieVerrouillee) setPoidsBrut(value); }}
                   step="0.001"
                   min="0"
                   placeholder={poidsSaisieVerrouillee ? "Poids depuis la balance" : "Ex : 247.500"}
@@ -1528,17 +1526,16 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
                           <option value="reporte">Reporter sur la prochaine pesée</option>
                         </select>
                         {edit.planType === "partiel" && (
-                          <input
-                            type="number"
+                          <NumericInput
+                            decimal={false}
                             placeholder={`Montant par retenue (max ${avance.soldeRestantFcfa.toLocaleString("fr-FR")} FCFA)`}
                             value={edit.montantPartiel}
-                            inputMode="numeric"
                             min={1}
                             max={avance.soldeRestantFcfa}
-                            onChange={(e) =>
+                            onChange={(value) =>
                               setAvancePlanEdits((prev) => ({
                                 ...prev,
-                                [avance.id]: { ...edit, montantPartiel: e.target.value },
+                                [avance.id]: { ...edit, montantPartiel: value },
                               }))
                             }
                             style={{ width: "100%", padding: "9px 10px", borderRadius: 8, border: "1px solid #d97706", fontSize: ".85rem" }}

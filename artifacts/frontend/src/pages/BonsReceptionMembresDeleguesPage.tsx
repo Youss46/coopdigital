@@ -17,6 +17,7 @@ import {
   useGetChauffeurs,
 } from "@workspace/api-client-react";
 import { MoneyInput } from "@/components/ui/money-input";
+import { NumericInput } from "@/components/ui/numeric-input";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok  = () => localStorage.getItem("coop_token") ?? "";
@@ -520,14 +521,14 @@ export default function BonsReceptionMembresDeleguesPage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
                   <label style={labelStyle}>Poids déclaré (kg)</label>
-                  <input type="number" min="0" step="0.1" value={form.poidsDeclaraKg}
-                    onChange={e => setForm(f => ({ ...f, poidsDeclaraKg: e.target.value }))}
+                  <NumericInput min="0" step="0.1" value={form.poidsDeclaraKg}
+                    onChange={v => setForm(f => ({ ...f, poidsDeclaraKg: v }))}
                     style={inputStyle} placeholder="ex. 2500" />
                 </div>
                 <div>
                   <label style={labelStyle}>Nombre de sacs déclarés</label>
-                  <input type="number" min="0" step="1" value={form.nombreSacsDeclares}
-                    onChange={e => setForm(f => ({ ...f, nombreSacsDeclares: e.target.value }))}
+                  <NumericInput min="0" step="1" value={form.nombreSacsDeclares}
+                    onChange={v => setForm(f => ({ ...f, nombreSacsDeclares: v }))}
                     style={inputStyle} placeholder="ex. 50" />
                 </div>
               </div>

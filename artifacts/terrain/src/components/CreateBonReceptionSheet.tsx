@@ -3,6 +3,7 @@ import { AlertTriangle, Fuel, Truck, X } from "lucide-react";
 import type { CreateBonReceptionTerrainInput } from "../lib/api";
 import type { BonReceptionCreationOptions } from "../lib/types";
 import { MoneyInput } from "./ui/money-input";
+import { NumericInput } from "./ui/numeric-input";
 
 interface FormState {
   membreDelegueId: string;
@@ -169,11 +170,11 @@ export default function CreateBonReceptionSheet({
             <div style={twoColumnsStyle}>
               <div>
                 <label style={labelStyle}>Poids déclaré (kg)</label>
-                <input type="number" min="0" step="0.1" inputMode="decimal" value={form.poidsDeclaraKg} onChange={(e) => update({ poidsDeclaraKg: e.target.value })} placeholder="Ex. 2 500" style={fieldStyle} />
+                <NumericInput decimal value={form.poidsDeclaraKg} onChange={(value) => update({ poidsDeclaraKg: value })} min="0" step="0.1" placeholder="Ex. 2 500" style={fieldStyle} />
               </div>
               <div>
                 <label style={labelStyle}>Sacs déclarés</label>
-                <input type="number" min="0" step="1" inputMode="numeric" value={form.nombreSacsDeclares} onChange={(e) => update({ nombreSacsDeclares: e.target.value })} placeholder="Ex. 50" style={fieldStyle} />
+                <NumericInput decimal={false} value={form.nombreSacsDeclares} onChange={(value) => update({ nombreSacsDeclares: value })} min="0" step="1" placeholder="Ex. 50" style={fieldStyle} />
               </div>
             </div>
 

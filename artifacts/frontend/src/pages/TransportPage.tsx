@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { MoneyInput } from "@/components/ui/money-input";
+import { NumericInput } from "@/components/ui/numeric-input";
 import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -379,7 +380,7 @@ function TabFlotte() {
             </div>
             <div>
               <Label>Capacité (T)</Label>
-              <Input type="number" step="0.1" value={form.capacite_kg} onChange={e => setForm(f => ({ ...f, capacite_kg: e.target.value }))} />
+              <NumericInput step="0.1" value={form.capacite_kg} onChange={v => setForm(f => ({ ...f, capacite_kg: v }))} />
             </div>
             <div>
               <Label>Propriétaire</Label>
@@ -406,7 +407,7 @@ function TabFlotte() {
             </div>
             <div>
               <Label>Kilométrage actuel</Label>
-              <Input type="number" value={form.kilometrage_actuel} onChange={e => setForm(f => ({ ...f, kilometrage_actuel: e.target.value }))} />
+              <NumericInput value={form.kilometrage_actuel} onChange={v => setForm(f => ({ ...f, kilometrage_actuel: v }))} />
             </div>
             <div>
               <Label>Année fabrication</Label>
@@ -422,7 +423,7 @@ function TabFlotte() {
             </div>
             <div>
               <Label>Prochain entretien (km)</Label>
-              <Input type="number" value={form.prochain_entretien_km} onChange={e => setForm(f => ({ ...f, prochain_entretien_km: e.target.value }))} />
+              <NumericInput value={form.prochain_entretien_km} onChange={v => setForm(f => ({ ...f, prochain_entretien_km: v }))} />
             </div>
             <div>
               <Label>Prochain entretien (date)</Label>
@@ -916,7 +917,7 @@ function TabMissions() {
             )}
             <div>
               <Label>Kilométrage départ</Label>
-              <Input type="number" value={form.kilometrage_depart} onChange={e => setForm(f => ({ ...f, kilometrage_depart: e.target.value }))} />
+              <NumericInput value={form.kilometrage_depart} onChange={v => setForm(f => ({ ...f, kilometrage_depart: v }))} />
             </div>
             <div className="col-span-2">
               <Label>Observations</Label>
@@ -941,11 +942,11 @@ function TabMissions() {
             </div>
             <div>
               <Label>Kilométrage arrivée *</Label>
-              <Input type="number" value={terminerForm.kilometrage_arrivee} onChange={e => setTerminerForm(f => ({ ...f, kilometrage_arrivee: e.target.value }))} />
+              <NumericInput value={terminerForm.kilometrage_arrivee} onChange={v => setTerminerForm(f => ({ ...f, kilometrage_arrivee: v }))} />
             </div>
             <div>
               <Label>Poids chargé (kg) *</Label>
-              <Input type="number" value={terminerForm.poids_charge_kg} onChange={e => setTerminerForm(f => ({ ...f, poids_charge_kg: e.target.value }))} />
+              <NumericInput value={terminerForm.poids_charge_kg} onChange={v => setTerminerForm(f => ({ ...f, poids_charge_kg: v }))} />
             </div>
             <div>
               <Label>Coût carburant (FCFA)</Label>
@@ -1436,7 +1437,7 @@ function TabMaintenance() {
             </div>
             <div>
               <Label>Kilom. a l'entretien</Label>
-              <Input type="number" value={form.kilometrage_entretien} onChange={e => setForm(f => ({ ...f, kilometrage_entretien: e.target.value }))} placeholder="ex : 45 000" />
+              <NumericInput value={form.kilometrage_entretien} onChange={v => setForm(f => ({ ...f, kilometrage_entretien: v }))} placeholder="ex : 45 000" />
             </div>
             <div>
               <Label>Cout (FCFA)</Label>
@@ -1448,7 +1449,7 @@ function TabMaintenance() {
             </div>
             <div>
               <Label>Prochain entretien (km)</Label>
-              <Input type="number" value={form.prochain_entretien_km} onChange={e => setForm(f => ({ ...f, prochain_entretien_km: e.target.value }))} placeholder="ex : 50 000" />
+              <NumericInput value={form.prochain_entretien_km} onChange={v => setForm(f => ({ ...f, prochain_entretien_km: v }))} placeholder="ex : 50 000" />
             </div>
             <div>
               <Label>Prochain entretien (date)</Label>
@@ -1492,15 +1493,15 @@ interface BonForm {
   vehicule_id: string;
   chauffeur_id: string;
   type_carburant: string;
-  quantite_autorisee: number | "";
+  quantite_autorisee: number | string;
   station_service: string;
   motif: string;
   date_emission: string;
 }
 
 interface UtiliserForm {
-  quantite_livree: number | "";
-  prix_litre_fcfa: number | "";
+  quantite_livree: number | string;
+  prix_litre_fcfa: number | string;
   date_utilisation: string;
   station_service: string;
   observations: string;
@@ -1902,10 +1903,9 @@ function TabCarburant() {
             )}
             <div>
               <Label>Quantité autorisée (L) *</Label>
-              <Input
-                type="number" min={1} step="any" placeholder="Ex : 50"
+               <NumericInput min={1} step="any" placeholder="Ex : 50"
                 value={traiterQte}
-                onChange={e => setTraiterQte(e.target.value)}
+                 onChange={setTraiterQte}
                 autoFocus
               />
               <p className="text-xs text-gray-400 mt-1">Le bon sera soumis pour approbation PCA/directeur.</p>
@@ -1964,8 +1964,8 @@ function TabCarburant() {
               </div>
               <div>
                 <Label>Quantité autorisée (L) *</Label>
-                <Input type="number" min={1} step="any" placeholder="50" value={form.quantite_autorisee}
-                  onChange={e => setForm(f => ({ ...f, quantite_autorisee: e.target.value === "" ? "" : parseFloat(e.target.value) }))} />
+                 <NumericInput min={1} step="any" placeholder="50" value={form.quantite_autorisee}
+                   onChange={v => setForm(f => ({ ...f, quantite_autorisee: v }))} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -2019,8 +2019,8 @@ function TabCarburant() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Quantité réellement livrée (L) *</Label>
-                <Input type="number" min={0} step="any" placeholder="0" value={uForm.quantite_livree}
-                  onChange={e => setUForm(f => ({ ...f, quantite_livree: e.target.value === "" ? "" : parseFloat(e.target.value) }))} />
+                 <NumericInput min={0} step="any" placeholder="0" value={uForm.quantite_livree}
+                   onChange={v => setUForm(f => ({ ...f, quantite_livree: v }))} />
               </div>
               <div>
                 <Label>Date d'utilisation *</Label>
@@ -2031,8 +2031,8 @@ function TabCarburant() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Prix au litre (FCFA)</Label>
-                <Input type="number" min={0} step="any" placeholder="Prix/L" value={uForm.prix_litre_fcfa}
-                  onChange={e => setUForm(f => ({ ...f, prix_litre_fcfa: e.target.value === "" ? "" : parseFloat(e.target.value) }))} />
+                 <NumericInput min={0} step="any" placeholder="Prix/L" value={uForm.prix_litre_fcfa}
+                   onChange={v => setUForm(f => ({ ...f, prix_litre_fcfa: v }))} />
               </div>
               <div>
                 <Label>Montant estimé</Label>
@@ -2107,7 +2107,7 @@ interface DepenseForm {
   libelle: string;
   fournisseur: string;
   reference_piece: string;
-  quantite: number | "";
+  quantite: number | string;
   unite: string;
 }
 
@@ -2388,8 +2388,8 @@ function TabDepenses() {
                 <div>
                   <Label>Quantité</Label>
                   <div className="flex gap-2">
-                    <Input type="number" min={0} step="any" placeholder="0" value={form.quantite}
-                      onChange={e => setForm(f => ({ ...f, quantite: e.target.value === "" ? "" : parseFloat(e.target.value) }))}
+                    <NumericInput min={0} step="any" placeholder="0" value={form.quantite}
+                      onChange={v => setForm(f => ({ ...f, quantite: v }))}
                       className="flex-1" />
                     <Input placeholder="unité" value={form.unite}
                       onChange={e => setForm(f => ({ ...f, unite: e.target.value }))}
@@ -2402,8 +2402,8 @@ function TabDepenses() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>Litres</Label>
-                  <Input type="number" min={0} step="any" placeholder="0" value={form.quantite}
-                    onChange={e => setForm(f => ({ ...f, quantite: e.target.value === "" ? "" : parseFloat(e.target.value), unite: "L" }))} />
+                  <NumericInput min={0} step="any" placeholder="0" value={form.quantite}
+                    onChange={v => setForm(f => ({ ...f, quantite: v, unite: "L" }))} />
                 </div>
                 <div>
                   <Label>Unité</Label>

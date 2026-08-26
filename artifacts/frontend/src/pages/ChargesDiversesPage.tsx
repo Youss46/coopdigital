@@ -5,6 +5,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -449,7 +450,7 @@ export default function ChargesDiversesPage() {
               </div>
               <div className="space-y-1">
                 <Label>Montant (FCFA) *</Label>
-                <Input type="number" min="0" step="1" placeholder="Ex: 50000" value={form.montant_fcfa} onChange={e => setForm(f => ({ ...f, montant_fcfa: e.target.value }))} />
+                <NumericInput min="0" step="1" placeholder="Ex: 50000" value={form.montant_fcfa} onChange={v => setForm(f => ({ ...f, montant_fcfa: v }))} />
                 {form.categorie === "ppsi" && parseFloat(form.montant_fcfa) > 0 && (
                   <p className="text-xs text-amber-700 mt-1">
                     Retenue PPSSI estimée (2 %) : {fmtFcfa(parseFloat(form.montant_fcfa) * 0.02)} · Net prestataire : {fmtFcfa(parseFloat(form.montant_fcfa) * 0.98)}

@@ -12,6 +12,7 @@ import {
   type ConfigAnomalies,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { NumericInput } from "@/components/ui/numeric-input";
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
@@ -427,7 +428,15 @@ function TabConfig({ peutConfigurer }: { peutConfigurer: boolean }) {
   const Field = ({ label, field, unit, min, max, step }: { label: string; field: keyof ConfigAnomalies; unit?: string; min?: number; max?: number; step?: number }) => (
     <div>
       <label className="block text-xs font-medium text-gray-600 mb-1">{label}{unit ? ` (${unit})` : ""}</label>
-      <input
+      {field.includes("poids") || field.includes("montant") || field === "avance_max_fcfa" ? <NumericInput
+        disabled={!peutConfigurer}
+        className={INPUT_CLS + (peutConfigurer ? "" : " opacity-60 cursor-not-allowed")}
+        value={numVal(field)}
+        min={min}
+        max={max}
+        step={step ?? 1}
+        onChange={(v) => setNum(String(field), v)}
+      /> : <input
         type="number"
         disabled={!peutConfigurer}
         className={INPUT_CLS + (peutConfigurer ? "" : " opacity-60 cursor-not-allowed")}
@@ -436,7 +445,7 @@ function TabConfig({ peutConfigurer }: { peutConfigurer: boolean }) {
         max={max}
         step={step ?? 1}
         onChange={(e) => setNum(String(field), e.target.value)}
-      />
+      />}
     </div>
   );
 

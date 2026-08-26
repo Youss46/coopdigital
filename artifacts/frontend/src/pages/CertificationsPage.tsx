@@ -1,3 +1,4 @@
+import { NumericInput } from "@/components/ui/numeric-input";
 import { useState, useEffect } from "react";
 import { useSearch, Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -215,7 +216,7 @@ function CertifForm({ initial, onSubmit, onCancel, loading }: {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Membres couverts</label>
-              <input type="number" min="0" className="w-full border rounded-lg px-3 py-2 text-sm" value={form.nbMembresCouVerts} onChange={e => set("nbMembresCouVerts", e.target.value)} />
+              <NumericInput min="0" className="w-full border rounded-lg px-3 py-2 text-sm" value={form.nbMembresCouVerts} onChange={v => set("nbMembresCouVerts", v)} />
             </div>
           </div>
           <div>

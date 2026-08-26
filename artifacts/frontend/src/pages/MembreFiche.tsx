@@ -1,3 +1,4 @@
+import { NumericInput } from "@/components/ui/numeric-input";
 import { useState } from "react";
 import { MoneyInput } from "@/components/ui/money-input";
 import { useRoute, useLocation } from "wouter";
@@ -1946,12 +1947,11 @@ export default function MembreFiche() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Nombre de parcelles</label>
-                    <input
-                      type="number"
+                    <NumericInput
                       min="0"
                       step="1"
                       value={editForm.nombreParcelles}
-                      onChange={e => setEditForm(f => ({ ...f, nombreParcelles: e.target.value }))}
+                      onChange={v => setEditForm(f => ({ ...f, nombreParcelles: v }))}
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 bg-white"
                     />
                   </div>

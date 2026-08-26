@@ -17,6 +17,7 @@ import { Building2, PlusCircle, ChevronRight, ArrowLeft, AlertTriangle, Loader2 
 import { usePermission } from "@/hooks/usePermission";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { NumericInput } from "@/components/ui/numeric-input";
 
 function formaterFCFA(n: number) {
   return new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
@@ -176,24 +177,22 @@ export default function ExportateursPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Poids refoulé (kg) *</label>
-                  <input
-                    type="number"
+                   <NumericInput
                     step="0.1"
                     value={formRefus.poidsRefuleKg}
-                    onChange={(e) => setFormRefus((f) => ({ ...f, poidsRefuleKg: e.target.value }))}
+                     onChange={(v) => setFormRefus((f) => ({ ...f, poidsRefuleKg: v }))}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
                     placeholder="500"
-                  />
+                   />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Nombre de sacs *</label>
-                  <input
-                    type="number"
+                   <NumericInput
                     value={formRefus.nombreSacsRefoules}
-                    onChange={(e) => setFormRefus((f) => ({ ...f, nombreSacsRefoules: e.target.value }))}
+                     onChange={(v) => setFormRefus((f) => ({ ...f, nombreSacsRefoules: v }))}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
                     placeholder="10"
-                  />
+                   />
                 </div>
               </div>
               <div>
@@ -405,24 +404,22 @@ export default function ExportateursPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Poids refoulé (kg) *</label>
-                  <input
-                    type="number"
+                   <NumericInput
                     step="0.1"
                     value={formRefus.poidsRefuleKg}
-                    onChange={(e) => setFormRefus((f) => ({ ...f, poidsRefuleKg: e.target.value }))}
+                     onChange={(v) => setFormRefus((f) => ({ ...f, poidsRefuleKg: v }))}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
                     placeholder="500"
-                  />
+                   />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Nombre de sacs *</label>
-                  <input
-                    type="number"
+                   <NumericInput
                     value={formRefus.nombreSacsRefoules}
-                    onChange={(e) => setFormRefus((f) => ({ ...f, nombreSacsRefoules: e.target.value }))}
+                     onChange={(v) => setFormRefus((f) => ({ ...f, nombreSacsRefoules: v }))}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
                     placeholder="10"
-                  />
+                   />
                 </div>
               </div>
               <div>

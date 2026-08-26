@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -499,7 +500,7 @@ export default function NouvelleExpeditionPage() {
             </div>
             <div>
               <Label>Poids chargé (kg) *</Label>
-              <Input type="number" value={poidsCharge} onChange={e => setPoidsCharge(e.target.value)} placeholder="18500" />
+              <NumericInput value={poidsCharge} onChange={setPoidsCharge} placeholder="18500" />
               {poidsChargeCalcule > 0 && poidsCharge === String(Math.round(poidsChargeCalcule * 10) / 10) && (
                 <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
                   <span>✦</span>
@@ -512,10 +513,9 @@ export default function NouvelleExpeditionPage() {
             </div>
             <div>
               <Label>Nombre de sacs *</Label>
-              <Input
-                type="number"
+              <NumericInput
                 value={nombreSacs}
-                onChange={e => { setNombreSacs(e.target.value); }}
+                onChange={v => { setNombreSacs(v); }}
                 placeholder="370"
               />
               {nombreSacsCalcule > 0 && nombreSacs === String(nombreSacsCalcule) && (

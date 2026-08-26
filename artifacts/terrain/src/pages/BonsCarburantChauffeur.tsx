@@ -5,6 +5,7 @@ import { Fuel, CheckCircle2, Clock, Droplets, QrCode, X, Share2, Copy, RefreshCw
 import BottomNavChauffeur from "@/components/BottomNavChauffeur";
 import { useToast } from "@/hooks/use-toast";
 import QRCode from "react-qr-code";
+import { NumericInput } from "@/components/ui/numeric-input";
 
 interface BonCarburant {
   id: number;
@@ -462,22 +463,24 @@ export default function BonsCarburantChauffeur() {
             {/* Fields */}
             <div className="t-field">
               <label className="t-label">Quantité livrée (L) *</label>
-              <input
+                <NumericInput
+                  decimal
                 className="t-input"
-                type="number" min={0} step="any" placeholder="Ex: 45"
+                  min={0} step="any" placeholder="Ex: 45"
                 value={form.quantite_livree}
-                onChange={e => setForm(f => ({ ...f, quantite_livree: e.target.value }))}
+                  onChange={value => setForm(f => ({ ...f, quantite_livree: value }))}
               />
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div className="t-field">
                 <label className="t-label">Prix au litre (FCFA)</label>
-                <input
+                <NumericInput
+                  decimal
                   className="t-input"
-                  type="number" min={0} step="any" placeholder="Prix/L"
+                  min={0} step="any" placeholder="Prix/L"
                   value={form.prix_litre_fcfa}
-                  onChange={e => setForm(f => ({ ...f, prix_litre_fcfa: e.target.value }))}
+                  onChange={value => setForm(f => ({ ...f, prix_litre_fcfa: value }))}
                 />
               </div>
               <div className="t-field">
@@ -761,11 +764,12 @@ export default function BonsCarburantChauffeur() {
               </div>
               <div className="t-field">
                 <label className="t-label">Quantité (L)</label>
-                <input
+                <NumericInput
+                  decimal
                   className="t-input"
-                  type="number" min={1} step="any" placeholder="Ex : 50"
+                  min={1} step="any" placeholder="Ex : 50"
                   value={demandeForm.quantite_demandee}
-                  onChange={e => setDemandeForm(f => ({ ...f, quantite_demandee: e.target.value }))}
+                  onChange={value => setDemandeForm(f => ({ ...f, quantite_demandee: value }))}
                 />
               </div>
             </div>

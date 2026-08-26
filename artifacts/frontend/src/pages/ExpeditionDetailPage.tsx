@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { NumericInput } from "@/components/ui/numeric-input";
 import {
   ArrowLeft, Ship, MapPin, CheckCircle2,
   ChevronRight, FileText, Users, Leaf, AlertCircle,
@@ -654,20 +655,18 @@ export default function ExpeditionDetailPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Poids reçu au port (kg) *</Label>
-                <Input
-                  type="number"
+                <NumericInput
                   value={poidsRecu}
-                  onChange={e => setPoidsRecu(e.target.value)}
+                  onChange={setPoidsRecu}
                   placeholder="18 465"
                 />
               </div>
               <div>
                 <Label>Nombre de sacs reçus</Label>
-                <Input
-                  type="number"
+                <NumericInput
                   min="0"
                   value={nombreSacsRecu}
-                  onChange={e => setNombreSacsRecu(e.target.value)}
+                  onChange={setNombreSacsRecu}
                   placeholder="Ex : 320"
                 />
               </div>
@@ -681,7 +680,7 @@ export default function ExpeditionDetailPage() {
               </div>
               <div>
                 <Label>Frais transport (FCFA)</Label>
-                <Input type="number" value={fraisTransport} onChange={e => setFraisTransport(e.target.value)} placeholder="50000" />
+                <NumericInput value={fraisTransport} onChange={setFraisTransport} placeholder="50000" />
               </div>
             </div>
 
@@ -703,22 +702,20 @@ export default function ExpeditionDetailPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-xs text-orange-700">Quantité refoulée (kg) *</Label>
-                    <Input
-                      type="number"
+                    <NumericInput
                       min="0"
                       value={poidsRefoul}
-                      onChange={e => setPoidsRefoul(e.target.value)}
+                      onChange={setPoidsRefoul}
                       placeholder="Ex : 500"
                       className="border-orange-300"
                     />
                   </div>
                   <div>
                     <Label className="text-xs text-orange-700">Nombre de sacs refoulés</Label>
-                    <Input
-                      type="number"
+                    <NumericInput
                       min="0"
                       value={nombreSacsRefoul}
-                      onChange={e => setNombreSacsRefoul(e.target.value)}
+                      onChange={setNombreSacsRefoul}
                       placeholder="Ex : 10"
                       className="border-orange-300"
                     />
