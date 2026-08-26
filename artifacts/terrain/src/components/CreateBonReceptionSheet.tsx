@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, Fuel, Truck, X } from "lucide-react";
 import type { CreateBonReceptionTerrainInput } from "../lib/api";
 import type { BonReceptionCreationOptions } from "../lib/types";
+import { MoneyInput } from "./ui/money-input";
 
 interface FormState {
   membreDelegueId: string;
@@ -252,11 +253,25 @@ export default function CreateBonReceptionSheet({
               <div style={twoColumnsStyle}>
                 <div>
                   <label style={labelStyle}>Carburant (F CFA)</label>
-                  <input type="number" min="0" step="500" inputMode="numeric" value={form.fraisCarburantFcfa} onChange={(e) => update({ fraisCarburantFcfa: e.target.value })} placeholder="0" style={fieldStyle} />
+                  <MoneyInput
+                    value={form.fraisCarburantFcfa}
+                    onChange={(value) => update({ fraisCarburantFcfa: value })}
+                    min="0"
+                    step="500"
+                    placeholder="0"
+                    style={fieldStyle}
+                  />
                 </div>
                 <div>
                   <label style={labelStyle}>Autres charges (F CFA)</label>
-                  <input type="number" min="0" step="500" inputMode="numeric" value={form.autresChargesFcfa} onChange={(e) => update({ autresChargesFcfa: e.target.value })} placeholder="0" style={fieldStyle} />
+                  <MoneyInput
+                    value={form.autresChargesFcfa}
+                    onChange={(value) => update({ autresChargesFcfa: value })}
+                    min="0"
+                    step="500"
+                    placeholder="0"
+                    style={fieldStyle}
+                  />
                 </div>
               </div>
               {Number(form.autresChargesFcfa) > 0 && (
