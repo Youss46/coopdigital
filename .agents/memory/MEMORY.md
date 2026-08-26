@@ -77,4 +77,5 @@
 - [Numérotation globale des reçus](receipt-sequence-global-uniqueness.md) — `paiements.numero_recu` est globalement unique; utiliser une séquence commune à toutes les coopératives.
 - [Numérotation locale des pesées](local-weighing-sequence.md) — le rang métier est atomique par coopérative et année; `livraisons.id` reste un identifiant SQL global.
 - [Périmètre fournisseur du dashboard](dashboard-supplier-scope.md) — les agrégats de livraisons filtrent par coopérative via membre OU fournisseur externe.
+- [Idempotence des règlements](payment-validation-idempotency.md) — la transition conditionnelle en transaction empêche les écritures comptables dupliquées lors de requêtes concurrentes.
 - [Références PDF des pesées](pdf-local-numbering.md) — les reçus et bordereaux affichent PES-S-<rang> avant tout identifiant legacy.

@@ -10,6 +10,14 @@ import { logger } from "../lib/logger.js";
 
 // ─── Helper ─────────────────────────────────────────────────────────────────
 
+class PaiementDejaTraiteError extends Error {
+  readonly status = 409;
+  constructor() {
+    super("Ce paiement a déjà été traité. Aucune écriture supplémentaire n'a été créée.");
+    this.name = "PaiementDejaTraiteError";
+  }
+}
+
 function startOfDay(d: Date) {
   const r = new Date(d);
   r.setHours(0, 0, 0, 0);
@@ -659,7 +667,7 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
 
     await db.transaction(async (tx) => {
       // 2. Mettre à jour le paiement (le mode peut être corrigé au moment de la validation)
-      await tx
+      const [paiementMisAJour] = await tx
         .update(paiementsTable)
         .set({
           statut: nouveauStatut as "effectue" | "confirme",
@@ -668,7 +676,18 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
           referenceTransaction: body.referenceTransaction ?? row.paiement.referenceTransaction,
           ...(modeOverride ? { modePaiement: modeOverride } : {}),
         })
-        .where(eq(paiementsTable.id, id));
+        // La condition sur le statut rend la validation idempotente :
+        // deux requêtes concurrentes ne peuvent pas créer deux écritures
+        // comptables pour le même règlement.
+        .where(and(
+          eq(paiementsTable.id, id),
+          eq(paiementsTable.statut, "en_attente"),
+        ))
+        .returning({ id: paiementsTable.id });
+
+      if (!paiementMisAJour) {
+        throw new PaiementDejaTraiteError();
+      }
 
       // 3. Mettre à jour le statut paiement de la livraison (si applicable)
       if (row.paiement.livraisonId) {
@@ -761,6 +780,10 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
     const updated = await fetchEnrichedPaiement(id);
     res.json(updated);
   } catch (err) {
+    if (err instanceof PaiementDejaTraiteError) {
+      res.status(err.status).json({ erreur: err.message });
+      return;
+    }
     req.log.error({ err }, "Erreur validerPaiement");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
