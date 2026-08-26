@@ -84,14 +84,28 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
       }
 
       if (gpsOps.length > 0) {
-        const gpsResult = await syncGpsOps(gpsOps);
-        for (const localId of gpsResult.succes) { await markGpsOpSynced(localId); nbSucces++; }
-        for (const { localId, erreur } of gpsResult.echecs) {
-          await incrementGpsTentatives(localId);
-          await markGpsOpError(localId, erreur);
-          nbEchecs++;
-          erreurs.push(erreur);
-          operationErrors.push({ localId, erreur });
+        try {
+          const gpsResult = await syncGpsOps(gpsOps);
+          for (const localId of gpsResult.succes) { await markGpsOpSynced(localId); nbSucces++; }
+          for (const { localId, erreur } of gpsResult.echecs) {
+            await incrementGpsTentatives(localId);
+            await markGpsOpError(localId, erreur);
+            nbEchecs++;
+            erreurs.push(erreur);
+            operationErrors.push({ localId, erreur });
+          }
+        } catch (error) {
+          const rawMessage = error instanceof Error ? error.message : "";
+          const erreur = rawMessage === "Failed to fetch" || rawMessage === "NetworkError"
+            ? "Réseau indisponible"
+            : rawMessage || "Réseau indisponible";
+          for (const op of gpsOps) {
+            await incrementGpsTentatives(op.localId);
+            await markGpsOpError(op.localId, erreur);
+            nbEchecs++;
+            erreurs.push(erreur);
+            operationErrors.push({ localId: op.localId, erreur });
+          }
         }
       }
 
