@@ -1006,7 +1006,7 @@ export async function syncOperations(
         await octroierAvance(effectiveId, cooperativeId, op.data as Parameters<typeof octroierAvance>[2], sais);
       } else if (op.type === "gps_collecte") {
         const { collecterParcelleAgent } = await import("./missionsAgentService.js");
-        const d = op.data as { missionId: number; membreId: number; crs?: string; polygoneGps: object; photos: string[]; notes?: string; superficieCalculeeHa?: number; probleme?: { type: string; description: string } };
+        const d = op.data as { missionId: number; membreId: number; crs: string; polygoneGps: object; photos: string[]; notes?: string; superficieCalculeeHa?: number; probleme?: { type: string; description: string } };
         await collecterParcelleAgent(d.missionId, d.membreId, agentId, {
           polygoneGps: d.polygoneGps,
           crs: d.crs,

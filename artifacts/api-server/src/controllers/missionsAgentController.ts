@@ -53,8 +53,8 @@ export async function collecterParcelleHandler(req: Request, res: Response): Pro
     probleme?: { type: string; description: string };
   };
 
-  if (!polygoneGps || !photos) {
-    res.status(400).json({ erreur: "polygoneGps et photos requis" });
+  if (!polygoneGps || !photos || crs !== "EPSG:4326") {
+    res.status(400).json({ erreur: "polygoneGps, photos et crs=EPSG:4326 requis" });
     return;
   }
 

@@ -43,8 +43,8 @@ function polygonAreaHa(points: GpsPoint[]): number {
   return Math.abs(area) / 2 / 10000;
 }
 
-function validatePolygon(raw: unknown, crs?: string): GpsPoint[] {
-  if (crs !== undefined && crs !== GPS_CRS) {
+function validatePolygon(raw: unknown, crs: string): GpsPoint[] {
+  if (crs !== GPS_CRS) {
     throw new Error(`Système de coordonnées non supporté : ${crs}. Utilisez ${GPS_CRS}.`);
   }
   if (!Array.isArray(raw) || raw.length < 3) throw new Error("Le contour GPS doit comporter au moins 3 points");
@@ -155,7 +155,7 @@ export async function collecterParcelleAgent(
   agentId: number,
   data: {
     polygoneGps: object;
-    crs?: string;
+    crs: string;
     photos: string[];
     notes?: string;
     superficieCalculeeHa?: number;
