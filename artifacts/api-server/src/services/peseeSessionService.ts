@@ -1077,7 +1077,8 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
                 produit:             "cacao",
                 certificationCacao:  detail.certificationCacao ?? null,
                 dateLivraison:       dateStr,
-                statutPaiement:      "EN ATTENTE",
+                statutPaiement:      "EN_ATTENTE",
+                montantRestant:      String(reglement.montantNetFcfa),
               })
               .returning();
 
@@ -1462,6 +1463,8 @@ export async function creerLivraisonDepuisSession(
         dateLivraison:      dateStr,
         agentId:            data.agentId ?? null,
         peseurId:           data.peseurId ?? null,
+        statutPaiement:     "EN_ATTENTE",
+        montantRestant:     String(montantNet),
       })
       .returning();
 

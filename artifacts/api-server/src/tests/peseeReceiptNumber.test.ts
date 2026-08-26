@@ -206,4 +206,10 @@ describe("creerLivraisonDepuisSession — stores REC receipt number on paiement"
     expect(mockReserverNumeroPesee).toHaveBeenCalledWith(COOPERATIVE_ID);
     expect(capturedLivraisonInsert?.numeroPesee).toBe(1);
   });
+
+  it("keeps the generated delivery unpaid until its payment is validated", async () => {
+    await creerLivraisonDepuisSession(COOPERATIVE_ID, SESSION_ID, {});
+    expect(capturedLivraisonInsert?.statutPaiement).toBe("EN_ATTENTE");
+    expect(capturedLivraisonInsert?.montantRestant).toBe("144600");
+  });
 });
