@@ -16,6 +16,13 @@ type DateFilters = {
   dateFin?: string;
 };
 
+function dateLocaleDuJour(): string {
+  const aujourdHui = new Date();
+  const mois = String(aujourdHui.getMonth() + 1).padStart(2, "0");
+  const jour = String(aujourdHui.getDate()).padStart(2, "0");
+  return `${aujourdHui.getFullYear()}-${mois}-${jour}`;
+}
+
 function formatDate(d: string) {
   const [y, m, day] = d.split("-");
   return `${day}/${m}/${y?.slice(2)}`;
@@ -47,9 +54,13 @@ export default function HistoriquePeseur() {
   const [fromCache, setFromCache] = useState(false);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
   const [downloadErreur, setDownloadErreur] = useState<string | null>(null);
-  const [dateDebutSaisie, setDateDebutSaisie] = useState("");
-  const [dateFinSaisie, setDateFinSaisie] = useState("");
-  const [filtresActifs, setFiltresActifs] = useState<DateFilters>({});
+  const [dateDuJour] = useState(dateLocaleDuJour);
+  const [dateDebutSaisie, setDateDebutSaisie] = useState(dateDuJour);
+  const [dateFinSaisie, setDateFinSaisie] = useState(dateDuJour);
+  const [filtresActifs, setFiltresActifs] = useState<DateFilters>({
+    dateDebut: dateDuJour,
+    dateFin: dateDuJour,
+  });
   const [filtreErreur, setFiltreErreur] = useState<string | null>(null);
 
   const charger = useCallback(async () => {
