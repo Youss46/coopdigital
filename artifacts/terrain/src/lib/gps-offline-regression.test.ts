@@ -248,6 +248,30 @@ describe("régression collecte GPS hors ligne", () => {
     await act(async () => root!.unmount());
     container.remove();
   });
+
+  it("normalise les coordonnées à six décimales et impose EPSG:4326", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), { status: 200 }),
+    );
+
+    await collecterParcelle(12, 34, {
+      polygoneGps: [
+        { lat: 5.3101234567, lon: -4.0209876543, accuracy: 8, ts: 1 },
+        { lat: 5.3111234567, lon: -4.0209876543, accuracy: 8, ts: 2 },
+        { lat: 5.3111234567, lon: -4.0199876543, accuracy: 8, ts: 3 },
+      ],
+      photos: ["photo-1", "photo-2"],
+    }, true);
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(body.crs).toBe("EPSG:4326");
+    expect(body.polygoneGps[0]).toMatchObject({
+      lat: 5.310123,
+      lon: -4.020988,
+    });
+    expect(body.polygoneGps[0].lat.toString().split(".")[1]).toHaveLength(6);
+    expect(body.polygoneGps[0].lon.toString().split(".")[1]).toHaveLength(6);
+  });
 });
 
 async function waitFor(assertion: () => void, timeoutMs = 1000): Promise<void> {
