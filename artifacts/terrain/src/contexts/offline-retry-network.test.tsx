@@ -2,7 +2,7 @@
 
 import { act, createElement, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GpsOp } from "../lib/idb";
 
 const fakeState = vi.hoisted(() => {
@@ -76,6 +76,7 @@ describe("relance GPS après coupure réseau", () => {
   let container: HTMLDivElement;
 
   beforeEach(() => {
+    Object.defineProperty(navigator, "onLine", { configurable: true, value: false });
     fakeState.op.status = "pending";
     delete fakeState.op.errorMsg;
     fakeState.syncGpsOps.mockReset();
@@ -86,6 +87,10 @@ describe("relance GPS après coupure réseau", () => {
     document.body.appendChild(container);
   });
 
+  afterEach(() => {
+    Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
+  });
+
   it("conserve le localId et l'erreur, puis relance la même opération sans doublon", async () => {
     await act(async () => {
       root = createRoot(container);
@@ -93,11 +98,12 @@ describe("relance GPS après coupure réseau", () => {
       await Promise.resolve();
     });
 
+    Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
     await act(async () => {
       await (globalThis as unknown as { triggerSync: () => Promise<void> }).triggerSync();
     });
     expect(container.textContent).toContain("error:Réseau indisponible");
-    expect(fakeState.markGpsOpError).toHaveBeenCalledWith(fakeState.op.localId, "Failed to fetch");
+    expect(fakeState.markGpsOpError).toHaveBeenCalledWith(fakeState.op.localId, "Réseau indisponible");
     expect(fakeState.op.tentatives).toBe(1);
 
     await act(async () => {

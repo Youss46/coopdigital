@@ -201,8 +201,6 @@ export default function CollecteGps() {
       getGpsDraft(missionId, membreId).then((draft) => {
         if (!active || !draft) return;
         gps.restore(draft.points, draft.history ?? []);
-        // Points restored from the local draft are the starting state, not corrections.
-        gps.clearHistory();
         setGpsFinalized(draft.finalized);
         setAutoMode(draft.autoMode);
         setAutoPaused(draft.autoPaused);

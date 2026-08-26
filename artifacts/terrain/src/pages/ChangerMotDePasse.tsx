@@ -105,7 +105,7 @@ export default function ChangerMotDePasse() {
   return (
     <div className="t-login">
       <img
-        src="/logo-512.png"
+        src={`${import.meta.env.BASE_URL}logo-512.png`}
         alt="CoopDigital"
         className="t-login__logo"
         style={{ width: "5rem", height: "5rem", borderRadius: "1.2rem", objectFit: "contain", margin: "0 auto" }}

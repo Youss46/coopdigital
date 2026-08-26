@@ -113,6 +113,7 @@ export async function getMissionDetail(missionId: number, agentId: number) {
       membreId: missionsMembresTable.membreId,
       statut: missionsMembresTable.statut,
       gpsCollecte: missionsMembresTable.gpsCollecte,
+      gpsCrs: missionsMembresTable.gpsCrs,
       photosCollectees: missionsMembresTable.photosCollectees,
       notesAgent: missionsMembresTable.notesAgent,
       dateCollecte: missionsMembresTable.dateCollecte,

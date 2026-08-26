@@ -73,3 +73,4 @@
 - [Taux PPSSI annuel](ppsi-taux-annuel.md) — le taux est modifiable une fois par année civile et doit piloter calculs, règlements et exports.
 - [Cartographie automatique terrain](terrain-auto-mapping.md) — le mode automatique filtre les positions GPS par précision et distance, avec pause/reprise et validation finale.
 - [Tests React du terrain](terrain-react-tests.md) — les tests de rendu utilisent jsdom uniquement au niveau du fichier et le plugin React dans la config Vitest.
+- [Assets Vite du terrain](terrain-vite-base-assets.md) — les assets publics doivent utiliser BASE_URL, car Terrain est servi sous le préfixe /terrain/.
