@@ -121,6 +121,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
 
   reporting: {
     voir_dashboard:             ["pca", "directeur", "comptable", "caissier", "magasinier", "responsable_tracabilite", "auditeur"],
+    generer_recu:               ["pca", "directeur", "comptable", "caissier", "delegue", "magasinier"],
     generer_rapport_mensuel:    ["pca", "directeur", "comptable"],
     generer_bilan_campagne:     ["pca", "directeur", "comptable"],
     voir_etats_financiers:      ["pca", "directeur", "comptable", "auditeur"],
