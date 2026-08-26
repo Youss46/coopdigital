@@ -1019,6 +1019,10 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
     membrePrenoms: membresTable.prenoms,
     membreCni: membresTable.numeroCni,
     membreTel: membresTable.telephone,
+     fournisseurNom: fournisseursTable.nom,
+     fournisseurPrenoms: fournisseursTable.prenoms,
+     fournisseurCni: fournisseursTable.numeroCni,
+     fournisseurTel: fournisseursTable.telephone,
     livraisonDate: livraisonsTable.dateLivraison,
     livraisonNumeroPesee: livraisonsTable.numeroPesee,
     livraisonRef: livraisonsTable.codeAchat,
@@ -1032,6 +1036,7 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
   }).from(paiementsTable)
     .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
     .leftJoin(livraisonsTable, eq(paiementsTable.livraisonId, livraisonsTable.id))
+    .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
     .leftJoin(validateurAlias, eq(paiementsTable.validePar, validateurAlias.id))
     .leftJoin(saisiseurPayAlias, eq(paiementsTable.agentSaisiseurId, saisiseurPayAlias.id))
     .where(eq(paiementsTable.id, paiementId));
@@ -1044,11 +1049,21 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
 
   let y = doc.y;
   doc.rect(MARGIN, y, PAGE_W - MARGIN * 2, 52).fill("#f0fdf4").stroke("#bbf7d0");
+  const isFournisseurExterne = row.fournisseurNom != null;
+  const beneficiaireNom = isFournisseurExterne
+    ? `${row.fournisseurPrenoms ?? ""} ${row.fournisseurNom ?? ""}`.trim()
+    : `${row.membrePrenoms ?? ""} ${row.membreNom ?? "—"}`.trim();
   doc.fontSize(8).fillColor(GRIS).font("Helvetica").text("BÉNÉFICIAIRE", MARGIN + 8, y + 5);
   doc.fontSize(11).fillColor(VERT).font("Helvetica-Bold")
-    .text(`${row.membrePrenoms ?? ""} ${row.membreNom ?? "—"}`, MARGIN + 8, y + 16);
+    .text(beneficiaireNom || "—", MARGIN + 8, y + 16);
   doc.fontSize(8).fillColor(GRIS).font("Helvetica")
-    .text(`CNI : ${row.membreCni ?? "—"}   |   Tél : ${row.membreTel ?? "—"}`, MARGIN + 8, y + 30);
+    .text(
+      isFournisseurExterne
+        ? `CNI : ${row.fournisseurCni ?? "—"}   |   Tél : ${row.fournisseurTel ?? "—"}`
+        : `CNI : ${row.membreCni ?? "—"}   |   Tél : ${row.membreTel ?? "—"}`,
+      MARGIN + 8,
+      y + 30,
+    );
   y += 60;
 
   doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold").text("DÉTAILS DU PAIEMENT", MARGIN, y);

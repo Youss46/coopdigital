@@ -328,4 +328,23 @@ describe("generateRecuPaiement (real PDF generation) — receipt number in PDF o
     // The PAY-{id} fallback must NOT appear anywhere in the output
     expect(text).not.toContain(`PAY-${String(PAIEMENT_ID).padStart(5, "0")}`);
   });
+
+  it("displays the external supplier identity on the payment receipt", async () => {
+    setupDbSelect(makePaiementRow({
+      membreNom: null,
+      membrePrenoms: null,
+      membreCni: null,
+      membreTel: null,
+      fournisseurNom: "VINI",
+      fournisseurPrenoms: "Junior",
+      fournisseurCni: "CI987654",
+      fournisseurTel: "+22507080910",
+    }));
+    const buf = await generateRecuPaiement(PAIEMENT_ID, 1);
+    const text = extractPdfText(buf);
+
+    expect(text).toContain("Junior VINI");
+    expect(text).toContain("CI987654");
+    expect(text).toContain("+22507080910");
+  });
 });
