@@ -116,20 +116,39 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
     ] = await Promise.all([
       db.select({ t: sql<number>`coalesce(sum(poids_kg::numeric),0)::float` })
         .from(livraisonsTable)
-        .innerJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
-        .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(livraisonsTable.dateLivraison, today))),
+        .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+        .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
+        .where(and(
+          or(
+            eq(membresTable.cooperativeId, cooperativeId),
+            eq(fournisseursTable.cooperativeId, cooperativeId),
+          ),
+          eq(livraisonsTable.dateLivraison, today),
+        )),
 
       db.select({ t: sql<number>`coalesce(sum(poids_kg::numeric),0)::float` })
         .from(livraisonsTable)
-        .innerJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
-        .where(and(eq(membresTable.cooperativeId, cooperativeId), gte(livraisonsTable.dateLivraison, weekStart))),
+        .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+        .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
+        .where(and(
+          or(
+            eq(membresTable.cooperativeId, cooperativeId),
+            eq(fournisseursTable.cooperativeId, cooperativeId),
+          ),
+          gte(livraisonsTable.dateLivraison, weekStart),
+        )),
 
       campagneId
         ? db.select({ t: sql<number>`coalesce(sum(poids_kg::numeric),0)::float` })
             .from(livraisonsTable)
+            .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+            .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
             .where(and(
               eq(livraisonsTable.campagneId, campagneId),
-              isNull(livraisonsTable.peseurId),
+              or(
+                eq(membresTable.cooperativeId, cooperativeId),
+                eq(fournisseursTable.cooperativeId, cooperativeId),
+              ),
             ))
         : Promise.resolve([{ t: 0 }]),
 
@@ -148,8 +167,15 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
           tonnage: sql<number>`coalesce(sum(poids_kg::numeric),0)::float`,
         })
         .from(livraisonsTable)
-        .innerJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
-        .where(and(eq(membresTable.cooperativeId, cooperativeId), gte(livraisonsTable.dateLivraison, thirtyDaysAgo)))
+        .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+        .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
+        .where(and(
+          or(
+            eq(membresTable.cooperativeId, cooperativeId),
+            eq(fournisseursTable.cooperativeId, cooperativeId),
+          ),
+          gte(livraisonsTable.dateLivraison, thirtyDaysAgo),
+        ))
         .groupBy(livraisonsTable.dateLivraison)
         .orderBy(livraisonsTable.dateLivraison),
 
@@ -667,9 +693,14 @@ export async function getComparaisonCampagnesPca(req: Request, res: Response): P
           db
             .select({ tonnageKg: sql<number>`coalesce(sum(${livraisonsTable.poidsKg}::numeric), 0)::float` })
             .from(livraisonsTable)
+            .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+            .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
             .where(and(
               eq(livraisonsTable.campagneId, c.id),
-              isNull(livraisonsTable.peseurId),
+              or(
+                eq(membresTable.cooperativeId, cooperativeId),
+                eq(fournisseursTable.cooperativeId, cooperativeId),
+              ),
             )),
           db
             .select({ tonnageKg: sql<number>`coalesce(sum(${transfertsStockTable.poidsArrivee_kg}::numeric), 0)::float` })
@@ -709,11 +740,14 @@ export async function getComparaisonCampagnesPca(req: Request, res: Response): P
         const [[livraisonsRow], [transfertsRow], [avRow], [membresRow], [caRow]] = await Promise.all([
           db.select({ t: sql<number>`coalesce(sum(poids_kg::numeric),0)::float` })
             .from(livraisonsTable)
-            .innerJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+            .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+            .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
             .where(and(
-              eq(membresTable.cooperativeId, cooperativeId),
               eq(livraisonsTable.campagneId, c.id),
-              isNull(livraisonsTable.peseurId),
+              or(
+                eq(membresTable.cooperativeId, cooperativeId),
+                eq(fournisseursTable.cooperativeId, cooperativeId),
+              ),
             )),
           db.select({ t: sql<number>`coalesce(sum(poids_arrivee_kg::numeric),0)::float` })
             .from(transfertsStockTable)
