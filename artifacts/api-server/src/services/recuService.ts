@@ -1,19 +1,24 @@
-import { db, cooperativesTable, entrepotsDeleguesTable } from "@workspace/db";
+import { db, entrepotsDeleguesTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 
 /**
- * Génère un numéro de réçu séquentiel par coopérative, format REC-YYYY-NNNNN.
- * L'incrément est atomique (UPDATE ... RETURNING) — pas de double attribution.
+ * Génère un numéro de reçu séquentiel global, format REC-YYYY-NNNNN.
+ *
+ * `paiements.numero_recu` possède une contrainte UNIQUE globale, alors que les
+ * coopératives sont des tenants distincts. Un compteur par coopérative pouvait
+ * donc générer le même numéro dans deux coopératives. La séquence PostgreSQL
+ * garantit une attribution atomique et sans collision entre tous les tenants.
+ *
  * Les gaps sont acceptables (rollback d'une transaction parente, etc.).
  */
-export async function genererNumeroRecu(cooperativeId: number): Promise<string> {
-  const [updated] = await db
-    .update(cooperativesTable)
-    .set({ dernierNumeroRecu: sql`dernier_numero_recu + 1` })
-    .where(eq(cooperativesTable.id, cooperativeId))
-    .returning({ n: cooperativesTable.dernierNumeroRecu });
-
-  const n = updated?.n ?? 1;
+export async function genererNumeroRecu(_cooperativeId: number): Promise<string> {
+  const result = await db.execute<{ n: string | number }>(
+    sql`SELECT nextval('numero_recu_global_seq') AS n`,
+  );
+  const n = Number(result.rows[0]?.n);
+  if (!Number.isInteger(n) || n < 1) {
+    throw new Error("Impossible de générer un numéro de reçu");
+  }
   const year = new Date().getFullYear();
   return `REC-${year}-${String(n).padStart(5, "0")}`;
 }

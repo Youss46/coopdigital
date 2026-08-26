@@ -876,6 +876,13 @@
       "when": 1788482100000,
       "tag": "0124_gps_wgs84",
       "breakpoints": true
+    },
+    {
+      "idx": 125,
+      "version": "7",
+      "when": 1788482200000,
+      "tag": "0125_numero_recu_global_seq",
+      "breakpoints": true
     }
   ]
 }

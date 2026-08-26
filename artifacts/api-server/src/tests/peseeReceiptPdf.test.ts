@@ -206,13 +206,11 @@ function makePaiementRow(overrides: Partial<Record<string, unknown>> = {}) {
 
 describe("genererNumeroRecu (real implementation) — REC-YYYY-NNNNN format", () => {
   beforeEach(() => {
-    vi.mocked(db.update).mockReset();
+    vi.mocked(db.execute).mockReset();
   });
 
   it("returns REC-<currentYear>-00042 when the DB counter returns n=42", async () => {
-    vi.mocked(db.update).mockReturnValueOnce(
-      makeUpdateChain([{ n: 42 }]) as unknown as ReturnType<typeof db.update>,
-    );
+    vi.mocked(db.execute).mockResolvedValueOnce({ rows: [{ n: 42 }] } as never);
 
     const result = await genererNumeroRecu(1);
     const year = new Date().getFullYear();
@@ -222,9 +220,7 @@ describe("genererNumeroRecu (real implementation) — REC-YYYY-NNNNN format", ()
   });
 
   it("returns REC-<year>-00001 when the DB counter returns n=1 (first ever reçu)", async () => {
-    vi.mocked(db.update).mockReturnValueOnce(
-      makeUpdateChain([{ n: 1 }]) as unknown as ReturnType<typeof db.update>,
-    );
+    vi.mocked(db.execute).mockResolvedValueOnce({ rows: [{ n: 1 }] } as never);
 
     const result = await genererNumeroRecu(1);
     const year = new Date().getFullYear();
@@ -233,26 +229,20 @@ describe("genererNumeroRecu (real implementation) — REC-YYYY-NNNNN format", ()
     expect(result).not.toMatch(/^PAY-/);
   });
 
-  it("falls back to n=1 when the DB returns an empty array (safety net)", async () => {
-    // Simulates a race where UPDATE touches 0 rows
-    vi.mocked(db.update).mockReturnValueOnce(
-      makeUpdateChain([]) as unknown as ReturnType<typeof db.update>,
+  it("fails explicitly when the sequence returns no value", async () => {
+    vi.mocked(db.execute).mockResolvedValueOnce({ rows: [] } as never);
+
+    await expect(genererNumeroRecu(1)).rejects.toThrow(
+      "Impossible de générer un numéro de reçu",
     );
-
-    const result = await genererNumeroRecu(1);
-    const year = new Date().getFullYear();
-
-    expect(result).toBe(`REC-${year}-00001`);
   });
 
-  it("calls db.update exactly once per invocation", async () => {
-    vi.mocked(db.update).mockReturnValueOnce(
-      makeUpdateChain([{ n: 7 }]) as unknown as ReturnType<typeof db.update>,
-    );
+  it("calls the global sequence exactly once per invocation", async () => {
+    vi.mocked(db.execute).mockResolvedValueOnce({ rows: [{ n: 7 }] } as never);
 
     await genererNumeroRecu(99);
 
-    expect(vi.mocked(db.update)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(db.execute)).toHaveBeenCalledTimes(1);
   });
 });
 
