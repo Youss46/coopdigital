@@ -16,6 +16,7 @@ import { envoyerPushGroupePortail } from "./pushService.js";
 import { entrerStockSiDelegue, getEntrepotDuDelegue } from "./entrepotDelegueService.js";
 import { computeCodeMembre } from "./portailService.js";
 import { isCertificationCacao } from "../lib/certificationCacao.js";
+import { generateEcrituresLivraison } from "./comptabiliteService.js";
 
 function toNum(v: unknown): number {
   return Number(v ?? 0);
@@ -606,6 +607,23 @@ export async function enregistrerCollecte(
       .where(eq(fournisseursTable.id, fournisseurId));
     membreNom = fourn ? `${fourn.nom} ${fourn.prenoms ?? ""}`.trim() : "";
   }
+
+  // Constater l'achat cacao immédiatement après la création de la livraison.
+  // Le règlement reste différé et produira son écriture séparément lors de sa
+  // validation. Ce chemin terrain doit donc proposer uniquement les écritures
+  // liées à la livraison, comme les contrôleurs classiques et les sessions.
+  void generateEcrituresLivraison(cooperativeId, {
+    livraisonId: livraison.id,
+    membreId: membreId ?? undefined,
+    fournisseurId: fournisseurId ?? undefined,
+    membreNom,
+    montantBrutFcfa: livraison.montantBrutFcfa,
+    avanceDeduiteFcfa: livraison.avanceDeduiteFcfa,
+    montantNetFcfa: livraison.montantNetFcfa,
+    dateLivraison: livraison.dateLivraison,
+  }).catch((err: unknown) => {
+    logger.error({ err, livraisonId: livraison.id }, "Erreur génération écritures livraison terrain");
+  });
 
   if (fournisseurId && entrepotFournisseurExt) {
     await db.insert(mouvementsStockTable).values({
