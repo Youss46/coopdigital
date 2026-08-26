@@ -664,6 +664,7 @@ export default function ExpeditionDetailPage() {
               <div>
                 <Label>Nombre de sacs reçus</Label>
                 <NumericInput
+                  decimal={false}
                   min="0"
                   value={nombreSacsRecu}
                   onChange={setNombreSacsRecu}
@@ -680,7 +681,7 @@ export default function ExpeditionDetailPage() {
               </div>
               <div>
                 <Label>Frais transport (FCFA)</Label>
-                <NumericInput value={fraisTransport} onChange={setFraisTransport} placeholder="50000" />
+                <NumericInput decimal={false} value={fraisTransport} onChange={setFraisTransport} placeholder="50000" />
               </div>
             </div>
 
@@ -712,7 +713,8 @@ export default function ExpeditionDetailPage() {
                   </div>
                   <div>
                     <Label className="text-xs text-orange-700">Nombre de sacs refoulés</Label>
-                    <NumericInput
+                  <NumericInput
+                    decimal={false}
                       min="0"
                       value={nombreSacsRefoul}
                       onChange={setNombreSacsRefoul}

@@ -527,7 +527,7 @@ export default function BonsReceptionMembresDeleguesPage() {
                 </div>
                 <div>
                   <label style={labelStyle}>Nombre de sacs déclarés</label>
-                  <NumericInput min="0" step="1" value={form.nombreSacsDeclares}
+                  <NumericInput decimal={false} min="0" step="1" value={form.nombreSacsDeclares}
                     onChange={v => setForm(f => ({ ...f, nombreSacsDeclares: v }))}
                     style={inputStyle} placeholder="ex. 50" />
                 </div>

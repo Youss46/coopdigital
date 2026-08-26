@@ -14,6 +14,7 @@ import {
 } from "@workspace/api-client-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { NumericInput } from "@/components/ui/numeric-input";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 function fcfa(n: number | null | undefined): string {
@@ -184,11 +185,11 @@ function ProjectionCampagneTab({ campagneId }: { campagneId: number }) {
             ].map(({ key, label, placeholder }) => (
               <label key={key} className="block">
                 <span className="text-xs text-gray-600 block mb-1">{label}</span>
-                <input
-                  type="number"
+                <NumericInput
+                  decimal={false}
                   placeholder={placeholder}
                   value={hypoForm[key as keyof typeof hypoForm]}
-                  onChange={(e) => setHypoForm((f) => ({ ...f, [key]: e.target.value }))}
+                  onChange={(v) => setHypoForm((f) => ({ ...f, [key]: v }))}
                   className="border rounded-lg px-3 py-2 text-sm w-full"
                 />
               </label>

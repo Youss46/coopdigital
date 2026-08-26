@@ -429,6 +429,7 @@ function TabConfig({ peutConfigurer }: { peutConfigurer: boolean }) {
     <div>
       <label className="block text-xs font-medium text-gray-600 mb-1">{label}{unit ? ` (${unit})` : ""}</label>
       {field.includes("poids") || field.includes("montant") || field === "avance_max_fcfa" ? <NumericInput
+        decimal={false}
         disabled={!peutConfigurer}
         className={INPUT_CLS + (peutConfigurer ? "" : " opacity-60 cursor-not-allowed")}
         value={numVal(field)}

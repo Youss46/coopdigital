@@ -663,7 +663,7 @@ export default function StationService() {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
                   <div className="t-field">
                     <label className="t-label">Quantité livrée (L) *</label>
-                    <NumericInput decimal className="t-input" style={{ height: 48, fontSize: "1rem" }}
+                    <NumericInput decimal={false} className="t-input" style={{ height: 48, fontSize: "1rem" }}
                       step="0.1" min="0" max={bon.quantite_autorisee + 1}
                       placeholder={`Max ${bon.quantite_autorisee} L`}
                       value={form.quantite_livree}

@@ -188,6 +188,7 @@ export default function ExportateursPage() {
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Nombre de sacs *</label>
                    <NumericInput
+                    decimal={false}
                     value={formRefus.nombreSacsRefoules}
                      onChange={(v) => setFormRefus((f) => ({ ...f, nombreSacsRefoules: v }))}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
@@ -415,6 +416,7 @@ export default function ExportateursPage() {
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Nombre de sacs *</label>
                    <NumericInput
+                    decimal={false}
                     value={formRefus.nombreSacsRefoules}
                      onChange={(v) => setFormRefus((f) => ({ ...f, nombreSacsRefoules: v }))}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"

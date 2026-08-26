@@ -320,7 +320,7 @@ export default function FormationsRsePage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nb participants</label>
-                <NumericInput min="0"
+                <NumericInput decimal={false} min="0"
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   value={form.nbParticipants ?? ""}
                   onChange={(v) => setForm({ ...form, nbParticipants: v ? parseInt(v) : null })}
@@ -328,7 +328,7 @@ export default function FormationsRsePage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">dont Femmes</label>
-                <NumericInput min="0"
+                <NumericInput decimal={false} min="0"
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   value={form.nbFemmes ?? ""}
                   onChange={(v) => setForm({ ...form, nbFemmes: v ? parseInt(v) : null })}

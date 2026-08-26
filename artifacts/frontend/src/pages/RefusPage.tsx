@@ -20,6 +20,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { usePermission } from "@/hooks/usePermission";
 import { useToast } from "@/hooks/use-toast";
+import { NumericInput } from "@/components/ui/numeric-input";
 
 const INPUT_CLS =
   "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white";
@@ -208,12 +209,12 @@ function TraiterModal({ refusId, poidsKg, onClose, onDone }: TraiterModalProps) 
               {/* Prix unitaire */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Prix unitaire (FCFA/kg) *</label>
-                <input
-                  type="number"
+                <NumericInput
+                  decimal={false}
                   className={INPUT_CLS}
                   placeholder="Ex: 850"
                   value={form.prixUnitaireNouveauFcfa ?? ""}
-                  onChange={(e) => field("prixUnitaireNouveauFcfa", parseInt(e.target.value))}
+                  onChange={(v) => field("prixUnitaireNouveauFcfa", v ? parseInt(v) : undefined)}
                 />
                 {prix > 0 && (
                   <p className="text-xs text-green-700 font-medium mt-1">

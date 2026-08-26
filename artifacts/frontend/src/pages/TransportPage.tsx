@@ -407,7 +407,7 @@ function TabFlotte() {
             </div>
             <div>
               <Label>Kilométrage actuel</Label>
-              <NumericInput value={form.kilometrage_actuel} onChange={v => setForm(f => ({ ...f, kilometrage_actuel: v }))} />
+              <NumericInput decimal={false} value={form.kilometrage_actuel} onChange={v => setForm(f => ({ ...f, kilometrage_actuel: v }))} />
             </div>
             <div>
               <Label>Année fabrication</Label>
@@ -423,7 +423,7 @@ function TabFlotte() {
             </div>
             <div>
               <Label>Prochain entretien (km)</Label>
-              <NumericInput value={form.prochain_entretien_km} onChange={v => setForm(f => ({ ...f, prochain_entretien_km: v }))} />
+              <NumericInput decimal={false} value={form.prochain_entretien_km} onChange={v => setForm(f => ({ ...f, prochain_entretien_km: v }))} />
             </div>
             <div>
               <Label>Prochain entretien (date)</Label>
@@ -917,7 +917,7 @@ function TabMissions() {
             )}
             <div>
               <Label>Kilométrage départ</Label>
-              <NumericInput value={form.kilometrage_depart} onChange={v => setForm(f => ({ ...f, kilometrage_depart: v }))} />
+              <NumericInput decimal={false} value={form.kilometrage_depart} onChange={v => setForm(f => ({ ...f, kilometrage_depart: v }))} />
             </div>
             <div className="col-span-2">
               <Label>Observations</Label>
@@ -942,7 +942,7 @@ function TabMissions() {
             </div>
             <div>
               <Label>Kilométrage arrivée *</Label>
-              <NumericInput value={terminerForm.kilometrage_arrivee} onChange={v => setTerminerForm(f => ({ ...f, kilometrage_arrivee: v }))} />
+              <NumericInput decimal={false} value={terminerForm.kilometrage_arrivee} onChange={v => setTerminerForm(f => ({ ...f, kilometrage_arrivee: v }))} />
             </div>
             <div>
               <Label>Poids chargé (kg) *</Label>
@@ -1437,7 +1437,7 @@ function TabMaintenance() {
             </div>
             <div>
               <Label>Kilom. a l'entretien</Label>
-              <NumericInput value={form.kilometrage_entretien} onChange={v => setForm(f => ({ ...f, kilometrage_entretien: v }))} placeholder="ex : 45 000" />
+            <NumericInput decimal={false} value={form.kilometrage_entretien} onChange={v => setForm(f => ({ ...f, kilometrage_entretien: v }))} placeholder="ex : 45 000" />
             </div>
             <div>
               <Label>Cout (FCFA)</Label>
@@ -1449,7 +1449,7 @@ function TabMaintenance() {
             </div>
             <div>
               <Label>Prochain entretien (km)</Label>
-              <NumericInput value={form.prochain_entretien_km} onChange={v => setForm(f => ({ ...f, prochain_entretien_km: v }))} placeholder="ex : 50 000" />
+            <NumericInput decimal={false} value={form.prochain_entretien_km} onChange={v => setForm(f => ({ ...f, prochain_entretien_km: v }))} placeholder="ex : 50 000" />
             </div>
             <div>
               <Label>Prochain entretien (date)</Label>
@@ -2031,7 +2031,7 @@ function TabCarburant() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Prix au litre (FCFA)</Label>
-                 <NumericInput min={0} step="any" placeholder="Prix/L" value={uForm.prix_litre_fcfa}
+                 <NumericInput decimal={false} min={0} step="any" placeholder="Prix/L" value={uForm.prix_litre_fcfa}
                    onChange={v => setUForm(f => ({ ...f, prix_litre_fcfa: v }))} />
               </div>
               <div>

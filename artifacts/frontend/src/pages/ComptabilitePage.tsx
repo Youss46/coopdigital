@@ -3141,9 +3141,10 @@ function OngletCloture() {
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Stock final cacao (FCFA) <span className="text-gray-400">— optionnel</span></label>
-            <input
-              type="number" value={stock} min={0}
-              onChange={(e) => setStock(e.target.value)}
+            <MoneyInput
+              value={stock}
+              min={0}
+              onChange={setStock}
               placeholder="Laisser vide si non applicable"
               className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700 w-52"
             />

@@ -15,6 +15,7 @@ import {
   getGetLivraisonsNonLoteesQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { NumericInput } from "@/components/ui/numeric-input";
 import {
   QrCode,
   Package,
@@ -1266,12 +1267,12 @@ export default function TracabilitePage() {
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   Quantité cible (kg)
                 </label>
-                <input
-                  type="number"
+                <NumericInput
+                  decimal={false}
                   min="1"
                   step="100"
                   value={quantiteCibleInput}
-                  onChange={(e) => setQuantiteCibleInput(e.target.value)}
+                  onChange={setQuantiteCibleInput}
                   onKeyDown={(e) => e.key === "Enter" && handleAutoSelect()}
                   placeholder="ex : 45000"
                   className="w-full border border-green-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700 bg-white"
@@ -1375,11 +1376,11 @@ export default function TracabilitePage() {
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   Nombre de sacs (optionnel)
                 </label>
-                <input
-                  type="number"
+                <NumericInput
+                  decimal={false}
                   min="1"
                   value={nombreSacsInput}
-                  onChange={(e) => setNombreSacsInput(e.target.value)}
+                  onChange={setNombreSacsInput}
                   placeholder="ex : 250"
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
                 />

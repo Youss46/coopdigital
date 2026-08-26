@@ -514,6 +514,7 @@ export default function NouvelleExpeditionPage() {
             <div>
               <Label>Nombre de sacs *</Label>
               <NumericInput
+                decimal={false}
                 value={nombreSacs}
                 onChange={v => { setNombreSacs(v); }}
                 placeholder="370"

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { openPdfViewer } from "@/lib/pdfViewer";
 import { MoneyInput } from "@/components/ui/money-input";
+import { NumericInput } from "@/components/ui/numeric-input";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Gift, ArrowUpCircle, ArrowDownCircle, TrendingUp, Plus, Loader2,
@@ -288,7 +289,7 @@ function ModalNouveauDon({ sens, categories, onClose, onSuccess }: ModalDonProps
                     </div>
                     <div className="col-span-2">
                       {i === 0 && <p className="text-xs text-muted-foreground mb-1">Qté</p>}
-                      <input type="number" min="0" value={l.quantite} onChange={(e) => updateLigne(i, { quantite: parseFloat(e.target.value) || 0 })} className={`${inputCls} text-xs`} />
+                      <NumericInput min="0" value={l.quantite} onChange={(v) => updateLigne(i, { quantite: parseFloat(v) || 0 })} className={`${inputCls} text-xs`} />
                     </div>
                     <div className="col-span-2">
                       {i === 0 && <p className="text-xs text-muted-foreground mb-1">Unité</p>}

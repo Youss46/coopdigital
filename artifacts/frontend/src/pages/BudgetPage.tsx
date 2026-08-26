@@ -223,10 +223,10 @@ function OngletHypotheses({
                   placeholder={placeholder}
                 />
               ) : (
-                <input
-                  type="number"
+                <NumericInput
+                  decimal={false}
                   value={form[key as keyof typeof form]}
-                  onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                  onChange={(v) => setForm((f) => ({ ...f, [key]: v }))}
                   disabled={!peutModifier}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700 disabled:bg-gray-50"
                   placeholder={placeholder}

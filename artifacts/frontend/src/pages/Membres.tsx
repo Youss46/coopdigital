@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { NumericInput } from "@/components/ui/numeric-input";
 import { usePermission } from "@/hooks/usePermission";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -1018,8 +1019,8 @@ export default function Membres() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Parts souscrites</label>
-                  <input type="number" min="0" step="1" value={((form as Record<string, unknown>)["nbrePartsSouscrites"] as string) ?? ""}
-                    onChange={(e) => setForm({ ...form, ...{ nbrePartsSouscrites: e.target.value } } as typeof form)}
+                  <NumericInput decimal={false} min="0" step="1" value={((form as Record<string, unknown>)["nbrePartsSouscrites"] as string) ?? ""}
+                    onChange={(v) => setForm({ ...form, ...{ nbrePartsSouscrites: v } } as typeof form)}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1" />
                 </div>
               </div>

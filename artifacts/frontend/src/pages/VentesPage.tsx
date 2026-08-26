@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { MoneyInput } from "@/components/ui/money-input";
+import { NumericInput } from "@/components/ui/numeric-input";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -717,12 +718,12 @@ export default function VentesPage() {
                         )}
                       </div>
                       <div className="flex gap-2">
-                        <input
-                          type="number"
+                        <NumericInput
+                          decimal={false}
                           min="1"
                           step="100"
                           value={quantiteCibleVente}
-                          onChange={e => { setQuantiteCibleVente(e.target.value); setAutoPreview(null); }}
+                          onChange={v => { setQuantiteCibleVente(v); setAutoPreview(null); }}
                           onKeyDown={e => e.key === "Enter" && handleAutoPreview()}
                           placeholder="ex : 45000"
                           className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
@@ -785,8 +786,8 @@ export default function VentesPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Poids vendu (kg) *</label>
-                    <input type="number" step="0.01" value={form.poidsKg}
-                      onChange={e => setForm(f => ({ ...f, poidsKg: e.target.value }))}
+                    <NumericInput step="0.01" value={form.poidsKg}
+                      onChange={v => setForm(f => ({ ...f, poidsKg: v }))}
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" placeholder="18 500" />
                   </div>
                   <div>
@@ -822,7 +823,7 @@ export default function VentesPage() {
 
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Nombre de sacs</label>
-                  <input type="number" min="0" value={form.nombreSacs} onChange={e => setForm(f => ({ ...f, nombreSacs: e.target.value }))}
+                  <NumericInput decimal={false} min="0" value={form.nombreSacs} onChange={v => setForm(f => ({ ...f, nombreSacs: v }))}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" placeholder="0" />
                 </div>
 
@@ -909,7 +910,7 @@ export default function VentesPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Nombre de sacs</label>
-                    <input type="number" min="0" value={formFourn.nombreSacs} onChange={e => setFormFourn(f => ({ ...f, nombreSacs: e.target.value }))}
+                    <NumericInput decimal={false} min="0" value={formFourn.nombreSacs} onChange={v => setFormFourn(f => ({ ...f, nombreSacs: v }))}
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600" placeholder="0" />
                   </div>
                   <div>
@@ -972,10 +973,10 @@ export default function VentesPage() {
             <div className="px-6 py-5 space-y-4">
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Montant encaissé (FCFA) *</label>
-                <input
-                  type="number"
+                <NumericInput
+                  decimal={false}
                   value={montantEncaisse}
-                  onChange={e => setMontantEncaisse(e.target.value)}
+                  onChange={setMontantEncaisse}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
                   placeholder="Montant reçu"
                   autoFocus

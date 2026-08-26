@@ -1948,6 +1948,7 @@ export default function MembreFiche() {
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Nombre de parcelles</label>
                     <NumericInput
+                      decimal={false}
                       min="0"
                       step="1"
                       value={editForm.nombreParcelles}

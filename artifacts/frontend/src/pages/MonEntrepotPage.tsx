@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { NumericInput } from "@/components/ui/numeric-input";
 import {
   Warehouse, Package, TrendingDown, TrendingUp, AlertTriangle,
   Plus, CheckCircle2, Clock, Truck, ArrowRight, History, RefreshCw,
@@ -363,9 +364,9 @@ export default function MonEntrepotPage() {
             <div className="space-y-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Poids pesé au départ (kg) *</label>
-                <input type="number" step="0.01" placeholder="0.00"
+                <NumericInput step="0.01" placeholder="0.00"
                   value={formDepart.poidsDepart_kg}
-                  onChange={(e) => setFormDepart(f => ({ ...f, poidsDepart_kg: e.target.value }))}
+                  onChange={v => setFormDepart(f => ({ ...f, poidsDepart_kg: v }))}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500" />
               </div>
               <div>

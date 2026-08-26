@@ -867,6 +867,7 @@ export default function StocksPage() {
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Quantité (nombre de sacs)</label>
                 <NumericInput
+                  decimal={false}
                   step="1"
                   min="0"
                   value={form.nombreSacs}

@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { openPdfViewer } from "@/lib/pdfViewer";
 import { MoneyInput } from "@/components/ui/money-input";
+import { NumericInput } from "@/components/ui/numeric-input";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   GraduationCap, Plus, Users, CheckCircle, Clock, MapPin,
@@ -353,7 +354,7 @@ function ModalSession({ onClose, onSaved }: { onClose: () => void; onSaved: () =
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-gray-700 mb-1 block">Nb places</label>
-              <input type="number" min="1" value={form.nbPlaces} onChange={set("nbPlaces")} placeholder="50"
+              <NumericInput decimal={false} min="1" value={form.nbPlaces} onChange={(v) => setForm((f) => ({ ...f, nbPlaces: v }))} placeholder="50"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
             </div>
             <div>

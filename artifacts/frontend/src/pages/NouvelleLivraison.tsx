@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation, Link } from "wouter";
 import { MoneyInput } from "@/components/ui/money-input";
+import { NumericInput } from "@/components/ui/numeric-input";
 import {
   useCreateLivraison,
   useGetMembres,
@@ -462,25 +463,24 @@ export default function NouvelleLivraison() {
               <label className="block text-xs font-medium text-gray-600 mb-1">
                 {doublePeseeRequise ? "1ère pesée (kg) *" : "Poids brut (kg) *"}
               </label>
-              <input
+              <NumericInput
                 required
-                type="number"
                 min="0.1"
                 step="0.1"
                 value={poidsKg}
-                onChange={(e) => setPoidsKg(e.target.value)}
+                onChange={setPoidsKg}
                 placeholder="120.5"
                 className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
               />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Nombre de sacs</label>
-              <input
-                type="number"
+              <NumericInput
+                decimal={false}
                 min="0"
                 step="1"
                 value={nombreSacs}
-                onChange={(e) => setNombreSacs(e.target.value)}
+                onChange={setNombreSacs}
                 placeholder="4"
                 className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
               />
@@ -502,12 +502,11 @@ export default function NouvelleLivraison() {
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   2ème pesée (kg) {doublePeseeRequise ? "*" : ""}
                 </label>
-                <input
-                  type="number"
+                <NumericInput
                   min="0"
                   step="0.1"
                   value={poids2eme}
-                  onChange={(e) => setPoids2eme(e.target.value)}
+                  onChange={setPoids2eme}
                   placeholder="121.0"
                   className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none ${ecartExcessif ? "border-red-300 bg-red-50" : "border-gray-200"}`}
                 />
@@ -560,12 +559,11 @@ export default function NouvelleLivraison() {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Retenue / tare (kg)</label>
-              <input
-                type="number"
+              <NumericInput
                 min="0"
                 step="0.1"
                 value={retenueKg}
-                onChange={(e) => setRetenueKg(e.target.value)}
+                onChange={setRetenueKg}
                 placeholder="0.0"
                 className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
               />

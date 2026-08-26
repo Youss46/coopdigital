@@ -1,3 +1,4 @@
+import { NumericInput } from "@/components/ui/numeric-input";
 import { useState, useEffect } from "react";
 import { openPdfViewer } from "@/lib/pdfViewer";
 import {
@@ -487,9 +488,9 @@ export default function CampagnesPage() {
                 </div>
                 <div className="col-span-2">
                   <label className="block text-xs font-medium text-gray-600 mb-1">Objectif de collecte (kg) <span className="text-gray-400 font-normal">(optionnel)</span></label>
-                  <input type="number" min="0" className={INPUT_CLS} placeholder="Ex : 500000"
+                  <NumericInput min="0" className={INPUT_CLS} placeholder="Ex : 500000"
                     value={(form as { tonnageCibleKg?: string | null }).tonnageCibleKg ?? ""}
-                    onChange={e => handleField("tonnageCibleKg" as keyof CampagneInput, e.target.value || null)} />
+                    onChange={v => handleField("tonnageCibleKg" as keyof CampagneInput, v || null)} />
                 </div>
               </div>
               <div className="flex justify-end gap-3">

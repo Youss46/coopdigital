@@ -216,7 +216,7 @@ function CertifForm({ initial, onSubmit, onCancel, loading }: {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Membres couverts</label>
-              <NumericInput min="0" className="w-full border rounded-lg px-3 py-2 text-sm" value={form.nbMembresCouVerts} onChange={v => set("nbMembresCouVerts", v)} />
+              <NumericInput decimal={false} min="0" className="w-full border rounded-lg px-3 py-2 text-sm" value={form.nbMembresCouVerts} onChange={v => set("nbMembresCouVerts", v)} />
             </div>
           </div>
           <div>

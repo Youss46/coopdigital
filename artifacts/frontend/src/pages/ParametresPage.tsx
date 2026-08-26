@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 import { openPdfViewer } from "@/lib/pdfViewer";
 import { MoneyInput } from "@/components/ui/money-input";
+import { NumericInput } from "@/components/ui/numeric-input";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetConfig,
@@ -810,7 +811,7 @@ export default function ParametresPage() {
               </div>
               <div>
                 <Label>Nombre de parts minimum</Label>
-                <Input type="number" disabled={!canEdit} value={v("nbre_parts_min")} onChange={(e) => set("nbre_parts_min", e.target.value)} />
+                <NumericInput decimal={false} disabled={!canEdit} value={v("nbre_parts_min")} onChange={(raw) => set("nbre_parts_min", raw)} />
               </div>
               <div>
                 <Label>Cotisation annuelle (FCFA)</Label>

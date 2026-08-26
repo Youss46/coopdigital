@@ -1384,7 +1384,7 @@ export default function DeleguesLocalitesPage() {
               {formPlan.planType === "partiel" && (
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Montant par paiement (FCFA) *</label>
-                  <input type="number" min="1" value={formPlan.montantPartiel} onChange={e => setFormPlan(f => ({ ...f, montantPartiel: e.target.value }))}
+                  <MoneyInput min="1" value={formPlan.montantPartiel} onChange={value => setFormPlan(f => ({ ...f, montantPartiel: value }))}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
                 </div>
               )}
@@ -1477,10 +1477,9 @@ export default function DeleguesLocalitesPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Montant (FCFA) *</label>
-                      <input
-                        type="number"
+                      <MoneyInput
                         value={formOctroi.montant}
-                        onChange={e => setFormOctroi(f => ({ ...f, montant: e.target.value }))}
+                        onChange={value => setFormOctroi(f => ({ ...f, montant: value }))}
                         className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]"
                         placeholder="50 000"
                       />
@@ -1616,10 +1615,9 @@ export default function DeleguesLocalitesPage() {
                                 <label className="block text-xs text-gray-500 mb-1">
                                   Montant (FCFA) — solde : {formaterMontant(a.soldeRestantFcfa)}
                                 </label>
-                                <input
-                                  type="number"
+                                <MoneyInput
                                   value={formRembours.montant}
-                                  onChange={e => setFormRembours(f => ({ ...f, montant: e.target.value }))}
+                                  onChange={value => setFormRembours(f => ({ ...f, montant: value }))}
                                   className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]"
                                   placeholder="Montant"
                                   min="1"

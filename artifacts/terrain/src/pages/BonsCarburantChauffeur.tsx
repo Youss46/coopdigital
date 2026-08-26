@@ -476,7 +476,7 @@ export default function BonsCarburantChauffeur() {
               <div className="t-field">
                 <label className="t-label">Prix au litre (FCFA)</label>
                 <NumericInput
-                  decimal
+                  decimal={false}
                   className="t-input"
                   min={0} step="any" placeholder="Prix/L"
                   value={form.prix_litre_fcfa}
