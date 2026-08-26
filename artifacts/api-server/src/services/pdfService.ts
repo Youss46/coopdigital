@@ -4023,6 +4023,7 @@ export async function generateBordereauAchatSession(
       bonReceptionId:     sessionsPeseeTable.bonReceptionId,
       livraisonId:        sessionsPeseeTable.livraisonId,
       membreId:           sessionsPeseeTable.membreId,
+       fournisseurId:      sessionsPeseeTable.fournisseurId,
       certificationCacao: sessionsPeseeTable.certificationCacao,
       peseurNom:          peseurUserAlias.nom,
       peseurPrenoms:      peseurUserAlias.prenoms,
@@ -4498,6 +4499,9 @@ export async function generateBordereauAchatSession(
     : "Cacao");
   fieldRow("Ouverture",     formaterDateHeure(session.createdAt));
   fieldRow("Clôture",       session.dateFin ? formaterDateHeure(session.dateFin) : "—");
+  if (estDelegueMembre || session.fournisseurId != null) {
+    fieldRow("Nombre de passages", String(lignes.length));
+  }
   fieldRow("Statut paiement", libelleStatutPaiement(livraisonReglement?.statutPaiement));
 
   const leftBottom = y;
