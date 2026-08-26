@@ -1510,46 +1510,59 @@ export async function creerLivraisonDepuisSession(
     return { livraison: livraison!, paiement: paiement!, isFournisseur };
   });
 
-  // Écritures OHADA — fire-and-forget, hors transaction
-  // Pour les fournisseurs externes : pas d'écritures OHADA sur le compte membre (4010)
-  if (!result.isFournisseur) {
-    void (async () => {
-      try {
+  // Écritures OHADA — fire-and-forget, hors transaction.
+  // Les fournisseurs externes doivent également constater la dette 401 :
+  // seul le périmètre des déductions (avances/intrants) est réservé aux membres.
+  void (async () => {
+    try {
+      let nomTiers = "—";
+      if (result.isFournisseur && result.livraison.fournisseurId) {
+        const [fournisseur] = await db
+          .select({ nom: fournisseursTable.nom, prenoms: fournisseursTable.prenoms })
+          .from(fournisseursTable)
+          .where(eq(fournisseursTable.id, result.livraison.fournisseurId))
+          .limit(1);
+        nomTiers = fournisseur
+          ? `${fournisseur.nom} ${fournisseur.prenoms ?? ""}`.trim()
+          : `Fournisseur externe #${result.livraison.fournisseurId}`;
+      } else if (result.livraison.membreId) {
         const [membre] = await db
           .select({ nom: membresTable.nom, prenoms: membresTable.prenoms })
           .from(membresTable)
-          .where(eq(membresTable.id, result.livraison.membreId!))
+          .where(eq(membresTable.id, result.livraison.membreId))
           .limit(1);
-
-        // Déterminer si le délégué (agentId) a reçu des alimentations de caisse
-        // coopérative avant la session → montantCoopFcfa pour la ventilation 601/521 vs 601/401.
-        let montantCoopFcfa = 0;
-        const delegueId = result.livraison.agentId;
-        if (delegueId) {
-          const cutoff = result.livraison.dateLivraison
-            ? new Date(result.livraison.dateLivraison)
-            : new Date();
-          montantCoopFcfa = await getMontantAlimentationsCaisseDelegue(
-            delegueId, cooperativeId, cutoff,
-          );
-        }
-
-        await generateEcrituresLivraison(cooperativeId, {
-          livraisonId:       result.livraison.id,
-          membreId:          result.livraison.membreId ?? undefined,
-          membreNom:         membre ? `${membre.nom} ${membre.prenoms}` : "—",
-          montantBrutFcfa:   result.livraison.montantBrutFcfa,
-          avanceDeduiteFcfa: result.livraison.avanceDeduiteFcfa,
-          montantNetFcfa:    result.livraison.montantNetFcfa,
-          dateLivraison:     result.livraison.dateLivraison,
-          montantCoopFcfa:   montantCoopFcfa > 0 ? montantCoopFcfa : undefined,
-        });
-      } catch (err) {
-        // Ne pas bloquer la réponse — l'écriture sera visible dans les anomalies comptables
-        console.error("[peseeSession] generateEcrituresLivraison failed", err);
+        nomTiers = membre ? `${membre.nom} ${membre.prenoms ?? ""}`.trim() : "—";
       }
-    })();
-  }
+
+      // Une alimentation de caisse délégué ne concerne que les livraisons
+      // de membres collectées par ce délégué, jamais un fournisseur externe.
+      let montantCoopFcfa = 0;
+      const delegueId = result.livraison.agentId;
+      if (!result.isFournisseur && delegueId) {
+        const cutoff = result.livraison.dateLivraison
+          ? new Date(result.livraison.dateLivraison)
+          : new Date();
+        montantCoopFcfa = await getMontantAlimentationsCaisseDelegue(
+          delegueId, cooperativeId, cutoff,
+        );
+      }
+
+      await generateEcrituresLivraison(cooperativeId, {
+        livraisonId:       result.livraison.id,
+        membreId:          result.livraison.membreId ?? undefined,
+        fournisseurId:     result.livraison.fournisseurId ?? undefined,
+        membreNom:         nomTiers,
+        montantBrutFcfa:   result.livraison.montantBrutFcfa,
+        avanceDeduiteFcfa: result.livraison.avanceDeduiteFcfa,
+        montantNetFcfa:    result.livraison.montantNetFcfa,
+        dateLivraison:     result.livraison.dateLivraison,
+        montantCoopFcfa:   montantCoopFcfa > 0 ? montantCoopFcfa : undefined,
+      });
+    } catch (err) {
+      // Ne pas bloquer la réponse — l'écriture sera visible dans les anomalies comptables
+      console.error("[peseeSession] generateEcrituresLivraison failed", err);
+    }
+  })();
 
   // ── Entrée stock — fire-and-forget ──────────────────────────────────────
   // Règle : fournisseur externe → entrepôt dédié pisteurs/fournisseurs externes
