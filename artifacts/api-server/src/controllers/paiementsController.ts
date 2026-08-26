@@ -203,7 +203,7 @@ async function debiterCaisseCentralePaiement(
   montantFcfa: number,
   paiementId: number,
   userId: number | null | undefined,
-  opts?: { compteDebitOverride?: string; libelle?: string },
+  opts?: { compteDebitOverride?: string; libelle?: string; skipAccounting?: boolean },
 ): Promise<void> {
   try {
     const [caisse] = await db
@@ -230,6 +230,7 @@ async function debiterCaisseCentralePaiement(
       libelle: opts?.libelle ?? `Paiement producteur — règlement #${paiementId}`,
       userId: userId ?? undefined,
       compteDebitOverride: opts?.compteDebitOverride,
+      skipAccounting: opts?.skipAccounting,
     });
 
     // Notifier si le solde passe sous le fond minimum configuré

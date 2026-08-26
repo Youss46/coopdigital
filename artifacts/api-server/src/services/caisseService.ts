@@ -841,7 +841,7 @@ export async function debiterCaisseParResponsable(
   montantFcfa: number,
   paiementId: number,
   livraisonId: number | null,
-  opts?: { compteDebitOverride?: string; libelle?: string },
+  opts?: { compteDebitOverride?: string; libelle?: string; skipAccounting?: boolean },
 ): Promise<{ nouveauSolde: number; alerte?: string }> {
   const [caisse] = await db
     .select()
@@ -869,6 +869,7 @@ export async function debiterCaisseParResponsable(
     referenceOperation: `PAI-${paiementId}`,
     userId,
     compteDebitOverride: opts?.compteDebitOverride,
+    skipAccounting: opts?.skipAccounting,
   });
 
   logger.info(
