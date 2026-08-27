@@ -379,7 +379,9 @@ function EtatCaisses({ caisses, loading, refetch, onJournal }: {
 }) {
   const { toast } = useToast();
   const { utilisateur } = useAuth();
-  const peutCreerCaisse = !["delegue", "caissier"].includes(utilisateur?.role ?? "");
+  const role = utilisateur?.role ?? "";
+  const peutEcrire = !["comptable", "auditeur"].includes(role);
+  const peutCreerCaisse = ["pca", "directeur"].includes(role);
   const [modalMvt, setModalMvt] = useState<number | null>(null);
   const [modalFermer, setModalFermer] = useState<number | null>(null);
   const [modalCreer, setModalCreer] = useState(false);
@@ -460,7 +462,7 @@ function EtatCaisses({ caisses, loading, refetch, onJournal }: {
             className="flex items-center justify-center gap-1 px-3 py-2 sm:py-1.5 border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50">
             <ChevronRight size={12} /> Journal
           </button>
-          {!ouvert ? (
+          {peutEcrire && (!ouvert ? (
             <button onClick={() => ouvrirSession(c.id)}
               className="flex items-center justify-center gap-1 px-3 py-2 sm:py-1.5 bg-green-600 text-white rounded-lg text-xs hover:bg-green-700">
               <Unlock size={12} /> Ouvrir
@@ -480,7 +482,7 @@ function EtatCaisses({ caisses, loading, refetch, onJournal }: {
                 <Lock size={12} /> Fermer
               </button>
             </>
-          )}
+          ))}
         </div>
       </div>
     );
@@ -673,6 +675,8 @@ function ModalTransfert({
 
 function JournalCaisse({ caisses, initCaisseId }: { caisses: Caisse[] | null; initCaisseId?: number }) {
   const { toast } = useToast();
+  const { utilisateur } = useAuth();
+  const peutEcrire = !["comptable", "auditeur"].includes(utilisateur?.role ?? "");
   const today = new Date().toISOString().slice(0, 10);
   const [caisseId, setCaisseId] = useState<number | "">(initCaisseId ?? (caisses?.[0]?.id ?? ""));
   const [date, setDate] = useState(today);
@@ -756,13 +760,13 @@ function JournalCaisse({ caisses, initCaisseId }: { caisses: Caisse[] | null; in
       {/* Actions session */}
       {caisseId && (
         <div className="flex flex-wrap gap-2 mb-4">
-          {!sessionOuverte && date === today && (
+          {peutEcrire && !sessionOuverte && date === today && (
             <button onClick={ouvrirSession}
               className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">
               <Unlock size={14} /> Ouvrir la session du jour
             </button>
           )}
-          {sessionOuverte && (
+          {peutEcrire && sessionOuverte && (
             <>
               <button onClick={() => setModalMvt(true)}
                 className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
@@ -1398,6 +1402,7 @@ function CaissesDelegueesTab({ caisses }: { caisses: Caisse[] | null }) {
 export default function CaissePage() {
   const { utilisateur } = useAuth();
   const isDelegue = utilisateur?.role === "delegue";
+  const isComptable = utilisateur?.role === "comptable";
 
   const [tab, setTab] = useState<"etat" | "journal" | "historique" | "delegues">("etat");
   const [journalCaisseId, setJournalCaisseId] = useState<number | undefined>();
@@ -1430,7 +1435,7 @@ export default function CaissePage() {
     { id: "etat" as const,        label: "État des caisses" },
     { id: "journal" as const,     label: "Journal de caisse" },
     { id: "historique" as const,  label: "Historique sessions" },
-    ...(!isDelegue ? [{ id: "delegues" as const, label: "Caisses déléguées" }] : []),
+    ...(!isDelegue && !isComptable ? [{ id: "delegues" as const, label: "Caisses déléguées" }] : []),
   ];
 
   return (
@@ -1472,7 +1477,7 @@ export default function CaissePage() {
       {tab === "historique" && (
         <HistoriqueSessions caisses={caisses} />
       )}
-      {tab === "delegues" && !isDelegue && (
+      {tab === "delegues" && !isDelegue && !isComptable && (
         <CaissesDelegueesTab caisses={caisses} />
       )}
     </div>

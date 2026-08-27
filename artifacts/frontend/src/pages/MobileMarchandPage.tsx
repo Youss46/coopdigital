@@ -69,7 +69,7 @@ export default function MobileMarchandPage() {
   const { toast } = useToast();
   const role = utilisateur?.role ?? "";
   const peutCreer = ["pca", "directeur"].includes(role);
-  const peutMouvement = ["pca", "directeur", "comptable", "caissier"].includes(role);
+  const peutMouvement = ["pca", "directeur", "caissier"].includes(role);
 
   const [comptes, setComptes] = useState<Compte[]>([]);
   const [loading, setLoading] = useState(false);

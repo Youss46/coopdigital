@@ -63,8 +63,9 @@ interface Mouvement {
 export default function BanquePage() {
   const { toast }       = useToast();
   const { utilisateur } = useAuth();
-  const canEdit   = utilisateur?.role !== "auditeur";
-  const canCreate = !["auditeur", "caissier"].includes(utilisateur?.role ?? "");
+  const role       = utilisateur?.role ?? "";
+  const canEdit    = !["auditeur", "comptable"].includes(role);
+  const canCreate  = ["pca", "directeur"].includes(role);
 
   const [comptes,         setComptes]         = useState<Compte[]>([]);
   const [selected,        setSelected]        = useState<Compte | null>(null);
