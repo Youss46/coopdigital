@@ -85,6 +85,11 @@ interface GpsTrackerState {
   error: string | null;
 }
 
+export interface AutoCaptureOptions {
+  minDistanceM: number;
+  maxAccuracyM: number;
+}
+
 export function useGpsTracker() {
   const [state, setState] = useState<GpsTrackerState>({
     points: [],
@@ -97,6 +102,7 @@ export function useGpsTracker() {
   const watchIdRef = useRef<number | null>(null);
   const pointsRef = useRef<GpsPoint[]>([]);
   const historyRef = useRef<GpsPoint[][]>([]);
+  const autoLastPointRef = useRef<GpsPoint | null>(null);
   const [historyLength, setHistoryLength] = useState(0);
 
   const recordBeforeChange = useCallback((points: GpsPoint[]) => {
@@ -144,6 +150,36 @@ export function useGpsTracker() {
     setState((s) => ({ ...s, points: nextPoints }));
   }, [recordBeforeChange]);
 
+  /**
+   * Ajoute une position au polygone uniquement si elle est suffisamment
+   * précise et éloignée du dernier point capturé automatiquement.
+   *
+   * Le dernier point est conservé dans une ref afin que des positions GPS
+   * successives ne dépendent pas d'un rendu React intermédiaire.
+   * Retourne le numéro du point ajouté, ou null si la position est ignorée.
+   */
+  const captureAutoPoint = useCallback((point: GpsPoint, options: AutoCaptureOptions): number | null => {
+    if ((point.accuracy ?? Infinity) > options.maxAccuracyM) return null;
+
+    const normalizedPoint = normalizeGpsPoint(point);
+    const previous = autoLastPointRef.current;
+    if (
+      previous &&
+      haversineDistance(previous.lat, previous.lon, normalizedPoint.lat, normalizedPoint.lon) < options.minDistanceM
+    ) {
+      return null;
+    }
+
+    const pointNumber = pointsRef.current.length + 1;
+    autoLastPointRef.current = normalizedPoint;
+    addPoint(normalizedPoint);
+    return pointNumber;
+  }, [addPoint]);
+
+  const resetAutoCapture = useCallback(() => {
+    autoLastPointRef.current = null;
+  }, []);
+
   const insertPoint = useCallback((index: number, point: GpsPoint) => {
     const points = [...pointsRef.current];
     recordBeforeChange(pointsRef.current);
@@ -182,6 +218,7 @@ export function useGpsTracker() {
     historyRef.current = [];
     setHistoryLength(0);
     pointsRef.current = [];
+    autoLastPointRef.current = null;
     setState((s) => ({ ...s, points: [] }));
   }, []);
 
@@ -195,6 +232,7 @@ export function useGpsTracker() {
     const restoredHistory = history.map((snapshot) => snapshot.map(normalizeGpsPoint));
     pointsRef.current = restoredPoints;
     historyRef.current = restoredHistory;
+    autoLastPointRef.current = restoredPoints.at(-1) ?? null;
     setHistoryLength(restoredHistory.length);
     setState((s) => ({ ...s, points: restoredPoints }));
   }, []);
@@ -204,6 +242,8 @@ export function useGpsTracker() {
     startTracking,
     stopTracking,
     addPoint,
+    captureAutoPoint,
+    resetAutoCapture,
     insertPoint,
     replacePoint,
     removePoint,
