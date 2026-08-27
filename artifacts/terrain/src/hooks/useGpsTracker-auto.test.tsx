@@ -80,6 +80,7 @@ describe("capture automatique du tracker GPS", () => {
       });
     });
     expect(pointNumber).toBeNull();
+    expect(tracker!.autoIgnoredAccuracy).toBe(20);
 
     await act(async () => {
       pointNumber = tracker!.captureAutoPoint(point(5.3101, 10), {
@@ -89,6 +90,35 @@ describe("capture automatique du tracker GPS", () => {
     });
     expect(pointNumber).toBe(2);
     expect(tracker!.points[1]?.accuracy).toBe(10);
+    expect(tracker!.autoIgnoredAccuracy).toBeNull();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("conserve le dernier point capturé après une pause puis reprend à 8 mètres", async () => {
+    await renderTracker();
+
+    await act(async () => {
+      tracker!.captureAutoPoint(point(5.31), {
+        minDistanceM: 8,
+        maxAccuracyM: 15,
+      });
+    });
+
+    // Pendant la pause, aucune position n'est proposée au captureur automatique.
+    // Le dernier point de référence reste donc le premier point.
+    expect(tracker!.points).toHaveLength(1);
+
+    let pointNumber: number | null;
+    await act(async () => {
+      pointNumber = tracker!.captureAutoPoint(point(5.31008), {
+        minDistanceM: 8,
+        maxAccuracyM: 15,
+      });
+    });
+    expect(pointNumber).toBe(2);
+    expect(tracker!.points).toHaveLength(2);
 
     await act(async () => root.unmount());
     container.remove();

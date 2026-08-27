@@ -782,6 +782,15 @@ export default function CollecteGps() {
                 🛰️ Mode automatique prêt — marchez autour de la parcelle. Le premier point sera ajouté dès qu'une position précise est disponible.
               </div>
             )}
+            {autoMode && gps.autoIgnoredAccuracy !== null && (
+              <div
+                role="status"
+                aria-live="polite"
+                style={{ background: "#f59e0b22", border: "1px solid #f59e0b44", borderRadius: 8, padding: "8px 10px", fontSize: ".78rem", color: "#fbbf24", marginBottom: 10 }}
+              >
+                ⚠️ Position ignorée — précision ±{gps.autoIgnoredAccuracy.toFixed(0)} m (maximum accepté : {AUTO_PRECISION_SEUIL} m). Le tracé reprend dès que le signal s'améliore.
+              </div>
+            )}
             {autoMode && gps.points.length > 0 && (
               <div style={{ background: "#2563eb18", border: "1px solid #2563eb44", borderRadius: 8, padding: "8px 10px", fontSize: ".78rem", color: "#60a5fa", marginBottom: 10 }}>
                 🛰️ Tracé automatique actif — marchez autour de la parcelle. Un point est ajouté tous les {AUTO_DISTANCE_MIN} m environ.

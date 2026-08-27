@@ -82,6 +82,7 @@ interface GpsTrackerState {
   currentPos: GpsPoint | null;
   isTracking: boolean;
   accuracy: number | null;
+  autoIgnoredAccuracy: number | null;
   error: string | null;
 }
 
@@ -96,6 +97,7 @@ export function useGpsTracker() {
     currentPos: null,
     isTracking: false,
     accuracy: null,
+    autoIgnoredAccuracy: null,
     error: null,
   });
 
@@ -159,7 +161,14 @@ export function useGpsTracker() {
    * Retourne le numéro du point ajouté, ou null si la position est ignorée.
    */
   const captureAutoPoint = useCallback((point: GpsPoint, options: AutoCaptureOptions): number | null => {
-    if ((point.accuracy ?? Infinity) > options.maxAccuracyM) return null;
+    if ((point.accuracy ?? Infinity) > options.maxAccuracyM) {
+      setState((s) => s.autoIgnoredAccuracy === point.accuracy
+        ? s
+        : { ...s, autoIgnoredAccuracy: point.accuracy ?? Infinity });
+      return null;
+    }
+
+    setState((s) => s.autoIgnoredAccuracy === null ? s : { ...s, autoIgnoredAccuracy: null });
 
     const normalizedPoint = normalizeGpsPoint(point);
     const previous = autoLastPointRef.current;
@@ -219,7 +228,7 @@ export function useGpsTracker() {
     setHistoryLength(0);
     pointsRef.current = [];
     autoLastPointRef.current = null;
-    setState((s) => ({ ...s, points: [] }));
+    setState((s) => ({ ...s, points: [], autoIgnoredAccuracy: null }));
   }, []);
 
   const clearHistory = useCallback(() => {
