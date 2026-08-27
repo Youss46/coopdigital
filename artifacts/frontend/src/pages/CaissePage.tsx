@@ -380,7 +380,7 @@ function EtatCaisses({ caisses, loading, refetch, onJournal }: {
   const { toast } = useToast();
   const { utilisateur } = useAuth();
   const role = utilisateur?.role ?? "";
-  const peutEcrire = !["comptable", "auditeur"].includes(role);
+  const peutEcrire = role !== "auditeur";
   const peutCreerCaisse = ["pca", "directeur"].includes(role);
   const [modalMvt, setModalMvt] = useState<number | null>(null);
   const [modalFermer, setModalFermer] = useState<number | null>(null);
@@ -676,7 +676,7 @@ function ModalTransfert({
 function JournalCaisse({ caisses, initCaisseId }: { caisses: Caisse[] | null; initCaisseId?: number }) {
   const { toast } = useToast();
   const { utilisateur } = useAuth();
-  const peutEcrire = !["comptable", "auditeur"].includes(utilisateur?.role ?? "");
+  const peutEcrire = utilisateur?.role !== "auditeur";
   const today = new Date().toISOString().slice(0, 10);
   const [caisseId, setCaisseId] = useState<number | "">(initCaisseId ?? (caisses?.[0]?.id ?? ""));
   const [date, setDate] = useState(today);

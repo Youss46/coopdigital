@@ -53,17 +53,19 @@ describe("périmètre du comptable", () => {
     expect(hasPermission("comptable", "tracabilite", "lire")).toBe(false);
   });
 
-  it("conserve la lecture seule sur caisse, banque, mobile marchand et chèques", () => {
+  it("autorise les opérations de trésorerie sans autoriser la création des comptes", () => {
     for (const [module, actionLecture, actionsEcriture] of [
-      ["caisse", "voir", ["ouvrir_session", "enregistrer_mvt", "fermer_session", "creer_caisse"]],
-      ["banque", "voir", ["creer", "enregistrer_mvt", "rapprocher"]],
-      ["mobile_marchand", "voir", ["creer", "enregistrer_mvt"]],
+      ["caisse", "voir", ["ouvrir_session", "enregistrer_mvt", "fermer_session"]],
+      ["banque", "voir", ["enregistrer_mvt", "rapprocher"]],
+      ["mobile_marchand", "voir", ["enregistrer_mvt"]],
       ["cheques", "lire", ["creer", "modifier", "encaisser", "rejeter", "annuler"]],
     ] as const) {
       expect(hasPermission("comptable", module, actionLecture)).toBe(true);
-      for (const action of actionsEcriture) {
-        expect(hasPermission("comptable", module, action)).toBe(false);
-      }
+      for (const action of actionsEcriture) expect(hasPermission("comptable", module, action)).toBe(true);
     }
+
+    expect(hasPermission("comptable", "caisse", "creer_caisse")).toBe(false);
+    expect(hasPermission("comptable", "banque", "creer")).toBe(false);
+    expect(hasPermission("comptable", "mobile_marchand", "creer")).toBe(false);
   });
 });

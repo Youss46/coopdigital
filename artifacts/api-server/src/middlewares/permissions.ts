@@ -303,34 +303,34 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
   // MODULE — CHÈQUES ÉMIS
   cheques: {
     lire:      ["pca", "directeur", "comptable", "caissier", "auditeur"],
-    creer:     ["pca", "directeur", "caissier"],
-    modifier:  ["pca", "directeur", "caissier"],
-    encaisser: ["pca", "directeur", "caissier"],
-    rejeter:   ["pca", "directeur"],
-    annuler:   ["pca", "directeur"],
+    creer:     ["pca", "directeur", "comptable", "caissier"],
+    modifier:  ["pca", "directeur", "comptable", "caissier"],
+    encaisser: ["pca", "directeur", "comptable", "caissier"],
+    rejeter:   ["pca", "directeur", "comptable"],
+    annuler:   ["pca", "directeur", "comptable"],
   },
 
   // MODULE — COMPTES BANCAIRES
   banque: {
     voir:             ["pca", "directeur", "comptable", "caissier", "auditeur"],
     creer:            ["pca", "directeur"],
-    enregistrer_mvt:  ["pca", "directeur", "caissier"],
-    rapprocher:       ["pca", "directeur"],
+    enregistrer_mvt:  ["pca", "directeur", "comptable", "caissier"],
+    rapprocher:       ["pca", "directeur", "comptable"],
   },
 
   // MODULE — COMPTES MOBILES MARCHANDS
   mobile_marchand: {
     voir:            ["pca", "directeur", "comptable", "caissier", "auditeur"],
     creer:           ["pca", "directeur"],
-    enregistrer_mvt: ["pca", "directeur", "caissier"],
+    enregistrer_mvt: ["pca", "directeur", "comptable", "caissier"],
   },
 
   // MODULE — GESTION DE CAISSE
   caisse: {
     voir:             ["pca", "directeur", "comptable", "caissier", "auditeur", "delegue"],
-    ouvrir_session:   ["pca", "directeur", "caissier", "delegue"],
-    enregistrer_mvt:  ["pca", "directeur", "caissier", "delegue"],
-    fermer_session:   ["pca", "directeur", "caissier", "delegue"],
+    ouvrir_session:   ["pca", "directeur", "comptable", "caissier", "delegue"],
+    enregistrer_mvt:  ["pca", "directeur", "comptable", "caissier", "delegue"],
+    fermer_session:   ["pca", "directeur", "comptable", "caissier", "delegue"],
     creer_caisse:     ["pca", "directeur"],
     voir_alertes:     ["pca", "directeur", "comptable", "caissier", "delegue"],
   },

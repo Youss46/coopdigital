@@ -64,7 +64,9 @@ export default function BanquePage() {
   const { toast }       = useToast();
   const { utilisateur } = useAuth();
   const role       = utilisateur?.role ?? "";
-  const canEdit    = !["auditeur", "comptable"].includes(role);
+  const canMouvement = ["pca", "directeur", "comptable", "caissier"].includes(role);
+  const canRapprocher = ["pca", "directeur", "comptable"].includes(role);
+  const canEdit    = canMouvement || canRapprocher;
   const canCreate  = ["pca", "directeur"].includes(role);
 
   const [comptes,         setComptes]         = useState<Compte[]>([]);
@@ -203,34 +205,40 @@ export default function BanquePage() {
         <div className="flex flex-wrap gap-2">
           {selected && canEdit && (
             <>
-              <button
-                onClick={() => setShowVirementMobile(true)}
-                className="flex items-center gap-1.5 px-2.5 py-2 text-xs sm:text-sm border border-green-300 text-green-700 rounded-lg hover:bg-green-50 whitespace-nowrap"
-              >
-                <ArrowRightLeft className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Virt. </span>Mobile
-              </button>
-              <button
-                onClick={() => setShowVirementCaisse(true)}
-                className="flex items-center gap-1.5 px-2.5 py-2 text-xs sm:text-sm border border-amber-300 text-amber-700 rounded-lg hover:bg-amber-50 whitespace-nowrap"
-              >
-                <Wallet className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Virt. </span>Caisse
-              </button>
-              <button
-                onClick={() => setShowRapprochement(true)}
-                className="flex items-center gap-1.5 px-2.5 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg hover:bg-gray-50 whitespace-nowrap"
-              >
-                <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
-                <span className="hidden xs:inline">Rapprocher</span>
-              </button>
-              <button
-                onClick={() => setShowMouvement(true)}
-                className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 whitespace-nowrap"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Mouvement
-              </button>
+              {canMouvement && (
+                <>
+                  <button
+                    onClick={() => setShowVirementMobile(true)}
+                    className="flex items-center gap-1.5 px-2.5 py-2 text-xs sm:text-sm border border-green-300 text-green-700 rounded-lg hover:bg-green-50 whitespace-nowrap"
+                  >
+                    <ArrowRightLeft className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Virt. </span>Mobile
+                  </button>
+                  <button
+                    onClick={() => setShowVirementCaisse(true)}
+                    className="flex items-center gap-1.5 px-2.5 py-2 text-xs sm:text-sm border border-amber-300 text-amber-700 rounded-lg hover:bg-amber-50 whitespace-nowrap"
+                  >
+                    <Wallet className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Virt. </span>Caisse
+                  </button>
+                  <button
+                    onClick={() => setShowMouvement(true)}
+                    className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 whitespace-nowrap"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Mouvement
+                  </button>
+                </>
+              )}
+              {canRapprocher && (
+                <button
+                  onClick={() => setShowRapprochement(true)}
+                  className="flex items-center gap-1.5 px-2.5 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg hover:bg-gray-50 whitespace-nowrap"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                  <span className="hidden xs:inline">Rapprocher</span>
+                </button>
+              )}
             </>
           )}
           {!selected && canCreate && (
