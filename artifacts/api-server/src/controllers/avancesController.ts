@@ -445,15 +445,51 @@ export async function rembourserAvance(req: Request, res: Response): Promise<voi
         .select()
         .from(avancesTable)
         .where(eq(avancesTable.id, id))
+        .for("update")
         .limit(1);
       if (!avanceFraiche || avanceFraiche.statut === "rembourse" || avanceFraiche.soldeRestantFcfa <= 0) {
         throw new Error("Cette avance est déjà remboursée");
       }
 
+      const [caisse] = await tx
+        .select()
+        .from(caissesTable)
+        .where(and(
+          eq(caissesTable.cooperativeId, cooperativeId),
+          eq(caissesTable.typeCaisse, "centrale"),
+          eq(caissesTable.actif, true),
+        ))
+        .for("update")
+        .limit(1);
+      if (!caisse) throw new Error("Aucune caisse centrale active n'est configurée.");
+
+      const [session] = await tx
+        .select()
+        .from(sessionsCaisseTable)
+        .where(and(
+          eq(sessionsCaisseTable.caisseId, caisse.id),
+          eq(sessionsCaisseTable.statut, "ouverte"),
+        ))
+        .orderBy(desc(sessionsCaisseTable.id))
+        .for("update")
+        .limit(1);
+      if (!session) throw new Error("Aucune session de caisse ouverte pour la caisse centrale.");
+
       const montantReel = Math.min(montantFcfa, avanceFraiche.soldeRestantFcfa);
       const nouveauRembourse = avanceFraiche.montantRembourse_fcfa + montantReel;
       const nouveauSolde = avanceFraiche.soldeRestantFcfa - montantReel;
       const nouveauStatut = nouveauSolde === 0 ? "rembourse" : "en_cours";
+      const soldeCaisse = Number(caisse.soldeActuelFcfa);
+      const nouveauSoldeCaisse = soldeCaisse + montantReel;
+
+      const [remboursement] = await tx.insert(remboursementsAvancesMembresTable).values({
+        avanceId: id,
+        montantFcfa: montantReel,
+        note: typeof req.body?.note === "string" && req.body.note.trim()
+          ? req.body.note.trim().slice(0, 500)
+          : "Remboursement manuel",
+      }).returning({ id: remboursementsAvancesMembresTable.id });
+
       const [updated] = await tx
         .update(avancesTable)
         .set({
@@ -464,20 +500,30 @@ export async function rembourserAvance(req: Request, res: Response): Promise<voi
         .where(eq(avancesTable.id, id))
         .returning();
 
-      await tx.insert(remboursementsAvancesMembresTable).values({
-        avanceId: id,
-        montantFcfa: montantReel,
-        note: typeof req.body?.note === "string" && req.body.note.trim()
-          ? req.body.note.trim().slice(0, 500)
-          : "Remboursement manuel",
+      await tx.insert(mouvementsCaisseTable).values({
+        caisseId: caisse.id,
+        sessionId: session.id,
+        cooperativeId,
+        type: "entree",
+        motif: "remboursement",
+        montantFcfa: String(montantReel),
+        libelle: `Remboursement avance AVA-${id}`,
+        referenceOperation: `AVA-${id}-RMB-${remboursement?.id ?? "MANUEL"}`,
+        soldeApresFcfa: String(nouveauSoldeCaisse),
+        enregistrePar: req.user?.id ?? null,
       });
+      await tx.update(caissesTable)
+        .set({ soldeActuelFcfa: String(nouveauSoldeCaisse) })
+        .where(eq(caissesTable.id, caisse.id));
       return updated!;
     });
 
     res.json(avanceMaj);
   } catch (err) {
     req.log.error({ err }, "Erreur rembourserAvance");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    const erreur = apiError(err);
+    const estErreurMetier = err instanceof Error && !err.message.startsWith("Failed query:");
+    res.status(estErreurMetier ? 400 : 500).json({ erreur });
   }
 }
 
