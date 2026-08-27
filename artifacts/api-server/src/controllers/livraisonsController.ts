@@ -7,7 +7,7 @@ const agentUserAlias = alias(usersTable, "agent_user");
 // Alias pour la jointure peseur saisie physique (proxy délégué central)
 const peseurUserAlias = alias(usersTable, "peseur_user");
 import { creerChequeDepuisLivraison } from "../services/chequesService.js";
-import { eq, and, desc, notInArray, or } from "drizzle-orm";
+import { eq, and, desc, notInArray, or, sql } from "drizzle-orm";
 import { CampagneFermeeError, assertCampagneOuverte } from "../lib/campagneGuard";
 import { checkLivraison, creerAnomalies } from "../services/anomalieService";
 import { CreateLivraisonBody } from "@workspace/api-zod";
@@ -92,7 +92,12 @@ export async function listLivraisons(req: Request, res: Response): Promise<void>
       .leftJoin(agentUserAlias, eq(livraisonsTable.agentId, agentUserAlias.id))
       .leftJoin(peseurUserAlias, eq(livraisonsTable.peseurId, peseurUserAlias.id))
       .where(whereClause)
-      .orderBy(desc(livraisonsTable.dateLivraison))
+      .orderBy(
+        desc(livraisonsTable.dateLivraison),
+        sql`COALESCE(${livraisonsTable.numeroPesee}, 0) DESC`,
+        desc(livraisonsTable.createdAt),
+        desc(livraisonsTable.id),
+      )
       .limit(limit);
 
     res.json(livraisons);
