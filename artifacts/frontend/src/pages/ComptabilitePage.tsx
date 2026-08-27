@@ -2393,9 +2393,16 @@ interface BalanceSageImport {
   feuille: string; statut: string; nombreLignes: number; nombreErreurs: number;
   comptesInconnus: number; compteContrepartie?: string | null; dateReprise?: string | null;
   nombreEcritures?: number | null; createdAt: string;
+  prepareePar?: number | null; prepareeLe?: string | null; prepareeParNom?: string | null; prepareeParRole?: string | null;
+  valideePar?: number | null; valideeLe?: string | null; valideeParNom?: string | null; valideeParRole?: string | null;
 }
 interface BalanceSageDetail extends BalanceSageImport {
   lignes: Array<{ numeroLigne: number; numeroCompte: string; libelle: string; totalDebit: number; totalCredit: number; soldeDebiteur: number; soldeCrediteur: number; compteConnu: boolean; erreur: string | null }>;
+}
+interface BalanceSageAuditEvent {
+  id: number; importId: number; exercice: number; action: "preparation" | "validation";
+  statut: "succes" | "echec"; userId: number | null; userNom: string | null; userRole: string | null;
+  message: string; createdAt: string; nomFichier: string | null;
 }
 interface BalanceSagePreview {
   empreinte: string; feuille: string; headers: string[]; preview: unknown[][];
@@ -2426,6 +2433,15 @@ function OngletImportBalances() {
     queryFn: () => apiFetch<BalanceSageImport[]>(`/api/comptabilite/balances-sage/imports?exercice=${exercice}`),
   });
   const imports = importsQuery.data ?? [];
+  const auditQuery = useQuery({
+    queryKey: ["balances-sage-reprise-audit", exercice, importSelectionne],
+    queryFn: () => {
+      const params = new URLSearchParams({ exercice: String(exercice) });
+      if (importSelectionne !== null) params.set("importId", String(importSelectionne));
+      return apiFetch<BalanceSageAuditEvent[]>(`/api/comptabilite/balances-sage/reprises/audit?${params.toString()}`);
+    },
+  });
+  const auditEvents = auditQuery.data ?? [];
 
   const lireDetail = async (id: number) => {
     try {
@@ -2471,8 +2487,11 @@ function OngletImportBalances() {
       const value = await apiPost<BalanceSagePreparation>(`/api/comptabilite/balances-sage/imports/${detail.id}/preparer-reprise`, { compteContrepartie: contrepartie.trim() });
       setPreparation(value); setDetail({ ...detail, ...value.import });
       void importsQuery.refetch();
+      void auditQuery.refetch();
+      void apiFetch<BalanceSageDetail>(`/api/comptabilite/balances-sage/imports/${detail.id}`).then(setDetail).catch(() => {});
       toast({ title: "Reprise préparée", description: "Contrôlez les écritures proposées avant validation." });
     } catch (err) {
+      void auditQuery.refetch();
       toast({ title: "Préparation impossible", description: (err as Error).message, variant: "destructive" });
     } finally { setActionLoading(false); }
   };
@@ -2484,7 +2503,10 @@ function OngletImportBalances() {
       const value = await apiPost<BalanceSageImport & { message: string }>(`/api/comptabilite/balances-sage/imports/${detail.id}/valider-reprise`, {});
       toast({ title: "Reprise validée", description: value.message });
       setDetail({ ...detail, ...value }); setPreparation(null); void importsQuery.refetch();
+      void auditQuery.refetch();
+      void apiFetch<BalanceSageDetail>(`/api/comptabilite/balances-sage/imports/${detail.id}`).then(setDetail).catch(() => {});
     } catch (err) {
+      void auditQuery.refetch();
       toast({ title: "Validation impossible", description: (err as Error).message, variant: "destructive" });
     } finally { setActionLoading(false); }
   };
@@ -2511,7 +2533,7 @@ function OngletImportBalances() {
 
       <div className="flex items-end gap-3">
         <div><label className="block text-xs font-medium text-gray-500 mb-1">Exercice</label>
-          <select value={exercice} onChange={(e) => { setExercice(Number(e.target.value)); setDetail(null); }} className="border border-gray-200 rounded-lg px-3 py-2 text-sm">
+           <select value={exercice} onChange={(e) => { setExercice(Number(e.target.value)); setDetail(null); setImportSelectionne(null); }} className="border border-gray-200 rounded-lg px-3 py-2 text-sm">
             {Array.from({ length: 6 }, (_, i) => exerciceActuel - i).map((a) => <option key={a}>{a}</option>)}
           </select>
         </div>
@@ -2547,10 +2569,74 @@ function OngletImportBalances() {
       {imports.length === 0 ? <div className="bg-white rounded-xl border border-dashed p-12 text-center text-sm text-gray-500"><FileSpreadsheet className="mx-auto mb-3 text-gray-300" size={36} />Aucune balance Sage importée pour {exercice}.</div> :
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden"><table className="w-full text-sm"><thead className="bg-gray-50"><tr><th className="text-left px-4 py-3 text-xs text-gray-500">Fichier</th><th className="text-left px-4 py-3 text-xs text-gray-500">Mode</th><th className="text-left px-4 py-3 text-xs text-gray-500">État</th><th className="text-right px-4 py-3 text-xs text-gray-500">Lignes</th><th className="px-4 py-3" /></tr></thead><tbody>{imports.map((item) => <tr key={item.id} className="border-t hover:bg-gray-50"><td className="px-4 py-3"><div className="font-medium">{item.nomFichier}</div><div className="text-xs text-gray-400">{new Date(item.createdAt).toLocaleString("fr-FR")}</div></td><td className="px-4 py-3">{item.mode === "historique" ? "Consultation" : "Reprise"}</td><td className="px-4 py-3"><span className={`px-2 py-1 rounded-full text-xs ${statusColor[item.statut] ?? "bg-gray-100 text-gray-600"}`}>{statusLabel[item.statut] ?? item.statut}{item.nombreErreurs ? ` · ${item.nombreErreurs} erreur(s)` : ""}</span></td><td className="px-4 py-3 text-right">{item.nombreLignes}</td><td className="px-4 py-3 text-right"><button onClick={() => void lireDetail(item.id)} className="text-green-700 hover:underline text-xs">Consulter</button></td></tr>)}</tbody></table></div>}
 
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+          <h3 className="text-sm font-semibold text-gray-800">Journal d’audit des reprises</h3>
+          <p className="text-xs text-gray-500 mt-1">
+            {importSelectionne === null ? `Événements de l’exercice ${exercice}` : `Événements de l’import sélectionné · exercice ${exercice}`}
+          </p>
+        </div>
+        {auditQuery.isLoading ? (
+          <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-5 w-5 border-2 border-green-600 border-t-transparent" /></div>
+        ) : auditEvents.length === 0 ? (
+          <p className="px-4 py-8 text-center text-sm text-gray-400">Aucun événement de reprise enregistré pour ce filtre.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead><tr className="border-b border-gray-100">
+                <th className="text-left px-4 py-2.5 font-semibold text-gray-500">Date</th>
+                <th className="text-left px-4 py-2.5 font-semibold text-gray-500">Import</th>
+                <th className="text-left px-4 py-2.5 font-semibold text-gray-500">Événement</th>
+                <th className="text-left px-4 py-2.5 font-semibold text-gray-500">Utilisateur</th>
+                <th className="text-left px-4 py-2.5 font-semibold text-gray-500">Détail</th>
+              </tr></thead>
+              <tbody>
+                {auditEvents.map((event) => {
+                  const actionLabel = event.action === "preparation" ? "Préparation" : "Validation";
+                  const success = event.statut === "succes";
+                  return (
+                    <tr key={event.id} className="border-t border-gray-50 align-top">
+                      <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{new Date(event.createdAt).toLocaleString("fr-FR")}</td>
+                      <td className="px-4 py-3 text-gray-600">
+                        <button className="text-left hover:text-green-700 hover:underline" onClick={() => void lireDetail(event.importId)}>
+                          {event.nomFichier ?? `Import #${event.importId}`}
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full ${success ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+                          {success ? <CheckCircle2 size={11} /> : <AlertTriangle size={11} />}
+                          {success ? actionLabel : `Échec — ${actionLabel.toLowerCase()}`}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{event.userNom ?? (event.userId ? `Utilisateur #${event.userId}` : "Utilisateur inconnu")}</td>
+                      <td className={`px-4 py-3 min-w-64 ${success ? "text-gray-500" : "text-red-700"}`}>{event.message}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       {detail && (
         <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-          <div className="flex items-start justify-between"><div><h3 className="font-semibold text-gray-900">{detail.nomFichier}</h3><p className="text-xs text-gray-500">{detail.mode === "historique" ? "Consultation sans impact sur les écritures" : "Reprise par à-nouveaux"}</p></div><button onClick={() => setDetail(null)}><X size={18} className="text-gray-400" /></button></div>
+           <div className="flex items-start justify-between"><div><h3 className="font-semibold text-gray-900">{detail.nomFichier}</h3><p className="text-xs text-gray-500">{detail.mode === "historique" ? "Consultation sans impact sur les écritures" : "Reprise par à-nouveaux"}</p></div><button onClick={() => { setDetail(null); setImportSelectionne(null); }}><X size={18} className="text-gray-400" /></button></div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm"><div className="bg-gray-50 rounded-lg p-3"><span className="text-xs text-gray-500">Lignes</span><strong className="block">{detail.nombreLignes}</strong></div><div className="bg-gray-50 rounded-lg p-3"><span className="text-xs text-gray-500">Erreurs</span><strong className="block">{detail.nombreErreurs}</strong></div><div className="bg-gray-50 rounded-lg p-3"><span className="text-xs text-gray-500">Comptes inconnus</span><strong className="block">{detail.comptesInconnus}</strong></div><div className="bg-gray-50 rounded-lg p-3"><span className="text-xs text-gray-500">État</span><strong className="block">{statusLabel[detail.statut] ?? detail.statut}</strong></div></div>
+           {detail.mode === "reprise" && (
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+               <div className="rounded-lg border border-purple-100 bg-purple-50/50 px-3 py-2.5">
+                 <p className="text-xs font-semibold text-purple-700">Préparée par</p>
+                 <p className="text-sm text-gray-800 mt-0.5">{detail.prepareeParNom ?? "—"}</p>
+                 <p className="text-xs text-gray-500">{detail.prepareeLe ? new Date(detail.prepareeLe).toLocaleString("fr-FR") : "Pas encore préparée"}</p>
+               </div>
+               <div className="rounded-lg border border-green-100 bg-green-50/50 px-3 py-2.5">
+                 <p className="text-xs font-semibold text-green-700">Validée par</p>
+                 <p className="text-sm text-gray-800 mt-0.5">{detail.valideeParNom ?? "—"}</p>
+                 <p className="text-xs text-gray-500">{detail.valideeLe ? new Date(detail.valideeLe).toLocaleString("fr-FR") : "Pas encore validée"}</p>
+               </div>
+             </div>
+           )}
           <div className="overflow-x-auto max-h-80 border rounded-lg"><table className="w-full text-xs"><thead className="sticky top-0 bg-gray-50"><tr><th className="text-left p-2">Compte</th><th className="text-left p-2">Libellé</th><th className="text-right p-2">Solde débiteur</th><th className="text-right p-2">Solde créditeur</th><th className="text-left p-2">Contrôle</th></tr></thead><tbody>{detail.lignes.map((line) => <tr key={line.numeroLigne} className="border-t"><td className="p-2 font-mono">{line.numeroCompte}</td><td className="p-2">{line.libelle}</td><td className="p-2 text-right">{FCFA(line.soldeDebiteur)}</td><td className="p-2 text-right">{FCFA(line.soldeCrediteur)}</td><td className={`p-2 ${line.erreur ? "text-amber-700" : "text-green-700"}`}>{line.erreur ?? "OK"}</td></tr>)}</tbody></table></div>
           {detail.mode === "reprise" && detail.statut !== "validee" && (
             <div className="border-t pt-4 space-y-3"><div><h4 className="font-semibold text-sm">Préparer les à-nouveaux</h4><p className="text-xs text-gray-500">Le compte de contrepartie doit être présent dans le plan comptable actif.</p></div><div className="flex flex-wrap gap-2"><input value={contrepartie} onChange={(e) => setContrepartie(e.target.value)} placeholder="Compte de contrepartie (ex. 110)" className="border rounded-lg px-3 py-2 text-sm font-mono" /><button onClick={handlePrepare} disabled={actionLoading || detail.statut === "preparee"} className="px-3 py-2 rounded-lg text-white text-sm disabled:opacity-40" style={{ backgroundColor: VERT }}>{detail.statut === "preparee" ? "Reprise préparée" : "Préparer pour contrôle"}</button></div></div>

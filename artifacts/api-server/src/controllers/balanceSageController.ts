@@ -1,14 +1,17 @@
 import { type Request, type Response } from "express";
 import multer from "multer";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import {
   balanceSageImportsTable,
   balanceSageLignesTable,
+  balanceSageRepriseAuditTable,
   db,
   ecrituresComptablesTable,
   exercicesTable,
   planComptableTable,
 } from "@workspace/db";
+import { usersTable } from "@workspace/db";
 import { parseBalanceSage, type BalanceSageMapping } from "../services/balanceSageService.js";
 
 export const balanceSageUpload = multer({
@@ -23,6 +26,34 @@ export const balanceSageUpload = multer({
 
 const tenant = (req: Request): number | null => req.user?.cooperativeId ?? null;
 const userId = (req: Request): number | null => (req.user as { id?: number } | undefined)?.id ?? null;
+const prepareurUser = alias(usersTable, "balance_sage_prepareur");
+const validateurUser = alias(usersTable, "balance_sage_validateur");
+const auditUser = alias(usersTable, "balance_sage_audit_user");
+
+const importWithUsersSelection = {
+  importRow: balanceSageImportsTable,
+  prepareeParNom: sql<string | null>`concat_ws(' ', ${prepareurUser.prenoms}, ${prepareurUser.nom})`,
+  prepareeParRole: prepareurUser.role,
+  valideeParNom: sql<string | null>`concat_ws(' ', ${validateurUser.prenoms}, ${validateurUser.nom})`,
+  valideeParRole: validateurUser.role,
+};
+
+async function enregistrerEchecReprise(
+  req: Request,
+  context: { cooperativeId: number; importId: number; exercice: number; action: "preparation" | "validation" },
+  message: string,
+): Promise<void> {
+  try {
+    await db.insert(balanceSageRepriseAuditTable).values({
+      ...context,
+      statut: "echec",
+      userId: userId(req),
+      message: message.slice(0, 4000),
+    });
+  } catch (auditError) {
+    req.log.error({ err: auditError, importId: context.importId, originalError: message }, "Impossible d'enregistrer l'échec de reprise dans l'audit");
+  }
+}
 
 function bodyMapping(value: unknown): BalanceSageMapping | undefined {
   if (!value) return undefined;
@@ -123,19 +154,29 @@ export async function listBalanceSageImports(req: Request, res: Response): Promi
   const where = exercice
     ? and(eq(balanceSageImportsTable.cooperativeId, cooperativeId), eq(balanceSageImportsTable.exercice, exercice))
     : eq(balanceSageImportsTable.cooperativeId, cooperativeId);
-  res.json(await db.select().from(balanceSageImportsTable).where(where).orderBy(sql`${balanceSageImportsTable.createdAt} DESC`));
+  const rows = await db.select(importWithUsersSelection)
+    .from(balanceSageImportsTable)
+    .leftJoin(prepareurUser, eq(prepareurUser.id, balanceSageImportsTable.prepareePar))
+    .leftJoin(validateurUser, eq(validateurUser.id, balanceSageImportsTable.valideePar))
+    .where(where)
+    .orderBy(sql`${balanceSageImportsTable.createdAt} DESC`);
+  res.json(rows.map(({ importRow, ...users }) => ({ ...importRow, ...users })));
 }
 
 export async function getBalanceSageImport(req: Request, res: Response): Promise<void> {
   const cooperativeId = tenant(req);
   if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
   const id = Number(req.params["id"]);
-  const [imp] = await db.select().from(balanceSageImportsTable)
+  const [importWithUsers] = await db.select(importWithUsersSelection)
+    .from(balanceSageImportsTable)
+    .leftJoin(prepareurUser, eq(prepareurUser.id, balanceSageImportsTable.prepareePar))
+    .leftJoin(validateurUser, eq(validateurUser.id, balanceSageImportsTable.valideePar))
     .where(and(eq(balanceSageImportsTable.id, id), eq(balanceSageImportsTable.cooperativeId, cooperativeId)));
-  if (!imp) { res.status(404).json({ erreur: "Import introuvable" }); return; }
+  if (!importWithUsers) { res.status(404).json({ erreur: "Import introuvable" }); return; }
+  const { importRow: imp, ...users } = importWithUsers;
   const lignes = await db.select().from(balanceSageLignesTable)
     .where(eq(balanceSageLignesTable.importId, id)).orderBy(asc(balanceSageLignesTable.numeroLigne));
-  res.json({ ...imp, lignes });
+  res.json({ ...imp, ...users, lignes });
 }
 
 async function loadImport(req: Request) {
@@ -150,8 +191,10 @@ async function loadImport(req: Request) {
 }
 
 export async function prepareBalanceSageReprise(req: Request, res: Response): Promise<void> {
+  let auditContext: { cooperativeId: number; importId: number; exercice: number; action: "preparation" } | null = null;
   try {
-    const { imp, lignes } = await loadImport(req);
+    const { imp, lignes, cooperativeId } = await loadImport(req);
+    auditContext = { cooperativeId, importId: imp.id, exercice: imp.exercice, action: "preparation" };
     if (imp.mode !== "reprise") throw new Error("Seul un import en mode reprise peut générer des à-nouveaux");
     if (imp.statut === "validee") throw new Error("Cette reprise est déjà validée");
     const compteContrepartie = String(req.body["compteContrepartie"] ?? "").trim();
@@ -160,7 +203,7 @@ export async function prepareBalanceSageReprise(req: Request, res: Response): Pr
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dateReprise)) throw new Error("Date de reprise invalide");
     const plans = await db.select({ numeroCompte: planComptableTable.numeroCompte, libelle: planComptableTable.libelle })
       .from(planComptableTable)
-      .where(and(eq(planComptableTable.cooperativeId, tenant(req)!), eq(planComptableTable.actif, true)));
+      .where(and(eq(planComptableTable.cooperativeId, cooperativeId), eq(planComptableTable.actif, true)));
     const compte = plans.find((p) => p.numeroCompte === compteContrepartie);
     if (!compte) throw new Error("Le compte de contrepartie doit exister dans le plan comptable actif");
     const invalid = lignes.filter((l) => l.erreur || !l.compteConnu || l.numeroCompte === compteContrepartie);
@@ -169,11 +212,19 @@ export async function prepareBalanceSageReprise(req: Request, res: Response): Pr
     const totalCrediteur = lignes.reduce((sum, row) => sum + row.soldeCrediteur, 0);
     if (totalDebiteur !== totalCrediteur) throw new Error(`La reprise n’est pas équilibrée : écart de ${Math.abs(totalDebiteur - totalCrediteur)} FCFA`);
     const nombreEcritures = lignes.filter((l) => l.soldeDebiteur > 0 || l.soldeCrediteur > 0).length;
-    const [updated] = await db.update(balanceSageImportsTable).set({
-      statut: "preparee", compteContrepartie, dateReprise,
-      prepareePar: userId(req), prepareeLe: new Date(), nombreEcritures,
-    }).where(and(eq(balanceSageImportsTable.id, imp.id), eq(balanceSageImportsTable.statut, "importe"))).returning();
-    if (!updated) throw new Error("La reprise a changé d’état, rechargez la page");
+    const updated = await db.transaction(async (tx) => {
+      const [nextImport] = await tx.update(balanceSageImportsTable).set({
+        statut: "preparee", compteContrepartie, dateReprise,
+        prepareePar: userId(req), prepareeLe: new Date(), nombreEcritures,
+      }).where(and(eq(balanceSageImportsTable.id, imp.id), eq(balanceSageImportsTable.statut, "importe"))).returning();
+      if (!nextImport) throw new Error("La reprise a changé d’état, rechargez la page");
+      await tx.insert(balanceSageRepriseAuditTable).values({
+        cooperativeId, importId: imp.id, exercice: imp.exercice,
+        action: "preparation", statut: "succes", userId: userId(req),
+        message: `${nombreEcritures} à-nouveaux préparés avec le compte de contrepartie ${compteContrepartie}.`,
+      });
+      return nextImport;
+    });
     res.json({
       import: updated,
       compteContrepartie: compte,
@@ -188,46 +239,93 @@ export async function prepareBalanceSageReprise(req: Request, res: Response): Pr
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erreur de préparation";
+    if (auditContext) await enregistrerEchecReprise(req, auditContext, message);
     res.status(message === "IMPORT_NOT_FOUND" ? 404 : message === "TENANT_REQUIRED" ? 401 : 422).json({ erreur: message === "IMPORT_NOT_FOUND" ? "Import introuvable" : message });
   }
 }
 
 export async function validateBalanceSageReprise(req: Request, res: Response): Promise<void> {
+  let auditContext: { cooperativeId: number; importId: number; exercice: number; action: "validation" } | null = null;
   try {
     const { imp, lignes, cooperativeId } = await loadImport(req);
+    auditContext = { cooperativeId, importId: imp.id, exercice: imp.exercice, action: "validation" };
     if (imp.mode !== "reprise" || imp.statut !== "preparee" || !imp.compteContrepartie || !imp.dateReprise) {
       throw new Error("La reprise doit être préparée et contrôlée avant validation");
     }
     const [exercice] = await db.select({ statut: exercicesTable.statut }).from(exercicesTable)
       .where(and(eq(exercicesTable.cooperativeId, cooperativeId), eq(exercicesTable.annee, imp.exercice)));
     if (exercice?.statut === "cloture") throw new Error("Impossible de valider une reprise dans un exercice clôturé");
-    const [updated] = await db.update(balanceSageImportsTable).set({
-      statut: "validee", valideePar: userId(req), valideeLe: new Date(),
-    }).where(and(eq(balanceSageImportsTable.id, imp.id), eq(balanceSageImportsTable.statut, "preparee"))).returning();
-    if (!updated) throw new Error("Cette reprise est déjà en cours de validation ou validée");
     const entries = lignes.flatMap((l) => l.soldeDebiteur > 0
       ? [{ debit: l.numeroCompte, credit: imp.compteContrepartie!, montant: l.soldeDebiteur, libelle: `À-nouveau ${imp.exercice} — ${l.libelle}` }]
       : l.soldeCrediteur > 0
         ? [{ debit: imp.compteContrepartie!, credit: l.numeroCompte, montant: l.soldeCrediteur, libelle: `À-nouveau ${imp.exercice} — ${l.libelle}` }]
         : []);
-    try {
-      await db.transaction(async (tx) => {
-        for (const entry of entries) {
-          await tx.insert(ecrituresComptablesTable).values({
-            cooperativeId, dateEcriture: imp.dateReprise!, numeroPiece: `SAGE-${imp.id}`,
-            libelle: entry.libelle, compteDebit: entry.debit, compteCredit: entry.credit,
-            montantFcfa: entry.montant, source: "manuel", sourceId: imp.id,
-            exercice: imp.exercice, typeEcriture: "a_nouveau",
-          });
-        }
+    const updated = await db.transaction(async (tx) => {
+      const [nextImport] = await tx.update(balanceSageImportsTable).set({
+        statut: "validee", valideePar: userId(req), valideeLe: new Date(),
+      }).where(and(eq(balanceSageImportsTable.id, imp.id), eq(balanceSageImportsTable.statut, "preparee"))).returning();
+      if (!nextImport) throw new Error("Cette reprise est déjà en cours de validation ou validée");
+      for (const entry of entries) {
+        await tx.insert(ecrituresComptablesTable).values({
+          cooperativeId, dateEcriture: imp.dateReprise!, numeroPiece: `SAGE-${imp.id}`,
+          libelle: entry.libelle, compteDebit: entry.debit, compteCredit: entry.credit,
+          montantFcfa: entry.montant, source: "manuel", sourceId: imp.id,
+          exercice: imp.exercice, typeEcriture: "a_nouveau",
+        });
+      }
+      await tx.insert(balanceSageRepriseAuditTable).values({
+        cooperativeId, importId: imp.id, exercice: imp.exercice,
+        action: "validation", statut: "succes", userId: userId(req),
+        message: `${entries.length} à-nouveaux validés et enregistrés dans le journal comptable.`,
       });
-    } catch (err) {
-      await db.update(balanceSageImportsTable).set({ statut: "preparee" }).where(eq(balanceSageImportsTable.id, imp.id));
-      throw err;
-    }
+      return nextImport;
+    });
     res.json({ ...updated, nombreEcritures: entries.length, message: `${entries.length} à-nouveau validés dans le journal comptable.` });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erreur de validation";
+    if (auditContext) await enregistrerEchecReprise(req, auditContext, message);
     res.status(message === "IMPORT_NOT_FOUND" ? 404 : message === "TENANT_REQUIRED" ? 401 : 422).json({ erreur: message === "IMPORT_NOT_FOUND" ? "Import introuvable" : message });
+  }
+}
+
+export async function listBalanceSageRepriseAudit(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = tenant(req);
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
+    const exercice = req.query["exercice"] ? parseExercice(req.query["exercice"]) : undefined;
+    const rawImportId = req.query["importId"];
+    const importId = rawImportId === undefined ? undefined : Number(rawImportId);
+    if (importId !== undefined && (!Number.isInteger(importId) || importId <= 0)) {
+      res.status(400).json({ erreur: "Import invalide" });
+      return;
+    }
+    const filters = [
+      eq(balanceSageRepriseAuditTable.cooperativeId, cooperativeId),
+      exercice === undefined ? undefined : eq(balanceSageRepriseAuditTable.exercice, exercice),
+      importId === undefined ? undefined : eq(balanceSageRepriseAuditTable.importId, importId),
+    ].filter((value): value is NonNullable<typeof value> => value !== undefined);
+    const events = await db.select({
+      id: balanceSageRepriseAuditTable.id,
+      cooperativeId: balanceSageRepriseAuditTable.cooperativeId,
+      importId: balanceSageRepriseAuditTable.importId,
+      exercice: balanceSageRepriseAuditTable.exercice,
+      action: balanceSageRepriseAuditTable.action,
+      statut: balanceSageRepriseAuditTable.statut,
+      userId: balanceSageRepriseAuditTable.userId,
+      userNom: sql<string | null>`concat_ws(' ', ${auditUser.prenoms}, ${auditUser.nom})`,
+      userRole: auditUser.role,
+      message: balanceSageRepriseAuditTable.message,
+      createdAt: balanceSageRepriseAuditTable.createdAt,
+      nomFichier: balanceSageImportsTable.nomFichier,
+    })
+      .from(balanceSageRepriseAuditTable)
+      .leftJoin(auditUser, eq(auditUser.id, balanceSageRepriseAuditTable.userId))
+      .leftJoin(balanceSageImportsTable, eq(balanceSageImportsTable.id, balanceSageRepriseAuditTable.importId))
+      .where(and(...filters))
+      .orderBy(desc(balanceSageRepriseAuditTable.createdAt));
+    res.json(events);
+  } catch (err) {
+    req.log.error({ err }, "listBalanceSageRepriseAudit");
+    res.status(400).json({ erreur: err instanceof Error ? err.message : "Erreur de lecture du journal de reprise" });
   }
 }

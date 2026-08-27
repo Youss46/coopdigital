@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, varchar, date, timestamp, text, boolean, unique } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, varchar, date, timestamp, text, boolean, unique, index } from "drizzle-orm/pg-core";
 
 export const balanceSageImportsTable = pgTable("balance_sage_imports", {
   id: serial("id").primaryKey(),
@@ -40,4 +40,25 @@ export const balanceSageLignesTable = pgTable("balance_sage_lignes", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   unique("balance_sage_lignes_import_ligne_unique").on(t.importId, t.numeroLigne),
+]);
+
+/**
+ * Journal immuable des tentatives de préparation et de validation des reprises.
+ * L'état de l'import reste la source de vérité métier ; cette table conserve
+ * également les tentatives qui ont échoué pour les contrôles d'audit.
+ */
+export const balanceSageRepriseAuditTable = pgTable("balance_sage_reprise_audit", {
+  id: serial("id").primaryKey(),
+  cooperativeId: integer("cooperative_id").notNull(),
+  importId: integer("import_id").notNull(),
+  exercice: integer("exercice").notNull(),
+  action: varchar("action", { length: 20 }).notNull(),
+  statut: varchar("statut", { length: 20 }).notNull(),
+  userId: integer("user_id"),
+  message: text("message").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("balance_sage_reprise_audit_coop_exercice_idx").on(t.cooperativeId, t.exercice),
+  index("balance_sage_reprise_audit_import_idx").on(t.importId),
+  index("balance_sage_reprise_audit_created_at_idx").on(t.createdAt),
 ]);
