@@ -925,6 +925,13 @@
       "when": 1788482800000,
       "tag": "0131_paiement_lignes",
       "breakpoints": true
+    },
+    {
+      "idx": 132,
+      "version": "7",
+      "when": 1788482900000,
+      "tag": "0132_paiement_lignes_total",
+      "breakpoints": true
     }
   ]
 }

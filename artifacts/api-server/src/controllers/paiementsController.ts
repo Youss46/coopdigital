@@ -786,6 +786,7 @@ async function debiterMobileDansTransaction(
             );
           }
 
+          const ecrituresVentilation: Parameters<typeof proposerEcrituresDansTransaction>[2] = [];
           for (let index = 0; index < lignes.length; index += 1) {
             const ligne = lignes[index]!;
             const ligneInseree = lignesInserees[index]!;
@@ -811,7 +812,7 @@ async function debiterMobileDansTransaction(
               : ligne.modePaiement === "orange_money" || ligne.modePaiement === "mtn_momo" || ligne.modePaiement === "wave"
               ? "552"
               : "521";
-            await proposerEcrituresDansTransaction(tx, cooperativeId, [{
+            ecrituresVentilation.push({
               source: "paiement",
               sourceId: id,
               libelle: isBonCarburant
@@ -824,8 +825,9 @@ async function debiterMobileDansTransaction(
               numeroPiece: `PAI-${id}`,
               tiersId: isBonCarburant ? undefined : (row.paiement.membreId ?? undefined),
               tiersType: isBonCarburant ? undefined : "membre",
-            }]);
+            });
           }
+          await proposerEcrituresDansTransaction(tx, cooperativeId, ecrituresVentilation);
         });
       } catch (err) {
         if (err instanceof PaiementDejaTraiteError) {
