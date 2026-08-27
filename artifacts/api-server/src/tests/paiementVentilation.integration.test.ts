@@ -35,6 +35,7 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
   let memberId: number;
   let caisseId: number;
   let sessionId: number;
+  let mobileAccountId: number;
   const paymentIds: number[] = [];
   const deliveryIds: number[] = [];
 
@@ -76,7 +77,7 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
          fond_caisse_minimum_fcfa, actif)
        VALUES ($1, $2, 'centrale', $3, 0, true)
        RETURNING id`,
-      [cooperativeId, "Caisse ventilation atomique", "1200000"],
+      [cooperativeId, "Caisse ventilation atomique", "10000000"],
     );
     caisseId = caisse.rows[0].id;
 
@@ -85,9 +86,18 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
         (caisse_id, cooperative_id, date_session, solde_ouverture_fcfa, statut)
        VALUES ($1, $2, CURRENT_DATE, $3, 'ouverte')
        RETURNING id`,
-      [caisseId, cooperativeId, "1200000"],
+      [caisseId, cooperativeId, "10000000"],
     );
     sessionId = session.rows[0].id;
+
+    const mobileAccount = await client.query(
+      `INSERT INTO comptes_mobiles_marchands
+        (cooperative_id, nom, operateur, solde_actuel_fcfa, actif)
+       VALUES ($1, $2, 'orange_money', $3, true)
+       RETURNING id`,
+      [cooperativeId, "Orange Money ventilation atomique", "1000000"],
+    );
+    mobileAccountId = mobileAccount.rows[0].id;
   });
 
   afterAll(async () => {
@@ -110,6 +120,10 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
     await client.query(`DELETE FROM mouvements_caisse WHERE caisse_id = $1`, [
       caisseId,
     ]);
+    await client.query(
+      `DELETE FROM mouvements_mobile_marchand WHERE compte_id = $1`,
+      [mobileAccountId],
+    );
     await client.query(`DELETE FROM paiements WHERE id = ANY($1::int[])`, [
       paymentIds,
     ]);
@@ -120,6 +134,10 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
       sessionId,
     ]);
     await client.query(`DELETE FROM caisses WHERE id = $1`, [caisseId]);
+    await client.query(
+      `DELETE FROM comptes_mobiles_marchands WHERE id = $1`,
+      [mobileAccountId],
+    );
     await client.query(
       `DELETE FROM config_comptable WHERE cooperative_id = $1`,
       [cooperativeId],
@@ -188,7 +206,7 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
   }
 
   async function paymentEffects(paymentId: number) {
-    const [payment, lines, movements, cheques, accounting] = await Promise.all([
+    const [payment, lines, movements, mobileMovements, cheques, accounting] = await Promise.all([
       pool.query(`SELECT statut FROM paiements WHERE id = $1`, [paymentId]),
       pool.query(
         `SELECT count(*)::int AS count FROM paiement_lignes WHERE paiement_id = $1`,
@@ -198,6 +216,12 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
         `SELECT count(*)::int AS count FROM mouvements_caisse
          WHERE caisse_id = $1 AND reference_operation = $2`,
         [caisseId, `PAI-${paymentId}`],
+      ),
+      pool.query(
+        `SELECT count(*)::int AS count FROM mouvements_mobile_marchand
+         WHERE compte_id = $1
+           AND libelle = $2`,
+        [mobileAccountId, `Paiement producteur — règlement #${paymentId}`],
       ),
       pool.query(
         `SELECT count(*)::int AS count FROM cheques_emis WHERE paiement_id = $1`,
@@ -213,6 +237,7 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
       statut: payment.rows[0].statut,
       lines: lines.rows[0].count,
       movements: movements.rows[0].count,
+      mobileMovements: mobileMovements.rows[0].count,
       cheques: cheques.rows[0].count,
       accounting: accounting.rows[0].count,
     };
@@ -237,6 +262,7 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
       statut: "en_attente",
       lines: 0,
       movements: 0,
+      mobileMovements: 0,
       cheques: 0,
       accounting: 0,
     });
@@ -262,6 +288,7 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
       statut: "en_attente",
       lines: 0,
       movements: 0,
+      mobileMovements: 0,
       cheques: 0,
       accounting: 0,
     });
@@ -291,6 +318,7 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
       statut: "confirme",
       lines: 2,
       movements: 1,
+      mobileMovements: 0,
       cheques: 1,
       accounting: 2,
     });
@@ -336,6 +364,7 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
       statut: "effectue",
       lines: 1,
       movements: 1,
+      mobileMovements: 0,
       cheques: 0,
       accounting: 1,
     });
@@ -387,6 +416,7 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
       statut: "effectue",
       lines: 1,
       movements: 1,
+      mobileMovements: 0,
       cheques: 0,
       accounting: 1,
     });
@@ -394,6 +424,7 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
       statut: "effectue",
       lines: 1,
       movements: 1,
+      mobileMovements: 0,
       cheques: 0,
       accounting: 1,
     });
@@ -434,6 +465,7 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
       statut: "en_attente",
       lines: 0,
       movements: 0,
+      mobileMovements: 0,
       cheques: 0,
       accounting: 0,
     });
@@ -465,6 +497,7 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
       statut: "effectue",
       lines: 1,
       movements: 1,
+      mobileMovements: 0,
       cheques: 0,
       accounting: 1,
     });
@@ -520,6 +553,7 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
       statut: "en_attente",
       lines: 0,
       movements: 0,
+      mobileMovements: 0,
       cheques: 0,
       accounting: 0,
     });
@@ -536,5 +570,128 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
       [deliveryId],
     );
     expect(pendingPayments.rows[0].count).toBe(1);
+  });
+
+  it("solde le reliquat par chèque et ne crée aucun effet en double", async () => {
+    const { paymentId, deliveryId } = await createDeferredPayment(590_000);
+
+    const firstResult = await validate(paymentId, {
+      montantReglementFcfa: 190_000,
+      modePaiement: "especes",
+    });
+    expect(firstResult.statusCode).toBe(200);
+
+    const pendingPayments = await client.query(
+      `SELECT id FROM paiements
+       WHERE livraison_id = $1 AND statut = 'en_attente'
+       ORDER BY id`,
+      [deliveryId],
+    );
+    expect(pendingPayments.rows).toHaveLength(1);
+    const remainderPaymentId = pendingPayments.rows[0].id as number;
+    paymentIds.push(remainderPaymentId);
+
+    const remainderResult = await validate(remainderPaymentId, {
+      modePaiement: "cheque",
+      numeroCheque: "CHQ-RELIQUAT-590000",
+      banque: "Banque de test",
+    });
+    expect(remainderResult.statusCode).toBe(200);
+
+    const duplicateResult = await validate(remainderPaymentId, {
+      modePaiement: "cheque",
+      numeroCheque: "CHQ-RELIQUAT-590000",
+      banque: "Banque de test",
+    });
+    expect(duplicateResult.statusCode).toBe(409);
+
+    expect(await client.query(
+      `SELECT statut_paiement, montant_restant
+       FROM livraisons WHERE id = $1`,
+      [deliveryId],
+    )).toMatchObject({
+      rows: [{ statut_paiement: "PAYÉ", montant_restant: "0.00" }],
+    });
+    expect(await client.query(
+      `SELECT count(*)::int AS count, coalesce(sum(montant_fcfa), 0)::numeric AS total
+       FROM paiements WHERE livraison_id = $1`,
+      [deliveryId],
+    )).toMatchObject({
+      rows: [{ count: 2, total: "590000" }],
+    });
+    expect(await paymentEffects(remainderPaymentId)).toEqual({
+      statut: "confirme",
+      lines: 1,
+      movements: 0,
+      mobileMovements: 0,
+      cheques: 1,
+      accounting: 1,
+    });
+    expect(await client.query(
+      `SELECT count(*)::int AS count
+       FROM cheques_emis WHERE paiement_id = $1`,
+      [remainderPaymentId],
+    )).toMatchObject({ rows: [{ count: 1 }] });
+  });
+
+  it("solde le reliquat par mobile money et ne crée aucun effet en double", async () => {
+    const { paymentId, deliveryId } = await createDeferredPayment(590_000);
+
+    const firstResult = await validate(paymentId, {
+      montantReglementFcfa: 190_000,
+      modePaiement: "especes",
+    });
+    expect(firstResult.statusCode).toBe(200);
+
+    const pendingPayments = await client.query(
+      `SELECT id FROM paiements
+       WHERE livraison_id = $1 AND statut = 'en_attente'
+       ORDER BY id`,
+      [deliveryId],
+    );
+    expect(pendingPayments.rows).toHaveLength(1);
+    const remainderPaymentId = pendingPayments.rows[0].id as number;
+    paymentIds.push(remainderPaymentId);
+
+    const remainderResult = await validate(remainderPaymentId, {
+      modePaiement: "orange_money",
+      referenceTransaction: "OM-RELIQUAT-590000",
+      telephone: "0700000000",
+    });
+    expect(remainderResult.statusCode).toBe(200);
+
+    const duplicateResult = await validate(remainderPaymentId, {
+      modePaiement: "orange_money",
+      referenceTransaction: "OM-RELIQUAT-590000",
+      telephone: "0700000000",
+    });
+    expect(duplicateResult.statusCode).toBe(409);
+
+    expect(await client.query(
+      `SELECT statut_paiement, montant_restant
+       FROM livraisons WHERE id = $1`,
+      [deliveryId],
+    )).toMatchObject({
+      rows: [{ statut_paiement: "PAYÉ", montant_restant: "0.00" }],
+    });
+    expect(await client.query(
+      `SELECT count(*)::int AS count, coalesce(sum(montant_fcfa), 0)::numeric AS total
+       FROM paiements WHERE livraison_id = $1`,
+      [deliveryId],
+    )).toMatchObject({
+      rows: [{ count: 2, total: "590000" }],
+    });
+    expect(await paymentEffects(remainderPaymentId)).toEqual({
+      statut: "confirme",
+      lines: 1,
+      movements: 0,
+      mobileMovements: 1,
+      cheques: 0,
+      accounting: 1,
+    });
+    expect(await client.query(
+      `SELECT solde_actuel_fcfa FROM comptes_mobiles_marchands WHERE id = $1`,
+      [mobileAccountId],
+    )).toMatchObject({ rows: [{ solde_actuel_fcfa: "600000" }] });
   });
 });
