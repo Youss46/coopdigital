@@ -1132,10 +1132,10 @@ export const GetBalanceQueryParams = zod.object({
 export const GetBalanceResponseItem = zod.object({
   "numeroCompte": zod.string(),
   "libelle": zod.string(),
-  "type": zod.enum(['actif', 'passif', 'charge', 'produit']),
   "totalDebit": zod.number(),
   "totalCredit": zod.number(),
-  "solde": zod.number()
+  "soldeDebiteur": zod.number(),
+  "soldeCrediteur": zod.number()
 })
 export const GetBalanceResponse = zod.array(GetBalanceResponseItem)
 

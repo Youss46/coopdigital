@@ -74,10 +74,10 @@ export async function getBalance(req: Request, res: Response): Promise<void> {
       SELECT
         a.numero_compte                        AS "numeroCompte",
         COALESCE(p.libelle, a.numero_compte)   AS libelle,
-        p.type,
         a.total_debit::int                     AS "totalDebit",
         a.total_credit::int                    AS "totalCredit",
-        (a.total_debit - a.total_credit)::int  AS "solde"
+        GREATEST(a.total_debit - a.total_credit, 0)::int AS "soldeDebiteur",
+        GREATEST(a.total_credit - a.total_debit, 0)::int AS "soldeCrediteur"
       FROM (
         SELECT
           numero_compte,

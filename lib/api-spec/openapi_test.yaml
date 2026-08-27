@@ -5518,20 +5518,19 @@ components:
 
     BalanceLigne:
       type: object
-      required: [numeroCompte, libelle, type, totalDebit, totalCredit, solde]
+      required: [numeroCompte, libelle, totalDebit, totalCredit, soldeDebiteur, soldeCrediteur]
       properties:
         numeroCompte:
           type: string
         libelle:
           type: string
-        type:
-          type: string
-          enum: [actif, passif, charge, produit]
         totalDebit:
           type: integer
         totalCredit:
           type: integer
-        solde:
+        soldeDebiteur:
+          type: integer
+        soldeCrediteur:
           type: integer
 
     MargeCollecte:

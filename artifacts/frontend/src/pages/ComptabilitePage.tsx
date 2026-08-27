@@ -2265,8 +2265,9 @@ function OngletGrandLivre() {
 
 // ─── Onglet Balance des comptes ───────────────────────────────────────────────
 interface BalanceLigne {
-  numeroCompte: string; libelle: string; type: string;
-  totalDebit: number; totalCredit: number; solde: number;
+  numeroCompte: string; libelle: string;
+  totalDebit: number; totalCredit: number;
+  soldeDebiteur: number; soldeCrediteur: number;
 }
 
 function OngletBalance() {
@@ -2282,6 +2283,8 @@ function OngletBalance() {
   const list = data ?? [];
   const totalDebit  = list.reduce((s, l) => s + l.totalDebit,  0);
   const totalCredit = list.reduce((s, l) => s + l.totalCredit, 0);
+  const totalSoldeDebiteur = list.reduce((s, l) => s + l.soldeDebiteur, 0);
+  const totalSoldeCrediteur = list.reduce((s, l) => s + l.soldeCrediteur, 0);
 
   const handleExport = () => void exportExcel(
     `balance_${exercice}.xlsx`,
@@ -2289,18 +2292,18 @@ function OngletBalance() {
     [
       { header: "N° Compte",    key: "compte",  width: 14 },
       { header: "Libellé",      key: "libelle", width: 45 },
-      { header: "Type",         key: "type",    width: 14, align: "center" },
-      { header: "Total Débit",  key: "debit",   width: 18, numFmt: "#,##0", align: "right" },
-      { header: "Total Crédit", key: "credit",  width: 18, numFmt: "#,##0", align: "right" },
-      { header: "Solde",        key: "solde",   width: 18, numFmt: "#,##0;[Red]-#,##0", align: "right" },
+      { header: "Mouvements Débit",   key: "debit",          width: 18, numFmt: "#,##0", align: "right" },
+      { header: "Mouvements Crédit",  key: "credit",         width: 18, numFmt: "#,##0", align: "right" },
+      { header: "Solde Débiteur",     key: "soldeDebiteur",  width: 18, numFmt: "#,##0", align: "right" },
+      { header: "Solde Créditeur",    key: "soldeCrediteur", width: 18, numFmt: "#,##0", align: "right" },
     ],
     list.map((l) => ({
       compte:  l.numeroCompte,
       libelle: l.libelle,
-      type:    l.type,
       debit:   Number(l.totalDebit),
       credit:  Number(l.totalCredit),
-      solde:   Number(l.solde),
+      soldeDebiteur:  Number(l.soldeDebiteur),
+      soldeCrediteur: Number(l.soldeCrediteur),
     }))
   );
 
@@ -2338,40 +2341,33 @@ function OngletBalance() {
                 <tr className="border-b border-gray-100 bg-gray-50">
                   <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">N° Compte</th>
                   <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Libellé</th>
-                  <th className="text-center text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Type</th>
-                  <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Total Débit</th>
-                  <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Total Crédit</th>
-                  <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Solde</th>
+                  <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Mouvements Débit</th>
+                  <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Mouvements Crédit</th>
+                  <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Solde Débiteur</th>
+                  <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Solde Créditeur</th>
                 </tr>
               </thead>
               <tbody>
                 {list.map((l) => {
-                  const ti = TYPES_COMPTE[l.type] ?? { label: l.type, color: "#6b7280" };
                   return (
                     <tr key={l.numeroCompte} className="border-b border-gray-50 hover:bg-gray-50/50">
                       <td className="px-4 py-3 font-mono font-semibold text-gray-800">{l.numeroCompte}</td>
                       <td className="px-4 py-3 text-gray-700">{l.libelle}</td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="text-xs font-medium px-2 py-0.5 rounded-full"
-                          style={{ backgroundColor: `${ti.color}18`, color: ti.color }}>{ti.label}</span>
-                      </td>
                       <td className="px-4 py-3 text-right font-medium text-gray-700">{FCFA(l.totalDebit)}</td>
                       <td className="px-4 py-3 text-right font-medium text-gray-700">{FCFA(l.totalCredit)}</td>
-                      <td className={`px-4 py-3 text-right font-bold ${l.solde >= 0 ? "text-green-700" : "text-red-600"}`}>
-                        {l.solde < 0 && "-"}{FCFA(Math.abs(l.solde))}
-                      </td>
+                      <td className="px-4 py-3 text-right font-medium text-gray-700">{FCFA(l.soldeDebiteur)}</td>
+                      <td className="px-4 py-3 text-right font-medium text-gray-700">{FCFA(l.soldeCrediteur)}</td>
                     </tr>
                   );
                 })}
               </tbody>
               <tfoot>
                 <tr className="border-t-2 border-gray-200 bg-gray-50">
-                  <td colSpan={3} className="px-4 py-3 font-bold text-gray-700 text-sm">TOTAUX</td>
+                  <td colSpan={2} className="px-4 py-3 font-bold text-gray-700 text-sm">TOTAUX</td>
                   <td className="px-4 py-3 text-right font-bold text-gray-900">{FCFA(totalDebit)}</td>
                   <td className="px-4 py-3 text-right font-bold text-gray-900">{FCFA(totalCredit)}</td>
-                  <td className={`px-4 py-3 text-right font-bold ${totalDebit >= totalCredit ? "text-green-700" : "text-red-600"}`}>
-                    {FCFA(Math.abs(totalDebit - totalCredit))}
-                  </td>
+                  <td className="px-4 py-3 text-right font-bold text-gray-900">{FCFA(totalSoldeDebiteur)}</td>
+                  <td className="px-4 py-3 text-right font-bold text-gray-900">{FCFA(totalSoldeCrediteur)}</td>
                 </tr>
               </tfoot>
             </table>

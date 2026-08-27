@@ -1452,10 +1452,10 @@ export const BalanceLigneType = {
 export interface BalanceLigne {
   numeroCompte: string;
   libelle: string;
-  type: BalanceLigneType;
   totalDebit: number;
   totalCredit: number;
-  solde: number;
+  soldeDebiteur: number;
+  soldeCrediteur: number;
 }
 
 export interface MargeCollecte {
