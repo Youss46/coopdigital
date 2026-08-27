@@ -775,6 +775,18 @@ async function debiterMobileDansTransaction(
             const montantEspeces = lignesEspeces.reduce((total, ligne) => total + ligne.montantFcfa, 0);
             if (req.user?.role === "delegue") {
               await debiterCaisseDansTransaction(tx, cooperativeId, userId, montantEspeces, id, userId);
+            } else if (row.membreDelegueId) {
+              // Un règlement d'un membre rattaché à un délégué doit débiter
+              // la caisse de ce délégué, même si la validation est faite par
+              // un Directeur, un Comptable ou un PCA.
+              await debiterCaisseDansTransaction(
+                tx,
+                cooperativeId,
+                userId,
+                montantEspeces,
+                id,
+                row.membreDelegueId,
+              );
             } else if (isMembreBaseCentrale) {
               await debiterCaisseDansTransaction(tx, cooperativeId, userId, montantEspeces, id);
             }
