@@ -446,10 +446,25 @@ const COMPTABLE_RESTRICTED_PATHS = [
   "/communication",
   "/scoring",
   "/gouvernance",
+  "/delegues",
   "/delegues-localites",
   "/certifications",
   "/archives",
 ];
+
+function isRestrictedRequestPath(req: Request, prefix: string): boolean {
+  const paths = [
+    req.path,
+    req.originalUrl?.split("?")[0],
+    `${req.baseUrl}${req.path}`,
+  ].filter((path): path is string => Boolean(path));
+
+  return paths.some((path) =>
+    path === prefix ||
+    path.endsWith(prefix) ||
+    path.includes(`${prefix}/`),
+  );
+}
 
 /**
  * Bloque l'accès direct du comptable aux modules opérationnels exclus.
@@ -463,7 +478,7 @@ export function denyComptableRestrictedModules(
 ): void {
   if (
     req.user?.role === "comptable" &&
-    COMPTABLE_RESTRICTED_PATHS.some((prefix) => req.path === prefix || req.path.startsWith(`${prefix}/`))
+    COMPTABLE_RESTRICTED_PATHS.some((prefix) => isRestrictedRequestPath(req, prefix))
   ) {
     res.status(403).json({
       erreur: "Accès refusé",

@@ -4,6 +4,7 @@
 - [Orval inline body naming conflict](orval-inline-body-conflict.md) — inline requestBody génère PostXxxBody qui entre en collision avec generated/types; fixer avec $ref vers schéma nommé.
 - [React Query v5 queryKey obligatoire](orval-query-key-required.md) — UseQueryOptions exige queryKey; utiliser getGet*QueryKey() avec options `enabled`.
 - [API route prefix convention](route-prefix.md) — routes/*.ts must NOT include `/api/` prefix; app.use("/api", router) already strips it.
+- [Express mounted RBAC paths](express-mounted-rbac-paths.md) — un middleware RBAC sous un préfixe Express doit contrôler le chemin complet, pas seulement req.path.
 - [Orval YAML path prefix rule](orval-yaml-path-prefix.md) — paths in openapi.yaml must NOT include the server baseUrl prefix; `servers: - url: /api` handles it automatically.
 - [api-zod barrel export + schemas config](api-zod-export-star.md) — orval.config.ts must NOT have `schemas: { path: "generated/types", type: "typescript" }` in the zod output; it generates TS types with same names as Zod consts → TS2308. After removing, fix index.ts to single `export * from "./generated/api"` (orval regenerates index.ts on each run pointing to the removed types dir).
 - [Express 5 params string cast](express5-params-typing.md) — `req.params[dynamicKey]` may type as `string | string[]`; use `String(req.params[key])` for dynamic access.

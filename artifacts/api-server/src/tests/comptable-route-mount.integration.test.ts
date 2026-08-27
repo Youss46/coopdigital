@@ -1,0 +1,147 @@
+import express, { type Request, type Response as ExpressResponse } from "express";
+import type { Server } from "node:http";
+import jwt from "jsonwebtoken";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+
+const { okHandler } = vi.hoisted(() => ({
+  okHandler: (_req: Request, res: ExpressResponse) => {
+    res.status(200).json({ ok: true });
+  },
+}));
+
+vi.mock("../controllers/peseeController.js", () => ({
+  handleGetBalancesAlertes: okHandler,
+  handleGetBalances: okHandler,
+  handleCreateBalance: okHandler,
+  handleUpdateBalance: okHandler,
+  handleCreateVerification: okHandler,
+  handleValiderDoublePesee: okHandler,
+  handleGetLitiges: okHandler,
+  handleCreateLitige: okHandler,
+  handleResoudreLitige: okHandler,
+  handleGetStatistiques: okHandler,
+  handleGetRapportAgent: okHandler,
+  handleGetConfig: okHandler,
+  handleUpdateConfig: okHandler,
+  handleBatchCreateSession: okHandler,
+  handleCreateSession: okHandler,
+  handleGetSessions: okHandler,
+  handleGetSession: okHandler,
+  handleAddLigne: okHandler,
+  handleDeleteLigne: okHandler,
+  handleTerminerSession: okHandler,
+  handleAnnulerSession: okHandler,
+  handleConvertirSessionEnLivraison: okHandler,
+  handleExpirerSessionsStales: okHandler,
+  handleGetBordereauSession: okHandler,
+}));
+
+vi.mock("../controllers/delegueController.js", () => ({
+  getCaisseHandler: okHandler,
+  getPaiementsDifferesHandler: okHandler,
+  regulariserPaiementHandler: okHandler,
+  listDeleguesHandler: okHandler,
+  getDetailCaisseHandler: okHandler,
+  approvisionnerHandler: okHandler,
+  getPaiementsDifferesAdminHandler: okHandler,
+  alimenterCaisseHandler: okHandler,
+  cloturerJourneeHandler: okHandler,
+  getAlertesCaissesDeleguesHandler: okHandler,
+}));
+
+vi.mock("../controllers/comptabiliteController.js", () => ({
+  getGrandLivre: okHandler,
+  getBalance: okHandler,
+  getJournalComptable: okHandler,
+  createEcritureManuelle: okHandler,
+  exportJournalCsv: okHandler,
+  getMargeCollecte: okHandler,
+  getTresorerie: okHandler,
+  getConfigComptable: okHandler,
+  updateConfigComptable: okHandler,
+  listEcrituresEnAttente: okHandler,
+  countEcrituresEnAttente: okHandler,
+  validerEcritureEnAttente: okHandler,
+  rejeterEcritureEnAttente: okHandler,
+  validerToutEcrituresEnAttente: okHandler,
+  listRegularisations: okHandler,
+  createRegularisation: okHandler,
+  deleteRegularisation: okHandler,
+  apercuCloture: okHandler,
+  cloturerExercice: okHandler,
+  getBalanceAuxiliaire: okHandler,
+  getGrandLivreTiers: okHandler,
+  getApercuAffectationResultat: okHandler,
+  apercuRistournes: okHandler,
+  declencherRistournes: okHandler,
+  getHistoriqueAffectations: okHandler,
+  getStatutsExercices: okHandler,
+  affecterResultat: okHandler,
+}));
+
+vi.mock("../middlewares/tenantGuard.js", () => ({
+  tenantGuard: (_req: Request, _res: ExpressResponse, next: () => void) => next(),
+}));
+
+describe("montage des routes et périmètre du comptable", () => {
+  let server: Server;
+  let baseUrl: string;
+  let app: express.Express;
+
+  beforeAll(async () => {
+    process.env.JWT_SECRET = "comptable-route-mount-test-secret";
+    process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test";
+    process.env.NODE_ENV = "test";
+
+    ({ default: app } = await import("../app.js"));
+
+    await new Promise<void>((resolve, reject) => {
+      server = app.listen(0, "127.0.0.1", (error?: Error) => {
+        if (error) reject(error);
+        else resolve();
+      });
+    });
+
+    const address = server.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Serveur de test indisponible");
+    }
+    baseUrl = `http://127.0.0.1:${address.port}`;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => (error ? reject(error) : resolve()));
+    });
+  });
+
+  function tokenFor(role: string): string {
+    return jwt.sign({ id: 1, role, cooperativeId: 1 }, process.env.JWT_SECRET!);
+  }
+
+  async function request(path: string, role: string): Promise<globalThis.Response> {
+    return fetch(`${baseUrl}${path}`, {
+      headers: { Authorization: `Bearer ${tokenFor(role)}` },
+    });
+  }
+
+  it.each([
+    ["/api/pesee/balances", "la pesée"],
+    ["/api/delegues", "les délégués"],
+  ])("refuse le comptable sur %s malgré le montage avant le garde global (%s)", async (path) => {
+    expect((await request(path, "comptable")).status).toBe(403);
+  });
+
+  it.each([
+    ["/api/pesee/balances", "pca"],
+    ["/api/pesee/balances", "directeur"],
+    ["/api/delegues", "pca"],
+    ["/api/delegues", "directeur"],
+  ])("laisse %s accéder à %s", async (path, role) => {
+    expect((await request(path, role)).status).toBe(200);
+  });
+
+  it("conserve l'accès du comptable aux routes comptables", async () => {
+    expect((await request("/api/comptabilite/grand-livre", "comptable")).status).toBe(200);
+  });
+});
