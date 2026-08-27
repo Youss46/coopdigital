@@ -232,6 +232,35 @@ describe("capture automatique du tracker GPS", () => {
     container.remove();
   });
 
+  it("ignore une position tardive de l'ancien watch après une reprise pageshow", async () => {
+    await renderTracker();
+
+    await act(async () => {
+      tracker!.startTracking();
+    });
+    expect(watchPosition).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      window.dispatchEvent(new Event("pageshow"));
+    });
+    expect(clearWatch).toHaveBeenCalledWith(0);
+    expect(watchPosition).toHaveBeenCalledTimes(2);
+    expect(tracker!.currentPos).toBeNull();
+
+    await act(async () => {
+      positions[0]!.success(browserPosition(5.31));
+    });
+    expect(tracker!.currentPos).toBeNull();
+
+    await act(async () => {
+      positions[1]!.success(browserPosition(5.3101));
+    });
+    expect(tracker!.currentPos?.lat).toBe(5.3101);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("explique une permission perdue puis confirme la reprise après réautorisation", async () => {
     await renderTracker();
 
