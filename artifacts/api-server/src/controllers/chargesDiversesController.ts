@@ -43,6 +43,8 @@ export async function handleCreateChargeDiverses(req: Request, res: Response): P
       montant_fcfa: number; categorie: string;
       compte_debit: string; compte_credit: string;
       mode_paiement: string; tiers?: string; reference_piece?: string;
+      compte_tresorerie_id?: number | null;
+      compte_tresorerie_type?: "caisse" | "banque" | "mobile_marchand" | null;
     };
     if (!body.date_charge || !body.libelle || !body.montant_fcfa || body.montant_fcfa <= 0 || !body.categorie) {
       res.status(400).json({ erreur: "date_charge, libelle, montant_fcfa et categorie requis" });
@@ -63,6 +65,8 @@ export async function handleCreateChargeDiverses(req: Request, res: Response): P
       modePaiement:   body.mode_paiement ?? "especes",
       tiers:          body.tiers ?? null,
       referencePiece: body.reference_piece ?? null,
+       compteTresorerieId: body.compte_tresorerie_id == null ? null : Number(body.compte_tresorerie_id),
+       compteTresorerieType: body.compte_tresorerie_type ?? null,
     });
     res.status(201).json(mapCharge(row));
   } catch (err) {
@@ -97,6 +101,8 @@ export async function handleUpdateChargeDiverses(req: Request, res: Response): P
       montant_fcfa?: number; categorie?: string;
       compte_debit?: string; compte_credit?: string;
       mode_paiement?: string; tiers?: string; reference_piece?: string;
+      compte_tresorerie_id?: number | null;
+      compte_tresorerie_type?: "caisse" | "banque" | "mobile_marchand" | null;
     };
     const row = await updateChargeDiverses(cooperativeId, id, {
       ...(body.date_charge     ? { dateCharge:     body.date_charge }      : {}),
@@ -109,6 +115,12 @@ export async function handleUpdateChargeDiverses(req: Request, res: Response): P
       ...(body.mode_paiement   ? { modePaiement:   body.mode_paiement }     : {}),
       ...(body.tiers           !== undefined ? { tiers: body.tiers }        : {}),
       ...(body.reference_piece !== undefined ? { referencePiece: body.reference_piece } : {}),
+      ...(body.compte_tresorerie_id !== undefined
+        ? { compteTresorerieId: body.compte_tresorerie_id == null ? null : Number(body.compte_tresorerie_id) }
+        : {}),
+      ...(body.compte_tresorerie_type !== undefined
+        ? { compteTresorerieType: body.compte_tresorerie_type }
+        : {}),
     });
     if (!row) { res.status(404).json({ erreur: "Charge introuvable ou déjà validée" }); return; }
     res.json(mapCharge(row));
@@ -143,9 +155,11 @@ export async function handleValiderChargeDiverses(req: Request, res: Response): 
       const retenue = reglement.retenue;
       const net = reglement.net;
       const piece = row.referencePiece ?? `PPSI-${row.id}`;
-      const compteTresorerie = row.modePaiement === "mobile_money" ? "552"
-        : row.modePaiement === "virement" || row.modePaiement === "cheque" ? "521"
-        : "571";
+       const compteTresorerie = ["571", "521", "552"].includes(row.compteCredit)
+         ? row.compteCredit
+         : row.modePaiement === "mobile_money" ? "552"
+         : row.modePaiement === "virement" || row.modePaiement === "cheque" ? "521"
+         : "571";
       const entries = [
         { compteDebit: row.compteDebit, compteCredit: "401", montantFcfa: montantBrut, libelle: `Prestation brute — ${row.libelle}` },
         ...(retenue > 0 ? [{ compteDebit: "401", compteCredit: "447", montantFcfa: retenue, libelle: `Retenue PPSI — ${row.libelle}` }] : []),
@@ -226,6 +240,8 @@ function mapCharge(r: Awaited<ReturnType<typeof getChargeDiverses>>) {
     mode_paiement:    r.modePaiement,
     tiers:            r.tiers ?? null,
     reference_piece:  r.referencePiece ?? null,
+    compte_tresorerie_id: r.compteTresorerieId ?? null,
+    compte_tresorerie_type: r.compteTresorerieType ?? null,
     statut:           r.statut,
     created_by:       r.createdBy ?? null,
     approved_by:      r.approvedBy ?? null,

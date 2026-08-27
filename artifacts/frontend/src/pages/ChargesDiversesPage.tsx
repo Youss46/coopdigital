@@ -54,6 +54,8 @@ interface Charge {
   categorie: string;
   compte_debit: string;
   compte_credit: string;
+  compte_tresorerie_id: number | null;
+  compte_tresorerie_type: "caisse" | "banque" | "mobile_marchand" | null;
   mode_paiement: string;
   tiers: string | null;
   reference_piece: string | null;
@@ -65,6 +67,24 @@ interface Stats {
   total_fcfa: number;
   nb_charges: number;
   par_categorie: Array<{ categorie: string; total: number; nb: number }>;
+}
+
+interface CaisseTresorerie {
+  id: number;
+  nom: string;
+  solde_actuel_fcfa?: string | number;
+}
+
+interface BanqueTresorerie {
+  id: number;
+  nom: string;
+  banque: string;
+}
+
+interface MobileTresorerie {
+  id: number;
+  nom: string;
+  operateur: string;
 }
 
 // ── Référentiels ──────────────────────────────────────────────────────────────
@@ -89,12 +109,6 @@ const MODES_PAIEMENT = [
   { value: "mobile_money",  label: "Mobile Money" },
 ];
 
-const COMPTES_CREDIT = [
-  { value: "571", label: "571 — Caisse" },
-  { value: "521", label: "521 — Banque" },
-  { value: "401", label: "401 — Fournisseurs" },
-];
-
 const EMPTY_FORM = {
   date_charge:     new Date().toISOString().split("T")[0]!,
   libelle:         "",
@@ -102,7 +116,9 @@ const EMPTY_FORM = {
   montant_fcfa:    "",
   categorie:       "autre",
   compte_debit:    "6580",
-  compte_credit:   "571",
+  compte_credit:   "",
+  compte_tresorerie_id: "",
+  compte_tresorerie_type: "",
   mode_paiement:   "especes",
   tiers:           "",
   reference_piece: "",
@@ -162,6 +178,21 @@ export default function ChargesDiversesPage() {
     enabled:  showStats,
   });
 
+  const { data: caisses = [] } = useQuery<CaisseTresorerie[]>({
+    queryKey: ["charges-diverses-comptes", "caisse"],
+    queryFn:  () => apiFetch<CaisseTresorerie[]>("/caisse"),
+  });
+
+  const { data: banques = [] } = useQuery<BanqueTresorerie[]>({
+    queryKey: ["charges-diverses-comptes", "banque"],
+    queryFn:  () => apiFetch<BanqueTresorerie[]>("/banque"),
+  });
+
+  const { data: mobiles = [] } = useQuery<MobileTresorerie[]>({
+    queryKey: ["charges-diverses-comptes", "mobile_marchand"],
+    queryFn:  () => apiFetch<MobileTresorerie[]>("/mobile-marchand"),
+  });
+
   // ── Mutations ─────────────────────────────────────────────────────────────────
   const invalidate = () => { void qc.invalidateQueries({ queryKey: ["charges-diverses"] }); };
 
@@ -175,6 +206,8 @@ export default function ChargesDiversesPage() {
         categorie:       data.categorie,
         compte_debit:    data.compte_debit,
         compte_credit:   data.compte_credit,
+        compte_tresorerie_id: data.compte_tresorerie_id ? Number(data.compte_tresorerie_id) : null,
+        compte_tresorerie_type: data.compte_tresorerie_type || null,
         mode_paiement:   data.mode_paiement,
         tiers:           data.tiers || null,
         reference_piece: data.reference_piece || null,
@@ -193,6 +226,8 @@ export default function ChargesDiversesPage() {
         categorie:       data.categorie,
         compte_debit:    data.compte_debit,
         compte_credit:   data.compte_credit,
+        compte_tresorerie_id: data.compte_tresorerie_id ? Number(data.compte_tresorerie_id) : null,
+        compte_tresorerie_type: data.compte_tresorerie_type || null,
         mode_paiement:   data.mode_paiement,
         tiers:           data.tiers || null,
         reference_piece: data.reference_piece || null,
@@ -230,6 +265,8 @@ export default function ChargesDiversesPage() {
       categorie:       c.categorie,
       compte_debit:    c.compte_debit,
       compte_credit:   c.compte_credit,
+      compte_tresorerie_id: c.compte_tresorerie_id ? String(c.compte_tresorerie_id) : "",
+      compte_tresorerie_type: c.compte_tresorerie_type ?? "",
       mode_paiement:   c.mode_paiement,
       tiers:           c.tiers ?? "",
       reference_piece: c.reference_piece ?? "",
@@ -242,6 +279,14 @@ export default function ChargesDiversesPage() {
       toast({ title: "Champs requis", description: "Libellé, montant et date sont obligatoires.", variant: "destructive" });
       return;
     }
+    if (!form.compte_credit) {
+      toast({ title: "Compte requis", description: "Sélectionnez le compte crédit de la charge.", variant: "destructive" });
+      return;
+    }
+    if (form.compte_credit !== "401" && (!form.compte_tresorerie_type || !form.compte_tresorerie_id)) {
+      toast({ title: "Compte de trésorerie requis", description: "Sélectionnez le compte de trésorerie qui sera débité à la validation.", variant: "destructive" });
+      return;
+    }
     if (editTarget) {
       updateMut.mutate({ ...form, id: editTarget.id });
     } else {
@@ -249,6 +294,32 @@ export default function ChargesDiversesPage() {
     }
   }, [form, editTarget, createMut, updateMut, toast]);
 
+  const handleCompteCreditChange = useCallback((value: string) => {
+    if (value === "401") {
+      setForm(f => ({
+        ...f,
+        compte_credit: "401",
+        compte_tresorerie_id: "",
+        compte_tresorerie_type: "",
+      }));
+      return;
+    }
+    const [type, id] = value.split(":");
+    if (!id || !["caisse", "banque", "mobile_marchand"].includes(type ?? "")) return;
+    const compteCredit = type === "caisse" ? "571" : type === "banque" ? "521" : "552";
+    const modePaiement = type === "caisse" ? "especes" : type === "banque" ? "virement" : "mobile_money";
+    setForm(f => ({
+      ...f,
+      compte_credit: compteCredit,
+      compte_tresorerie_id: id,
+      compte_tresorerie_type: type,
+      mode_paiement: modePaiement,
+    }));
+  }, []);
+
+  const compteCreditValue = form.compte_tresorerie_type && form.compte_tresorerie_id
+    ? `${form.compte_tresorerie_type}:${form.compte_tresorerie_id}`
+    : form.compte_credit;
   const catLabel = (v: string) => CATEGORIES.find(c => c.value === v)?.label ?? v;
   const isSubmitting = createMut.isPending || updateMut.isPending;
 
@@ -497,13 +568,40 @@ export default function ChargesDiversesPage() {
                 <p className="text-xs text-gray-400">Auto-rempli selon catégorie</p>
               </div>
               <div className="space-y-1">
-                <Label>Compte crédit</Label>
-                <Select value={form.compte_credit} onValueChange={v => setForm(f => ({ ...f, compte_credit: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Label>Compte crédit / trésorerie *</Label>
+                <Select value={compteCreditValue} onValueChange={handleCompteCreditChange}>
+                  <SelectTrigger><SelectValue placeholder="Sélectionner un compte" /></SelectTrigger>
                   <SelectContent>
-                    {COMPTES_CREDIT.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                    <SelectItem value="401">401 — Fournisseurs (sans sortie immédiate)</SelectItem>
+                    {form.compte_credit === "571" && !form.compte_tresorerie_id && (
+                      <SelectItem value="571" disabled>571 — Caisse (compte historique à remplacer)</SelectItem>
+                    )}
+                    {form.compte_credit === "521" && !form.compte_tresorerie_id && (
+                      <SelectItem value="521" disabled>521 — Banque (compte historique à remplacer)</SelectItem>
+                    )}
+                    {form.compte_credit === "552" && !form.compte_tresorerie_id && (
+                      <SelectItem value="552" disabled>552 — Mobile Marchand (compte historique à remplacer)</SelectItem>
+                    )}
+                    {caisses.map(c => (
+                      <SelectItem key={`caisse:${c.id}`} value={`caisse:${c.id}`}>
+                        571 — Caisse : {c.nom}
+                      </SelectItem>
+                    ))}
+                    {banques.map(c => (
+                      <SelectItem key={`banque:${c.id}`} value={`banque:${c.id}`}>
+                        521 — Banque : {c.nom}{c.banque ? ` (${c.banque})` : ""}
+                      </SelectItem>
+                    ))}
+                    {mobiles.map(c => (
+                      <SelectItem key={`mobile_marchand:${c.id}`} value={`mobile_marchand:${c.id}`}>
+                        552 — Mobile Marchand : {c.nom}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-gray-400">
+                  La validation créera automatiquement une sortie sur le compte sélectionné.
+                </p>
               </div>
             </div>
 

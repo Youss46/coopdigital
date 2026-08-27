@@ -1,4 +1,14 @@
-import { db, chargesDiversesTable } from "@workspace/db";
+import {
+  db,
+  chargesDiversesTable,
+  caissesTable,
+  sessionsCaisseTable,
+  mouvementsCaisseTable,
+  comptesBancairesTable,
+  mouvementsBanqueTable,
+  comptesMobilesMarchandsTable,
+  mouvementsMobileMarchandTable,
+} from "@workspace/db";
 import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
 import { getTauxPpsi } from "./fiscaliteService.js";
 
@@ -13,6 +23,8 @@ export type CreateChargeInput = {
   modePaiement: string;
   tiers?: string | null;
   referencePiece?: string | null;
+  compteTresorerieId?: number | null;
+  compteTresorerieType?: "caisse" | "banque" | "mobile_marchand" | null;
 };
 
 export type ReglementPpsi = {
@@ -113,29 +125,182 @@ export async function validerChargeDiverses(
       eq(chargesDiversesTable.id, id),
       eq(chargesDiversesTable.cooperativeId, cooperativeId),
       eq(chargesDiversesTable.statut, "brouillon"),
-    )).limit(1);
+    )).for("update").limit(1);
   if (!charge) return null;
 
   const isPpsi = charge.categorie === "ppsi";
   const tauxPpsi = isPpsi ? await getTauxPpsi(cooperativeId) : null;
   const brut = Math.round(parseFloat(charge.montantFcfa));
   const reglement = isPpsi ? calculerReglementPpsi(brut, tauxPpsi!) : null;
-  const [row] = await db
-    .update(chargesDiversesTable)
-    .set({
-      statut: "valide",
-      approvedBy,
-      approvedAt: new Date(),
-      updatedAt: new Date(),
-      ...(isPpsi ? {
-        ppsiTauxPct: tauxPpsi!.toFixed(2),
-        retenuePpsiFcfa: reglement!.retenue,
-        montantNetFcfa: reglement!.net,
-      } : {}),
-    })
-    .where(and(eq(chargesDiversesTable.id, id), eq(chargesDiversesTable.cooperativeId, cooperativeId), eq(chargesDiversesTable.statut, "brouillon")))
-    .returning();
-  return row ?? null;
+  const compteParType = {
+    caisse: "571",
+    banque: "521",
+    mobile_marchand: "552",
+  } as const;
+  const compteCredit = charge.compteCredit;
+  const compteTresorerieType = charge.compteTresorerieType as keyof typeof compteParType | null;
+  const compteTresorerieId = charge.compteTresorerieId;
+  const mouvementTresorerie = compteCredit !== "401";
+
+  if (mouvementTresorerie) {
+    if (!compteTresorerieType || !compteTresorerieId) {
+      throw new Error("Un compte de trésorerie doit être sélectionné avant la validation");
+    }
+    if (compteParType[compteTresorerieType] !== compteCredit) {
+      throw new Error("Le compte de trésorerie sélectionné ne correspond pas au compte crédit");
+    }
+  } else if (compteTresorerieType || compteTresorerieId) {
+    throw new Error("Un compte fournisseur ne peut pas être associé à un mouvement de trésorerie");
+  }
+
+  const montantSortie = isPpsi ? reglement!.net : brut;
+  const dateOperation = charge.dateCharge;
+  const libelleMouvement = `Charge diverse — ${charge.libelle}`;
+  const reference = charge.referencePiece ?? `CHD-${charge.id}`;
+
+  return db.transaction(async (tx) => {
+    // Recharger et verrouiller la charge dans la transaction : deux validations
+    // concurrentes ne doivent jamais créer deux sorties de trésorerie.
+    const [chargeVerrouillee] = await tx.select({ id: chargesDiversesTable.id })
+      .from(chargesDiversesTable)
+      .where(and(
+        eq(chargesDiversesTable.id, id),
+        eq(chargesDiversesTable.cooperativeId, cooperativeId),
+        eq(chargesDiversesTable.statut, "brouillon"),
+      ))
+      .for("update")
+      .limit(1);
+    if (!chargeVerrouillee) return null;
+
+    if (mouvementTresorerie && montantSortie > 0) {
+      if (compteTresorerieType === "caisse") {
+        const [caisse] = await tx.select().from(caissesTable)
+          .where(and(
+            eq(caissesTable.id, compteTresorerieId!),
+            eq(caissesTable.cooperativeId, cooperativeId),
+            eq(caissesTable.actif, true),
+          ))
+          .for("update")
+          .limit(1);
+        if (!caisse) throw new Error("Caisse introuvable ou inactive");
+
+        const [session] = await tx.select({ id: sessionsCaisseTable.id })
+          .from(sessionsCaisseTable)
+          .where(and(
+            eq(sessionsCaisseTable.caisseId, caisse.id),
+            eq(sessionsCaisseTable.dateSession, new Date().toISOString().slice(0, 10)),
+            eq(sessionsCaisseTable.statut, "ouverte"),
+          ))
+          .limit(1);
+        if (!session) throw new Error(`Aucune session ouverte sur la caisse "${caisse.nom}"`);
+
+        const solde = parseFloat(String(caisse.soldeActuelFcfa));
+        if (solde < montantSortie) {
+          throw new Error(`Solde insuffisant en caisse (${solde.toLocaleString("fr-FR")} FCFA disponible)`);
+        }
+        const nouveauSolde = solde - montantSortie;
+        await tx.insert(mouvementsCaisseTable).values({
+          caisseId: caisse.id,
+          sessionId: session.id,
+          cooperativeId,
+          type: "sortie",
+          motif: "charge_diverse",
+          montantFcfa: montantSortie.toString(),
+          libelle: libelleMouvement,
+          referenceOperation: reference,
+          soldeApresFcfa: nouveauSolde.toString(),
+          enregistrePar: approvedBy,
+        });
+        await tx.update(caissesTable)
+          .set({ soldeActuelFcfa: nouveauSolde.toString() })
+          .where(eq(caissesTable.id, caisse.id));
+      } else if (compteTresorerieType === "banque") {
+        const [banque] = await tx.select().from(comptesBancairesTable)
+          .where(and(
+            eq(comptesBancairesTable.id, compteTresorerieId!),
+            eq(comptesBancairesTable.cooperativeId, cooperativeId),
+            eq(comptesBancairesTable.actif, true),
+          ))
+          .for("update")
+          .limit(1);
+        if (!banque) throw new Error("Compte bancaire introuvable ou inactif");
+
+        const solde = parseFloat(String(banque.soldeActuelFcfa));
+        if (solde < montantSortie) {
+          throw new Error(`Solde bancaire insuffisant (${solde.toLocaleString("fr-FR")} FCFA disponible)`);
+        }
+        const nouveauSolde = solde - montantSortie;
+        await tx.insert(mouvementsBanqueTable).values({
+          compteId: banque.id,
+          cooperativeId,
+          type: "debit",
+          motif: "charge_diverse",
+          montantFcfa: montantSortie.toString(),
+          libelle: libelleMouvement,
+          reference,
+          dateOperation,
+          dateValeur: null,
+          soldeApresFcfa: nouveauSolde.toString(),
+          enregistrePar: approvedBy,
+        });
+        await tx.update(comptesBancairesTable)
+          .set({ soldeActuelFcfa: nouveauSolde.toString() })
+          .where(eq(comptesBancairesTable.id, banque.id));
+      } else if (compteTresorerieType === "mobile_marchand") {
+        const [mobile] = await tx.select().from(comptesMobilesMarchandsTable)
+          .where(and(
+            eq(comptesMobilesMarchandsTable.id, compteTresorerieId!),
+            eq(comptesMobilesMarchandsTable.cooperativeId, cooperativeId),
+            eq(comptesMobilesMarchandsTable.actif, true),
+          ))
+          .for("update")
+          .limit(1);
+        if (!mobile) throw new Error("Compte Mobile Marchand introuvable ou inactif");
+
+        const solde = parseFloat(String(mobile.soldeActuelFcfa));
+        if (solde < montantSortie) {
+          throw new Error(`Solde Mobile Marchand insuffisant (${solde.toLocaleString("fr-FR")} FCFA disponible)`);
+        }
+        const nouveauSolde = solde - montantSortie;
+        await tx.insert(mouvementsMobileMarchandTable).values({
+          compteId: mobile.id,
+          cooperativeId,
+          type: "debit",
+          motif: "charge_diverse",
+          montantFcfa: montantSortie.toString(),
+          libelle: libelleMouvement,
+          reference,
+          dateOperation,
+          soldeApresFcfa: nouveauSolde.toString(),
+          enregistrePar: approvedBy,
+        });
+        await tx.update(comptesMobilesMarchandsTable)
+          .set({ soldeActuelFcfa: nouveauSolde.toString() })
+          .where(eq(comptesMobilesMarchandsTable.id, mobile.id));
+      }
+    }
+
+    const [row] = await tx
+      .update(chargesDiversesTable)
+      .set({
+        statut: "valide",
+        approvedBy,
+        approvedAt: new Date(),
+        updatedAt: new Date(),
+        ...(isPpsi ? {
+          ppsiTauxPct: tauxPpsi!.toFixed(2),
+          retenuePpsiFcfa: reglement!.retenue,
+          montantNetFcfa: reglement!.net,
+        } : {}),
+      })
+      .where(and(
+        eq(chargesDiversesTable.id, id),
+        eq(chargesDiversesTable.cooperativeId, cooperativeId),
+        eq(chargesDiversesTable.statut, "brouillon"),
+      ))
+      .returning();
+    return row ?? null;
+  });
 }
 
 export async function deleteChargeDiverses(cooperativeId: number, id: number) {
