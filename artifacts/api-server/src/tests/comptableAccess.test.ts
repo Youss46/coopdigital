@@ -67,5 +67,6 @@ describe("périmètre du comptable", () => {
     expect(hasPermission("comptable", "caisse", "creer_caisse")).toBe(false);
     expect(hasPermission("comptable", "banque", "creer")).toBe(false);
     expect(hasPermission("comptable", "mobile_marchand", "creer")).toBe(false);
+    expect(hasPermission("comptable", "avances", "octroyer")).toBe(true);
   });
 });
