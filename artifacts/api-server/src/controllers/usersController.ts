@@ -1,7 +1,7 @@
 import { type Request, type Response } from "express";
 import bcrypt from "bcryptjs";
 import { db, usersTable } from "@workspace/db";
-import { eq, asc, and } from "drizzle-orm";
+import { eq, asc, and, sql } from "drizzle-orm";
 import {
   CreateUserBody,
   UpdateUserBody,
@@ -309,12 +309,63 @@ export async function deleteUser(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    await db
-      .delete(usersTable)
-      .where(and(eq(usersTable.id, id), eq(usersTable.cooperativeId, cooperativeId)));
+    await db.transaction(async (tx) => {
+      // Ces données sont propres au compte et ne portent pas d'historique métier.
+      // Elles doivent être retirées avant le compte car leurs FK sont NOT NULL.
+      const detachQueries = [
+        sql`DELETE FROM "lectures_messages" WHERE "user_id" = ${id}`,
+        sql`DELETE FROM "notifications" WHERE "user_id" = ${id}`,
+        sql`DELETE FROM "preferences_notifications" WHERE "user_id" = ${id}`,
+        // Les opérations historiques restent conservées, mais sans pointer
+        // vers un compte qui n'existe plus.
+        sql`UPDATE "alimentations_caisse_delegue" SET "envoye_par" = NULL WHERE "envoye_par" = ${id}`,
+        sql`UPDATE "avances" SET "agent_id" = NULL WHERE "agent_id" = ${id}`,
+        sql`UPDATE "bilans_campagne" SET "genere_par" = NULL WHERE "genere_par" = ${id}`,
+        sql`UPDATE "budgets_campagne" SET "valide_par" = NULL WHERE "valide_par" = ${id}`,
+        sql`UPDATE "bulletins_paie" SET "paye_par" = NULL WHERE "paye_par" = ${id}`,
+        sql`UPDATE "config_cooperative" SET "updated_by" = NULL WHERE "updated_by" = ${id}`,
+        sql`UPDATE "distributions_intrants" SET "agent_id" = NULL WHERE "agent_id" = ${id}`,
+        sql`UPDATE "equipements" SET "affecte_user_id" = NULL WHERE "affecte_user_id" = ${id}`,
+        sql`UPDATE "historique_prix" SET "saisi_par" = NULL WHERE "saisi_par" = ${id}`,
+        sql`UPDATE "historique_sms" SET "agent_id" = NULL WHERE "agent_id" = ${id}`,
+        sql`UPDATE "indicateurs_rse" SET "calcule_par" = NULL WHERE "calcule_par" = ${id}`,
+        sql`UPDATE "liberations_parts" SET "agent_id" = NULL WHERE "agent_id" = ${id}`,
+        sql`UPDATE "litiges_pesee" SET "resolu_par" = NULL WHERE "resolu_par" = ${id}`,
+        sql`UPDATE "livraisons" SET "agent_id" = NULL, "peseur_id" = NULL WHERE "agent_id" = ${id} OR "peseur_id" = ${id}`,
+        sql`UPDATE "messages_internes" SET "auteur_id" = NULL WHERE "auteur_id" = ${id}`,
+        sql`UPDATE "messages_mission" SET "auteur_id" = NULL WHERE "auteur_id" = ${id}`,
+        sql`UPDATE "mouvements_caisse_delegue" SET "created_by_id" = NULL WHERE "created_by_id" = ${id}`,
+        sql`UPDATE "mouvements_stock" SET "agent_id" = NULL WHERE "agent_id" = ${id}`,
+        sql`UPDATE "paiements" SET "initialise_par" = NULL, "valide_par" = NULL WHERE "initialise_par" = ${id} OR "valide_par" = ${id}`,
+        sql`UPDATE "parcelles" SET "enregistre_par" = NULL WHERE "enregistre_par" = ${id}`,
+        sql`UPDATE "projets_investissement" SET "responsable_id" = NULL WHERE "responsable_id" = ${id}`,
+        sql`UPDATE "simulations" SET "created_by" = NULL WHERE "created_by" = ${id}`,
+        sql`UPDATE "taux_change" SET "saisi_par" = NULL WHERE "saisi_par" = ${id}`,
+        sql`UPDATE "tickets_support" SET "ouvert_par" = NULL WHERE "ouvert_par" = ${id}`,
+        sql`UPDATE "traitements_refus" SET "traite_par" = NULL WHERE "traite_par" = ${id}`,
+      ];
+      for (const query of detachQueries) {
+        await tx.execute(query);
+      }
+
+      await tx
+        .delete(usersTable)
+        .where(and(eq(usersTable.id, id), eq(usersTable.cooperativeId, cooperativeId)));
+    });
     res.status(204).end();
   } catch (err) {
     req.log.error({ err }, "Erreur lors de la suppression du compte");
+    if (
+      typeof err === "object" &&
+      err !== null &&
+      "code" in err &&
+      (err as { code?: string }).code === "23503"
+    ) {
+      res.status(409).json({
+        erreur: "Ce compte est encore lié à une donnée métier obligatoire. Désactivez-le plutôt que de le supprimer.",
+      });
+      return;
+    }
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
