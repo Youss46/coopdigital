@@ -73,6 +73,7 @@
 - [Règlement prestataire PPSSI](ppsi-prestataire-reglement.md) — le brut crée la dette 401, la retenue solde 401 vers 447, et seul le net est porté en sortie de trésorerie.
 - [Taux PPSSI annuel](ppsi-taux-annuel.md) — le taux est modifiable une fois par année civile et doit piloter calculs, règlements et exports.
 - [Cartographie automatique terrain](terrain-auto-mapping.md) — le mode automatique filtre les positions GPS par précision et distance, avec pause/reprise et validation finale.
+- [Port de prévisualisation Terrain](terrain-preview-port.md) — lire le port réellement ouvert par le workflow avant toute capture locale.
 - [Tests React du terrain](terrain-react-tests.md) — les tests de rendu utilisent jsdom uniquement au niveau du fichier et le plugin React dans la config Vitest.
 - [Assets Vite du terrain](terrain-vite-base-assets.md) — les assets publics doivent utiliser BASE_URL, car Terrain est servi sous le préfixe /terrain/.
 - [Numérotation globale des reçus](receipt-sequence-global-uniqueness.md) — `paiements.numero_recu` est globalement unique; utiliser une séquence commune à toutes les coopératives.
