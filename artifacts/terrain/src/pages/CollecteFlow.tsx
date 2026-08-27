@@ -12,6 +12,7 @@ import { useProxy } from "../contexts/ProxyContext";
 import { getCachedPrix, cachePrix } from "../lib/idb";
 import type { Fournisseur, CollecteResult, PrixActuel } from "../lib/types";
 import { NumericInput } from "../components/ui/numeric-input";
+import { tareFromNombreSacs } from "../lib/sessionPesee";
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -276,7 +277,10 @@ export default function CollecteFlow() {
                   decimal={false}
                   className="t-input t-input--lg"
                   value={nombreSacs}
-                  onChange={setNombreSacs}
+                  onChange={(value) => {
+                    setNombreSacs(value);
+                    setRetenueKg(tareFromNombreSacs(value));
+                  }}
                   min="1"
                   placeholder="Ex: 5"
                 />
@@ -310,15 +314,17 @@ export default function CollecteFlow() {
               </div>
 
               <div className="t-field">
-                <label className="t-label">Retenue / tare (kg)</label>
+                <label className="t-label">Retenue / tare (kg) · 1 kg par sac</label>
                 <NumericInput
                   decimal
                   className="t-input"
                   value={retenueKg}
-                  onChange={setRetenueKg}
+                  onChange={() => {}}
                   step="0.1"
                   min="0"
-                  placeholder="0"
+                  readOnly
+                  aria-label="Tare calculée automatiquement"
+                  title="La tare est calculée automatiquement : 1 kg par sac"
                 />
               </div>
 

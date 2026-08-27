@@ -43,6 +43,7 @@ import type { AvanceDeleagueTerrain } from "../lib/api";
 import {
   getFournisseurForSession,
   isIncompleteMemberDelegateSession,
+  tareFromNombreSacs,
 } from "../lib/sessionPesee";
 
 type Step = "membre" | "certif" | "session" | "succes";
@@ -1180,21 +1181,26 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
                     decimal={false}
                     className="t-input t-input--lg"
                     value={nbSacs}
-                    onChange={setNbSacs}
+                    onChange={(value) => {
+                      setNbSacs(value);
+                      setTare(tareFromNombreSacs(value));
+                    }}
                     min="0"
                     placeholder="0"
                   />
                 </div>
                 <div className="t-field">
-                  <label className="t-label">Tare (kg)</label>
+                  <label className="t-label">Tare (kg) · 1 kg par sac</label>
                   <NumericInput
                     decimal
                     className="t-input"
                     value={tare}
-                    onChange={setTare}
+                    onChange={() => {}}
                     step="0.1"
                     min="0"
-                    placeholder="0"
+                    readOnly
+                    aria-label="Tare calculée automatiquement"
+                    title="La tare est calculée automatiquement : 1 kg par sac"
                   />
                 </div>
               </div>
