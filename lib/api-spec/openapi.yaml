@@ -1038,6 +1038,149 @@ paths:
         "401":
           description: Non authentifié
 
+  /comptabilite/balances-sage/preview:
+    post:
+      operationId: previewBalanceSage
+      tags: [comptabilite]
+      summary: Prévisualiser une balance Sage
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [fichier]
+              properties:
+                fichier:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Aperçu et colonnes détectées
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BalanceSagePreview"
+        "400":
+          description: Fichier invalide
+
+  /comptabilite/balances-sage/imports:
+    get:
+      operationId: listBalanceSageImports
+      tags: [comptabilite]
+      summary: Lister les balances Sage importées
+      parameters:
+        - name: exercice
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Imports de la coopérative
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BalanceSageImport"
+    post:
+      operationId: importBalanceSage
+      tags: [comptabilite]
+      summary: Importer une balance Sage
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [fichier, exercice, mode, mapping]
+              properties:
+                fichier:
+                  type: string
+                  format: binary
+                exercice:
+                  type: integer
+                mode:
+                  type: string
+                  enum: [historique, reprise]
+                mapping:
+                  type: string
+                  description: Objet JSON de correspondance des colonnes physiques
+      responses:
+        "201":
+          description: Balance importée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BalanceSageImport"
+        "409":
+          description: Import déjà effectué
+
+  /comptabilite/balances-sage/imports/{id}:
+    get:
+      operationId: getBalanceSageImport
+      tags: [comptabilite]
+      summary: Consulter une balance Sage importée
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Détail de la balance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BalanceSageImportDetail"
+        "404":
+          description: Import introuvable
+
+  /comptabilite/balances-sage/imports/{id}/preparer-reprise:
+    post:
+      operationId: prepareBalanceSageReprise
+      tags: [comptabilite]
+      summary: Préparer les à-nouveaux sans les comptabiliser
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BalanceSagePreparationInput"
+      responses:
+        "200":
+          description: Écritures proposées pour contrôle
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BalanceSagePreparation"
+        "422":
+          description: Balance non équilibrée ou compte inconnu
+
+  /comptabilite/balances-sage/imports/{id}/valider-reprise:
+    post:
+      operationId: validateBalanceSageReprise
+      tags: [comptabilite]
+      summary: Valider définitivement les à-nouveaux
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Reprise comptabilisée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BalanceSageImport"
+        "422":
+          description: Reprise non préparée ou déjà validée
+
   /comptabilite/journal:
     get:
       operationId: getJournalComptable
@@ -8039,6 +8182,106 @@ components:
           type: integer
         soldeCrediteur:
           type: integer
+
+    BalanceSageMapping:
+      type: object
+      required: [numeroCompte, libelle, totalDebit, totalCredit]
+      properties:
+        numeroCompte: { type: integer }
+        libelle: { type: integer }
+        totalDebit: { type: integer }
+        totalCredit: { type: integer }
+        soldeDebiteur: { type: integer, nullable: true }
+        soldeCrediteur: { type: integer, nullable: true }
+
+    BalanceSagePreview:
+      type: object
+      required: [empreinte, feuille, headers, preview, mappingSuggere, lignesDetectees]
+      properties:
+        empreinte: { type: string }
+        feuille: { type: string }
+        headers:
+          type: array
+          items: { type: string }
+        preview:
+          type: array
+          items:
+            type: array
+            items: {}
+        mappingSuggere:
+          $ref: "#/components/schemas/BalanceSageMapping"
+        lignesDetectees: { type: integer }
+
+    BalanceSageImport:
+      type: object
+      required: [id, exercice, mode, nomFichier, empreinte, feuille, statut, nombreLignes, nombreErreurs, comptesInconnus, createdAt]
+      properties:
+        id: { type: integer }
+        exercice: { type: integer }
+        mode: { type: string, enum: [historique, reprise] }
+        nomFichier: { type: string }
+        empreinte: { type: string }
+        feuille: { type: string }
+        statut: { type: string, enum: [importe, a_corriger, preparee, validee] }
+        nombreLignes: { type: integer }
+        nombreErreurs: { type: integer }
+        comptesInconnus: { type: integer }
+        compteContrepartie: { type: string, nullable: true }
+        dateReprise: { type: string, nullable: true }
+        nombreEcritures: { type: integer, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    BalanceSageLigne:
+      type: object
+      required: [numeroLigne, numeroCompte, libelle, totalDebit, totalCredit, soldeDebiteur, soldeCrediteur, compteConnu]
+      properties:
+        numeroLigne: { type: integer }
+        numeroCompte: { type: string }
+        libelle: { type: string }
+        totalDebit: { type: integer }
+        totalCredit: { type: integer }
+        soldeDebiteur: { type: integer }
+        soldeCrediteur: { type: integer }
+        compteConnu: { type: boolean }
+        erreur: { type: string, nullable: true }
+
+    BalanceSageImportDetail:
+      allOf:
+        - $ref: "#/components/schemas/BalanceSageImport"
+        - type: object
+          required: [lignes]
+          properties:
+            lignes:
+              type: array
+              items:
+                $ref: "#/components/schemas/BalanceSageLigne"
+
+    BalanceSagePreparationInput:
+      type: object
+      required: [compteContrepartie]
+      properties:
+        compteContrepartie: { type: string }
+        dateReprise: { type: string, format: date }
+
+    BalanceSagePreparation:
+      type: object
+      required: [import, totalDebiteur, totalCrediteur, nombreEcritures, ecritures]
+      properties:
+        import:
+          $ref: "#/components/schemas/BalanceSageImport"
+        totalDebiteur: { type: integer }
+        totalCrediteur: { type: integer }
+        nombreEcritures: { type: integer }
+        ecritures:
+          type: array
+          items:
+            type: object
+            required: [compteDebit, compteCredit, montantFcfa, libelle]
+            properties:
+              compteDebit: { type: string }
+              compteCredit: { type: string }
+              montantFcfa: { type: integer }
+              libelle: { type: string }
 
     MargeCollecte:
       type: object

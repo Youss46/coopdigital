@@ -1448,6 +1448,95 @@ export interface BalanceLigne {
   soldeCrediteur: number;
 }
 
+export interface BalanceSageMapping {
+  numeroCompte: number;
+  libelle: number;
+  totalDebit: number;
+  totalCredit: number;
+  soldeDebiteur?: number | null;
+  soldeCrediteur?: number | null;
+}
+
+export interface BalanceSagePreview {
+  empreinte: string;
+  feuille: string;
+  headers: string[];
+  preview: unknown[][];
+  mappingSuggere: BalanceSageMapping;
+  lignesDetectees: number;
+}
+
+export type BalanceSageImportMode = typeof BalanceSageImportMode[keyof typeof BalanceSageImportMode];
+
+
+export const BalanceSageImportMode = {
+  historique: 'historique',
+  reprise: 'reprise',
+} as const;
+
+export type BalanceSageImportStatut = typeof BalanceSageImportStatut[keyof typeof BalanceSageImportStatut];
+
+
+export const BalanceSageImportStatut = {
+  importe: 'importe',
+  a_corriger: 'a_corriger',
+  preparee: 'preparee',
+  validee: 'validee',
+} as const;
+
+export interface BalanceSageImport {
+  id: number;
+  exercice: number;
+  mode: BalanceSageImportMode;
+  nomFichier: string;
+  empreinte: string;
+  feuille: string;
+  statut: BalanceSageImportStatut;
+  nombreLignes: number;
+  nombreErreurs: number;
+  comptesInconnus: number;
+  compteContrepartie?: string | null;
+  dateReprise?: string | null;
+  nombreEcritures?: number | null;
+  createdAt: string;
+}
+
+export interface BalanceSageLigne {
+  numeroLigne: number;
+  numeroCompte: string;
+  libelle: string;
+  totalDebit: number;
+  totalCredit: number;
+  soldeDebiteur: number;
+  soldeCrediteur: number;
+  compteConnu: boolean;
+  erreur?: string | null;
+}
+
+export type BalanceSageImportDetail = BalanceSageImport & {
+  lignes: BalanceSageLigne[];
+};
+
+export interface BalanceSagePreparationInput {
+  compteContrepartie: string;
+  dateReprise?: string;
+}
+
+export type BalanceSagePreparationEcrituresItem = {
+  compteDebit: string;
+  compteCredit: string;
+  montantFcfa: number;
+  libelle: string;
+};
+
+export interface BalanceSagePreparation {
+  import: BalanceSageImport;
+  totalDebiteur: number;
+  totalCrediteur: number;
+  nombreEcritures: number;
+  ecritures: BalanceSagePreparationEcrituresItem[];
+}
+
 export interface MargeCollecte {
   caVentesFcfa: number;
   coutAchatsFcfa: number;
@@ -4845,6 +4934,30 @@ limit?: number;
 
 export type GetBalanceParams = {
 exercice?: number;
+};
+
+export type PreviewBalanceSageBody = {
+  fichier: Blob;
+};
+
+export type ListBalanceSageImportsParams = {
+exercice?: number;
+};
+
+export type ImportBalanceSageBodyMode = typeof ImportBalanceSageBodyMode[keyof typeof ImportBalanceSageBodyMode];
+
+
+export const ImportBalanceSageBodyMode = {
+  historique: 'historique',
+  reprise: 'reprise',
+} as const;
+
+export type ImportBalanceSageBody = {
+  fichier: Blob;
+  exercice: number;
+  mode: ImportBalanceSageBodyMode;
+  /** Objet JSON de correspondance des colonnes physiques */
+  mapping: string;
 };
 
 export type GetJournalComptableParams = {

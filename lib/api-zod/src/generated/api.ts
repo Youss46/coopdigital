@@ -1123,7 +1123,7 @@ export const GetGrandLivreResponse = zod.object({
 
 
 /**
- * @summary Balance des comptes (débit / crédit / solde)
+ * @summary Balance des comptes à six colonnes
  */
 export const GetBalanceQueryParams = zod.object({
   "exercice": zod.coerce.number().optional()
@@ -1138,6 +1138,170 @@ export const GetBalanceResponseItem = zod.object({
   "soldeCrediteur": zod.number()
 })
 export const GetBalanceResponse = zod.array(GetBalanceResponseItem)
+
+
+/**
+ * @summary Prévisualiser une balance Sage
+ */
+export const PreviewBalanceSageBody = zod.object({
+  "fichier": zod.instanceof(File)
+})
+
+export const PreviewBalanceSageResponse = zod.object({
+  "empreinte": zod.string(),
+  "feuille": zod.string(),
+  "headers": zod.array(zod.string()),
+  "preview": zod.array(zod.array(zod.unknown())),
+  "mappingSuggere": zod.object({
+  "numeroCompte": zod.number(),
+  "libelle": zod.number(),
+  "totalDebit": zod.number(),
+  "totalCredit": zod.number(),
+  "soldeDebiteur": zod.number().nullish(),
+  "soldeCrediteur": zod.number().nullish()
+}),
+  "lignesDetectees": zod.number()
+})
+
+
+/**
+ * @summary Lister les balances Sage importées
+ */
+export const ListBalanceSageImportsQueryParams = zod.object({
+  "exercice": zod.coerce.number().optional()
+})
+
+export const ListBalanceSageImportsResponseItem = zod.object({
+  "id": zod.number(),
+  "exercice": zod.number(),
+  "mode": zod.enum(['historique', 'reprise']),
+  "nomFichier": zod.string(),
+  "empreinte": zod.string(),
+  "feuille": zod.string(),
+  "statut": zod.enum(['importe', 'a_corriger', 'preparee', 'validee']),
+  "nombreLignes": zod.number(),
+  "nombreErreurs": zod.number(),
+  "comptesInconnus": zod.number(),
+  "compteContrepartie": zod.string().nullish(),
+  "dateReprise": zod.string().nullish(),
+  "nombreEcritures": zod.number().nullish(),
+  "createdAt": zod.coerce.date()
+})
+export const ListBalanceSageImportsResponse = zod.array(ListBalanceSageImportsResponseItem)
+
+
+/**
+ * @summary Importer une balance Sage
+ */
+export const ImportBalanceSageBody = zod.object({
+  "fichier": zod.instanceof(File),
+  "exercice": zod.number(),
+  "mode": zod.enum(['historique', 'reprise']),
+  "mapping": zod.string().describe('Objet JSON de correspondance des colonnes physiques')
+})
+
+
+/**
+ * @summary Consulter une balance Sage importée
+ */
+export const GetBalanceSageImportParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetBalanceSageImportResponse = zod.object({
+  "id": zod.number(),
+  "exercice": zod.number(),
+  "mode": zod.enum(['historique', 'reprise']),
+  "nomFichier": zod.string(),
+  "empreinte": zod.string(),
+  "feuille": zod.string(),
+  "statut": zod.enum(['importe', 'a_corriger', 'preparee', 'validee']),
+  "nombreLignes": zod.number(),
+  "nombreErreurs": zod.number(),
+  "comptesInconnus": zod.number(),
+  "compteContrepartie": zod.string().nullish(),
+  "dateReprise": zod.string().nullish(),
+  "nombreEcritures": zod.number().nullish(),
+  "createdAt": zod.coerce.date()
+}).and(zod.object({
+  "lignes": zod.array(zod.object({
+  "numeroLigne": zod.number(),
+  "numeroCompte": zod.string(),
+  "libelle": zod.string(),
+  "totalDebit": zod.number(),
+  "totalCredit": zod.number(),
+  "soldeDebiteur": zod.number(),
+  "soldeCrediteur": zod.number(),
+  "compteConnu": zod.boolean(),
+  "erreur": zod.string().nullish()
+}))
+}))
+
+
+/**
+ * @summary Préparer les à-nouveaux sans les comptabiliser
+ */
+export const PrepareBalanceSageRepriseParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const PrepareBalanceSageRepriseBody = zod.object({
+  "compteContrepartie": zod.string(),
+  "dateReprise": zod.coerce.date().optional()
+})
+
+export const PrepareBalanceSageRepriseResponse = zod.object({
+  "import": zod.object({
+  "id": zod.number(),
+  "exercice": zod.number(),
+  "mode": zod.enum(['historique', 'reprise']),
+  "nomFichier": zod.string(),
+  "empreinte": zod.string(),
+  "feuille": zod.string(),
+  "statut": zod.enum(['importe', 'a_corriger', 'preparee', 'validee']),
+  "nombreLignes": zod.number(),
+  "nombreErreurs": zod.number(),
+  "comptesInconnus": zod.number(),
+  "compteContrepartie": zod.string().nullish(),
+  "dateReprise": zod.string().nullish(),
+  "nombreEcritures": zod.number().nullish(),
+  "createdAt": zod.coerce.date()
+}),
+  "totalDebiteur": zod.number(),
+  "totalCrediteur": zod.number(),
+  "nombreEcritures": zod.number(),
+  "ecritures": zod.array(zod.object({
+  "compteDebit": zod.string(),
+  "compteCredit": zod.string(),
+  "montantFcfa": zod.number(),
+  "libelle": zod.string()
+}))
+})
+
+
+/**
+ * @summary Valider définitivement les à-nouveaux
+ */
+export const ValidateBalanceSageRepriseParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ValidateBalanceSageRepriseResponse = zod.object({
+  "id": zod.number(),
+  "exercice": zod.number(),
+  "mode": zod.enum(['historique', 'reprise']),
+  "nomFichier": zod.string(),
+  "empreinte": zod.string(),
+  "feuille": zod.string(),
+  "statut": zod.enum(['importe', 'a_corriger', 'preparee', 'validee']),
+  "nombreLignes": zod.number(),
+  "nombreErreurs": zod.number(),
+  "comptesInconnus": zod.number(),
+  "compteContrepartie": zod.string().nullish(),
+  "dateReprise": zod.string().nullish(),
+  "nombreEcritures": zod.number().nullish(),
+  "createdAt": zod.coerce.date()
+})
 
 
 /**

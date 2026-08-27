@@ -126,6 +126,8 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     voir_historique_corrections:      ["pca", "directeur", "comptable", "auditeur"],
     // Veille IA anomalies comptables
     voir_anomalies_ia:                ["comptable"],
+    importer_balance:                 ["pca", "directeur", "comptable"],
+    valider_reprise_balance:          ["pca", "directeur", "comptable"],
   },
 
   // MODULE M06 — REPORTING

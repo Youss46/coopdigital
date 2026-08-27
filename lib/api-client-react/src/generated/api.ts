@@ -50,6 +50,11 @@ import type {
   Bailleur,
   BailleurInput,
   BalanceLigne,
+  BalanceSageImport,
+  BalanceSageImportDetail,
+  BalanceSagePreparation,
+  BalanceSagePreparationInput,
+  BalanceSagePreview,
   BilanCampagneResult,
   BilanEtat,
   BonCarburant,
@@ -213,6 +218,7 @@ import type {
   HypotheseBudget,
   HypothesesBody,
   HypothesesInput,
+  ImportBalanceSageBody,
   Intrant,
   IntrantInput,
   IntrantResume,
@@ -220,6 +226,7 @@ import type {
   LigneBudget,
   LigneBudgetSubvention,
   LigneEcheancier,
+  ListBalanceSageImportsParams,
   ListEcrituresEnAttenteParams,
   ListFournisseursParams,
   ListIntrantsParams,
@@ -265,6 +272,7 @@ import type {
   PresenceResult,
   Preteur,
   PreteurInput,
+  PreviewBalanceSageBody,
   ProjectionCampagne,
   ProjectionTresorerie,
   RapportAgentPesee,
@@ -3651,7 +3659,7 @@ export const getGetBalanceUrl = (params?: GetBalanceParams,) => {
 }
 
 /**
- * @summary Balance des comptes (débit / crédit / solde)
+ * @summary Balance des comptes à six colonnes
  */
 export const getBalance = async (params?: GetBalanceParams, options?: RequestInit): Promise<BalanceLigne[]> => {
 
@@ -3698,7 +3706,7 @@ export type GetBalanceQueryError = ErrorType<void>
 
 
 /**
- * @summary Balance des comptes (débit / crédit / solde)
+ * @summary Balance des comptes à six colonnes
  */
 
 export function useGetBalance<TData = Awaited<ReturnType<typeof getBalance>>, TError = ErrorType<void>>(
@@ -3718,6 +3726,458 @@ export function useGetBalance<TData = Awaited<ReturnType<typeof getBalance>>, TE
 
 
 
+
+export const getPreviewBalanceSageUrl = () => {
+
+
+
+
+  return `/api/comptabilite/balances-sage/preview`
+}
+
+/**
+ * @summary Prévisualiser une balance Sage
+ */
+export const previewBalanceSage = async (previewBalanceSageBody: PreviewBalanceSageBody, options?: RequestInit): Promise<BalanceSagePreview> => {
+    const formData = new FormData();
+formData.append(`fichier`, previewBalanceSageBody.fichier);
+
+  return customFetch<BalanceSagePreview>(getPreviewBalanceSageUrl(),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body:
+      formData,
+  }
+);}
+
+
+
+
+export const getPreviewBalanceSageMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewBalanceSage>>, TError,{data: BodyType<PreviewBalanceSageBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewBalanceSage>>, TError,{data: BodyType<PreviewBalanceSageBody>}, TContext> => {
+
+const mutationKey = ['previewBalanceSage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewBalanceSage>>, {data: BodyType<PreviewBalanceSageBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  previewBalanceSage(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewBalanceSageMutationResult = NonNullable<Awaited<ReturnType<typeof previewBalanceSage>>>
+    export type PreviewBalanceSageMutationBody = BodyType<PreviewBalanceSageBody>
+    export type PreviewBalanceSageMutationError = ErrorType<void>
+
+    /**
+ * @summary Prévisualiser une balance Sage
+ */
+export const usePreviewBalanceSage = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewBalanceSage>>, TError,{data: BodyType<PreviewBalanceSageBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewBalanceSage>>,
+        TError,
+        {data: BodyType<PreviewBalanceSageBody>},
+        TContext
+      > => {
+      return useMutation(getPreviewBalanceSageMutationOptions(options));
+    }
+
+export const getListBalanceSageImportsUrl = (params?: ListBalanceSageImportsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/comptabilite/balances-sage/imports?${stringifiedParams}` : `/api/comptabilite/balances-sage/imports`
+}
+
+/**
+ * @summary Lister les balances Sage importées
+ */
+export const listBalanceSageImports = async (params?: ListBalanceSageImportsParams, options?: RequestInit): Promise<BalanceSageImport[]> => {
+
+  return customFetch<BalanceSageImport[]>(getListBalanceSageImportsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListBalanceSageImportsQueryKey = (params?: ListBalanceSageImportsParams,) => {
+    return [
+    `/api/comptabilite/balances-sage/imports`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListBalanceSageImportsQueryOptions = <TData = Awaited<ReturnType<typeof listBalanceSageImports>>, TError = ErrorType<unknown>>(params?: ListBalanceSageImportsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBalanceSageImports>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListBalanceSageImportsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listBalanceSageImports>>> = ({ signal }) => listBalanceSageImports(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listBalanceSageImports>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListBalanceSageImportsQueryResult = NonNullable<Awaited<ReturnType<typeof listBalanceSageImports>>>
+export type ListBalanceSageImportsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Lister les balances Sage importées
+ */
+
+export function useListBalanceSageImports<TData = Awaited<ReturnType<typeof listBalanceSageImports>>, TError = ErrorType<unknown>>(
+ params?: ListBalanceSageImportsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBalanceSageImports>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListBalanceSageImportsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getImportBalanceSageUrl = () => {
+
+
+
+
+  return `/api/comptabilite/balances-sage/imports`
+}
+
+/**
+ * @summary Importer une balance Sage
+ */
+export const importBalanceSage = async (importBalanceSageBody: ImportBalanceSageBody, options?: RequestInit): Promise<BalanceSageImport> => {
+    const formData = new FormData();
+formData.append(`fichier`, importBalanceSageBody.fichier);
+formData.append(`exercice`, importBalanceSageBody.exercice.toString())
+formData.append(`mode`, importBalanceSageBody.mode);
+formData.append(`mapping`, importBalanceSageBody.mapping);
+
+  return customFetch<BalanceSageImport>(getImportBalanceSageUrl(),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body:
+      formData,
+  }
+);}
+
+
+
+
+export const getImportBalanceSageMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importBalanceSage>>, TError,{data: BodyType<ImportBalanceSageBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof importBalanceSage>>, TError,{data: BodyType<ImportBalanceSageBody>}, TContext> => {
+
+const mutationKey = ['importBalanceSage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof importBalanceSage>>, {data: BodyType<ImportBalanceSageBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  importBalanceSage(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ImportBalanceSageMutationResult = NonNullable<Awaited<ReturnType<typeof importBalanceSage>>>
+    export type ImportBalanceSageMutationBody = BodyType<ImportBalanceSageBody>
+    export type ImportBalanceSageMutationError = ErrorType<void>
+
+    /**
+ * @summary Importer une balance Sage
+ */
+export const useImportBalanceSage = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importBalanceSage>>, TError,{data: BodyType<ImportBalanceSageBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof importBalanceSage>>,
+        TError,
+        {data: BodyType<ImportBalanceSageBody>},
+        TContext
+      > => {
+      return useMutation(getImportBalanceSageMutationOptions(options));
+    }
+
+export const getGetBalanceSageImportUrl = (id: number,) => {
+
+
+
+
+  return `/api/comptabilite/balances-sage/imports/${id}`
+}
+
+/**
+ * @summary Consulter une balance Sage importée
+ */
+export const getBalanceSageImport = async (id: number, options?: RequestInit): Promise<BalanceSageImportDetail> => {
+
+  return customFetch<BalanceSageImportDetail>(getGetBalanceSageImportUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBalanceSageImportQueryKey = (id: number,) => {
+    return [
+    `/api/comptabilite/balances-sage/imports/${id}`
+    ] as const;
+    }
+
+
+export const getGetBalanceSageImportQueryOptions = <TData = Awaited<ReturnType<typeof getBalanceSageImport>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBalanceSageImport>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBalanceSageImportQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBalanceSageImport>>> = ({ signal }) => getBalanceSageImport(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBalanceSageImport>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBalanceSageImportQueryResult = NonNullable<Awaited<ReturnType<typeof getBalanceSageImport>>>
+export type GetBalanceSageImportQueryError = ErrorType<void>
+
+
+/**
+ * @summary Consulter une balance Sage importée
+ */
+
+export function useGetBalanceSageImport<TData = Awaited<ReturnType<typeof getBalanceSageImport>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBalanceSageImport>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBalanceSageImportQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPrepareBalanceSageRepriseUrl = (id: number,) => {
+
+
+
+
+  return `/api/comptabilite/balances-sage/imports/${id}/preparer-reprise`
+}
+
+/**
+ * @summary Préparer les à-nouveaux sans les comptabiliser
+ */
+export const prepareBalanceSageReprise = async (id: number,
+    balanceSagePreparationInput: BalanceSagePreparationInput, options?: RequestInit): Promise<BalanceSagePreparation> => {
+
+  return customFetch<BalanceSagePreparation>(getPrepareBalanceSageRepriseUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      balanceSagePreparationInput,)
+  }
+);}
+
+
+
+
+export const getPrepareBalanceSageRepriseMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof prepareBalanceSageReprise>>, TError,{id: number;data: BodyType<BalanceSagePreparationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof prepareBalanceSageReprise>>, TError,{id: number;data: BodyType<BalanceSagePreparationInput>}, TContext> => {
+
+const mutationKey = ['prepareBalanceSageReprise'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof prepareBalanceSageReprise>>, {id: number;data: BodyType<BalanceSagePreparationInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  prepareBalanceSageReprise(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PrepareBalanceSageRepriseMutationResult = NonNullable<Awaited<ReturnType<typeof prepareBalanceSageReprise>>>
+    export type PrepareBalanceSageRepriseMutationBody = BodyType<BalanceSagePreparationInput>
+    export type PrepareBalanceSageRepriseMutationError = ErrorType<void>
+
+    /**
+ * @summary Préparer les à-nouveaux sans les comptabiliser
+ */
+export const usePrepareBalanceSageReprise = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof prepareBalanceSageReprise>>, TError,{id: number;data: BodyType<BalanceSagePreparationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof prepareBalanceSageReprise>>,
+        TError,
+        {id: number;data: BodyType<BalanceSagePreparationInput>},
+        TContext
+      > => {
+      return useMutation(getPrepareBalanceSageRepriseMutationOptions(options));
+    }
+
+export const getValidateBalanceSageRepriseUrl = (id: number,) => {
+
+
+
+
+  return `/api/comptabilite/balances-sage/imports/${id}/valider-reprise`
+}
+
+/**
+ * @summary Valider définitivement les à-nouveaux
+ */
+export const validateBalanceSageReprise = async (id: number, options?: RequestInit): Promise<BalanceSageImport> => {
+
+  return customFetch<BalanceSageImport>(getValidateBalanceSageRepriseUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getValidateBalanceSageRepriseMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof validateBalanceSageReprise>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof validateBalanceSageReprise>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['validateBalanceSageReprise'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof validateBalanceSageReprise>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  validateBalanceSageReprise(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ValidateBalanceSageRepriseMutationResult = NonNullable<Awaited<ReturnType<typeof validateBalanceSageReprise>>>
+
+    export type ValidateBalanceSageRepriseMutationError = ErrorType<void>
+
+    /**
+ * @summary Valider définitivement les à-nouveaux
+ */
+export const useValidateBalanceSageReprise = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof validateBalanceSageReprise>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof validateBalanceSageReprise>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getValidateBalanceSageRepriseMutationOptions(options));
+    }
 
 export const getGetJournalComptableUrl = (params?: GetJournalComptableParams,) => {
   const normalizedParams = new URLSearchParams();

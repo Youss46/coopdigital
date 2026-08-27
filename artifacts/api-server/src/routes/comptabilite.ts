@@ -51,6 +51,15 @@ import {
   getHistoriqueEcritureHandler,
   validerNumeroCompteHandler,
 } from "../controllers/planComptableController";
+import {
+  balanceSageUpload,
+  previewBalanceSage,
+  importBalanceSage,
+  listBalanceSageImports,
+  getBalanceSageImport,
+  prepareBalanceSageReprise,
+  validateBalanceSageReprise,
+} from "../controllers/balanceSageController";
 
 const router: IRouter = Router();
 
@@ -60,6 +69,12 @@ router.use(authMiddleware);
 router.get("/comptabilite/tiers/:id/grand-livre", authMiddleware, getGrandLivreTiers);
 router.get("/comptabilite/grand-livre",   checkPermission("comptabilite", "voir_grand_livre"),        getGrandLivre);
 router.get("/comptabilite/balance",           checkPermission("comptabilite", "voir_balance"), getBalance);
+router.post("/comptabilite/balances-sage/preview", checkPermission("comptabilite", "importer_balance"), balanceSageUpload.single("fichier"), previewBalanceSage);
+router.post("/comptabilite/balances-sage/imports", checkPermission("comptabilite", "importer_balance"), balanceSageUpload.single("fichier"), importBalanceSage);
+router.get("/comptabilite/balances-sage/imports", checkPermission("comptabilite", "voir_balance"), listBalanceSageImports);
+router.get("/comptabilite/balances-sage/imports/:id", checkPermission("comptabilite", "voir_balance"), getBalanceSageImport);
+router.post("/comptabilite/balances-sage/imports/:id/preparer-reprise", checkPermission("comptabilite", "importer_balance"), prepareBalanceSageReprise);
+router.post("/comptabilite/balances-sage/imports/:id/valider-reprise", checkPermission("comptabilite", "valider_reprise_balance"), validateBalanceSageReprise);
 router.get("/comptabilite/balance-auxiliaire", checkPermission("comptabilite", "voir_balance"), getBalanceAuxiliaire);
 router.get("/comptabilite/journal",        checkPermission("comptabilite", "lire"), getJournalComptable);
 router.get("/comptabilite/journal/export", checkPermission("comptabilite", "lire"), exportJournalCsv);

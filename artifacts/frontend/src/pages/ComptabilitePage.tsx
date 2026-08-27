@@ -27,7 +27,7 @@ import {
 } from "@workspace/api-client-react";
 import { usePermission } from "@/hooks/usePermission";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, Settings, Clock, BookOpen, CheckCheck, X, Edit2, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, RefreshCw, DollarSign, List, Sliders, RotateCcw, Plus, Pencil, Ban, ChevronDown, ChevronUp, Search, RotateCw, FileText, Scale, Droplets, Lock, Download, Filter, Users, Sparkles, ShieldAlert, Eye } from "lucide-react";
+import { AlertTriangle, Settings, Clock, BookOpen, CheckCheck, X, Edit2, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, RefreshCw, DollarSign, List, Sliders, RotateCcw, Plus, Pencil, Ban, ChevronDown, ChevronUp, Search, RotateCw, FileText, Scale, Droplets, Lock, Download, Filter, Users, Sparkles, ShieldAlert, Eye, Upload, CheckCircle2, FileSpreadsheet } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { type TauxChange } from "@workspace/api-client-react";
 
@@ -1219,6 +1219,14 @@ async function apiFetch<T>(path: string): Promise<T> {
   if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { erreur?: string }).erreur ?? r.statusText);
   return r.json() as Promise<T>;
 }
+async function apiUpload<T>(path: string, file: File, fields: Record<string, unknown> = {}): Promise<T> {
+  const body = new FormData();
+  body.append("fichier", file);
+  Object.entries(fields).forEach(([key, value]) => body.append(key, typeof value === "string" ? value : JSON.stringify(value)));
+  const r = await fetch(`${_BASE}${path}`, { method: "POST", headers: { Authorization: `Bearer ${tok()}` }, body });
+  if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { erreur?: string }).erreur ?? r.statusText);
+  return r.json() as Promise<T>;
+}
 async function apiPost<T>(path: string, body: unknown): Promise<T> {
   const r = await fetch(`${_BASE}${path}`, { method: "POST", headers: hdr(), body: JSON.stringify(body) });
   if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { erreur?: string }).erreur ?? r.statusText);
@@ -2372,6 +2380,182 @@ function OngletBalance() {
               </tfoot>
             </table>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Import des balances Sage ────────────────────────────────────────────────
+type BalanceImportMode = "historique" | "reprise";
+interface BalanceSageImport {
+  id: number; exercice: number; mode: BalanceImportMode; nomFichier: string;
+  feuille: string; statut: string; nombreLignes: number; nombreErreurs: number;
+  comptesInconnus: number; compteContrepartie?: string | null; dateReprise?: string | null;
+  nombreEcritures?: number | null; createdAt: string;
+}
+interface BalanceSageDetail extends BalanceSageImport {
+  lignes: Array<{ numeroLigne: number; numeroCompte: string; libelle: string; totalDebit: number; totalCredit: number; soldeDebiteur: number; soldeCrediteur: number; compteConnu: boolean; erreur: string | null }>;
+}
+interface BalanceSagePreview {
+  empreinte: string; feuille: string; headers: string[]; preview: unknown[][];
+  mappingSuggere: Record<string, number | undefined>; lignesDetectees: number;
+}
+interface BalanceSagePreparation {
+  import: BalanceSageImport; totalDebiteur: number; totalCrediteur: number; nombreEcritures: number;
+  ecritures: Array<{ compteDebit: string; compteCredit: string; montantFcfa: number; libelle: string }>;
+}
+
+function OngletImportBalances() {
+  const { toast } = useToast();
+  const exerciceActuel = new Date().getFullYear();
+  const [exercice, setExercice] = useState(exerciceActuel);
+  const [mode, setMode] = useState<BalanceImportMode>("historique");
+  const [fichier, setFichier] = useState<File | null>(null);
+  const [preview, setPreview] = useState<BalanceSagePreview | null>(null);
+  const [mapping, setMapping] = useState<Record<string, number | undefined>>({});
+  const [importSelectionne, setImportSelectionne] = useState<number | null>(null);
+  const [detail, setDetail] = useState<BalanceSageDetail | null>(null);
+  const [contrepartie, setContrepartie] = useState("");
+  const [preparation, setPreparation] = useState<BalanceSagePreparation | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+
+  const importsQuery = useQuery({
+    queryKey: ["balances-sage-imports", exercice],
+    queryFn: () => apiFetch<BalanceSageImport[]>(`/api/comptabilite/balances-sage/imports?exercice=${exercice}`),
+  });
+  const imports = importsQuery.data ?? [];
+
+  const lireDetail = async (id: number) => {
+    try {
+      const value = await apiFetch<BalanceSageDetail>(`/api/comptabilite/balances-sage/imports/${id}`);
+      setImportSelectionne(id); setDetail(value);
+      setPreparation(null);
+      if (value.compteContrepartie) setContrepartie(value.compteContrepartie);
+    } catch (err) {
+      toast({ title: "Impossible de charger l'import", description: (err as Error).message, variant: "destructive" });
+    }
+  };
+
+  const handlePreview = async () => {
+    if (!fichier) { toast({ title: "Choisissez un fichier Sage", variant: "destructive" }); return; }
+    setActionLoading(true);
+    try {
+      const value = await apiUpload<BalanceSagePreview>("/api/comptabilite/balances-sage/preview", fichier);
+      setPreview(value); setMapping(value.mappingSuggere);
+    } catch (err) {
+      toast({ title: "Lecture impossible", description: (err as Error).message, variant: "destructive" });
+    } finally { setActionLoading(false); }
+  };
+
+  const handleImport = async () => {
+    if (!fichier || !preview) return;
+    setActionLoading(true);
+    try {
+      await apiUpload<BalanceSageImport>("/api/comptabilite/balances-sage/imports", fichier, { exercice, mode, mapping: JSON.stringify(mapping) });
+      toast({ title: mode === "historique" ? "Balance importée pour consultation" : "Balance importée pour préparation" });
+      setFichier(null); setPreview(null); setShowImport(false);
+      void importsQuery.refetch();
+    } catch (err) {
+      toast({ title: "Import refusé", description: (err as Error).message, variant: "destructive" });
+    } finally { setActionLoading(false); }
+  };
+
+  const handlePrepare = async () => {
+    if (!detail || !contrepartie.trim()) {
+      toast({ title: "Compte de contrepartie requis", variant: "destructive" }); return;
+    }
+    setActionLoading(true);
+    try {
+      const value = await apiPost<BalanceSagePreparation>(`/api/comptabilite/balances-sage/imports/${detail.id}/preparer-reprise`, { compteContrepartie: contrepartie.trim() });
+      setPreparation(value); setDetail({ ...detail, ...value.import });
+      void importsQuery.refetch();
+      toast({ title: "Reprise préparée", description: "Contrôlez les écritures proposées avant validation." });
+    } catch (err) {
+      toast({ title: "Préparation impossible", description: (err as Error).message, variant: "destructive" });
+    } finally { setActionLoading(false); }
+  };
+
+  const handleValidate = async () => {
+    if (!detail || !preparation) return;
+    setActionLoading(true);
+    try {
+      const value = await apiPost<BalanceSageImport & { message: string }>(`/api/comptabilite/balances-sage/imports/${detail.id}/valider-reprise`, {});
+      toast({ title: "Reprise validée", description: value.message });
+      setDetail({ ...detail, ...value }); setPreparation(null); void importsQuery.refetch();
+    } catch (err) {
+      toast({ title: "Validation impossible", description: (err as Error).message, variant: "destructive" });
+    } finally { setActionLoading(false); }
+  };
+
+  const mappingFields = [
+    ["numeroCompte", "Numéro de compte", true], ["libelle", "Intitulé", true],
+    ["totalDebit", "Mouvements débit", true], ["totalCredit", "Mouvements crédit", true],
+    ["soldeDebiteur", "Solde débiteur", false], ["soldeCrediteur", "Solde créditeur", false],
+  ] as const;
+  const statusLabel: Record<string, string> = { importe: "Importé", a_corriger: "À vérifier", preparee: "Préparée", validee: "Validée" };
+  const statusColor: Record<string, string> = { importe: "bg-blue-50 text-blue-700", a_corriger: "bg-amber-50 text-amber-700", preparee: "bg-purple-50 text-purple-700", validee: "bg-green-50 text-green-700" };
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">Balances Sage</h2>
+          <p className="text-sm text-gray-500 mt-1">Importez une balance .xls sans fabriquer de faux journaux historiques.</p>
+        </div>
+        <button onClick={() => { setShowImport(true); setPreview(null); }} className="ml-auto flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm font-semibold" style={{ backgroundColor: VERT }}>
+          <Upload size={15} /> Importer une balance
+        </button>
+      </div>
+
+      <div className="flex items-end gap-3">
+        <div><label className="block text-xs font-medium text-gray-500 mb-1">Exercice</label>
+          <select value={exercice} onChange={(e) => { setExercice(Number(e.target.value)); setDetail(null); }} className="border border-gray-200 rounded-lg px-3 py-2 text-sm">
+            {Array.from({ length: 6 }, (_, i) => exerciceActuel - i).map((a) => <option key={a}>{a}</option>)}
+          </select>
+        </div>
+        <span className="text-xs text-gray-500 pb-2">Les imports sont isolés par coopérative, exercice et mode.</span>
+      </div>
+
+      {showImport && (
+        <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
+          <div className="flex items-start justify-between"><div><h3 className="font-semibold text-gray-900">Assistant d’import Sage</h3><p className="text-xs text-gray-500 mt-1">Le fichier n’est lu qu’en mémoire. Les montants sont normalisés en FCFA.</p></div><button onClick={() => setShowImport(false)}><X size={18} className="text-gray-400" /></button></div>
+          <div className="grid md:grid-cols-2 gap-3">
+            <label className="border rounded-lg p-3 cursor-pointer hover:border-green-500"><input type="radio" checked={mode === "historique"} onChange={() => setMode("historique")} className="mr-2" /><strong className="text-sm">Consultation historique</strong><span className="block text-xs text-gray-500 ml-5 mt-1">Conserve la balance sans modifier le journal.</span></label>
+            <label className="border rounded-lg p-3 cursor-pointer hover:border-green-500"><input type="radio" checked={mode === "reprise"} onChange={() => setMode("reprise")} className="mr-2" /><strong className="text-sm">Préparer une reprise</strong><span className="block text-xs text-gray-500 ml-5 mt-1">Prépare des à-nouveaux contrôlables, puis validables.</span></label>
+          </div>
+          <div className="flex flex-wrap gap-3 items-center"><input type="file" accept=".xls,.xlsx,.csv" onChange={(e) => setFichier(e.target.files?.[0] ?? null)} className="text-sm" /><button onClick={handlePreview} disabled={!fichier || actionLoading} className="px-3 py-2 rounded-lg border text-sm disabled:opacity-40">{actionLoading ? "Lecture…" : "Prévisualiser"}</button></div>
+          {preview && (
+            <div className="space-y-4 border-t pt-4">
+              <div className="flex items-center gap-2 text-sm text-green-700"><CheckCircle2 size={16} /> {preview.lignesDetectees} lignes détectées dans la feuille « {preview.feuille} »</div>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {mappingFields.map(([key, label, required]) => <label key={key} className="text-xs font-medium text-gray-600">{label}{required ? " *" : ""}
+                  <select value={mapping[key] ?? ""} onChange={(e) => setMapping({ ...mapping, [key]: e.target.value === "" ? undefined : Number(e.target.value) })} className="mt-1 w-full border rounded-lg px-2 py-2 text-sm">
+                    {!required && <option value="">Déduire du débit/crédit</option>}
+                    {preview.headers.map((header, index) => <option key={header} value={index}>{header}</option>)}
+                  </select>
+                </label>)}
+              </div>
+              <div className="overflow-x-auto border rounded-lg"><table className="text-xs min-w-full"><tbody>{preview.preview.slice(0, 5).map((row, i) => <tr key={i} className="border-b last:border-0">{(row as unknown[]).map((cell, j) => <td key={j} className="px-2 py-1.5 whitespace-nowrap">{String(cell ?? "")}</td>)}</tr>)}</tbody></table></div>
+              <button onClick={handleImport} disabled={actionLoading} className="px-4 py-2 rounded-lg text-white text-sm disabled:opacity-50" style={{ backgroundColor: VERT }}>{actionLoading ? "Import…" : `Importer en mode ${mode === "historique" ? "consultation" : "reprise"}`}</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {imports.length === 0 ? <div className="bg-white rounded-xl border border-dashed p-12 text-center text-sm text-gray-500"><FileSpreadsheet className="mx-auto mb-3 text-gray-300" size={36} />Aucune balance Sage importée pour {exercice}.</div> :
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden"><table className="w-full text-sm"><thead className="bg-gray-50"><tr><th className="text-left px-4 py-3 text-xs text-gray-500">Fichier</th><th className="text-left px-4 py-3 text-xs text-gray-500">Mode</th><th className="text-left px-4 py-3 text-xs text-gray-500">État</th><th className="text-right px-4 py-3 text-xs text-gray-500">Lignes</th><th className="px-4 py-3" /></tr></thead><tbody>{imports.map((item) => <tr key={item.id} className="border-t hover:bg-gray-50"><td className="px-4 py-3"><div className="font-medium">{item.nomFichier}</div><div className="text-xs text-gray-400">{new Date(item.createdAt).toLocaleString("fr-FR")}</div></td><td className="px-4 py-3">{item.mode === "historique" ? "Consultation" : "Reprise"}</td><td className="px-4 py-3"><span className={`px-2 py-1 rounded-full text-xs ${statusColor[item.statut] ?? "bg-gray-100 text-gray-600"}`}>{statusLabel[item.statut] ?? item.statut}{item.nombreErreurs ? ` · ${item.nombreErreurs} erreur(s)` : ""}</span></td><td className="px-4 py-3 text-right">{item.nombreLignes}</td><td className="px-4 py-3 text-right"><button onClick={() => void lireDetail(item.id)} className="text-green-700 hover:underline text-xs">Consulter</button></td></tr>)}</tbody></table></div>}
+
+      {detail && (
+        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+          <div className="flex items-start justify-between"><div><h3 className="font-semibold text-gray-900">{detail.nomFichier}</h3><p className="text-xs text-gray-500">{detail.mode === "historique" ? "Consultation sans impact sur les écritures" : "Reprise par à-nouveaux"}</p></div><button onClick={() => setDetail(null)}><X size={18} className="text-gray-400" /></button></div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm"><div className="bg-gray-50 rounded-lg p-3"><span className="text-xs text-gray-500">Lignes</span><strong className="block">{detail.nombreLignes}</strong></div><div className="bg-gray-50 rounded-lg p-3"><span className="text-xs text-gray-500">Erreurs</span><strong className="block">{detail.nombreErreurs}</strong></div><div className="bg-gray-50 rounded-lg p-3"><span className="text-xs text-gray-500">Comptes inconnus</span><strong className="block">{detail.comptesInconnus}</strong></div><div className="bg-gray-50 rounded-lg p-3"><span className="text-xs text-gray-500">État</span><strong className="block">{statusLabel[detail.statut] ?? detail.statut}</strong></div></div>
+          <div className="overflow-x-auto max-h-80 border rounded-lg"><table className="w-full text-xs"><thead className="sticky top-0 bg-gray-50"><tr><th className="text-left p-2">Compte</th><th className="text-left p-2">Libellé</th><th className="text-right p-2">Solde débiteur</th><th className="text-right p-2">Solde créditeur</th><th className="text-left p-2">Contrôle</th></tr></thead><tbody>{detail.lignes.map((line) => <tr key={line.numeroLigne} className="border-t"><td className="p-2 font-mono">{line.numeroCompte}</td><td className="p-2">{line.libelle}</td><td className="p-2 text-right">{FCFA(line.soldeDebiteur)}</td><td className="p-2 text-right">{FCFA(line.soldeCrediteur)}</td><td className={`p-2 ${line.erreur ? "text-amber-700" : "text-green-700"}`}>{line.erreur ?? "OK"}</td></tr>)}</tbody></table></div>
+          {detail.mode === "reprise" && detail.statut !== "validee" && (
+            <div className="border-t pt-4 space-y-3"><div><h4 className="font-semibold text-sm">Préparer les à-nouveaux</h4><p className="text-xs text-gray-500">Le compte de contrepartie doit être présent dans le plan comptable actif.</p></div><div className="flex flex-wrap gap-2"><input value={contrepartie} onChange={(e) => setContrepartie(e.target.value)} placeholder="Compte de contrepartie (ex. 110)" className="border rounded-lg px-3 py-2 text-sm font-mono" /><button onClick={handlePrepare} disabled={actionLoading || detail.statut === "preparee"} className="px-3 py-2 rounded-lg text-white text-sm disabled:opacity-40" style={{ backgroundColor: VERT }}>{detail.statut === "preparee" ? "Reprise préparée" : "Préparer pour contrôle"}</button></div></div>
+          )}
+          {preparation && detail.statut === "preparee" && <div className="border rounded-lg bg-purple-50/50 p-4 space-y-3"><div className="flex justify-between text-sm"><span>Total débiteur : <strong>{FCFA(preparation.totalDebiteur)}</strong></span><span>Total créditeur : <strong>{FCFA(preparation.totalCrediteur)}</strong></span></div><p className="text-xs text-purple-800">{preparation.nombreEcritures} écritures seront ajoutées comme à-nouveaux. Contrôlez la liste puis validez.</p><div className="max-h-44 overflow-y-auto text-xs space-y-1">{preparation.ecritures.map((entry, i) => <div key={i} className="flex justify-between gap-3"><span>{entry.compteDebit} → {entry.compteCredit}</span><span className="font-medium">{FCFA(entry.montantFcfa)}</span></div>)}</div><button onClick={handleValidate} disabled={actionLoading} className="px-4 py-2 rounded-lg text-white text-sm disabled:opacity-50" style={{ backgroundColor: VERT }}>{actionLoading ? "Validation…" : "Valider définitivement la reprise"}</button></div>}
         </div>
       )}
     </div>
@@ -4002,7 +4186,7 @@ function OngletAnomaliesIA() {
 }
 
 // ─── Page principale ──────────────────────────────────────────────────────────
-type Onglet = "journal" | "en_attente" | "config" | "devises" | "plan_comptable" | "grand_livre" | "balance" | "balance_aux" | "flux" | "cloture" | "anomalies_ia";
+type Onglet = "journal" | "en_attente" | "config" | "devises" | "plan_comptable" | "grand_livre" | "balance" | "balance_aux" | "import_balances" | "flux" | "cloture" | "anomalies_ia";
 
 export default function ComptabilitePage() {
   const [onglet, setOnglet] = useState<Onglet>("en_attente");
@@ -4015,6 +4199,7 @@ export default function ComptabilitePage() {
   const peutGrandLivre  = usePermission("comptabilite", "voir_grand_livre");
   const peutBalance     = usePermission("comptabilite", "voir_balance");
   const peutSaisir      = usePermission("comptabilite", "saisir_ecriture_manuelle");
+  const peutImporterBalance = usePermission("comptabilite", "importer_balance");
 
   const { data: countData } = useCountEcrituresEnAttente({ query: { queryKey: getCountEcrituresEnAttenteQueryKey(), enabled: peutVoirAttente } });
   const nbEnAttente = countData?.count ?? 0;
@@ -4035,6 +4220,7 @@ export default function ComptabilitePage() {
     ...(peutGrandLivre ? [{ id: "grand_livre" as Onglet, label: "Grand-livre",  icon: FileText }] : []),
     ...(peutBalance    ? [{ id: "balance"     as Onglet, label: "Balance",         icon: Scale }] : []),
     ...(peutBalance    ? [{ id: "balance_aux" as Onglet, label: "Balance tiers",   icon: Users }] : []),
+    ...(peutImporterBalance ? [{ id: "import_balances" as Onglet, label: "Import Sage", icon: Upload }] : []),
     { id: "flux",        label: "Flux trésorerie",  icon: Droplets },
     ...(peutVoirConfig ? [{ id: "cloture"         as Onglet, label: "Clôture",        icon: Lock }] : []),
     ...(peutVoirTaux   ? [{ id: "devises"         as Onglet, label: "Devises",        icon: DollarSign }] : []),
@@ -4100,6 +4286,7 @@ export default function ComptabilitePage() {
         {onglet === "grand_livre"   && peutGrandLivre && <OngletGrandLivre />}
         {onglet === "balance"       && peutBalance    && <OngletBalance />}
         {onglet === "balance_aux"   && peutBalance    && <OngletBalanceAuxiliaire />}
+        {onglet === "import_balances" && peutImporterBalance && <OngletImportBalances />}
         {onglet === "flux"          && <OngletFluxTresorerie />}
         {onglet === "cloture"       && peutVoirConfig && <OngletCloture />}
         {onglet === "devises"       && peutVoirTaux   && <OngletDevises />}

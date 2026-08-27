@@ -117,6 +117,8 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     // Corrections d'écritures
     corriger:                 ["pca", "directeur", "comptable"],
     voir_historique_corrections: ["pca", "directeur", "comptable", "auditeur"],
+    importer_balance:           ["pca", "directeur", "comptable"],
+    valider_reprise_balance:    ["pca", "directeur", "comptable"],
   },
 
   reporting: {
