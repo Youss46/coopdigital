@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { terrainAuthMiddleware, delegueOnly, peseurOrDelegueOnly } from "../middlewares/terrainAuth.js";
 import { authMiddleware } from "../middlewares/auth.js";
+import { denyComptableRestrictedModules } from "../middlewares/permissions.js";
 import {
   getMonEntrepotHandler,
   getMesMouvementsHandler,
@@ -40,6 +41,7 @@ router.get("/terrain/transferts/en_attente_pesee",              terrainAuthMiddl
 
 // ─── Routes admin (JWT coopérative) ───────────────────────────────────────────
 // Ont leur propre authMiddleware (routeur enregistré avant le guard global)
+router.use(["/entrepots", "/transferts"], authMiddleware, denyComptableRestrictedModules);
 
 router.get("/entrepots/stats",               authMiddleware, getStatsHandler);
 router.get("/entrepots/delegues-liste",      authMiddleware, listDeleguesEntrepotsHandler);

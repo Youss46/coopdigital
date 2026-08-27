@@ -5,7 +5,7 @@ import { authMiddleware } from "../middlewares/auth";
 const ROLES_APPROBATEUR = ["pca", "directeur"];
 
 // Rôles autorisés à configurer les stations-service
-const ROLES_GESTIONNAIRE_STATION = ["pca", "directeur", "comptable", "admin"];
+const ROLES_GESTIONNAIRE_STATION = ["pca", "directeur", "admin"];
 
 function requireRole(roles: string[]) {
   return (req: Request, res: Response, next: NextFunction): void => {

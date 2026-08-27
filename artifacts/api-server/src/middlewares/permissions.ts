@@ -38,7 +38,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
 
   // MODULE M02 — TRAÇABILITÉ
   tracabilite: {
-    lire:             ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
+    lire:             ["pca", "directeur", "responsable_tracabilite", "auditeur"],
     creer_lot:        ["pca", "directeur", "responsable_tracabilite"],
     modifier_lot:     ["pca", "directeur", "responsable_tracabilite"],
     supprimer_lot:    ["pca", "directeur"],
@@ -48,11 +48,11 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
 
   // MODULE M03 — STOCKS
   stocks: {
-    lire:                ["pca", "directeur", "comptable", "magasinier", "auditeur"],
+    lire:                ["pca", "directeur", "magasinier", "auditeur"],
     entree:              ["pca", "directeur", "magasinier"],
     sortie:              ["pca", "directeur", "magasinier"],
-    creer_entrepot:      ["pca", "directeur", "comptable"],
-    modifier_entrepot:   ["pca", "directeur", "comptable"],
+    creer_entrepot:      ["pca", "directeur"],
+    modifier_entrepot:   ["pca", "directeur"],
     supprimer_entrepot:  ["pca"],
     voir_alertes:        ["pca", "directeur", "magasinier"],
   },
@@ -179,7 +179,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
 
   // MODULE REFUS
   refus: {
-    lire:    ["pca", "directeur", "magasinier", "responsable_tracabilite", "comptable", "auditeur"],
+    lire:    ["pca", "directeur", "magasinier", "responsable_tracabilite", "auditeur"],
     traiter: ["pca", "directeur", "magasinier", "responsable_tracabilite"],
   },
 
@@ -192,7 +192,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
 
   // MODULE M07 — COMMUNICATION
   communication: {
-    lire_historique:    ["pca", "directeur", "comptable", "caissier", "delegue", "magasinier", "responsable_tracabilite", "auditeur", "agent_terrain"],
+    lire_historique:    ["pca", "directeur", "caissier", "delegue", "magasinier", "responsable_tracabilite", "auditeur", "agent_terrain"],
     envoyer_sms:        ["pca", "directeur", "delegue"],
     envoyer_whatsapp:   ["pca", "directeur"],
     configurer_alertes: ["pca", "directeur"],
@@ -208,13 +208,13 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
 
   // MODULE GOUVERNANCE — ASSEMBLÉES GÉNÉRALES
   gouvernance: {
-    voir:             ["pca", "directeur", "comptable", "auditeur"],
+    voir:             ["pca", "directeur", "auditeur"],
     planifier_ag:     ["pca", "directeur"],
     convoquer:        ["pca", "directeur"],
     gerer_seance:     ["pca", "directeur"],
     enregistrer_vote: ["pca", "directeur"],
     generer_pv:       ["pca", "directeur"],
-    voir_archives:    ["pca", "directeur", "comptable", "auditeur"],
+    voir_archives:    ["pca", "directeur", "auditeur"],
   },
 
   // MODULE SUBVENTIONS / BAILLEURS
@@ -263,7 +263,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
 
   // MODULE PARCELLES & EUDR
   parcelles: {
-    voir_carte:       ["pca", "directeur", "comptable", "responsable_tracabilite", "delegue", "auditeur"],
+    voir_carte:       ["pca", "directeur", "responsable_tracabilite", "delegue", "auditeur"],
     creer_parcelle:   ["pca", "directeur", "delegue", "responsable_tracabilite"],
     modifier_parcelle:["pca", "directeur", "delegue", "responsable_tracabilite"],
     verifier_eudr:    ["pca", "directeur", "responsable_tracabilite", "auditeur"],
@@ -297,7 +297,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     voir_journal:           ["pca", "directeur", "auditeur"],
     voir_stats:             ["pca", "directeur"],
     exporter:               ["pca", "directeur", "auditeur"],
-    voir_historique_entite: ["pca", "directeur", "comptable", "auditeur"],
+    voir_historique_entite: ["pca", "directeur", "auditeur"],
   },
 
   // MODULE — CHÈQUES ÉMIS
@@ -365,26 +365,26 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
 
   // MODULE — FORMATIONS RSE
   formations_rse: {
-    voir:  ["pca", "directeur", "comptable", "auditeur"],
+    voir:  ["pca", "directeur", "auditeur"],
     creer: ["pca", "directeur"],
   },
 
   // MODULE — FORMATIONS & RENFORCEMENT DE CAPACITÉS
   formation: {
-    voir:                  ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
+    voir:                  ["pca", "directeur", "responsable_tracabilite", "auditeur"],
     planifier:             ["pca", "directeur", "responsable_tracabilite"],
     inscrire:              ["pca", "directeur", "responsable_tracabilite"],
     gerer_presences:       ["pca", "directeur", "responsable_tracabilite", "delegue"],
     generer_attestation:   ["pca", "directeur", "responsable_tracabilite"],
-    voir_stats:            ["pca", "directeur", "comptable", "auditeur"],
+    voir_stats:            ["pca", "directeur", "auditeur"],
   },
 
   // MODULE — EXPÉDITIONS PORT
   expeditions: {
-    lire:         ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
+    lire:         ["pca", "directeur", "responsable_tracabilite", "auditeur"],
     creer:        ["pca", "directeur"],
     modifier:     ["pca", "directeur", "responsable_tracabilite"],
-    valider:      ["pca", "directeur", "comptable"],
+    valider:      ["pca", "directeur"],
     litige:       ["pca", "directeur"],
     rapport_eudr: ["pca", "directeur", "responsable_tracabilite", "auditeur"],
   },
@@ -426,6 +426,52 @@ export function hasPermission(userRole: string, module: string, action: string):
   const allowed = PERMISSIONS[module]?.[action];
   if (!allowed) return false;
   return allowed.includes(userRole);
+}
+
+const COMPTABLE_RESTRICTED_PATHS = [
+  "/missions",
+  "/lots",
+  "/pesee",
+  "/stocks",
+  "/pesee/bons-reception",
+  "/refus",
+  "/transport",
+  "/expeditions",
+  "/parcelles",
+  "/planning-collecte",
+  "/formations",
+  "/formations-rse",
+  "/equipements",
+  "/previsions",
+  "/communication",
+  "/scoring",
+  "/gouvernance",
+  "/delegues-localites",
+  "/certifications",
+  "/archives",
+];
+
+/**
+ * Bloque l'accès direct du comptable aux modules opérationnels exclus.
+ * Cette protection complète la navigation frontend et couvre les routes
+ * historiques qui ne déclarent pas encore une permission action par action.
+ */
+export function denyComptableRestrictedModules(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  if (
+    req.user?.role === "comptable" &&
+    COMPTABLE_RESTRICTED_PATHS.some((prefix) => req.path === prefix || req.path.startsWith(`${prefix}/`))
+  ) {
+    res.status(403).json({
+      erreur: "Accès refusé",
+      message: "Ce module n'est pas accessible avec le rôle comptable.",
+    });
+    return;
+  }
+  next();
 }
 
 // ─── Middleware Express réutilisable ─────────────────────────────────────────

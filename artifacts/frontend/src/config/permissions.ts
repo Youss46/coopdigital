@@ -25,7 +25,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
   },
 
   tracabilite: {
-    lire:             ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
+    lire:             ["pca", "directeur", "responsable_tracabilite", "auditeur"],
     creer_lot:        ["pca", "directeur", "responsable_tracabilite"],
     modifier_lot:     ["pca", "directeur", "responsable_tracabilite"],
     supprimer_lot:    ["pca", "directeur"],
@@ -34,11 +34,11 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
   },
 
   stocks: {
-    lire:               ["pca", "directeur", "comptable", "magasinier", "auditeur"],
+    lire:               ["pca", "directeur", "magasinier", "auditeur"],
     entree:             ["pca", "directeur", "magasinier"],
     sortie:             ["pca", "directeur", "magasinier"],
-    creer_entrepot:     ["pca", "directeur", "comptable"],
-    modifier_entrepot:  ["pca", "directeur", "comptable"],
+    creer_entrepot:     ["pca", "directeur"],
+    modifier_entrepot:  ["pca", "directeur"],
     supprimer_entrepot: ["pca"],
     voir_alertes:       ["pca", "directeur", "magasinier"],
   },
@@ -130,7 +130,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
   },
 
   communication: {
-    lire_historique:    ["pca", "directeur", "comptable", "caissier", "delegue", "magasinier", "responsable_tracabilite", "auditeur", "agent_terrain"],
+    lire_historique:    ["pca", "directeur", "caissier", "delegue", "magasinier", "responsable_tracabilite", "auditeur", "agent_terrain"],
     envoyer_sms:        ["pca", "directeur", "delegue"],
     envoyer_whatsapp:   ["pca", "directeur"],
     configurer_alertes: ["pca", "directeur"],
@@ -152,13 +152,13 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
   },
 
   gouvernance: {
-    voir:             ["pca", "directeur", "comptable", "auditeur"],
+    voir:             ["pca", "directeur", "auditeur"],
     planifier_ag:     ["pca", "directeur"],
     convoquer:        ["pca", "directeur"],
     gerer_seance:     ["pca", "directeur"],
     enregistrer_vote: ["pca", "directeur"],
     generer_pv:       ["pca", "directeur"],
-    voir_archives:    ["pca", "directeur", "comptable", "auditeur"],
+    voir_archives:    ["pca", "directeur", "auditeur"],
   },
 
   prix: {
@@ -188,12 +188,12 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
   },
 
   refus: {
-    lire:    ["pca", "directeur", "magasinier", "responsable_tracabilite", "comptable", "auditeur"],
+    lire:    ["pca", "directeur", "magasinier", "responsable_tracabilite", "auditeur"],
     traiter: ["pca", "directeur", "magasinier", "responsable_tracabilite"],
   },
 
   transport: {
-    lire:        ["pca", "directeur", "comptable", "magasinier", "auditeur"],
+    lire:        ["pca", "directeur", "magasinier", "auditeur"],
     creer_bon:   ["pca", "directeur", "magasinier"],
     soumettre:   ["pca", "directeur", "magasinier"],
     approuver:   ["pca", "directeur"],
@@ -225,20 +225,20 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     voir_journal:           ["pca", "directeur", "auditeur"],
     voir_stats:             ["pca", "directeur"],
     exporter:               ["pca", "directeur", "auditeur"],
-    voir_historique_entite: ["pca", "directeur", "comptable", "auditeur"],
+    voir_historique_entite: ["pca", "directeur", "auditeur"],
   },
 
   formation: {
-    voir:                ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
+    voir:                ["pca", "directeur", "responsable_tracabilite", "auditeur"],
     planifier:           ["pca", "directeur", "responsable_tracabilite"],
     inscrire:            ["pca", "directeur", "responsable_tracabilite"],
     gerer_presences:     ["pca", "directeur", "responsable_tracabilite", "delegue"],
     generer_attestation: ["pca", "directeur", "responsable_tracabilite"],
-    voir_stats:          ["pca", "directeur", "comptable", "auditeur"],
+    voir_stats:          ["pca", "directeur", "auditeur"],
   },
 
   formations_rse: {
-    voir:  ["pca", "directeur", "comptable", "auditeur"],
+    voir:  ["pca", "directeur", "auditeur"],
     creer: ["pca", "directeur"],
   },
 

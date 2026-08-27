@@ -28,30 +28,30 @@ export const NAV_ITEMS: NavItemConfig[] = [
 
   // ── Membres ──────────────────────────────────────────────────────────────────
   { href: "/membres",                label: "Membres",                   roles: ["pca","directeur","comptable","caissier","responsable_tracabilite","delegue","auditeur"], category: "Membres" },
-  { href: "/cartes-membres",         label: "Cartes membres",            roles: ["pca","directeur","comptable","delegue","auditeur"],                          category: "Membres" },
-  { href: "/scoring",                label: "Scoring Producteurs",       roles: ["pca","directeur","comptable","auditeur"],                                    category: "Membres" },
+  { href: "/cartes-membres",         label: "Cartes membres",            roles: ["pca","directeur","delegue","auditeur"],                                    category: "Membres" },
+  { href: "/scoring",                label: "Scoring Producteurs",       roles: ["pca","directeur","auditeur"],                                               category: "Membres" },
 
   // ── Collecte ─────────────────────────────────────────────────────────────────
   { href: "/campagnes",              label: "Campagnes",                 roles: ["pca","directeur","comptable","magasinier","delegue","auditeur"],              category: "Collecte" },
   { href: "/livraisons",             label: "Livraisons",                roles: ["pca","directeur","comptable","caissier","magasinier","delegue","auditeur"],          category: "Collecte" },
-  { href: "/sessions-pesee",         label: "Sessions de pesée",         roles: ["pca","directeur","comptable","magasinier","auditeur"],                       category: "Collecte" },
-  { href: "/transport",              label: "Transport",                 roles: ["pca","directeur","comptable","auditeur","magasinier"],                       category: "Collecte" },
-  { href: "/expeditions",            label: "Expéditions port",          roles: ["pca","directeur","comptable","responsable_tracabilite","auditeur"],           category: "Collecte" },
+  { href: "/sessions-pesee",         label: "Sessions de pesée",         roles: ["pca","directeur","magasinier","auditeur"],                                    category: "Collecte" },
+  { href: "/transport",              label: "Transport",                 roles: ["pca","directeur","auditeur","magasinier"],                                    category: "Collecte" },
+  { href: "/expeditions",            label: "Expéditions port",          roles: ["pca","directeur","responsable_tracabilite","auditeur"],                      category: "Collecte" },
 
   // ── Traçabilité ──────────────────────────────────────────────────────────────
   { href: "/tracabilite",            label: "Traçabilité",               roles: ["pca","directeur","responsable_tracabilite","auditeur"],                      category: "Traçabilité" },
-  { href: "/parcelles",              label: "Parcelles & EUDR",          roles: ["pca","directeur","comptable","responsable_tracabilite","auditeur"],           category: "Traçabilité", showEudrAlerteBadge: true },
+  { href: "/parcelles",              label: "Parcelles & EUDR",          roles: ["pca","directeur","responsable_tracabilite","auditeur"],                      category: "Traçabilité", showEudrAlerteBadge: true },
   { href: "/certifications/tableau-de-bord", label: "Tableau de bord certif.", roles: ["pca","directeur","responsable_tracabilite"],      category: "Traçabilité" },
   { href: "/certifications",         label: "Certifications",            roles: ["pca","directeur","responsable_tracabilite"],           category: "Traçabilité" },
   { href: "/enquetes",               label: "Missions d'enquête",        roles: ["pca","directeur","responsable_tracabilite"],           category: "Traçabilité" },
   { href: "/missions",               label: "Missions terrain",          roles: ["responsable_tracabilite"],                                                   category: "Traçabilité" },
 
   // ── Stocks ───────────────────────────────────────────────────────────────────
-  { href: "/stocks",                 label: "Stocks",                    roles: ["pca","directeur","magasinier","comptable","auditeur"],                       category: "Stocks" },
-  { href: "/entrepots",              label: "Entrepôts délégués",        roles: ["pca","directeur","comptable","auditeur"],                                    category: "Stocks" },
+  { href: "/stocks",                 label: "Stocks",                    roles: ["pca","directeur","magasinier","auditeur"],                                    category: "Stocks" },
+  { href: "/entrepots",              label: "Entrepôts délégués",        roles: ["pca","directeur","auditeur"],                                               category: "Stocks" },
   { href: "/mon-entrepot",           label: "Mon entrepôt",              roles: ["delegue"],                                                                   category: "Stocks" },
-  { href: "/refus",                  label: "Stocks refoulés",           roles: ["pca","directeur","magasinier","comptable","auditeur"],                       category: "Stocks" },
-  { href: "/bons-reception-membres", label: "Bons de réception",         roles: ["pca","directeur","magasinier","comptable","auditeur"],                       category: "Stocks" },
+  { href: "/refus",                  label: "Stocks refoulés",           roles: ["pca","directeur","magasinier","auditeur"],                                    category: "Stocks" },
+  { href: "/bons-reception-membres", label: "Bons de réception",         roles: ["pca","directeur","magasinier","auditeur"],                                    category: "Stocks" },
 
   // ── Finance membre ───────────────────────────────────────────────────────────
   { href: "/avances",                label: "Avances",                   roles: ["pca","directeur","comptable","caissier","delegue","auditeur"],                          category: "Finance membre" },
@@ -84,15 +84,15 @@ export const NAV_ITEMS: NavItemConfig[] = [
   { href: "/salaires",               label: "Salaires",                  roles: ["pca","directeur","comptable","auditeur"],                                    category: "Finances" },
 
   // ── RH & Social ──────────────────────────────────────────────────────────────
-  { href: "/formations",             label: "Formations",                roles: ["pca","directeur","comptable","auditeur","delegue"],                          category: "RH & Social" },
-  { href: "/formations-rse",         label: "Formations RSE",            roles: ["pca","directeur","comptable","auditeur"],                                    category: "RH & Social" },
-  { href: "/equipements",            label: "Équipements",               roles: ["pca","directeur","comptable","auditeur"],                                    category: "RH & Social" },
+  { href: "/formations",             label: "Formations",                roles: ["pca","directeur","auditeur","delegue"],                                    category: "RH & Social" },
+  { href: "/formations-rse",         label: "Formations RSE",            roles: ["pca","directeur","auditeur"],                                               category: "RH & Social" },
+  { href: "/equipements",            label: "Équipements",               roles: ["pca","directeur","auditeur"],                                               category: "RH & Social" },
 
   // ── Archives ─────────────────────────────────────────────────────────────────
-  { href: "/archives",               label: "Archives",                  roles: ["pca","directeur","comptable","auditeur"],                                    category: "Archives" },
+  { href: "/archives",               label: "Archives",                  roles: ["pca","directeur","auditeur"],                                               category: "Archives" },
 
   // ── Pilotage ─────────────────────────────────────────────────────────────────
-  { href: "/previsions",             label: "Prévisions",                roles: ["pca","directeur","comptable","auditeur"],                                    category: "Pilotage" },
+  { href: "/previsions",             label: "Prévisions",                roles: ["pca","directeur","auditeur"],                                               category: "Pilotage" },
   { href: "/reporting",              label: "Reporting",                 roles: ["pca","directeur","comptable","responsable_tracabilite","auditeur"],           category: "Pilotage" },
   { href: "/rapport-gestion",        label: "Rapport de gestion IA",     roles: ["pca","directeur"],                                                          category: "Pilotage" },
   { href: "/anomalies",              label: "Anomalies",                 roles: ["pca","directeur","comptable","auditeur"],                                    category: "Pilotage", showAnomaliesBadge: true },
@@ -100,14 +100,14 @@ export const NAV_ITEMS: NavItemConfig[] = [
 
   // ── Organisation ─────────────────────────────────────────────────────────────
   { href: "/gouvernance",            label: "Gouvernance",               roles: ["pca","directeur","secretaire","auditeur"],                                   category: "Organisation" },
-  { href: "/communication",          label: "Communication",             roles: ["pca","directeur","comptable","caissier","magasinier","responsable_tracabilite","delegue","auditeur","agent_terrain"], category: "Organisation", showMessagesBadge: true },
-  { href: "/delegues",               label: "Délégués Localité",         roles: ["pca","directeur","comptable","auditeur"],                                    category: "Organisation" },
-  { href: "/delegues-localites",     label: "Délégués de localités",     roles: ["pca","directeur","comptable","auditeur"],                                    category: "Organisation" },
-  { href: "/peseurs",                label: "Peseurs",                   roles: ["pca","directeur","comptable"],                                               category: "Organisation" },
+  { href: "/communication",          label: "Communication",             roles: ["pca","directeur","caissier","magasinier","responsable_tracabilite","delegue","auditeur","agent_terrain"], category: "Organisation", showMessagesBadge: true },
+  { href: "/delegues",               label: "Délégués Localité",         roles: ["pca","directeur","auditeur"],                                               category: "Organisation" },
+  { href: "/delegues-localites",     label: "Délégués de localités",     roles: ["pca","directeur","auditeur"],                                               category: "Organisation" },
+  { href: "/peseurs",                label: "Peseurs",                   roles: ["pca","directeur"],                                                          category: "Organisation" },
   { href: "/mes-peseurs",            label: "Mes peseurs",               roles: ["delegue"],                                                                   category: "Organisation" },
   { href: "/administration/comptes", label: "Administration",            roles: ["pca","directeur"],                                                           category: "Organisation" },
   { href: "/parametres",             label: "Paramètres",                roles: ["pca","directeur"],                                                           category: "Organisation" },
 
   // ── Hors ligne ───────────────────────────────────────────────────────────────
-  { href: "/ops-en-attente", label: "Opérations hors ligne", roles: ["pca","directeur","comptable","delegue","auditeur","magasinier","responsable_tracabilite"], category: "Hors ligne", showPendingOpsBadge: true },
+  { href: "/ops-en-attente", label: "Opérations hors ligne", roles: ["pca","directeur","delegue","auditeur","magasinier","responsable_tracabilite"], category: "Hors ligne", showPendingOpsBadge: true },
 ];

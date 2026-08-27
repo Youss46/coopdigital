@@ -22,7 +22,7 @@ function requireRole(roles: string[]) {
   };
 }
 
-const ROLES_ARCHIVES = ["pca", "directeur", "comptable", "auditeur"];
+const ROLES_ARCHIVES = ["pca", "directeur", "auditeur"];
 
 router.get("/archives",                        requireRole(ROLES_ARCHIVES), handleListArchives);
 router.get("/archives/comparer",               requireRole(ROLES_ARCHIVES), handleComparerCampagnes);

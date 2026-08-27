@@ -137,10 +137,10 @@ function AppRoutes() {
         <ProtectedRoute component={Membres} />
       </Route>
       <Route path="/missions/:id">
-        <ProtectedRoute component={MissionDetailPage} />
+        <ProtectedRoute component={MissionDetailPage} roles={["pca", "directeur", "responsable_tracabilite", "agent_terrain"]} />
       </Route>
       <Route path="/missions">
-        <ProtectedRoute component={MissionsPage} />
+        <ProtectedRoute component={MissionsPage} roles={["pca", "directeur", "responsable_tracabilite", "agent_terrain"]} />
       </Route>
       <Route path="/avances">
         <ProtectedRoute component={Avances} />
@@ -152,19 +152,19 @@ function AppRoutes() {
         <ProtectedRoute component={LivraisonsPage} />
       </Route>
       <Route path="/sessions-pesee">
-        <ProtectedRoute component={SessionsPeseePage} />
+        <ProtectedRoute component={SessionsPeseePage} roles={["pca", "directeur", "magasinier", "auditeur"]} />
       </Route>
       <Route path="/bons-reception-membres">
-        <ProtectedRoute component={BonsReceptionMembresDeleguesPage} />
+        <ProtectedRoute component={BonsReceptionMembresDeleguesPage} roles={["pca", "directeur", "magasinier", "auditeur"]} />
       </Route>
       <Route path="/tracabilite">
-        <ProtectedRoute component={TracabilitePage} />
+        <ProtectedRoute component={TracabilitePage} roles={["pca", "directeur", "responsable_tracabilite", "auditeur"]} />
       </Route>
       <Route path="/parcelles">
-        <ProtectedRoute component={ParcellePage} />
+        <ProtectedRoute component={ParcellePage} roles={["pca", "directeur", "responsable_tracabilite", "auditeur"]} />
       </Route>
       <Route path="/stocks">
-        <ProtectedRoute component={StocksPage} />
+        <ProtectedRoute component={StocksPage} roles={["pca", "directeur", "magasinier", "auditeur"]} />
       </Route>
       <Route path="/exportateurs">
         <ProtectedRoute component={ExportateursPage} />
@@ -179,7 +179,7 @@ function AppRoutes() {
         <ProtectedRoute component={SalairesPage} />
       </Route>
       <Route path="/communication">
-        <ProtectedRoute component={CommunicationPage} />
+        <ProtectedRoute component={CommunicationPage} roles={["pca", "directeur", "caissier", "magasinier", "responsable_tracabilite", "delegue", "auditeur", "agent_terrain"]} />
       </Route>
       <Route path="/reporting">
         <ProtectedRoute component={ReportingPage} />
@@ -203,7 +203,7 @@ function AppRoutes() {
         <ProtectedRoute component={ReglementsPage} />
       </Route>
       <Route path="/refus">
-        <ProtectedRoute component={RefusPage} />
+        <ProtectedRoute component={RefusPage} roles={["pca", "directeur", "magasinier", "responsable_tracabilite", "auditeur"]} />
       </Route>
       <Route path="/primes">
         <ProtectedRoute component={PrimesPage} />
@@ -221,13 +221,13 @@ function AppRoutes() {
         <ProtectedRoute component={SubventionsPage} />
       </Route>
       <Route path="/gouvernance">
-        <ProtectedRoute component={GouvernancePage} />
+        <ProtectedRoute component={GouvernancePage} roles={["pca", "directeur", "secretaire", "auditeur"]} />
       </Route>
       <Route path="/prix">
         <ProtectedRoute component={PrixPage} />
       </Route>
       <Route path="/scoring">
-        <ProtectedRoute component={ScoringPage} />
+        <ProtectedRoute component={ScoringPage} roles={["pca", "directeur", "auditeur"]} />
       </Route>
       <Route path="/anomalies">
         <ProtectedRoute component={AnomaliesPage} />
@@ -251,22 +251,22 @@ function AppRoutes() {
         <ProtectedRoute component={MonProfilPage} />
       </Route>
       <Route path="/transport">
-        <ProtectedRoute component={TransportPage} />
+        <ProtectedRoute component={TransportPage} roles={["pca", "directeur", "magasinier", "auditeur"]} />
       </Route>
       <Route path="/equipements">
-        <ProtectedRoute component={EquipementsPage} />
+        <ProtectedRoute component={EquipementsPage} roles={["pca", "directeur", "auditeur"]} />
       </Route>
       <Route path="/previsions">
-        <ProtectedRoute component={PrevisionsPage} />
+        <ProtectedRoute component={PrevisionsPage} roles={["pca", "directeur", "auditeur"]} />
       </Route>
       <Route path="/dons">
         <ProtectedRoute component={DonsPage} />
       </Route>
       <Route path="/formations">
-        <ProtectedRoute component={FormationsPage} />
+        <ProtectedRoute component={FormationsPage} roles={["pca", "directeur", "responsable_tracabilite", "delegue", "auditeur"]} />
       </Route>
       <Route path="/formations-rse">
-        <ProtectedRoute component={FormationsRsePage} />
+        <ProtectedRoute component={FormationsRsePage} roles={["pca", "directeur", "auditeur"]} />
       </Route>
       <Route path="/caisse">
         <ProtectedRoute component={CaissePage} />
@@ -290,31 +290,31 @@ function AppRoutes() {
         <ProtectedRoute component={InvestissementsPage} />
       </Route>
       <Route path="/delegues">
-        <ProtectedRoute component={DeleguesPage} />
+        <ProtectedRoute component={DeleguesPage} roles={["pca", "directeur", "auditeur"]} />
       </Route>
       <Route path="/delegues-localites">
-        <ProtectedRoute component={DeleguesLocalitesPage} roles={["pca", "directeur", "comptable", "auditeur"]} />
+        <ProtectedRoute component={DeleguesLocalitesPage} roles={["pca", "directeur", "auditeur"]} />
       </Route>
       <Route path="/cartes-membres">
-        <ProtectedRoute component={CartesMembres} />
+        <ProtectedRoute component={CartesMembres} roles={["pca", "directeur", "delegue", "auditeur"]} />
       </Route>
       <Route path="/finances/tableau-bord">
         <ProtectedRoute component={FinancesTableauBordPage} />
       </Route>
       <Route path="/expeditions/nouvelle">
-        <ProtectedRoute component={NouvelleExpeditionPage} />
+        <ProtectedRoute component={NouvelleExpeditionPage} roles={["pca", "directeur"]} />
       </Route>
       <Route path="/expeditions/:id">
-        <ProtectedRoute component={ExpeditionDetailPage} />
+        <ProtectedRoute component={ExpeditionDetailPage} roles={["pca", "directeur", "responsable_tracabilite", "auditeur"]} />
       </Route>
       <Route path="/expeditions">
-        <ProtectedRoute component={ExpeditionsPage} />
+        <ProtectedRoute component={ExpeditionsPage} roles={["pca", "directeur", "responsable_tracabilite", "auditeur"]} />
       </Route>
       <Route path="/entrepots">
-        <ProtectedRoute component={EntrepotsPage} />
+        <ProtectedRoute component={EntrepotsPage} roles={["pca", "directeur", "auditeur"]} />
       </Route>
       <Route path="/peseurs">
-        <ProtectedRoute component={PeseursPage} />
+        <ProtectedRoute component={PeseursPage} roles={["pca", "directeur"]} />
       </Route>
       <Route path="/mes-peseurs">
         <ProtectedRoute component={MesPeseursPage} />
@@ -323,22 +323,22 @@ function AppRoutes() {
         <ProtectedRoute component={MonEntrepotPage} />
       </Route>
       <Route path="/ops-en-attente">
-        <ProtectedRoute component={PendingOpsPage} />
+        <ProtectedRoute component={PendingOpsPage} roles={["pca", "directeur", "delegue", "auditeur", "magasinier", "responsable_tracabilite"]} />
       </Route>
       <Route path="/archives">
-        <ProtectedRoute component={ArchivesPage} />
+        <ProtectedRoute component={ArchivesPage} roles={["pca", "directeur", "auditeur"]} />
       </Route>
       <Route path="/certifications/tableau-de-bord">
-        <ProtectedRoute component={CertificationsDashboardPage} />
+        <ProtectedRoute component={CertificationsDashboardPage} roles={["pca", "directeur", "responsable_tracabilite"]} />
       </Route>
       <Route path="/certifications">
-        <ProtectedRoute component={CertificationsPage} />
+        <ProtectedRoute component={CertificationsPage} roles={["pca", "directeur", "responsable_tracabilite"]} />
       </Route>
       <Route path="/enquetes/:id">
-        <ProtectedRoute component={MissionEnqueteDetailPage} />
+        <ProtectedRoute component={MissionEnqueteDetailPage} roles={["pca", "directeur", "responsable_tracabilite"]} />
       </Route>
       <Route path="/enquetes">
-        <ProtectedRoute component={MissionsEnquetePage} />
+        <ProtectedRoute component={MissionsEnquetePage} roles={["pca", "directeur", "responsable_tracabilite"]} />
       </Route>
       <Route path="/charges-diverses">
         <ProtectedRoute component={ChargesDiversesPage} />
