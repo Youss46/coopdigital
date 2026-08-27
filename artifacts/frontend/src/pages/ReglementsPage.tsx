@@ -56,6 +56,16 @@ function fmt(n: number | null | undefined) {
   return new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
 }
 
+function parseMontantSaisi(value: string) {
+  const chiffres = value.replace(/\D/g, "");
+  return chiffres ? Number(chiffres) : 0;
+}
+
+function formatMontantSaisi(value: string | number) {
+  const montant = typeof value === "number" ? value : parseMontantSaisi(value);
+  return montant > 0 ? new Intl.NumberFormat("fr-FR").format(montant) : value === "" ? "" : "0";
+}
+
 function fmtPoids(p: string | null | undefined) {
   if (!p) return "—";
   return parseFloat(p).toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " kg";
@@ -142,7 +152,7 @@ function ModalValidation({
     banque: string;
     dateEcheance: string;
   }>>([
-    { modePaiement: "especes", montantFcfa: String(montantNet), numeroCheque: "", banque: "", dateEcheance: "" },
+    { modePaiement: "especes", montantFcfa: formatMontantSaisi(montantNet), numeroCheque: "", banque: "", dateEcheance: "" },
     { modePaiement: "cheque", montantFcfa: "0", numeroCheque: "", banque: "", dateEcheance: "" },
   ]);
   const isCarburant = isBonCarburant(paiement);
@@ -160,18 +170,42 @@ function ModalValidation({
   const isEspeces = selectedMode === "especes";
   const sessionBloquee = isEspeces && sessionCaisseOuverte === false;
   const refManquante = isMobile && !ref.trim();
-  const totalVentile = ventilations.reduce((total, ligne) => total + (Number(ligne.montantFcfa) || 0), 0);
+  const totalVentile = ventilations.reduce((total, ligne) => total + parseMontantSaisi(ligne.montantFcfa), 0);
   const ventilationIncorrecte = multiMoyens && totalVentile !== montantNet;
+
+  function updateMontantVentilation(index: number, value: string) {
+    const montant = parseMontantSaisi(value);
+    const valeurFormatee = formatMontantSaisi(value);
+    setVentilations((old) => {
+      const next = old.map((item, i) => i === index
+        ? { ...item, montantFcfa: valeurFormatee }
+        : item);
+
+      // Le second moyen absorbe automatiquement le solde dans le cas
+      // courant espèces + chèque.
+      if (old.length === 2) {
+        const autreIndex = index === 0 ? 1 : 0;
+        next[autreIndex] = {
+          ...next[autreIndex],
+          montantFcfa: formatMontantSaisi(Math.max(montantNet - montant, 0)),
+        };
+      }
+      return next;
+    });
+  }
 
   function handleConfirm() {
     if (multiMoyens) {
-      if (ventilationIncorrecte || ventilations.some((ligne) => !Number.isInteger(Number(ligne.montantFcfa)) || Number(ligne.montantFcfa) <= 0)) {
+      if (ventilationIncorrecte || ventilations.some((ligne) => {
+        const montant = parseMontantSaisi(ligne.montantFcfa);
+        return !Number.isInteger(montant) || montant <= 0;
+      })) {
         setTouched(true);
         return;
       }
       onConfirm("", "", undefined, ventilations.map((ligne) => ({
         modePaiement: ligne.modePaiement,
-        montantFcfa: Number(ligne.montantFcfa),
+        montantFcfa: parseMontantSaisi(ligne.montantFcfa),
         ...(ligne.modePaiement === "cheque" ? {
           numeroCheque: ligne.numeroCheque || null,
           banque: ligne.banque || null,
@@ -256,10 +290,11 @@ function ModalValidation({
                         {MODES_CARBURANT.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
                       </select>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         min="1"
                         value={ligne.montantFcfa}
-                        onChange={(e) => setVentilations((old) => old.map((item, i) => i === index ? { ...item, montantFcfa: e.target.value } : item))}
+                        onChange={(e) => updateMontantVentilation(index, e.target.value)}
                         className="w-32 border border-gray-200 rounded-lg px-2 py-2 text-xs text-right"
                         placeholder="Montant"
                       />
