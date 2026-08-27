@@ -192,6 +192,9 @@ function makePaiementRow(overrides: Partial<Record<string, unknown>> = {}) {
     membreCni: "CI12345",
     membreTel: "+22501234567",
     livraisonDate: "2026-08-17",
+    livraisonMontantNetFcfa: 590000,
+    livraisonMontantRestant: 400000,
+    livraisonStatutPaiement: "PARTIEL",
     livraisonRef: null,
     validateurNom: null,
     validateurPrenoms: null,
@@ -260,12 +263,14 @@ describe("generateRecuPaiement (real PDF generation) — receipt number in PDF o
    * Configure db.select for three consecutive calls:
    *  call 1 → main paiement join query  (returns [row])
    *  call 2 → paiement lignes query     (returns [] — legacy payment)
-   *  call 3 → getCampagneEnCours query  (returns [] — no campaign)
+   *  call 3 → linked delivery's validated payments query (returns [] — no history)
+   *  call 4 → getCampagneEnCours query  (returns [] — no campaign)
    */
-  function setupDbSelect(row: Record<string, unknown>) {
+  function setupDbSelect(row: Record<string, unknown>, history: Array<{ id: number }> = []) {
     vi.mocked(db.select)
       .mockReturnValueOnce(makeSelectChain([row]) as unknown as ReturnType<typeof db.select>)
       .mockReturnValueOnce(makeSelectChain([])  as unknown as ReturnType<typeof db.select>)
+      .mockReturnValueOnce(makeSelectChain(history)  as unknown as ReturnType<typeof db.select>)
       .mockReturnValueOnce(makeSelectChain([])  as unknown as ReturnType<typeof db.select>);
   }
 
@@ -348,5 +353,40 @@ describe("generateRecuPaiement (real PDF generation) — receipt number in PDF o
     expect(text).toContain("Junior VINI");
     expect(text).toContain("CI987654");
     expect(text).toContain("+22507080910");
+  });
+
+  it("displays the current installment and remaining balance for a partial delivery", async () => {
+    setupDbSelect(makePaiementRow({
+      montantFcfa: 190000,
+      livraisonMontantNetFcfa: 590000,
+      livraisonMontantRestant: 400000,
+      livraisonStatutPaiement: "PARTIEL",
+    }), [{ id: PAIEMENT_ID }]);
+    const buf = await generateRecuPaiement(PAIEMENT_ID, 1);
+    const text = extractPdfText(buf);
+    const textSansAccents = text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toUpperCase();
+
+    expect(textSansAccents).toContain("REGLEMENT 1");
+    expect(text).toContain("190 000 FCFA");
+    expect(textSansAccents).toContain("RESTE DU");
+    expect(text).toContain("400 000 FCFA");
+    expect(text).toContain("PARTIELLE");
+  });
+
+  it("displays the settled status and zero balance for the final installment", async () => {
+    setupDbSelect(makePaiementRow({
+      montantFcfa: 150000,
+      statut: "effectue",
+      livraisonMontantNetFcfa: 590000,
+      livraisonMontantRestant: 0,
+      livraisonStatutPaiement: "PAYÉ",
+    }), [{ id: PAIEMENT_ID }]);
+    const buf = await generateRecuPaiement(PAIEMENT_ID, 1);
+    const text = extractPdfText(buf);
+    const textSansAccents = text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toUpperCase();
+
+    expect(text).toContain("150 000 FCFA");
+    expect(text).toContain("0 FCFA");
+    expect(textSansAccents).toContain("REGLEE");
   });
 });

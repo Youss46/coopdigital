@@ -1127,9 +1127,6 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
     y += 4;
   }
   y += 10;
-  const montantLivraison = row.livraisonMontantNetFcfa != null
-    ? Number(row.livraisonMontantNetFcfa)
-    : null;
   const montantRestantLivraison = row.livraisonMontantRestant != null
     ? Number(row.livraisonMontantRestant)
     : null;
@@ -1137,7 +1134,7 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
     .toUpperCase() === "PAYE";
-  if (row.livraisonId && montantLivraison != null && montantRestantLivraison != null) {
+  if (row.livraisonId && row.livraisonMontantNetFcfa != null && montantRestantLivraison != null) {
     const statutLivraison = livraisonEstReglee ? "RÉGLÉE" : "PARTIELLE";
     const payMontants: Array<[string, string, string]> = [
       [`Règlement${numeroVersement > 0 ? ` ${numeroVersement}` : ""}`, formaterFCFA(Number(row.montantFcfa)), "#f0fdf4"],
