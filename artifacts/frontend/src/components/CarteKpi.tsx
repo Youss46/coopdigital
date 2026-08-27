@@ -15,6 +15,7 @@ interface CarteKpiProps {
   badge?: Badge;
   onClick?: () => void;
   actionLabel?: string;
+  compactValue?: boolean;
 }
 
 const badgeClasses: Record<Badge["type"], string> = {
@@ -32,6 +33,7 @@ export function CarteKpi({
   badge,
   onClick,
   actionLabel,
+  compactValue = false,
 }: CarteKpiProps) {
   const valeurAnimee = useCountUp(valeur);
 
@@ -53,7 +55,7 @@ export function CarteKpi({
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-xs sm:text-sm text-gray-500 font-medium leading-snug">{titre}</p>
-        <p className="text-sm sm:text-2xl font-bold text-gray-900 mt-0.5 leading-tight break-words tabular-nums">{valeurAnimee}</p>
+        <p className={`${compactValue ? "text-sm sm:text-lg" : "text-sm sm:text-2xl"} font-bold text-gray-900 mt-0.5 leading-tight break-words tabular-nums`}>{valeurAnimee}</p>
         {sousTitre && <p className="text-xs text-gray-400 mt-0.5 leading-snug">{sousTitre}</p>}
         {badge && (
           <span className={`inline-block mt-1 text-xs font-medium px-2 py-0.5 rounded-full ${badgeClasses[badge.type]}`}>

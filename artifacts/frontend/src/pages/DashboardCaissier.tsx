@@ -382,6 +382,7 @@ export default function DashboardCaissier() {
             titre="Trésorerie totale"
             valeur={formaterFCFA(totalTresorerie)}
             montantFcfa={totalTresorerie}
+            compactValue
             icone={Wallet}
             couleur="#be185d"
             sousTitre="Caisses + Banque + Mobile"
@@ -391,6 +392,7 @@ export default function DashboardCaissier() {
             titre="Caisses physiques"
             valeur={formaterFCFA(totalCaisses)}
             montantFcfa={totalCaisses}
+            compactValue
             icone={Wallet}
             couleur="#0284c7"
             sousTitre={`${nbSessionsOuvertes}/${caisses.length} session${caisses.length > 1 ? "s" : ""} ouverte${nbSessionsOuvertes > 1 ? "s" : ""}`}
@@ -399,6 +401,7 @@ export default function DashboardCaissier() {
             titre="Comptes bancaires"
             valeur={formaterFCFA(totalBanque)}
             montantFcfa={totalBanque}
+            compactValue
             icone={Building2}
             couleur="#0891b2"
             sousTitre={`${comptesBanque.filter(c => c.actif).length} compte${comptesBanque.length > 1 ? "s" : ""} actif${comptesBanque.length > 1 ? "s" : ""}`}
@@ -407,6 +410,7 @@ export default function DashboardCaissier() {
             titre="Mobile Marchands"
             valeur={formaterFCFA(totalMobile)}
             montantFcfa={totalMobile}
+            compactValue
             icone={Smartphone}
             couleur="#7c3aed"
             sousTitre={`${comptesMobile.filter(c => c.actif).length} compte${comptesMobile.length > 1 ? "s" : ""} actif${comptesMobile.length > 1 ? "s" : ""}`}
@@ -421,6 +425,7 @@ export default function DashboardCaissier() {
             titre="Entrées du jour"
             valeur={formaterFCFA(entreesJour)}
             montantFcfa={entreesJour}
+            compactValue
             icone={TrendingUp}
             couleur="#059669"
             sousTitre={loadingJournal ? "Chargement…" : `${mouvements.filter(m => m.type === "entree").length} opération${mouvements.filter(m => m.type === "entree").length > 1 ? "s" : ""}`}
@@ -429,6 +434,7 @@ export default function DashboardCaissier() {
             titre="Sorties du jour"
             valeur={formaterFCFA(sortiesJour)}
             montantFcfa={sortiesJour}
+            compactValue
             icone={TrendingDown}
             couleur="#dc2626"
             sousTitre={loadingJournal ? "Chargement…" : `${mouvements.filter(m => m.type === "sortie").length} opération${mouvements.filter(m => m.type === "sortie").length > 1 ? "s" : ""}`}
@@ -437,6 +443,7 @@ export default function DashboardCaissier() {
             titre="Net du jour (caisse)"
             valeur={(netJour >= 0 ? "+" : "") + formaterFCFA(netJour)}
             montantFcfa={Math.abs(netJour)}
+            compactValue
             icone={ArrowDownUp}
             couleur={netJour >= 0 ? "#0284c7" : "#d97706"}
             sousTitre={netJour >= 0 ? "Solde positif" : "Solde négatif"}
@@ -444,6 +451,7 @@ export default function DashboardCaissier() {
           <CarteKpi
             titre="Avances du jour"
             valeur={nbAvancesJour > 0 ? `${nbAvancesJour} avance${nbAvancesJour > 1 ? "s" : ""}` : "Aucune"}
+            compactValue
             icone={Banknote}
             couleur="#d97706"
             sousTitre={nbAvancesJour > 0 ? formaterFCFA(montantAvancesJour) : undefined}
@@ -611,6 +619,7 @@ export default function DashboardCaissier() {
             titre="Avances en cours"
             valeur={formaterFCFA(dashboard?.avancesEnCoursMontant ?? 0)}
             montantFcfa={dashboard?.avancesEnCoursMontant ?? 0}
+            compactValue
             icone={Clock}
             couleur="#0891b2"
             badge={(dashboard?.avancesEnRetardNb ?? 0) > 0
@@ -620,6 +629,7 @@ export default function DashboardCaissier() {
           <CarteKpi
             titre="Membres actifs"
             valeur={String(dashboard?.membresActifs ?? "—")}
+            compactValue
             icone={Users}
             couleur="#15803d"
             sousTitre="dans la coopérative"
@@ -627,6 +637,7 @@ export default function DashboardCaissier() {
           <CarteKpi
             titre="Sessions ouvertes"
             valeur={`${nbSessionsOuvertes} / ${caisses.length}`}
+            compactValue
             icone={CheckCircle2}
             couleur="#059669"
             sousTitre={nbSessionsOuvertes > 0 ? "Caisse(s) active(s)" : "Aucune session active"}
