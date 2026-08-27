@@ -682,9 +682,25 @@ export default function CollecteGps() {
                </div>
              )}
 
-            {gps.error && (
-              <div style={{ color: "#ef4444", fontSize: ".82rem", marginBottom: 8, textAlign: "center" }}>{gps.error}</div>
-            )}
+             {(gps.error || gps.status === "tracking") && (
+               <div
+                 data-testid="status-gps"
+                 role={gps.error ? "alert" : "status"}
+                 aria-live="polite"
+                 style={{
+                   color: gps.error ? "#ef4444" : "#60a5fa",
+                   fontSize: ".82rem",
+                   marginBottom: 8,
+                   textAlign: "center",
+                 }}
+               >
+                 {gps.error ?? (
+                   gps.currentPos
+                     ? "📡 GPS actif — le tracé reprend automatiquement avec les positions précises."
+                     : "📡 GPS actif — recherche d'une position précise…"
+                 )}
+               </div>
+             )}
 
             {/* Stats temps réel */}
             {gps.points.length > 0 && (

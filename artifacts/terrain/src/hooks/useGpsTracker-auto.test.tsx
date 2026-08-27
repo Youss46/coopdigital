@@ -2,13 +2,37 @@
 
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useGpsTracker } from "./useGpsTracker";
 
 describe("capture automatique du tracker GPS", () => {
   let tracker: ReturnType<typeof useGpsTracker> | undefined;
   let root: Root;
   let container: HTMLDivElement;
+  let positions: Array<{ success: PositionCallback; error: PositionErrorCallback }>;
+  let watchPosition: ReturnType<typeof vi.fn>;
+  let clearWatch: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    positions = [];
+    watchPosition = vi.fn((success: PositionCallback, error: PositionErrorCallback) => {
+      positions.push({ success, error });
+      return positions.length - 1;
+    });
+    clearWatch = vi.fn();
+    Object.defineProperty(navigator, "geolocation", {
+      configurable: true,
+      value: { watchPosition, clearWatch },
+    });
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "visible",
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
   function Harness() {
     tracker = useGpsTracker();
@@ -25,6 +49,21 @@ describe("capture automatique du tracker GPS", () => {
 
   function point(lat: number, accuracy = 5) {
     return { lat, lon: -4.02, accuracy, ts: Date.now() };
+  }
+
+  function browserPosition(lat: number, accuracy = 5): GeolocationPosition {
+    return {
+      coords: {
+        latitude: lat,
+        longitude: -4.02,
+        accuracy,
+        altitude: null,
+        altitudeAccuracy: null,
+        heading: null,
+        speed: null,
+      },
+      timestamp: Date.now(),
+    };
   }
 
   it("capture le premier point puis respecte la distance minimale", async () => {
@@ -147,6 +186,81 @@ describe("capture automatique du tracker GPS", () => {
       });
     });
     expect(pointNumber).toBe(3);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("conserve les points et reprend le tracé automatique après un verrouillage", async () => {
+    await renderTracker();
+
+    await act(async () => {
+      tracker!.startTracking();
+      positions[0]!.success(browserPosition(5.31));
+      tracker!.captureAutoPoint(point(5.31), { minDistanceM: 8, maxAccuracyM: 15 });
+    });
+    expect(tracker!.points).toHaveLength(1);
+    expect(watchPosition).toHaveBeenCalledTimes(1);
+
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(watchPosition).toHaveBeenCalledTimes(1);
+
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(watchPosition).toHaveBeenCalledTimes(2);
+    expect(clearWatch).toHaveBeenCalledWith(0);
+    expect(tracker!.points).toHaveLength(1);
+
+    await act(async () => {
+      positions[1]!.success(browserPosition(5.31003));
+      expect(tracker!.captureAutoPoint(point(5.31003), { minDistanceM: 8, maxAccuracyM: 15 })).toBeNull();
+    });
+    expect(tracker!.points).toHaveLength(1);
+
+    await act(async () => {
+      positions[1]!.success(browserPosition(5.3101));
+      expect(tracker!.captureAutoPoint(point(5.3101), { minDistanceM: 8, maxAccuracyM: 15 })).toBe(2);
+    });
+    expect(tracker!.points).toHaveLength(2);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it("explique une permission perdue puis confirme la reprise après réautorisation", async () => {
+    await renderTracker();
+
+    await act(async () => {
+      tracker!.startTracking();
+      positions[0]!.error({
+        code: 1,
+        message: "Permission denied",
+        PERMISSION_DENIED: 1,
+        POSITION_UNAVAILABLE: 2,
+        TIMEOUT: 3,
+      });
+    });
+    expect(tracker!.status).toBe("permission_denied");
+    expect(tracker!.isTracking).toBe(false);
+    expect(tracker!.error).toContain("Autorisation GPS refusée");
+
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+    });
+    expect(watchPosition).toHaveBeenCalledTimes(2);
+    expect(tracker!.status).toBe("tracking");
+    expect(tracker!.error).toBeNull();
+
+    await act(async () => {
+      positions[1]!.success(browserPosition(5.31, 7));
+    });
+    expect(tracker!.status).toBe("tracking");
+    expect(tracker!.accuracy).toBe(7);
 
     await act(async () => root.unmount());
     container.remove();

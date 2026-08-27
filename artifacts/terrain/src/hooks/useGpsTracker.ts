@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { normalizeGpsPoint, type GpsPoint } from "../lib/types";
 
 export function haversineDistance(
@@ -81,9 +81,38 @@ interface GpsTrackerState {
   points: GpsPoint[];
   currentPos: GpsPoint | null;
   isTracking: boolean;
+  status: "idle" | "tracking" | "permission_denied" | "signal_unavailable" | "unavailable";
   accuracy: number | null;
   autoIgnoredAccuracy: number | null;
   error: string | null;
+}
+
+function formatGpsError(error: GeolocationPositionError): {
+  status: GpsTrackerState["status"];
+  message: string;
+} {
+  if (error.code === error.PERMISSION_DENIED) {
+    return {
+      status: "permission_denied",
+      message: "Autorisation GPS refusée. Autorisez la localisation dans les réglages puis déverrouillez à nouveau le téléphone pour reprendre le tracé.",
+    };
+  }
+  if (error.code === error.POSITION_UNAVAILABLE) {
+    return {
+      status: "signal_unavailable",
+      message: "Signal GPS indisponible. Le tracé déjà capturé est conservé ; la reprise se fera dès qu'une position sera disponible.",
+    };
+  }
+  if (error.code === error.TIMEOUT) {
+    return {
+      status: "signal_unavailable",
+      message: "Délai GPS dépassé. Attendez une position précise ; le tracé déjà capturé est conservé.",
+    };
+  }
+  return {
+    status: "signal_unavailable",
+    message: `GPS indisponible${error.message ? ` : ${error.message}` : ""}. Le tracé déjà capturé est conservé.`,
+  };
 }
 
 export interface AutoCaptureOptions {
@@ -96,6 +125,7 @@ export function useGpsTracker() {
     points: [],
     currentPos: null,
     isTracking: false,
+    status: "idle",
     accuracy: null,
     autoIgnoredAccuracy: null,
     error: null,
@@ -105,6 +135,8 @@ export function useGpsTracker() {
   const pointsRef = useRef<GpsPoint[]>([]);
   const historyRef = useRef<GpsPoint[][]>([]);
   const autoLastPointRef = useRef<GpsPoint | null>(null);
+  const trackingRequestedRef = useRef(false);
+  const trackingGenerationRef = useRef(0);
   const [historyLength, setHistoryLength] = useState(0);
 
   const recordBeforeChange = useCallback((points: GpsPoint[]) => {
@@ -113,35 +145,110 @@ export function useGpsTracker() {
   }, []);
 
   const startTracking = useCallback(() => {
+    trackingRequestedRef.current = true;
+    const generation = ++trackingGenerationRef.current;
+
+    if (watchIdRef.current !== null) {
+      navigator.geolocation?.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+
     if (!navigator.geolocation) {
-      setState((s) => ({ ...s, error: "Géolocalisation non disponible sur cet appareil" }));
+      setState((s) => ({
+        ...s,
+        isTracking: false,
+        status: "unavailable",
+        currentPos: null,
+        accuracy: null,
+        error: "Géolocalisation non disponible sur cet appareil. Vérifiez que le GPS est activé.",
+      }));
       return;
     }
-    setState((s) => ({ ...s, isTracking: true, error: null }));
-    watchIdRef.current = navigator.geolocation.watchPosition(
+
+    setState((s) => ({
+      ...s,
+      isTracking: true,
+      status: "tracking",
+      currentPos: null,
+      accuracy: null,
+      error: null,
+    }));
+
+    try {
+      watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
+        if (generation !== trackingGenerationRef.current) return;
         const pt: GpsPoint = {
           lat: position.coords.latitude,
           lon: position.coords.longitude,
           accuracy: position.coords.accuracy,
           ts: Date.now(),
         };
-        setState((s) => ({ ...s, currentPos: pt, accuracy: position.coords.accuracy }));
+        setState((s) => ({
+          ...s,
+          currentPos: pt,
+          accuracy: position.coords.accuracy,
+          isTracking: true,
+          status: "tracking",
+          error: null,
+        }));
       },
       (err) => {
-        setState((s) => ({ ...s, error: `GPS : ${err.message}`, isTracking: false }));
+        if (generation !== trackingGenerationRef.current) return;
+        const gpsError = formatGpsError(err);
+        setState((s) => ({
+          ...s,
+          error: gpsError.message,
+          status: gpsError.status,
+          isTracking: false,
+          currentPos: null,
+          accuracy: null,
+        }));
       },
       { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 },
-    );
+      );
+    } catch {
+      setState((s) => ({
+        ...s,
+        isTracking: false,
+        status: "unavailable",
+        currentPos: null,
+        accuracy: null,
+        error: "Impossible de démarrer le GPS. Vérifiez l'autorisation de localisation puis réessayez.",
+      }));
+    }
   }, []);
 
   const stopTracking = useCallback(() => {
+    trackingRequestedRef.current = false;
+    trackingGenerationRef.current += 1;
     if (watchIdRef.current !== null) {
       navigator.geolocation.clearWatch(watchIdRef.current);
       watchIdRef.current = null;
     }
-    setState((s) => ({ ...s, isTracking: false }));
+    setState((s) => ({ ...s, isTracking: false, status: "idle" }));
   }, []);
+
+  useEffect(() => {
+    const resumeTracking = () => {
+      if (document.visibilityState === "hidden" || !trackingRequestedRef.current) return;
+      startTracking();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") resumeTracking();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", resumeTracking);
+    window.addEventListener("pageshow", resumeTracking);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", resumeTracking);
+      window.removeEventListener("pageshow", resumeTracking);
+      stopTracking();
+    };
+  }, [startTracking, stopTracking]);
 
   const addPoint = useCallback((point: GpsPoint) => {
     const normalizedPoint = normalizeGpsPoint(point);
