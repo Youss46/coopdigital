@@ -958,7 +958,7 @@ export interface LivraisonInput {
 }
 
 /**
- * Permet de corriger le mode de règlement au moment de la validation. Uniquement accepté pour les paiements liés à un bon carburant (bonCarburantId présent).
+ * Permet de corriger le mode de règlement au moment de la validation. Accepté pour les paiements liés à un bon carburant, sans mode prédéfini, ou pour un versement d'une livraison différée.
 
  */
 export type ValiderPaiementInputModePaiement = typeof ValiderPaiementInputModePaiement[keyof typeof ValiderPaiementInputModePaiement] | null;
@@ -1005,7 +1005,16 @@ export interface ValiderPaiementInput {
   referenceTransaction?: string | null;
   dateReglement?: string | null;
   telephone?: string | null;
-  /** Permet de corriger le mode de règlement au moment de la validation. Uniquement accepté pour les paiements liés à un bon carburant (bonCarburantId présent).
+  numeroCheque?: string | null;
+  banque?: string | null;
+  dateEcheance?: string | null;
+  /**
+     * Montant de ce versement. Pour une livraison différée, il doit être strictement positif et ne pas dépasser le solde restant.
+
+     * @minimum 1
+     */
+  montantReglementFcfa?: number | null;
+  /** Permet de corriger le mode de règlement au moment de la validation. Accepté pour les paiements liés à un bon carburant, sans mode prédéfini, ou pour un versement d'une livraison différée.
    */
   modePaiement?: ValiderPaiementInputModePaiement;
   /**
@@ -1118,6 +1127,16 @@ export interface PaiementListItem {
   intrantsDeduitsFcfa?: number | null;
   /** @nullable */
   montantNetFcfa?: number | null;
+  /**
+     * Statut global de règlement de la livraison liée.
+     * @nullable
+     */
+  livraisonStatutPaiement?: string | null;
+  /**
+     * Solde restant à payer sur la livraison liée.
+     * @nullable
+     */
+  livraisonMontantRestant?: number | null;
   /** @nullable */
   agentId?: number | null;
   /** @nullable */

@@ -287,8 +287,10 @@ export async function createLivraison(req: Request, res: Response): Promise<void
           livraisonId: livraison!.id,
           membreId: membreId ?? null,
           montantFcfa: montantNet,
+          // Un règlement différé choisit son moyen à chaque versement.
+          // Laisser le mode null évite de figer le premier versement en espèces.
           modePaiement: estDiffere
-            ? "especes"
+            ? null
             : ((modePaiement as "orange_money" | "mtn_momo" | "especes" | "wave" | "cheque") ?? "especes"),
           statut: "en_attente",
           numeroRecu,

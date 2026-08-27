@@ -8,6 +8,7 @@ import { verifierCaisseEspeces, debiterCaisseParResponsable, enregistrerMouvemen
 import { notifierParRole } from "../services/notificationService.js";
 import { logger } from "../lib/logger.js";
 import type { ComptabiliteTransaction } from "../services/comptabiliteService.js";
+import { genererNumeroRecu } from "../services/recuService.js";
 
 // ─── Helper ─────────────────────────────────────────────────────────────────
 
@@ -17,6 +18,22 @@ class PaiementDejaTraiteError extends Error {
     super("Ce paiement a déjà été traité. Aucune écriture supplémentaire n'a été créée.");
     this.name = "PaiementDejaTraiteError";
   }
+}
+
+class PaiementMontantInvalideError extends Error {
+  readonly status = 422;
+  constructor(message: string) {
+    super(message);
+    this.name = "PaiementMontantInvalideError";
+  }
+}
+
+function estLivraisonAvecSolde(statut: string | null | undefined): boolean {
+  const normalise = String(statut ?? "")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toUpperCase();
+  return ["EN_ATTENTE", "PARTIEL", "DIFFERE", "IMPAYE", "EN_RETARD"].includes(normalise);
 }
 
 function startOfDay(d: Date) {
@@ -286,6 +303,8 @@ const SELECT_FIELDS = {
   avanceDeduiteFcfa: livraisonsTable.avanceDeduiteFcfa,
   intrantsDeduitsFcfa: livraisonsTable.intrantsDeduitsFcfa,
   montantNetFcfa: livraisonsTable.montantNetFcfa,
+  livraisonStatutPaiement: livraisonsTable.statutPaiement,
+  livraisonMontantRestant: sql<number>`coalesce(${livraisonsTable.montantRestant}, '0')::integer`,
   compteDetteProducteur: livraisonsTable.compteDetteProducteur,
   agentId: livraisonsTable.agentId,
   // Attribution proxy gérant
@@ -621,6 +640,10 @@ async function debiterMobileDansTransaction(
   const body = (req.body ?? {}) as {
     referenceTransaction?: string | null;
     telephone?: string | null;
+    montantReglementFcfa?: number | null;
+    numeroCheque?: string | null;
+    banque?: string | null;
+    dateEcheance?: string | null;
     modePaiement?: string | null;
     ventilations?: Array<{
       modePaiement?: string;
@@ -645,6 +668,9 @@ async function debiterMobileDansTransaction(
         membreDelegueId: membresTable.delegueId,
         fournisseurCoopId: fournisseursTable.cooperativeId,
         bonCarburantCoopId: bonsCarburantTable.cooperativeId,
+        livraisonStatutPaiement: livraisonsTable.statutPaiement,
+        livraisonMontantNetFcfa: livraisonsTable.montantNetFcfa,
+        livraisonMontantRestant: sql<number>`coalesce(${livraisonsTable.montantRestant}, '0')::integer`,
         compteDetteProducteur: livraisonsTable.compteDetteProducteur,
       })
       .from(paiementsTable)
@@ -668,7 +694,40 @@ async function debiterMobileDansTransaction(
       return;
     }
 
-    // Le mode peut être fourni si : (a) bon carburant, ou (b) paiement sans mode pré-sélectionné (pesée groupée)
+    const livraisonAvecSolde = !!row.paiement.livraisonId && estLivraisonAvecSolde(row.livraisonStatutPaiement);
+    const montantRestantActuel = livraisonAvecSolde
+      ? Math.max(0, Math.round(Number(row.livraisonMontantRestant ?? row.livraisonMontantNetFcfa ?? row.paiement.montantFcfa)))
+      : row.paiement.montantFcfa;
+    const montantDemande = body.montantReglementFcfa == null
+      ? row.paiement.montantFcfa
+      : Number(body.montantReglementFcfa);
+
+    if (body.montantReglementFcfa != null) {
+      if (!Number.isSafeInteger(montantDemande) || montantDemande <= 0) {
+        res.status(400).json({ erreur: "Le montant du versement doit être un entier strictement positif." });
+        return;
+      }
+      if (!livraisonAvecSolde) {
+        res.status(400).json({ erreur: "Le montant partiel est disponible uniquement pour une livraison à régler." });
+        return;
+      }
+    }
+    if (livraisonAvecSolde && (!Number.isSafeInteger(montantDemande) || montantDemande <= 0 || montantDemande > montantRestantActuel)) {
+      res.status(422).json({
+        erreur: `Le versement doit être compris entre 1 et ${montantRestantActuel.toLocaleString("fr-FR")} FCFA.`,
+      });
+      return;
+    }
+    if (!livraisonAvecSolde && montantDemande !== row.paiement.montantFcfa) {
+      res.status(400).json({ erreur: "Le montant ne peut pas être modifié pour ce règlement." });
+      return;
+    }
+    const numeroRecuReste = livraisonAvecSolde && montantDemande < montantRestantActuel
+      ? await genererNumeroRecu(cooperativeId)
+      : null;
+
+    // Le mode peut être fourni si : (a) bon carburant, (b) paiement sans mode
+    // pré-sélectionné, ou (c) versement d'une livraison différée.
     const isBonCarburantPaiement = !!row.paiement.bonCarburantId;
     const hasNoMode = row.paiement.modePaiement === null;
     if (body.ventilations !== undefined) {
@@ -712,9 +771,9 @@ async function debiterMobileDansTransaction(
       }
 
       const totalVentile = lignes.reduce((total, ligne) => total + ligne.montantFcfa, 0);
-      if (totalVentile !== row.paiement.montantFcfa) {
+      if (totalVentile !== montantDemande) {
         res.status(400).json({
-          erreur: `Le total ventilé (${totalVentile.toLocaleString("fr-FR")} FCFA) doit être égal au montant à régler (${row.paiement.montantFcfa.toLocaleString("fr-FR")} FCFA).`,
+          erreur: `Le total ventilé (${totalVentile.toLocaleString("fr-FR")} FCFA) doit être égal au montant du versement (${montantDemande.toLocaleString("fr-FR")} FCFA).`,
         });
         return;
       }
@@ -730,18 +789,43 @@ async function debiterMobileDansTransaction(
       const compteDebitPaiement = isBonCarburant
         ? "6042"
         : await resolveCompteDetteProducteur(cooperativeId, row.compteDetteProducteur);
-      const isMembreBaseCentrale = !row.membreDelegueId;
       const lignesEspeces = lignes.filter((ligne) => ligne.modePaiement === "especes");
       const lignesMobiles = lignes.filter((ligne) =>
         ligne.modePaiement === "orange_money" || ligne.modePaiement === "mtn_momo" || ligne.modePaiement === "wave",
       );
       const nouveauStatut = lignes.every((ligne) => ligne.modePaiement === "especes") ? "effectue" : "confirme";
 
+      let soldeApresLivraison: number | null = null;
       try {
         await db.transaction(async (tx) => {
+          if (livraisonAvecSolde && row.paiement.livraisonId) {
+            const [livraisonVerrouillee] = await tx
+              .select({
+                montantNetFcfa: livraisonsTable.montantNetFcfa,
+                montantRestant: livraisonsTable.montantRestant,
+                statutPaiement: livraisonsTable.statutPaiement,
+              })
+              .from(livraisonsTable)
+              .where(eq(livraisonsTable.id, row.paiement.livraisonId))
+              .for("update")
+              .limit(1);
+            const reste = Math.max(0, Math.round(Number(
+              livraisonVerrouillee?.montantRestant
+              ?? livraisonVerrouillee?.montantNetFcfa
+              ?? 0,
+            )));
+            if (!livraisonVerrouillee || montantDemande > reste) {
+              throw new PaiementMontantInvalideError(
+                `Le solde de cette livraison a changé. Le montant restant est de ${reste.toLocaleString("fr-FR")} FCFA.`,
+              );
+            }
+            soldeApresLivraison = reste - montantDemande;
+          }
+
           const [paiementMisAJour] = await tx
             .update(paiementsTable)
             .set({
+              montantFcfa: montantDemande,
               statut: nouveauStatut,
               validePar: userId ?? null,
               dateValidation: new Date(),
@@ -754,8 +838,25 @@ async function debiterMobileDansTransaction(
 
           if (row.paiement.livraisonId) {
             await tx.update(livraisonsTable)
-              .set({ statutPaiement: "PAYÉ" })
+              .set(livraisonAvecSolde
+                ? {
+                    statutPaiement: soldeApresLivraison === 0 ? "PAYÉ" : "PARTIEL",
+                    montantRestant: String(soldeApresLivraison),
+                  }
+                : { statutPaiement: "PAYÉ" })
               .where(eq(livraisonsTable.id, row.paiement.livraisonId));
+          }
+
+          if (livraisonAvecSolde && row.paiement.livraisonId && (soldeApresLivraison ?? 0) > 0) {
+            await tx.insert(paiementsTable).values({
+              livraisonId: row.paiement.livraisonId,
+              membreId: row.paiement.membreId,
+              campagneId: row.paiement.campagneId,
+              montantFcfa: soldeApresLivraison!,
+              modePaiement: null,
+              statut: "en_attente",
+              numeroRecu: numeroRecuReste,
+            });
           }
 
           const lignesInserees = await tx.insert(paiementLignesTable).values(
@@ -836,6 +937,10 @@ async function debiterMobileDansTransaction(
           res.status(err.status).json({ erreur: err.message });
           return;
         }
+        if (err instanceof PaiementMontantInvalideError) {
+          res.status(err.status).json({ erreur: err.message });
+          return;
+        }
         const message = err instanceof Error ? err.message : "Impossible de valider le règlement";
         if (/insuffisant|Aucune caisse|session de caisse|Mobile Marchand/i.test(message)) {
           res.status(422).json({ erreur: message });
@@ -853,7 +958,7 @@ async function debiterMobileDansTransaction(
       res.json(updated);
       return;
     }
-    if (body.modePaiement && !isBonCarburantPaiement && !hasNoMode) {
+    if (body.modePaiement && !isBonCarburantPaiement && !hasNoMode && !livraisonAvecSolde) {
       res.status(400).json({
         erreur: "Le mode de paiement ne peut être modifié que pour les règlements sans mode pré-sélectionné ou pour les bons carburant.",
       });
@@ -869,7 +974,7 @@ async function debiterMobileDansTransaction(
       });
       return;
     }
-    const modeOverride = (isBonCarburantPaiement || hasNoMode) && body.modePaiement
+    const modeOverride = (isBonCarburantPaiement || hasNoMode || livraisonAvecSolde) && body.modePaiement
       ? (body.modePaiement as typeof MODES_VALIDES[number])
       : null;
     const mode = (modeOverride ?? row.paiement.modePaiement) as string;
@@ -897,7 +1002,7 @@ async function debiterMobileDansTransaction(
     //    (paiement marqué effectue mais caisse non débitée)
     if (isDelegueEspeces && userId && cooperativeId) {
       try {
-        await verifierCaisseEspeces(userId, cooperativeId, row.paiement.montantFcfa);
+        await verifierCaisseEspeces(userId, cooperativeId, montantDemande);
       } catch (err) {
         res.status(422).json({ erreur: (err as Error).message });
         return;
@@ -937,9 +1042,9 @@ async function debiterMobileDansTransaction(
       }
 
       const soldeMobile = parseFloat(String(compteMobile.soldeActuelFcfa));
-      if (soldeMobile < row.paiement.montantFcfa) {
+      if (soldeMobile < montantDemande) {
         res.status(422).json({
-          erreur: `Solde ${label} insuffisant (compte « ${compteMobile.nom} »). Disponible : ${soldeMobile.toLocaleString("fr-FR")} FCFA, requis : ${row.paiement.montantFcfa.toLocaleString("fr-FR")} FCFA.`,
+          erreur: `Solde ${label} insuffisant (compte « ${compteMobile.nom} »). Disponible : ${soldeMobile.toLocaleString("fr-FR")} FCFA, requis : ${montantDemande.toLocaleString("fr-FR")} FCFA.`,
         });
         return;
       }
@@ -947,8 +1052,7 @@ async function debiterMobileDansTransaction(
 
     // Pré-vérification Caisse Centrale pour espèces hors-délégué (membre base centrale)
     const isNonDelegueEspeces = req.user?.role !== "delegue" && mode === "especes";
-    const isMembreBaseCentrale = !row.membreDelegueId;
-    if (isNonDelegueEspeces && isMembreBaseCentrale && cooperativeId) {
+    if (isNonDelegueEspeces && cooperativeId) {
       const [caisseCentrale] = await db
         .select({
           id:             caissesTable.id,
@@ -978,26 +1082,48 @@ async function debiterMobileDansTransaction(
         return;
       }
 
-      if (parseFloat(String(caisseCentrale.soldeActuelFcfa)) < row.paiement.montantFcfa) {
+      if (parseFloat(String(caisseCentrale.soldeActuelFcfa)) < montantDemande) {
         res.status(422).json({ erreur: "Fonds insuffisants sur le compte pour effectuer ce paiement." });
         return;
       }
     }
 
+    let soldeApresLivraison: number | null = null;
     await db.transaction(async (tx) => {
-      // 2. Mettre à jour le paiement (le mode peut être corrigé au moment de la validation)
+      if (livraisonAvecSolde && row.paiement.livraisonId) {
+        const [livraisonVerrouillee] = await tx
+          .select({
+            montantNetFcfa: livraisonsTable.montantNetFcfa,
+            montantRestant: livraisonsTable.montantRestant,
+          })
+          .from(livraisonsTable)
+          .where(eq(livraisonsTable.id, row.paiement.livraisonId))
+          .for("update")
+          .limit(1);
+        const reste = Math.max(0, Math.round(Number(
+          livraisonVerrouillee?.montantRestant
+          ?? livraisonVerrouillee?.montantNetFcfa
+          ?? 0,
+        )));
+        if (!livraisonVerrouillee || montantDemande > reste) {
+          throw new PaiementMontantInvalideError(
+            `Le solde de cette livraison a changé. Le montant restant est de ${reste.toLocaleString("fr-FR")} FCFA.`,
+          );
+        }
+        soldeApresLivraison = reste - montantDemande;
+      }
+
+      // La condition sur le statut rend la validation idempotente.
       const [paiementMisAJour] = await tx
         .update(paiementsTable)
         .set({
+          montantFcfa: montantDemande,
           statut: nouveauStatut as "effectue" | "confirme",
           validePar: userId ?? null,
           dateValidation: new Date(),
           referenceTransaction: body.referenceTransaction ?? row.paiement.referenceTransaction,
           ...(modeOverride ? { modePaiement: modeOverride } : {}),
         })
-        // La condition sur le statut rend la validation idempotente :
-        // deux requêtes concurrentes ne peuvent pas créer deux écritures
-        // comptables pour le même règlement.
         .where(and(
           eq(paiementsTable.id, id),
           eq(paiementsTable.statut, "en_attente"),
@@ -1008,91 +1134,103 @@ async function debiterMobileDansTransaction(
         throw new PaiementDejaTraiteError();
       }
 
-      // 3. Mettre à jour le statut paiement de la livraison (si applicable)
       if (row.paiement.livraisonId) {
         await tx
           .update(livraisonsTable)
-          .set({ statutPaiement: "PAYÉ" })
+          .set(livraisonAvecSolde
+            ? {
+                statutPaiement: soldeApresLivraison === 0 ? "PAYÉ" : "PARTIEL",
+                montantRestant: String(soldeApresLivraison),
+              }
+            : { statutPaiement: "PAYÉ" })
           .where(eq(livraisonsTable.id, row.paiement.livraisonId));
-
       }
 
-      // L'écriture liée au paiement doit être créée avant le commit métier.
-      // Une erreur ici rollbacke donc le statut du paiement et de la livraison.
-      {
-        const isBonCarburant = !!row.paiement.bonCarburantId;
-        const isMobile = mode === "orange_money" || mode === "mtn_momo" || mode === "wave";
-        const compteDebitPaiement = isBonCarburant
-          ? "6042"
-          : await resolveCompteDetteProducteur(cooperativeId, row.compteDetteProducteur);
-        await proposerEcrituresDansTransaction(tx, cooperativeId, [{
-          source: "paiement",
-          sourceId: id,
-          libelle: isBonCarburant
-            ? `Carburant – Bon PAI-${id}`
-            : `Paiement producteur – ${`${row.nom ?? ""} ${row.prenoms ?? ""}`.trim() || `PAI-${id}`}`,
-          compteDebit: compteDebitPaiement,
-          compteCredit: isMobile ? "552" : mode === "especes" ? "571" : "521",
-          montantFcfa: row.paiement.montantFcfa,
-          date: new Date().toISOString().slice(0, 10),
-          numeroPiece: `PAI-${id}`,
-          tiersId: isBonCarburant ? undefined : (row.paiement.membreId ?? undefined),
-          tiersType: isBonCarburant ? undefined : "membre",
-        }]);
+      if (livraisonAvecSolde && row.paiement.livraisonId && (soldeApresLivraison ?? 0) > 0) {
+        await tx.insert(paiementsTable).values({
+          livraisonId: row.paiement.livraisonId,
+          membreId: row.paiement.membreId,
+          campagneId: row.paiement.campagneId,
+          montantFcfa: soldeApresLivraison!,
+          modePaiement: null,
+          statut: "en_attente",
+          numeroRecu: numeroRecuReste,
+        });
       }
+
+      const isBonCarburant = !!row.paiement.bonCarburantId;
+      const isMobile = mode === "orange_money" || mode === "mtn_momo" || mode === "wave";
+      const compteDebitPaiement = isBonCarburant
+        ? "6042"
+        : await resolveCompteDetteProducteur(cooperativeId, row.compteDetteProducteur);
+
+      if (mode === "especes" && cooperativeId) {
+        if (isDelegueEspeces) {
+          await debiterCaisseDansTransaction(tx, cooperativeId, userId, montantDemande, id);
+        } else {
+          await debiterCaisseDansTransaction(tx, cooperativeId, userId, montantDemande, id);
+        }
+      }
+
+      if (isMobile) {
+        await debiterMobileDansTransaction(
+          tx,
+          cooperativeId,
+          mode,
+          montantDemande,
+          id,
+          userId,
+          body.referenceTransaction ?? row.paiement.referenceTransaction,
+        );
+      }
+
+      const [ligneInseree] = await tx.insert(paiementLignesTable).values({
+        paiementId: id,
+        modePaiement: mode as "especes" | "cheque" | "virement" | "orange_money" | "mtn_momo" | "wave",
+        montantFcfa: montantDemande,
+        referenceTransaction: body.referenceTransaction ?? null,
+        numeroCheque: mode === "cheque" ? body.numeroCheque ?? null : null,
+        banque: mode === "cheque" ? body.banque ?? null : null,
+        dateEcheance: mode === "cheque" ? body.dateEcheance ?? null : null,
+      }).returning({ id: paiementLignesTable.id });
+
+      if (mode === "cheque") {
+        await tx.insert(chequesEmisTable).values({
+          cooperativeId,
+          numeroCheque: body.numeroCheque ?? null,
+          beneficiaire: `${row.nom ?? ""} ${row.prenoms ?? ""}`.trim() || `PAI-${id}`,
+          montantFcfa: montantDemande,
+          paiementId: id,
+          paiementLigneId: ligneInseree!.id,
+          membreId: row.paiement.membreId ?? null,
+          livraisonId: row.paiement.livraisonId ?? null,
+          dateEmission: new Date().toISOString().slice(0, 10),
+          dateEcheance: body.dateEcheance ?? null,
+          statut: "emis",
+          createdBy: userId ?? null,
+        });
+      }
+
+      await proposerEcrituresDansTransaction(tx, cooperativeId, [{
+        source: "paiement",
+        sourceId: id,
+        libelle: isBonCarburant
+          ? `Carburant – Bon PAI-${id}`
+          : `Paiement producteur – ${`${row.nom ?? ""} ${row.prenoms ?? ""}`.trim() || `PAI-${id}`}`,
+        compteDebit: compteDebitPaiement,
+        compteCredit: isMobile ? "552" : mode === "especes" ? "571" : "521",
+        montantFcfa: montantDemande,
+        date: new Date().toISOString().slice(0, 10),
+        numeroPiece: `PAI-${id}`,
+        tiersId: isBonCarburant ? undefined : (row.paiement.membreId ?? undefined),
+        tiersType: isBonCarburant ? undefined : "membre",
+      }]);
     });
 
-    // 4–7. Déterminer si c'est un bon carburant (impacte les comptes OHADA)
-    const isBonCarburant = !!row.paiement.bonCarburantId;
-    const compteDebitPaiement = isBonCarburant
-      ? "6042"
-      : await resolveCompteDetteProducteur(cooperativeId, row.compteDetteProducteur);
-    const caisseOpts = isBonCarburant
-      ? { compteDebitOverride: "6042", libelle: `Carburant — règlement #${id}`, skipAccounting: true }
-      : { compteDebitOverride: compteDebitPaiement, skipAccounting: true };
-
-    // 4. Débiter la caisse principale du délégué si paiement espèces
-    //    (hors tx DB car enregistrerMouvement gère sa propre cohérence interne)
-    if (isDelegueEspeces && userId && cooperativeId) {
-      await debiterCaisseParResponsable(
-        userId,
-        cooperativeId,
-        row.paiement.montantFcfa,
-        id,
-        row.paiement.livraisonId,
-        caisseOpts,
-      );
-    }
-
-    // 5. Débiter automatiquement le compte Mobile Marchand si paiement mobile
-    if (isMobileMarchand && cooperativeId) {
-      await debiterCompteMobileMarchandPaiement(
-        cooperativeId,
-        mode,
-        row.paiement.montantFcfa,
-        id,
-        userId,
-        body.referenceTransaction ?? row.paiement.referenceTransaction,
-      );
-    }
-
-    // 6. Débiter la Caisse Centrale si paiement espèces par un rôle non-délégué
-    //    Pour les bons carburant : isMembreBaseCentrale = true (pas de membre → delegueId null)
-    //    Le caisseOpts contient compteDebitOverride: "6042" si bon carburant
-    if (isNonDelegueEspeces && isMembreBaseCentrale && cooperativeId) {
-      await debiterCaisseCentralePaiement(
-        cooperativeId,
-        row.paiement.montantFcfa,
-        id,
-        userId,
-        caisseOpts,
-      );
-    }
-
-    // 8. Notifier le producteur (best-effort)
+    // Notifier le producteur (best-effort)
     if (row.paiement.membreId) void envoyerPushGroupePortail([row.paiement.membreId], {
       title: "✅ Paiement validé",
-      body: `${new Intl.NumberFormat("fr-FR").format(row.paiement.montantFcfa)} FCFA — ${mode === "orange_money" ? "Orange Money" : mode === "mtn_momo" ? "MTN MoMo" : mode === "wave" ? "Wave" : mode === "cheque" ? "Chèque" : "Espèces"}`,
+      body: `${new Intl.NumberFormat("fr-FR").format(montantDemande)} FCFA — ${mode === "orange_money" ? "Orange Money" : mode === "mtn_momo" ? "MTN MoMo" : mode === "wave" ? "Wave" : mode === "cheque" ? "Chèque" : "Espèces"}`,
       url: "/paiements",
     });
 
@@ -1100,6 +1238,10 @@ async function debiterMobileDansTransaction(
     res.json(updated);
   } catch (err) {
     if (err instanceof PaiementDejaTraiteError) {
+      res.status(err.status).json({ erreur: err.message });
+      return;
+    }
+    if (err instanceof PaiementMontantInvalideError) {
       res.status(err.status).json({ erreur: err.message });
       return;
     }
@@ -1139,6 +1281,9 @@ export async function rejeterPaiement(req: Request, res: Response): Promise<void
         nom: membresTable.nom,
         fournisseurCoopId: fournisseursTable.cooperativeId,
         bonCarburantCoopId: bonsCarburantTable.cooperativeId,
+        livraisonStatutPaiement: livraisonsTable.statutPaiement,
+        livraisonMontantNetFcfa: livraisonsTable.montantNetFcfa,
+        livraisonMontantRestant: sql<number>`coalesce(${livraisonsTable.montantRestant}, '0')::integer`,
       })
       .from(paiementsTable)
       .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
@@ -1161,9 +1306,12 @@ export async function rejeterPaiement(req: Request, res: Response): Promise<void
       return;
     }
 
+    const livraisonAvecSolde = !!row.paiement.livraisonId && estLivraisonAvecSolde(row.livraisonStatutPaiement);
+    const numeroRecuRemplacement = livraisonAvecSolde ? await genererNumeroRecu(cooperativeId) : null;
+
     await db.transaction(async (tx) => {
       // 1. Rejeter le paiement
-      await tx
+      const [paiementRejete] = await tx
         .update(paiementsTable)
         .set({
           statut: "rejete",
@@ -1171,14 +1319,51 @@ export async function rejeterPaiement(req: Request, res: Response): Promise<void
           dateValidation: new Date(),
           motifRejet: body.motifRejet.trim(),
         })
-        .where(eq(paiementsTable.id, id));
+        .where(and(eq(paiementsTable.id, id), eq(paiementsTable.statut, "en_attente")))
+        .returning({ id: paiementsTable.id });
+      if (!paiementRejete) throw new PaiementDejaTraiteError();
 
-      // 2. Remettre la livraison en EN_ATTENTE (si applicable)
+      // 2. Préserver le solde d'une livraison partiellement payée et recréer
+      // un règlement actionnable après le rejet du versement courant.
       if (row.paiement.livraisonId) {
+        let reste = 0;
+        if (livraisonAvecSolde) {
+          const [livraisonVerrouillee] = await tx
+            .select({
+              montantNetFcfa: livraisonsTable.montantNetFcfa,
+              montantRestant: livraisonsTable.montantRestant,
+            })
+            .from(livraisonsTable)
+            .where(eq(livraisonsTable.id, row.paiement.livraisonId))
+            .for("update")
+            .limit(1);
+          reste = Math.max(0, Math.round(Number(
+            livraisonVerrouillee?.montantRestant
+            ?? livraisonVerrouillee?.montantNetFcfa
+            ?? 0,
+          )));
+        }
         await tx
           .update(livraisonsTable)
-          .set({ statutPaiement: "EN_ATTENTE" })
+          .set(livraisonAvecSolde
+            ? {
+                statutPaiement: reste < Math.round(Number(row.livraisonMontantNetFcfa ?? 0)) ? "PARTIEL" : "EN_ATTENTE",
+                montantRestant: String(reste),
+              }
+            : { statutPaiement: "EN_ATTENTE" })
           .where(eq(livraisonsTable.id, row.paiement.livraisonId));
+
+        if (livraisonAvecSolde && reste > 0) {
+          await tx.insert(paiementsTable).values({
+            livraisonId: row.paiement.livraisonId,
+            membreId: row.paiement.membreId,
+            campagneId: row.paiement.campagneId,
+            montantFcfa: reste,
+            modePaiement: null,
+            statut: "en_attente",
+            numeroRecu: numeroRecuRemplacement,
+          });
+        }
       }
     });
 
@@ -1192,6 +1377,10 @@ export async function rejeterPaiement(req: Request, res: Response): Promise<void
     const updated = await fetchEnrichedPaiement(id);
     res.json(updated);
   } catch (err) {
+    if (err instanceof PaiementDejaTraiteError) {
+      res.status(err.status).json({ erreur: err.message });
+      return;
+    }
     req.log.error({ err }, "Erreur rejeterPaiement");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }

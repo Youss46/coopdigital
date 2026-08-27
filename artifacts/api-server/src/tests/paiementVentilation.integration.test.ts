@@ -34,6 +34,7 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
   let caisseId: number;
   let sessionId: number;
   const paymentIds: number[] = [];
+  const deliveryIds: number[] = [];
 
   beforeAll(async () => {
     client = await pool.connect();
@@ -96,6 +97,7 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
     );
     await client.query(`DELETE FROM mouvements_caisse WHERE caisse_id = $1`, [caisseId]);
     await client.query(`DELETE FROM paiements WHERE id = ANY($1::int[])`, [paymentIds]);
+    await client.query(`DELETE FROM livraisons WHERE id = ANY($1::int[])`, [deliveryIds]);
     await client.query(`DELETE FROM sessions_caisse WHERE id = $1`, [sessionId]);
     await client.query(`DELETE FROM caisses WHERE id = $1`, [caisseId]);
     await client.query(`DELETE FROM config_comptable WHERE cooperative_id = $1`, [cooperativeId]);
@@ -112,6 +114,29 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
       [memberId, amount],
     );
     const id = result.rows[0].id;
+    paymentIds.push(id);
+    return id;
+  }
+
+  async function createDeferredPayment(amount: number): Promise<number> {
+    const livraison = await client.query(
+      `INSERT INTO livraisons
+        (membre_id, poids_kg, prix_unitaire_fcfa, montant_brut_fcfa,
+         avance_deduite_fcfa, intrants_deduits_fcfa, montant_net_fcfa,
+         date_livraison, statut_paiement, montant_restant)
+       VALUES ($1, 1, $2, $3, 0, 0, $3, CURRENT_DATE, 'EN_ATTENTE', $3)
+       RETURNING id`,
+      [memberId, amount, amount],
+    );
+    const livraisonId = livraison.rows[0].id as number;
+    deliveryIds.push(livraisonId);
+    const payment = await client.query(
+      `INSERT INTO paiements (livraison_id, membre_id, montant_fcfa, statut)
+       VALUES ($1, $2, $3, 'en_attente')
+       RETURNING id`,
+      [livraisonId, memberId, amount],
+    );
+    const id = payment.rows[0].id as number;
     paymentIds.push(id);
     return id;
   }
@@ -215,5 +240,33 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
       cheques: 1,
       accounting: 2,
     });
+  });
+
+  it("conserve le reliquat et crée le prochain versement", async () => {
+    const paymentId = await createDeferredPayment(590_000);
+
+    const result = await validate(paymentId, {
+      montantReglementFcfa: 190_000,
+      modePaiement: "especes",
+    });
+
+    expect(result.statusCode).toBe(200);
+    const delivery = await client.query(
+      `SELECT statut_paiement, montant_restant FROM livraisons WHERE id = $1`,
+      [deliveryIds[0]],
+    );
+    expect(delivery.rows[0]).toMatchObject({
+      statut_paiement: "PARTIEL",
+      montant_restant: "400000.00",
+    });
+    const payments = await client.query(
+      `SELECT id, montant_fcfa, statut FROM paiements WHERE livraison_id = $1 ORDER BY id`,
+      [deliveryIds[0]],
+    );
+    expect(payments.rows).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: paymentId, montant_fcfa: 190000, statut: "effectue" }),
+      expect.objectContaining({ montant_fcfa: 400000, statut: "en_attente" }),
+    ]));
+    paymentIds.push(...payments.rows.map((row: { id: number }) => row.id).filter((id: number) => !paymentIds.includes(id)));
   });
 });

@@ -35,6 +35,15 @@ function telProducteur(p: PaiementListItem) {
 function isBonCarburant(p: PaiementListItem) {
   return !!p.bonCarburantId;
 }
+function livraisonAvecSolde(p: PaiementListItem) {
+  const statut = (p.livraisonStatutPaiement ?? "").normalize("NFD").replace(/\p{Diacritic}/gu, "").toUpperCase();
+  return !!p.livraisonId && ["EN_ATTENTE", "PARTIEL", "DIFFERE"].includes(statut);
+}
+function montantRestantLivraison(p: PaiementListItem) {
+  return livraisonAvecSolde(p)
+    ? Math.max(0, p.livraisonMontantRestant ?? p.montantFcfa)
+    : p.montantFcfa;
+}
 function montantEspeces(p: PaiementListItem) {
   if (p.lignes?.length) {
     return p.lignes
@@ -135,7 +144,7 @@ function ModalValidation({
 }: {
   paiement: PaiementListItem;
   onClose: () => void;
-  onConfirm: (ref: string, telephone: string, mode?: string, ventilations?: VentilationPaiementInput[]) => void;
+  onConfirm: (ref: string, telephone: string, montant: number, mode?: string, ventilations?: VentilationPaiementInput[], cheque?: { numero: string; banque: string }) => void;
   loading: boolean;
   sessionCaisseOuverte?: boolean | null;
   isDelegue?: boolean;
@@ -144,7 +153,14 @@ function ModalValidation({
   const [telephone, setTelephone] = useState(telProducteur(paiement) ?? "");
   const [touched, setTouched] = useState(false);
   const montantNet = paiement.montantNetFcfa ?? paiement.montantFcfa;
+  const estLivraisonAvecSolde = livraisonAvecSolde(paiement);
+  const montantRestant = montantRestantLivraison(paiement);
+  const montantDejaPaye = Math.max(0, montantNet - montantRestant);
+  const [montantVersementSaisi, setMontantVersementSaisi] = useState(formatMontantSaisi(montantRestant));
+  const montantVersement = parseMontantSaisi(montantVersementSaisi);
   const [multiMoyens, setMultiMoyens] = useState(false);
+  const [numeroCheque, setNumeroCheque] = useState("");
+  const [banque, setBanque] = useState("");
   const [ventilations, setVentilations] = useState<Array<{
     modePaiement: VentilationPaiementInput["modePaiement"];
     montantFcfa: string;
@@ -152,13 +168,13 @@ function ModalValidation({
     banque: string;
     dateEcheance: string;
   }>>([
-    { modePaiement: "especes", montantFcfa: formatMontantSaisi(montantNet), numeroCheque: "", banque: "", dateEcheance: "" },
+    { modePaiement: "especes", montantFcfa: formatMontantSaisi(montantRestant), numeroCheque: "", banque: "", dateEcheance: "" },
     { modePaiement: "cheque", montantFcfa: "0", numeroCheque: "", banque: "", dateEcheance: "" },
   ]);
   const isCarburant = isBonCarburant(paiement);
   // Pré-remplir avec le mode déjà fixé sur le paiement (livraisons normales)
   // Pour les bons carburant ou les paiements sans mode, laisser la sélection libre
-  const modePreset = !isCarburant && paiement.modePaiement ? paiement.modePaiement : null;
+  const modePreset = !isCarburant && !estLivraisonAvecSolde && paiement.modePaiement ? paiement.modePaiement : null;
   const initialMode = modePreset ?? (isDelegue ? "especes" : "");
   const [selectedMode, setSelectedMode] = useState<string>(initialMode);
   // Modes available in the selector depend on role
@@ -171,7 +187,7 @@ function ModalValidation({
   const sessionBloquee = isEspeces && sessionCaisseOuverte === false;
   const refManquante = isMobile && !ref.trim();
   const totalVentile = ventilations.reduce((total, ligne) => total + parseMontantSaisi(ligne.montantFcfa), 0);
-  const ventilationIncorrecte = multiMoyens && totalVentile !== montantNet;
+  const ventilationIncorrecte = multiMoyens && totalVentile !== montantVersement;
   const ventilationEspecesBloquee = multiMoyens
     && ventilations.some((ligne) => ligne.modePaiement === "especes")
     && sessionCaisseOuverte === false;
@@ -190,14 +206,29 @@ function ModalValidation({
         const autreIndex = index === 0 ? 1 : 0;
         next[autreIndex] = {
           ...next[autreIndex],
-          montantFcfa: formatMontantSaisi(Math.max(montantNet - montant, 0)),
+           montantFcfa: formatMontantSaisi(Math.max(montantVersement - montant, 0)),
         };
       }
       return next;
     });
   }
 
+  function updateMontantVersement(value: string) {
+    setMontantVersementSaisi(formatMontantSaisi(value));
+    const montant = parseMontantSaisi(value);
+    setVentilations((old) => old.length === 2
+      ? old.map((item, index) => ({
+          ...item,
+          montantFcfa: formatMontantSaisi(index === 0 ? montant : 0),
+        }))
+      : old);
+  }
+
   function handleConfirm() {
+    if (!Number.isSafeInteger(montantVersement) || montantVersement <= 0 || montantVersement > montantRestant) {
+      setTouched(true);
+      return;
+    }
     if (multiMoyens) {
       if (ventilationIncorrecte || ventilations.some((ligne) => {
         const montant = parseMontantSaisi(ligne.montantFcfa);
@@ -206,7 +237,7 @@ function ModalValidation({
         setTouched(true);
         return;
       }
-      onConfirm("", "", undefined, ventilations.map((ligne) => ({
+      onConfirm("", "", montantVersement, undefined, ventilations.map((ligne) => ({
         modePaiement: ligne.modePaiement,
         montantFcfa: parseMontantSaisi(ligne.montantFcfa),
         ...(ligne.modePaiement === "cheque" ? {
@@ -220,7 +251,7 @@ function ModalValidation({
     if (modeManquant) { setTouched(true); return; }
     if (sessionBloquee) return;
     if (refManquante) { setTouched(true); return; }
-    onConfirm(ref, telephone, selectedMode || undefined);
+    onConfirm(ref, telephone, montantVersement, selectedMode || undefined, undefined, { numero: numeroCheque, banque });
   }
 
   return (
@@ -257,11 +288,48 @@ function ModalValidation({
                 <span className="text-red-600">− {fmt(paiement.intrantsDeduitsFcfa)}</span>
               </div>
             )}
+            {estLivraisonAvecSolde && (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Total livraison</span>
+                  <span className="text-gray-700">{fmt(montantNet)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Déjà versé</span>
+                  <span className="text-green-700">{fmt(montantDejaPaye)}</span>
+                </div>
+              </>
+            )}
             <div className="border-t pt-2 flex justify-between items-center">
-              <span className="font-semibold text-gray-700">Net à payer</span>
-              <span className="text-xl font-bold" style={{ color: "#1a4731" }}>{fmt(paiement.montantNetFcfa ?? paiement.montantFcfa)}</span>
+              <span className="font-semibold text-gray-700">{estLivraisonAvecSolde ? "Solde restant" : "Net à payer"}</span>
+              <span className="text-xl font-bold" style={{ color: "#1a4731" }}>{fmt(estLivraisonAvecSolde ? montantRestant : montantNet)}</span>
             </div>
           </div>
+
+          {estLivraisonAvecSolde && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Montant de ce versement <span className="text-red-500 font-semibold">*</span>
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={montantVersementSaisi}
+                onChange={(e) => updateMontantVersement(e.target.value)}
+                className={`w-full border rounded-lg px-3 py-2 text-sm text-right focus:outline-none focus:ring-1 ${
+                  touched && (montantVersement <= 0 || montantVersement > montantRestant)
+                    ? "border-red-400 bg-red-50 focus:ring-red-400"
+                    : "border-gray-200 focus:ring-green-400"
+                }`}
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Entre 1 et {fmt(montantRestant)}. Le reliquat sera conservé pour un prochain versement.
+              </p>
+              {touched && (montantVersement <= 0 || montantVersement > montantRestant) && (
+                <p className="text-xs text-red-500 mt-1">Le montant doit être positif et ne pas dépasser le solde restant.</p>
+              )}
+            </div>
+          )}
 
           {/* Mode de règlement */}
           <div>
@@ -320,9 +388,9 @@ function ModalValidation({
                 </button>
                 <div className={`flex justify-between text-xs font-semibold px-1 ${ventilationIncorrecte ? "text-red-600" : "text-green-700"}`}>
                   <span>Total ventilé</span>
-                  <span>{fmt(totalVentile)} / {fmt(montantNet)}</span>
+                  <span>{fmt(totalVentile)} / {fmt(montantVersement)}</span>
                 </div>
-                {touched && ventilationIncorrecte && <p className="text-xs text-red-500">Le total des moyens doit correspondre au net à payer.</p>}
+                {touched && ventilationIncorrecte && <p className="text-xs text-red-500">Le total des moyens doit correspondre au montant de ce versement.</p>}
               </div>
             ) : modePreset ? (
               /* Mode pré-sélectionné — lecture seule */
@@ -380,6 +448,23 @@ function ModalValidation({
                 onChange={(e) => setTelephone(e.target.value)}
                 placeholder="07 XX XX XX XX"
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-400"
+              />
+            </div>
+          )}
+
+          {!multiMoyens && selectedMode === "cheque" && (
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                value={numeroCheque}
+                onChange={(e) => setNumeroCheque(e.target.value)}
+                placeholder="N° du chèque"
+                className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-400"
+              />
+              <input
+                value={banque}
+                onChange={(e) => setBanque(e.target.value)}
+                placeholder="Banque (optionnel)"
+                className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-400"
               />
             </div>
           )}
@@ -615,8 +700,14 @@ function ModalRecu({ paiement, onClose }: { paiement: PaiementListItem; onClose:
             )}
             <div className="px-4 py-3 flex justify-between items-center bg-green-50 rounded-b-xl">
               <span className="font-semibold text-gray-700">Montant payé</span>
-              <span className="text-xl font-bold text-green-700">{fmt(paiement.montantNetFcfa ?? paiement.montantFcfa)}</span>
+              <span className="text-xl font-bold text-green-700">{fmt(paiement.montantFcfa)}</span>
             </div>
+            {livraisonAvecSolde(paiement) && (
+              <div className="px-4 py-2.5 flex justify-between text-xs">
+                <span className="text-gray-500">Solde livraison après ce versement</span>
+                <span className="font-semibold text-blue-700">{fmt(paiement.livraisonMontantRestant)}</span>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-between text-xs text-gray-400">
@@ -740,19 +831,31 @@ export default function ReglementsPage() {
     qc.invalidateQueries({ queryKey: getGetPaiementsStatsQueryKey() });
   }
 
-  async function handleValider(ref: string, telephone: string, mode?: ValiderPaiementInputModePaiement, ventilations?: VentilationPaiementInput[]) {
+  async function handleValider(
+    ref: string,
+    telephone: string,
+    montant: number,
+    mode?: ValiderPaiementInputModePaiement,
+    ventilations?: VentilationPaiementInput[],
+    cheque?: { numero: string; banque: string },
+  ) {
     if (modal?.type !== "valider") return;
-    // Le backend n'accepte modePaiement que si : (a) pas de mode pré-sélectionné, ou (b) bon carburant
+    // Le mode peut aussi être choisi pour chaque versement d'une livraison différée.
     const hasPresetMode = !!modal.paiement.modePaiement;
     const isCarburant = isBonCarburant(modal.paiement);
-    const sendMode = mode && (!hasPresetMode || isCarburant);
+    const sendMode = mode && (!hasPresetMode || isCarburant || livraisonAvecSolde(modal.paiement));
     try {
       await validerMut.mutateAsync({
         id: modal.paiement.id,
         data: {
           referenceTransaction: ref || null,
           telephone: telephone || null,
+          ...(livraisonAvecSolde(modal.paiement) ? { montantReglementFcfa: montant } : {}),
           ...(sendMode ? { modePaiement: mode } : {}),
+          ...(cheque && mode === "cheque" ? {
+            numeroCheque: cheque.numero || null,
+            banque: cheque.banque || null,
+          } : {}),
           ...(ventilations ? { ventilations } : {}),
         },
       });
@@ -1102,7 +1205,7 @@ export default function ReglementsPage() {
         <ModalValidation
           paiement={modal.paiement}
           onClose={() => setModal(null)}
-          onConfirm={(ref, telephone, mode, ventilations) => void handleValider(ref, telephone, mode as ValiderPaiementInputModePaiement | undefined, ventilations)}
+          onConfirm={(ref, telephone, montant, mode, ventilations, cheque) => void handleValider(ref, telephone, montant, mode as ValiderPaiementInputModePaiement | undefined, ventilations, cheque)}
           loading={validerMut.isPending}
           sessionCaisseOuverte={isDelegue ? sessionDelegueOuverte : sessionCentraleOuverte}
           isDelegue={isDelegue}
@@ -1175,6 +1278,8 @@ function PaiementRow({
 }) {
   const poids = p.poidsNetKg ?? p.poidsKg;
   const montantNet = p.montantNetFcfa ?? p.montantFcfa;
+  const montantRestant = montantRestantLivraison(p);
+  const montantDejaPaye = Math.max(0, montantNet - montantRestant);
   const showActions = p.statut === "en_attente";
   const showRecu = p.statut === "confirme" || p.statut === "effectue" || p.statut === "en_cours";
   const showRejet = p.statut === "rejete";
@@ -1213,6 +1318,12 @@ function PaiementRow({
             {(p.intrantsDeduitsFcfa ?? 0) > 0 && (
               <span className="text-red-500">− intrants {fmt(p.intrantsDeduitsFcfa)}</span>
             )}
+            {livraisonAvecSolde(p) && (
+              <>
+                <span className="text-green-700">Déjà versé : {fmt(montantDejaPaye)}</span>
+                <span className="text-blue-700 font-medium">Reste : {fmt(montantRestant)}</span>
+              </>
+            )}
           </div>
           )}
           {/* Proxy gérant */}
@@ -1236,7 +1347,10 @@ function PaiementRow({
 
         {/* Montant net + actions */}
         <div className="text-right flex flex-col items-end gap-2 shrink-0">
-          <span className="font-bold text-gray-900">{fmt(montantNet)}</span>
+          <div>
+            <span className="font-bold text-gray-900">{fmt(p.montantFcfa)}</span>
+            {livraisonAvecSolde(p) && <p className="text-[10px] text-gray-400">ce versement</p>}
+          </div>
           <div className="flex items-center gap-1.5">
             {showActions && peutValider && !delegueBloque && (
               <button

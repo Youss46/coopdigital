@@ -77,6 +77,8 @@ interface Livraison {
   avanceDeduiteFcfa: number | null;
   intrantsDeduitsFcfa: number | null;
   montantNetFcfa: number | null;
+  statutPaiement: string | null;
+  montantRestant: string | number | null;
   dateLivraison: string;
   createdAt: string;
   agentNom: string | null;
@@ -114,6 +116,13 @@ function fmtPoids(v: string | null | undefined) {
 function fmtDate(d: string | null | undefined) {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function statutPaiementLabel(statut: string | null | undefined) {
+  const normalise = (statut ?? "").normalize("NFD").replace(/\p{Diacritic}/gu, "").toUpperCase();
+  if (normalise === "PAYE") return { label: "Payé", cls: "bg-green-100 text-green-700" };
+  if (normalise === "PARTIEL") return { label: "Partiellement payé", cls: "bg-blue-100 text-blue-700" };
+  return { label: "En attente", cls: "bg-amber-100 text-amber-700" };
 }
 
 // ─── SessionsPeseeSection ─────────────────────────────────────────────────────
@@ -341,6 +350,8 @@ export default function LivraisonsPage() {
 
   const totalPoids = livraisons.reduce((s, l) => s + parseFloat(l.poidsKg ?? "0"), 0);
   const totalNet = livraisons.reduce((s, l) => s + (l.montantNetFcfa ?? 0), 0);
+  const totalRestant = livraisons.reduce((s, l) => s + Number(l.montantRestant ?? 0), 0);
+  const totalPaye = Math.max(0, totalNet - totalRestant);
 
   return (
     <div className="space-y-5">
@@ -353,7 +364,7 @@ export default function LivraisonsPage() {
       </div>
 
       {/* KPIs résumé */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         <div className="bg-white border border-gray-100 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-1.5">
             <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center">
@@ -375,6 +386,16 @@ export default function LivraisonsPage() {
             {new Intl.NumberFormat("fr-FR").format(totalNet)}
           </p>
           <p className="text-xs text-gray-400 mt-0.5">FCFA</p>
+        </div>
+        <div className="bg-white border border-gray-100 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-1.5">
+            <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
+              <Banknote size={14} className="text-blue-600" />
+            </div>
+            <span className="text-xs text-gray-500 font-medium">Reste à payer</span>
+          </div>
+          <p className="text-lg font-bold text-blue-700">{new Intl.NumberFormat("fr-FR").format(totalRestant)}</p>
+          <p className="text-xs text-gray-400 mt-0.5">Déjà versé : {fmt(totalPaye)}</p>
         </div>
       </div>
 
@@ -559,6 +580,8 @@ function LivraisonRow({ livraison: l }: { livraison: Livraison }) {
   const [downloadingRecu, setDownloadingRecu] = useState(false);
   const [printingRecu, setPrintingRecu] = useState(false);
   const poids = parseFloat(l.poidsKg ?? "0");
+  const statut = statutPaiementLabel(l.statutPaiement);
+  const montantRestant = Number(l.montantRestant ?? 0);
 
   return (
     <div>
@@ -613,6 +636,10 @@ function LivraisonRow({ livraison: l }: { livraison: Livraison }) {
 
         <div className="text-right flex-shrink-0">
           <p className="text-sm font-bold text-gray-900">{fmt(l.montantNetFcfa)}</p>
+          <p className="text-xs text-gray-500">Reste : {fmt(montantRestant)}</p>
+          <span className={`inline-block mt-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${statut.cls}`}>
+            {statut.label}
+          </span>
           {l.prixUnitaireFcfa && (
             <p className="text-xs text-gray-400">{l.prixUnitaireFcfa} FCFA/kg</p>
           )}
@@ -669,6 +696,12 @@ function LivraisonRow({ livraison: l }: { livraison: Livraison }) {
               labelCls="font-semibold text-gray-800"
               valueCls="font-bold text-green-700"
             />
+            <DetailLine label="Déjà versé" value={fmt(Math.max(0, Number(l.montantNetFcfa ?? 0) - montantRestant))} valueCls="text-green-700" />
+            <DetailLine label="Solde restant" value={fmt(montantRestant)} valueCls={montantRestant > 0 ? "font-bold text-blue-700" : "font-bold text-green-700"} />
+            <div className="flex justify-between items-center text-xs pt-1">
+              <span className="text-gray-500">Statut du règlement</span>
+              <span className={`font-semibold px-2 py-0.5 rounded-full ${statut.cls}`}>{statut.label}</span>
+            </div>
           </div>
           {l.agentNom && (
             <div className="border-t border-gray-200 pt-1.5 mt-1.5 space-y-1">

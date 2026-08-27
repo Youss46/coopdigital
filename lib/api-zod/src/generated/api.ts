@@ -3196,6 +3196,8 @@ export const ListPaiementsResponseItem = zod.object({
   "avanceDeduiteFcfa": zod.number().nullish(),
   "intrantsDeduitsFcfa": zod.number().nullish(),
   "montantNetFcfa": zod.number().nullish(),
+  "livraisonStatutPaiement": zod.string().nullish().describe('Statut global de règlement de la livraison liée.'),
+  "livraisonMontantRestant": zod.number().nullish().describe('Solde restant à payer sur la livraison liée.'),
   "agentId": zod.number().nullish(),
   "agentSaisiseurId": zod.number().nullish(),
   "agentSaisiseurNom": zod.string().nullish(),
@@ -3225,11 +3227,16 @@ export const ValiderPaiementParams = zod.object({
 
 
 
+
 export const ValiderPaiementBody = zod.object({
   "referenceTransaction": zod.string().nullish(),
   "dateReglement": zod.string().nullish(),
   "telephone": zod.string().nullish(),
-  "modePaiement": zod.enum(['especes', 'cheque', 'virement', 'orange_money', 'mtn_momo', 'wave']).nullish().describe('Permet de corriger le mode de règlement au moment de la validation. Uniquement accepté pour les paiements liés à un bon carburant (bonCarburantId présent).\n'),
+  "numeroCheque": zod.string().nullish(),
+  "banque": zod.string().nullish(),
+  "dateEcheance": zod.string().nullish(),
+  "montantReglementFcfa": zod.number().min(1).nullish().describe('Montant de ce versement. Pour une livraison différée, il doit être strictement positif et ne pas dépasser le solde restant.\n'),
+  "modePaiement": zod.enum(['especes', 'cheque', 'virement', 'orange_money', 'mtn_momo', 'wave']).nullish().describe('Permet de corriger le mode de règlement au moment de la validation. Accepté pour les paiements liés à un bon carburant, sans mode prédéfini, ou pour un versement d\'une livraison différée.\n'),
   "ventilations": zod.array(zod.object({
   "modePaiement": zod.enum(['especes', 'cheque', 'virement', 'orange_money', 'mtn_momo', 'wave']),
   "montantFcfa": zod.number().min(1),
@@ -3267,6 +3274,8 @@ export const ValiderPaiementResponse = zod.object({
   "avanceDeduiteFcfa": zod.number().nullish(),
   "intrantsDeduitsFcfa": zod.number().nullish(),
   "montantNetFcfa": zod.number().nullish(),
+  "livraisonStatutPaiement": zod.string().nullish().describe('Statut global de règlement de la livraison liée.'),
+  "livraisonMontantRestant": zod.number().nullish().describe('Solde restant à payer sur la livraison liée.'),
   "agentId": zod.number().nullish(),
   "agentSaisiseurId": zod.number().nullish(),
   "agentSaisiseurNom": zod.string().nullish(),
@@ -3324,6 +3333,8 @@ export const RejeterPaiementResponse = zod.object({
   "avanceDeduiteFcfa": zod.number().nullish(),
   "intrantsDeduitsFcfa": zod.number().nullish(),
   "montantNetFcfa": zod.number().nullish(),
+  "livraisonStatutPaiement": zod.string().nullish().describe('Statut global de règlement de la livraison liée.'),
+  "livraisonMontantRestant": zod.number().nullish().describe('Solde restant à payer sur la livraison liée.'),
   "agentId": zod.number().nullish(),
   "agentSaisiseurId": zod.number().nullish(),
   "agentSaisiseurNom": zod.string().nullish(),

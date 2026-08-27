@@ -7533,14 +7533,30 @@ components:
         telephone:
           type: string
           nullable: true
+        numeroCheque:
+          type: string
+          nullable: true
+        banque:
+          type: string
+          nullable: true
+        dateEcheance:
+          type: string
+          nullable: true
+        montantReglementFcfa:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: >
+            Montant de ce versement. Pour une livraison différée, il doit être
+            strictement positif et ne pas dépasser le solde restant.
         modePaiement:
           type: string
           nullable: true
           enum: [especes, cheque, virement, orange_money, mtn_momo, wave]
           description: >
             Permet de corriger le mode de règlement au moment de la validation.
-            Uniquement accepté pour les paiements liés à un bon carburant
-            (bonCarburantId présent).
+            Accepté pour les paiements liés à un bon carburant, sans mode
+            prédéfini, ou pour un versement d'une livraison différée.
         ventilations:
           type: array
           minItems: 1
@@ -7625,6 +7641,12 @@ components:
           type: ["integer", "null"]
         montantNetFcfa:
           type: ["integer", "null"]
+        livraisonStatutPaiement:
+          type: ["string", "null"]
+          description: Statut global de règlement de la livraison liée.
+        livraisonMontantRestant:
+          type: ["integer", "null"]
+          description: Solde restant à payer sur la livraison liée.
         agentId:
           type: ["integer", "null"]
         agentSaisiseurId:
