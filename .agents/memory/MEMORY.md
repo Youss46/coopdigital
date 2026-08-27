@@ -82,4 +82,5 @@
 - [Idempotence des règlements](payment-validation-idempotency.md) — la transition conditionnelle en transaction empêche les écritures comptables dupliquées lors de requêtes concurrentes.
 - [Atomicité des règlements ventilés](paiement-ventilation-atomicity.md) — paiement, lignes, trésorerie, chèques et comptabilité doivent rester dans une transaction et totaliser le montant parent.
 - [Versements partiels livraison](paiement-versements-partiels.md) — le solde livraison est verrouillé; chaque versement est un paiement distinct et le reliquat redevient actionnable.
+- [Fixtures PostgreSQL typées](postgres-fixture-parameter-types.md) — dans un INSERT de test, caster séparément les paramètres réutilisés entre colonnes integer et numeric.
 - [Références PDF des pesées](pdf-local-numbering.md) — les reçus et bordereaux affichent PES-S-<rang> avant tout identifiant legacy.

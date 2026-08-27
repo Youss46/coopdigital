@@ -2,7 +2,9 @@ import { pool } from "@workspace/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { validerPaiement } from "../controllers/paiementsController.js";
 
-const enabled = process.env.RUN_POSTGRES_INTEGRATION === "1" && Boolean(process.env.DATABASE_URL);
+const enabled =
+  process.env.RUN_POSTGRES_INTEGRATION === "1" &&
+  Boolean(process.env.DATABASE_URL);
 
 type TestResponse = {
   statusCode: number;
@@ -51,7 +53,14 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
         (cooperative_id, nom, prenoms, telephone, superficie_ha, date_adhesion)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING id`,
-      [cooperativeId, "Test", "Ventilation", `070001${process.pid}`, "1", "2026-01-01"],
+      [
+        cooperativeId,
+        "Test",
+        "Ventilation",
+        `070001${process.pid}`,
+        "1",
+        "2026-01-01",
+      ],
     );
     memberId = member.rows[0].id;
 
@@ -67,7 +76,7 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
          fond_caisse_minimum_fcfa, actif)
        VALUES ($1, $2, 'centrale', $3, 0, true)
        RETURNING id`,
-      [cooperativeId, "Caisse ventilation atomique", "50000"],
+      [cooperativeId, "Caisse ventilation atomique", "500000"],
     );
     caisseId = caisse.rows[0].id;
 
@@ -76,13 +85,16 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
         (caisse_id, cooperative_id, date_session, solde_ouverture_fcfa, statut)
        VALUES ($1, $2, CURRENT_DATE, $3, 'ouverte')
        RETURNING id`,
-      [caisseId, cooperativeId, "50000"],
+      [caisseId, cooperativeId, "500000"],
     );
     sessionId = session.rows[0].id;
   });
 
   afterAll(async () => {
-    await client.query(`DELETE FROM cheques_emis WHERE paiement_id = ANY($1::int[])`, [paymentIds]);
+    await client.query(
+      `DELETE FROM cheques_emis WHERE paiement_id = ANY($1::int[])`,
+      [paymentIds],
+    );
     await client.query(
       `DELETE FROM ecritures_comptables
         WHERE cooperative_id = $1 AND source = 'paiement'
@@ -95,14 +107,27 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
           AND source_id = ANY($2::int[])`,
       [cooperativeId, paymentIds],
     );
-    await client.query(`DELETE FROM mouvements_caisse WHERE caisse_id = $1`, [caisseId]);
-    await client.query(`DELETE FROM paiements WHERE id = ANY($1::int[])`, [paymentIds]);
-    await client.query(`DELETE FROM livraisons WHERE id = ANY($1::int[])`, [deliveryIds]);
-    await client.query(`DELETE FROM sessions_caisse WHERE id = $1`, [sessionId]);
+    await client.query(`DELETE FROM mouvements_caisse WHERE caisse_id = $1`, [
+      caisseId,
+    ]);
+    await client.query(`DELETE FROM paiements WHERE id = ANY($1::int[])`, [
+      paymentIds,
+    ]);
+    await client.query(`DELETE FROM livraisons WHERE id = ANY($1::int[])`, [
+      deliveryIds,
+    ]);
+    await client.query(`DELETE FROM sessions_caisse WHERE id = $1`, [
+      sessionId,
+    ]);
     await client.query(`DELETE FROM caisses WHERE id = $1`, [caisseId]);
-    await client.query(`DELETE FROM config_comptable WHERE cooperative_id = $1`, [cooperativeId]);
+    await client.query(
+      `DELETE FROM config_comptable WHERE cooperative_id = $1`,
+      [cooperativeId],
+    );
     await client.query(`DELETE FROM membres WHERE id = $1`, [memberId]);
-    await client.query(`DELETE FROM cooperatives WHERE id = $1`, [cooperativeId]);
+    await client.query(`DELETE FROM cooperatives WHERE id = $1`, [
+      cooperativeId,
+    ]);
     client.release();
   });
 
@@ -118,15 +143,18 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
     return id;
   }
 
-  async function createDeferredPayment(amount: number): Promise<number> {
+  async function createDeferredPayment(
+    amount: number,
+  ): Promise<{ paymentId: number; deliveryId: number }> {
     const livraison = await client.query(
       `INSERT INTO livraisons
         (membre_id, poids_kg, prix_unitaire_fcfa, montant_brut_fcfa,
          avance_deduite_fcfa, intrants_deduits_fcfa, montant_net_fcfa,
          date_livraison, statut_paiement, montant_restant)
-       VALUES ($1, 1, $2, $3, 0, 0, $3, CURRENT_DATE, 'EN_ATTENTE', $3)
+       VALUES ($1, 1, $2::integer, $3::integer, 0, 0, $3::integer,
+               CURRENT_DATE, 'EN_ATTENTE', $4::numeric)
        RETURNING id`,
-      [memberId, amount, amount],
+      [memberId, amount, amount, amount],
     );
     const livraisonId = livraison.rows[0].id as number;
     deliveryIds.push(livraisonId);
@@ -138,7 +166,7 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
     );
     const id = payment.rows[0].id as number;
     paymentIds.push(id);
-    return id;
+    return { paymentId: id, deliveryId: livraisonId };
   }
 
   function request(paymentId: number, body: unknown) {
@@ -150,7 +178,10 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
     } as any;
   }
 
-  async function validate(paymentId: number, body: unknown): Promise<TestResponse> {
+  async function validate(
+    paymentId: number,
+    body: unknown,
+  ): Promise<TestResponse> {
     const res = response();
     await validerPaiement(request(paymentId, body), res as any);
     return res;
@@ -159,13 +190,19 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
   async function paymentEffects(paymentId: number) {
     const [payment, lines, movements, cheques, accounting] = await Promise.all([
       pool.query(`SELECT statut FROM paiements WHERE id = $1`, [paymentId]),
-      pool.query(`SELECT count(*)::int AS count FROM paiement_lignes WHERE paiement_id = $1`, [paymentId]),
+      pool.query(
+        `SELECT count(*)::int AS count FROM paiement_lignes WHERE paiement_id = $1`,
+        [paymentId],
+      ),
       pool.query(
         `SELECT count(*)::int AS count FROM mouvements_caisse
          WHERE caisse_id = $1 AND reference_operation = $2`,
         [caisseId, `PAI-${paymentId}`],
       ),
-      pool.query(`SELECT count(*)::int AS count FROM cheques_emis WHERE paiement_id = $1`, [paymentId]),
+      pool.query(
+        `SELECT count(*)::int AS count FROM cheques_emis WHERE paiement_id = $1`,
+        [paymentId],
+      ),
       pool.query(
         `SELECT count(*)::int AS count FROM ecritures_comptables
          WHERE cooperative_id = $1 AND source = 'paiement' AND source_id = $2`,
@@ -187,7 +224,11 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
     const result = await validate(paymentId, {
       ventilations: [
         { modePaiement: "especes", montantFcfa: 700 },
-        { modePaiement: "cheque", montantFcfa: 200, numeroCheque: "CHQ-INVALID-TOTAL" },
+        {
+          modePaiement: "cheque",
+          montantFcfa: 200,
+          numeroCheque: "CHQ-INVALID-TOTAL",
+        },
       ],
     });
 
@@ -208,7 +249,11 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
       ventilations: [
         { modePaiement: "especes", montantFcfa: 1_000 },
         // La colonne historique numero_cheque est limitée à 50 caractères.
-        { modePaiement: "cheque", montantFcfa: 1_000, numeroCheque: "X".repeat(51) },
+        {
+          modePaiement: "cheque",
+          montantFcfa: 1_000,
+          numeroCheque: "X".repeat(51),
+        },
       ],
     });
 
@@ -227,12 +272,21 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
     const body = {
       ventilations: [
         { modePaiement: "especes", montantFcfa: 1_000 },
-        { modePaiement: "cheque", montantFcfa: 2_000, numeroCheque: "CHQ-CONCURRENCE" },
+        {
+          modePaiement: "cheque",
+          montantFcfa: 2_000,
+          numeroCheque: "CHQ-CONCURRENCE",
+        },
       ],
     };
 
-    const results = await Promise.all([validate(paymentId, body), validate(paymentId, body)]);
-    expect(results.map((result) => result.statusCode).sort()).toEqual([200, 409]);
+    const results = await Promise.all([
+      validate(paymentId, body),
+      validate(paymentId, body),
+    ]);
+    expect(results.map((result) => result.statusCode).sort()).toEqual([
+      200, 409,
+    ]);
     expect(await paymentEffects(paymentId)).toEqual({
       statut: "confirme",
       lines: 2,
@@ -243,7 +297,7 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
   });
 
   it("conserve le reliquat et crée le prochain versement", async () => {
-    const paymentId = await createDeferredPayment(590_000);
+    const { paymentId, deliveryId } = await createDeferredPayment(590_000);
 
     const result = await validate(paymentId, {
       montantReglementFcfa: 190_000,
@@ -253,7 +307,7 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
     expect(result.statusCode).toBe(200);
     const delivery = await client.query(
       `SELECT statut_paiement, montant_restant FROM livraisons WHERE id = $1`,
-      [deliveryIds[0]],
+      [deliveryId],
     );
     expect(delivery.rows[0]).toMatchObject({
       statut_paiement: "PARTIEL",
@@ -261,12 +315,146 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
     });
     const payments = await client.query(
       `SELECT id, montant_fcfa, statut FROM paiements WHERE livraison_id = $1 ORDER BY id`,
-      [deliveryIds[0]],
+      [deliveryId],
     );
-    expect(payments.rows).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: paymentId, montant_fcfa: 190000, statut: "effectue" }),
-      expect.objectContaining({ montant_fcfa: 400000, statut: "en_attente" }),
-    ]));
-    paymentIds.push(...payments.rows.map((row: { id: number }) => row.id).filter((id: number) => !paymentIds.includes(id)));
+    expect(payments.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: paymentId,
+          montant_fcfa: 190000,
+          statut: "effectue",
+        }),
+        expect.objectContaining({ montant_fcfa: 400000, statut: "en_attente" }),
+      ]),
+    );
+    paymentIds.push(
+      ...payments.rows
+        .map((row: { id: number }) => row.id)
+        .filter((id: number) => !paymentIds.includes(id)),
+    );
+    expect(await paymentEffects(paymentId)).toEqual({
+      statut: "effectue",
+      lines: 1,
+      movements: 1,
+      cheques: 0,
+      accounting: 1,
+    });
+  });
+
+  it("refuse un versement supérieur au reliquat sans effet financier", async () => {
+    const { paymentId, deliveryId } = await createDeferredPayment(590_000);
+
+    const result = await validate(paymentId, {
+      montantReglementFcfa: 590_001,
+      modePaiement: "especes",
+    });
+
+    expect(result.statusCode).toBe(422);
+    expect(await paymentEffects(paymentId)).toEqual({
+      statut: "en_attente",
+      lines: 0,
+      movements: 0,
+      cheques: 0,
+      accounting: 0,
+    });
+    const delivery = await client.query(
+      `SELECT statut_paiement, montant_restant FROM livraisons WHERE id = $1`,
+      [deliveryId],
+    );
+    expect(delivery.rows[0]).toMatchObject({
+      statut_paiement: "EN_ATTENTE",
+      montant_restant: "590000.00",
+    });
+  });
+
+  it("ne duplique pas un versement partiel lors de validations concurrentes", async () => {
+    const { paymentId, deliveryId } = await createDeferredPayment(590_000);
+    const body = {
+      montantReglementFcfa: 190_000,
+      modePaiement: "especes",
+    };
+
+    const results = await Promise.all([
+      validate(paymentId, body),
+      validate(paymentId, body),
+    ]);
+    expect(results.map((result) => result.statusCode).sort()).toEqual([
+      200, 409,
+    ]);
+    expect(await paymentEffects(paymentId)).toEqual({
+      statut: "effectue",
+      lines: 1,
+      movements: 1,
+      cheques: 0,
+      accounting: 1,
+    });
+
+    const delivery = await client.query(
+      `SELECT statut_paiement, montant_restant FROM livraisons WHERE id = $1`,
+      [deliveryId],
+    );
+    expect(delivery.rows[0]).toMatchObject({
+      statut_paiement: "PARTIEL",
+      montant_restant: "400000.00",
+    });
+    const payments = await client.query(
+      `SELECT montant_fcfa, statut FROM paiements WHERE livraison_id = $1 ORDER BY id`,
+      [deliveryId],
+    );
+    expect(payments.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ montant_fcfa: 190000, statut: "effectue" }),
+        expect.objectContaining({ montant_fcfa: 400000, statut: "en_attente" }),
+      ]),
+    );
+    expect(payments.rows).toHaveLength(2);
+    paymentIds.push(
+      ...(
+        await client.query(`SELECT id FROM paiements WHERE livraison_id = $1`, [
+          deliveryId,
+        ])
+      ).rows
+        .map((row: { id: number }) => row.id)
+        .filter((id: number) => !paymentIds.includes(id)),
+    );
+  });
+
+  it("rollbacke le reliquat et la caisse si le chèque du versement échoue", async () => {
+    const { paymentId, deliveryId } = await createDeferredPayment(590_000);
+
+    const result = await validate(paymentId, {
+      montantReglementFcfa: 190_000,
+      ventilations: [
+        { modePaiement: "especes", montantFcfa: 100_000 },
+        {
+          modePaiement: "cheque",
+          montantFcfa: 90_000,
+          // La colonne historique numero_cheque est limitée à 50 caractères.
+          numeroCheque: "X".repeat(51),
+        },
+      ],
+    });
+
+    expect(result.statusCode).toBe(500);
+    expect(await paymentEffects(paymentId)).toEqual({
+      statut: "en_attente",
+      lines: 0,
+      movements: 0,
+      cheques: 0,
+      accounting: 0,
+    });
+    const delivery = await client.query(
+      `SELECT statut_paiement, montant_restant FROM livraisons WHERE id = $1`,
+      [deliveryId],
+    );
+    expect(delivery.rows[0]).toMatchObject({
+      statut_paiement: "EN_ATTENTE",
+      montant_restant: "590000.00",
+    });
+    const pendingPayments = await client.query(
+      `SELECT count(*)::int AS count FROM paiements WHERE livraison_id = $1 AND statut = 'en_attente'`,
+      [deliveryId],
+    );
+    expect(pendingPayments.rows[0].count).toBe(1);
   });
 });
