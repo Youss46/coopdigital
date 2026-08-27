@@ -3,7 +3,7 @@ import {
   CheckCircle2, Clock, XCircle, Loader2, CreditCard, Search,
   CheckCheck, AlertCircle, Banknote, Smartphone, ChevronDown,
   Receipt, Package, User, Calendar, TrendingUp, X, Wallet,
-  AlertTriangle, Lock, FileDown, Fuel,
+  AlertTriangle, Lock, FileDown, Printer, Fuel,
 } from "lucide-react";
 import {
   useListPaiements,
@@ -630,6 +630,47 @@ function ModalRejet({
 
 function ModalRecu({ paiement, onClose }: { paiement: PaiementListItem; onClose: () => void }) {
   const [downloading, setDownloading] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  const [printError, setPrintError] = useState<string | null>(null);
+
+  async function handlePrintPdf() {
+    setPrintError(null);
+    // Ouvrir la fenêtre avant l'appel réseau évite que le navigateur bloque le popup.
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      setPrintError("L'impression nécessite d'autoriser les fenêtres pop-up pour ce site.");
+      return;
+    }
+
+    setPrinting(true);
+    try {
+      printWindow.document.title = "Préparation du reçu…";
+      printWindow.document.body.innerHTML = "<p style=\"font-family:sans-serif;padding:2rem\">Préparation du reçu…</p>";
+      const res = await fetch(`${BASE}/api/rapports/recu/paiement/${paiement.id}`, {
+        headers: { Authorization: `Bearer ${tok()}` },
+      });
+      if (!res.ok) throw new Error(`Erreur ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      let printed = false;
+      const print = () => {
+        if (printed) return;
+        printed = true;
+        printWindow.focus();
+        printWindow.print();
+      };
+      printWindow.addEventListener("load", print, { once: true });
+      printWindow.location.href = url;
+      // Certains lecteurs PDF ne propagent pas l'événement load à la fenêtre.
+      window.setTimeout(print, 1500);
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      printWindow.close();
+      setPrintError("Impossible de préparer le reçu pour l'impression.");
+    } finally {
+      setPrinting(false);
+    }
+  }
 
   async function handleDownloadPdf() {
     setDownloading(true);
@@ -715,27 +756,36 @@ function ModalRecu({ paiement, onClose }: { paiement: PaiementListItem; onClose:
             <StatutBadge statut={paiement.statut} />
           </div>
 
+          {printError && <p className="text-xs text-red-600">{printError}</p>}
+
           <div className="flex gap-2">
             <button
               onClick={onClose}
-              className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="flex-1 min-w-0 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
               Fermer
             </button>
             <button
-              onClick={handleDownloadPdf}
-              disabled={downloading}
-              className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white flex items-center justify-center gap-1.5 disabled:opacity-50"
+              onClick={handlePrintPdf}
+              disabled={printing}
+              className="flex-1 min-w-0 py-2.5 rounded-xl text-sm font-medium text-white flex items-center justify-center gap-1.5 disabled:opacity-50"
               style={{ backgroundColor: "#1a4731" }}
             >
-              {downloading ? (
+              {printing ? (
                 <Loader2 size={14} className="animate-spin" />
               ) : (
                 <>
-                  <FileDown size={14} />
-                  PDF
+                  <Printer size={14} />
+                  Imprimer
                 </>
               )}
+            </button>
+            <button
+              onClick={handleDownloadPdf}
+              disabled={downloading}
+              className="flex-1 min-w-0 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 flex items-center justify-center gap-1.5 hover:bg-gray-50 disabled:opacity-50"
+            >
+              {downloading ? <Loader2 size={14} className="animate-spin" /> : <><FileDown size={14} /> Télécharger</>}
             </button>
           </div>
         </div>
