@@ -1163,17 +1163,25 @@ export async function createAgentTerrain(req: Request, res: Response): Promise<v
   const cooperativeId = req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
 
-  const { nom, prenoms, email, telephone, zone, motDePasse } = req.body as {
-    nom?: string; prenoms?: string; email?: string;
-    telephone?: string; zone?: string; motDePasse?: string;
-  };
-
-  if (!nom || !prenoms || !email || !motDePasse) {
-    res.status(400).json({ erreur: "Nom, prénoms, email et mot de passe sont requis" });
-    return;
-  }
-
   try {
+    const body = req.body as {
+      nom?: unknown; prenoms?: unknown; email?: unknown;
+      telephone?: unknown; zone?: unknown; motDePasse?: unknown;
+    } | undefined;
+    const nom = typeof body?.nom === "string" ? body.nom.trim() : "";
+    const prenoms = typeof body?.prenoms === "string" ? body.prenoms.trim() : "";
+    const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
+    const telephone = typeof body?.telephone === "string"
+      ? body.telephone.trim().replace(/\s+/g, "")
+      : "";
+    const zone = typeof body?.zone === "string" ? body.zone.trim() : "";
+    const motDePasse = typeof body?.motDePasse === "string" ? body.motDePasse : "";
+
+    if (!nom || !prenoms || !email || !telephone || !motDePasse) {
+      res.status(400).json({ erreur: "Nom, prénoms, email, téléphone et mot de passe sont requis" });
+      return;
+    }
+
     const passwordHash = await bcrypt.hash(motDePasse, 10);
     const [created] = await db
       .insert(usersTable)
@@ -1181,15 +1189,15 @@ export async function createAgentTerrain(req: Request, res: Response): Promise<v
         nom,
         prenoms,
         email,
-        telephone: telephone ? telephone.trim().replace(/\s+/g, "") : null,
+        telephone,
         passwordHash,
         role: "agent_terrain",
         cooperativeId,
         actif: true,
         motDePasseTemporaire: true,
-        section: zone ?? null,
+        section: zone || null,
         zoneType: null,
-        zoneNom: zone ?? null,
+        zoneNom: zone || null,
         zoneVillages: null,
       })
       .returning({
@@ -1204,9 +1212,18 @@ export async function createAgentTerrain(req: Request, res: Response): Promise<v
 
     res.status(201).json(created);
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const dbError = err as { code?: string; detail?: string; message?: string };
+    const msg = dbError.message ?? String(err);
     if (msg.includes("unique") || msg.includes("duplicate")) {
       res.status(409).json({ erreur: "Un compte avec cet email existe déjà" });
+      return;
+    }
+    if (dbError.code === "23503") {
+      res.status(400).json({ erreur: "La coopérative associée au compte est introuvable" });
+      return;
+    }
+    if (dbError.code === "23514") {
+      res.status(400).json({ erreur: "Le rôle agent terrain n'est pas accepté par le schéma actuel" });
       return;
     }
     req.log.error({ err }, "Erreur createAgentTerrain");
