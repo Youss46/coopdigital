@@ -76,7 +76,7 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
          fond_caisse_minimum_fcfa, actif)
        VALUES ($1, $2, 'centrale', $3, 0, true)
        RETURNING id`,
-      [cooperativeId, "Caisse ventilation atomique", "500000"],
+      [cooperativeId, "Caisse ventilation atomique", "1200000"],
     );
     caisseId = caisse.rows[0].id;
 
@@ -85,7 +85,7 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
         (caisse_id, cooperative_id, date_session, solde_ouverture_fcfa, statut)
        VALUES ($1, $2, CURRENT_DATE, $3, 'ouverte')
        RETURNING id`,
-      [caisseId, cooperativeId, "500000"],
+      [caisseId, cooperativeId, "1200000"],
     );
     sessionId = session.rows[0].id;
   });
@@ -339,6 +339,86 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
       cheques: 0,
       accounting: 1,
     });
+  });
+
+  it("valide le versement du reliquat et clôture la livraison sans doublon", async () => {
+    const { paymentId, deliveryId } = await createDeferredPayment(590_000);
+
+    const firstResult = await validate(paymentId, {
+      montantReglementFcfa: 190_000,
+      modePaiement: "especes",
+    });
+    expect(firstResult.statusCode).toBe(200);
+
+    const pendingPayments = await client.query(
+      `SELECT id FROM paiements
+       WHERE livraison_id = $1 AND statut = 'en_attente'
+       ORDER BY id`,
+      [deliveryId],
+    );
+    expect(pendingPayments.rows).toHaveLength(1);
+    const remainderPaymentId = pendingPayments.rows[0].id as number;
+    paymentIds.push(remainderPaymentId);
+
+    const remainderResult = await validate(remainderPaymentId, {
+      modePaiement: "especes",
+    });
+    expect(remainderResult.statusCode).toBe(200);
+
+    const delivery = await client.query(
+      `SELECT statut_paiement, montant_restant FROM livraisons WHERE id = $1`,
+      [deliveryId],
+    );
+    expect(delivery.rows[0]).toMatchObject({
+      statut_paiement: "PAYÉ",
+      montant_restant: "0.00",
+    });
+
+    expect(await client.query(
+      `SELECT count(*)::int AS count, coalesce(sum(montant_fcfa), 0)::numeric AS total
+       FROM paiements
+       WHERE livraison_id = $1`,
+      [deliveryId],
+    )).toMatchObject({
+      rows: [{ count: 2, total: "590000" }],
+    });
+
+    expect(await paymentEffects(paymentId)).toEqual({
+      statut: "effectue",
+      lines: 1,
+      movements: 1,
+      cheques: 0,
+      accounting: 1,
+    });
+    expect(await paymentEffects(remainderPaymentId)).toEqual({
+      statut: "effectue",
+      lines: 1,
+      movements: 1,
+      cheques: 0,
+      accounting: 1,
+    });
+
+    expect(await client.query(
+      `SELECT count(*)::int AS count, coalesce(sum(montant_fcfa), 0)::numeric AS total
+       FROM mouvements_caisse
+       WHERE caisse_id = $1 AND reference_operation = ANY($2::text[])`,
+      [caisseId, [`PAI-${paymentId}`, `PAI-${remainderPaymentId}`]],
+    )).toMatchObject({
+      rows: [{ count: 2, total: "590000" }],
+    });
+    expect(await client.query(
+      `SELECT count(*)::int AS count
+       FROM paiement_lignes
+       WHERE paiement_id = ANY($1::int[])`,
+      [[paymentId, remainderPaymentId]],
+    )).toMatchObject({ rows: [{ count: 2 }] });
+    expect(await client.query(
+      `SELECT count(*)::int AS count
+       FROM ecritures_comptables
+       WHERE cooperative_id = $1 AND source = 'paiement'
+         AND source_id = ANY($2::int[])`,
+      [cooperativeId, [paymentId, remainderPaymentId]],
+    )).toMatchObject({ rows: [{ count: 2 }] });
   });
 
   it("refuse un versement supérieur au reliquat sans effet financier", async () => {
