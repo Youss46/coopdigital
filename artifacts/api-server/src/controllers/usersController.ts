@@ -310,42 +310,53 @@ export async function deleteUser(req: Request, res: Response): Promise<void> {
     }
 
     await db.transaction(async (tx) => {
-      // Ces données sont propres au compte et ne portent pas d'historique métier.
-      // Elles doivent être retirées avant le compte car leurs FK sont NOT NULL.
-      const detachQueries = [
-        sql`DELETE FROM "lectures_messages" WHERE "user_id" = ${id}`,
-        sql`DELETE FROM "notifications" WHERE "user_id" = ${id}`,
-        sql`DELETE FROM "preferences_notifications" WHERE "user_id" = ${id}`,
-        // Les opérations historiques restent conservées, mais sans pointer
-        // vers un compte qui n'existe plus.
-        sql`UPDATE "alimentations_caisse_delegue" SET "envoye_par" = NULL WHERE "envoye_par" = ${id}`,
-        sql`UPDATE "avances" SET "agent_id" = NULL WHERE "agent_id" = ${id}`,
-        sql`UPDATE "bilans_campagne" SET "genere_par" = NULL WHERE "genere_par" = ${id}`,
-        sql`UPDATE "budgets_campagne" SET "valide_par" = NULL WHERE "valide_par" = ${id}`,
-        sql`UPDATE "bulletins_paie" SET "paye_par" = NULL WHERE "paye_par" = ${id}`,
-        sql`UPDATE "config_cooperative" SET "updated_by" = NULL WHERE "updated_by" = ${id}`,
-        sql`UPDATE "distributions_intrants" SET "agent_id" = NULL WHERE "agent_id" = ${id}`,
-        sql`UPDATE "equipements" SET "affecte_user_id" = NULL WHERE "affecte_user_id" = ${id}`,
-        sql`UPDATE "historique_prix" SET "saisi_par" = NULL WHERE "saisi_par" = ${id}`,
-        sql`UPDATE "historique_sms" SET "agent_id" = NULL WHERE "agent_id" = ${id}`,
-        sql`UPDATE "indicateurs_rse" SET "calcule_par" = NULL WHERE "calcule_par" = ${id}`,
-        sql`UPDATE "liberations_parts" SET "agent_id" = NULL WHERE "agent_id" = ${id}`,
-        sql`UPDATE "litiges_pesee" SET "resolu_par" = NULL WHERE "resolu_par" = ${id}`,
-        sql`UPDATE "livraisons" SET "agent_id" = NULL, "peseur_id" = NULL WHERE "agent_id" = ${id} OR "peseur_id" = ${id}`,
-        sql`UPDATE "messages_internes" SET "auteur_id" = NULL WHERE "auteur_id" = ${id}`,
-        sql`UPDATE "messages_mission" SET "auteur_id" = NULL WHERE "auteur_id" = ${id}`,
-        sql`UPDATE "mouvements_caisse_delegue" SET "created_by_id" = NULL WHERE "created_by_id" = ${id}`,
-        sql`UPDATE "mouvements_stock" SET "agent_id" = NULL WHERE "agent_id" = ${id}`,
-        sql`UPDATE "paiements" SET "initialise_par" = NULL, "valide_par" = NULL WHERE "initialise_par" = ${id} OR "valide_par" = ${id}`,
-        sql`UPDATE "parcelles" SET "enregistre_par" = NULL WHERE "enregistre_par" = ${id}`,
-        sql`UPDATE "projets_investissement" SET "responsable_id" = NULL WHERE "responsable_id" = ${id}`,
-        sql`UPDATE "simulations" SET "created_by" = NULL WHERE "created_by" = ${id}`,
-        sql`UPDATE "taux_change" SET "saisi_par" = NULL WHERE "saisi_par" = ${id}`,
-        sql`UPDATE "tickets_support" SET "ouvert_par" = NULL WHERE "ouvert_par" = ${id}`,
-        sql`UPDATE "traitements_refus" SET "traite_par" = NULL WHERE "traite_par" = ${id}`,
-      ];
-      for (const query of detachQueries) {
-        await tx.execute(query);
+      type UserForeignKey = {
+        schemaName: string;
+        tableName: string;
+        columnName: string;
+        notNull: boolean;
+      };
+
+      const fkResult = await tx.execute(sql`
+        SELECT
+          child_ns.nspname AS "schemaName",
+          child.relname AS "tableName",
+          child_col.attname AS "columnName",
+          child_col.attnotnull AS "notNull"
+        FROM pg_constraint constraint_row
+        JOIN pg_class parent ON parent.oid = constraint_row.confrelid
+        JOIN pg_namespace parent_ns ON parent_ns.oid = parent.relnamespace
+        JOIN pg_class child ON child.oid = constraint_row.conrelid
+        JOIN pg_namespace child_ns ON child_ns.oid = child.relnamespace
+        JOIN pg_attribute child_col
+          ON child_col.attrelid = child.oid
+         AND child_col.attnum = constraint_row.conkey[1]
+        WHERE constraint_row.contype = 'f'
+          AND parent_ns.nspname = 'public'
+          AND parent.relname = 'users'
+          AND child_ns.nspname = 'public'
+          AND cardinality(constraint_row.conkey) = 1
+      `);
+      const userForeignKeys = fkResult.rows as UserForeignKey[];
+      const accountOwnedTables = new Set([
+        "lectures_messages",
+        "notifications",
+        "preferences_notifications",
+      ]);
+      const quoteIdentifier = (value: string) => `"${value.replaceAll("\"", "\"\"")}"`;
+
+      for (const foreignKey of userForeignKeys) {
+        const table = `${quoteIdentifier(foreignKey.schemaName)}.${quoteIdentifier(foreignKey.tableName)}`;
+        const column = quoteIdentifier(foreignKey.columnName);
+        const statement = foreignKey.notNull && accountOwnedTables.has(foreignKey.tableName)
+          ? `DELETE FROM ${table} WHERE ${column} = ${id}`
+          : foreignKey.notNull
+            ? null
+            : `UPDATE ${table} SET ${column} = NULL WHERE ${column} = ${id}`;
+
+        // Une FK obligatoire hors données personnelles doit bloquer la
+        // suppression : elle protège un objet métier appartenant au compte.
+        if (statement) await tx.execute(sql.raw(statement));
       }
 
       await tx
