@@ -418,6 +418,14 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     gerer_zones: ["pca", "directeur"],
   },
 
+  // MODULE — ENTREPÔTS DÉLÉGUÉS & TRANSFERTS
+  // La consultation est ouverte à l'audit, mais les opérations qui modifient
+  // le stock ou le transfert restent réservées à la direction.
+  entrepots_delegues: {
+    lire:   ["pca", "directeur", "auditeur"],
+    gerer:  ["pca", "directeur"],
+  },
+
 };
 
 // ─── Fonction principale ─────────────────────────────────────────────────────

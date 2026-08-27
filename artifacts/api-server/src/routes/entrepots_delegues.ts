@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { terrainAuthMiddleware, delegueOnly, peseurOrDelegueOnly } from "../middlewares/terrainAuth.js";
 import { authMiddleware } from "../middlewares/auth.js";
-import { denyComptableRestrictedModules } from "../middlewares/permissions.js";
+import { checkPermission } from "../middlewares/permissions.js";
 import {
   getMonEntrepotHandler,
   getMesMouvementsHandler,
@@ -41,21 +41,24 @@ router.get("/terrain/transferts/en_attente_pesee",              terrainAuthMiddl
 
 // ─── Routes admin (JWT coopérative) ───────────────────────────────────────────
 // Ont leur propre authMiddleware (routeur enregistré avant le guard global)
-router.use(["/entrepots", "/transferts"], authMiddleware, denyComptableRestrictedModules);
+// et leur propre RBAC : le garde global de routes n'est pas encore exécuté.
+const adminReadMiddleware = [authMiddleware, checkPermission("entrepots_delegues", "lire")];
+const adminManageMiddleware = [authMiddleware, checkPermission("entrepots_delegues", "gerer")];
+router.use(["/entrepots", "/transferts"], ...adminReadMiddleware);
 
-router.get("/entrepots/stats",               authMiddleware, getStatsHandler);
-router.get("/entrepots/delegues-liste",      authMiddleware, listDeleguesEntrepotsHandler);
-router.get("/entrepots",                     authMiddleware, listEntrepotsHandler);
-router.post("/entrepots",                    authMiddleware, creerEntrepotHandler);
-router.put("/entrepots/:id",                 authMiddleware, modifierEntrepotHandler);
-router.get("/entrepots/:id/mouvements",      authMiddleware, getMouvementsEntrepotHandler);
-router.post("/entrepots/:id/ajustement",     authMiddleware, ajusterStockHandler);
-router.post("/entrepots/:id/transfert",      authMiddleware, creerTransfertAdminHandler);
+router.get("/entrepots/stats",               ...adminReadMiddleware, getStatsHandler);
+router.get("/entrepots/delegues-liste",      ...adminReadMiddleware, listDeleguesEntrepotsHandler);
+router.get("/entrepots",                     ...adminReadMiddleware, listEntrepotsHandler);
+router.post("/entrepots",                    ...adminManageMiddleware, creerEntrepotHandler);
+router.put("/entrepots/:id",                 ...adminManageMiddleware, modifierEntrepotHandler);
+router.get("/entrepots/:id/mouvements",      ...adminReadMiddleware, getMouvementsEntrepotHandler);
+router.post("/entrepots/:id/ajustement",     ...adminManageMiddleware, ajusterStockHandler);
+router.post("/entrepots/:id/transfert",      ...adminManageMiddleware, creerTransfertAdminHandler);
 
-router.get("/transferts",                                authMiddleware, listTransfertsHandler);
-router.get("/transferts/:id/pdf",                        authMiddleware, getRapportTransfertPdfHandler);
-router.put("/transferts/:id/arrivee-physique",           authMiddleware, signalerArriveePhysiqueHandler);
-router.put("/transferts/:id/arrivee",                    authMiddleware, confirmerArriveeHandler);
-router.put("/transferts/:id/litige",                     authMiddleware, signalerLitigeHandler);
+router.get("/transferts",                                ...adminReadMiddleware, listTransfertsHandler);
+router.get("/transferts/:id/pdf",                        ...adminReadMiddleware, getRapportTransfertPdfHandler);
+router.put("/transferts/:id/arrivee-physique",           ...adminManageMiddleware, signalerArriveePhysiqueHandler);
+router.put("/transferts/:id/arrivee",                    ...adminManageMiddleware, confirmerArriveeHandler);
+router.put("/transferts/:id/litige",                     ...adminManageMiddleware, signalerLitigeHandler);
 
 export default router;
