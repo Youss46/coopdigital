@@ -192,9 +192,14 @@ Retourne un tableau JSON au format exact :
 [{"numeroCompte":"<numéro exactement copié du PLAN_COMPTABLE>","score":<entier de 0 à 100>,"raison":"<justification courte en français>"}]`;
 
     try {
-      const anthropic = new Anthropic({ apiKey });
+      const model = process.env["ANTHROPIC_MODEL"] ?? "claude-sonnet-5";
+      const baseURL = process.env["ANTHROPIC_BASE_URL"];
+      const anthropic = new Anthropic({
+        apiKey,
+        ...(baseURL ? { baseURL } : {}),
+      });
       const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-5",
+        model,
         max_tokens: 1200,
         system,
         messages: [{ role: "user", content: user }],
