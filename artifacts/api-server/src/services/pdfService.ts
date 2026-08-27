@@ -47,7 +47,7 @@ import {
   vehiculesTable,
   chauffeursTable,
 } from "@workspace/db";
-import { eq, desc, gte, lte, lt, and, sql, inArray } from "drizzle-orm";
+import { eq, desc, asc, gte, lte, lt, and, sql, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { drawHeader, drawFooter } from "./pdfHeaderService";
 import { computeCodeMembre } from "./portailService";
@@ -1027,6 +1027,9 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
     livraisonDate: livraisonsTable.dateLivraison,
     livraisonNumeroPesee: livraisonsTable.numeroPesee,
     livraisonRef: livraisonsTable.codeAchat,
+    livraisonMontantNetFcfa: livraisonsTable.montantNetFcfa,
+    livraisonMontantRestant: livraisonsTable.montantRestant,
+    livraisonStatutPaiement: livraisonsTable.statutPaiement,
     // Agent validateur
     validateurNom: validateurAlias.nom,
     validateurPrenoms: validateurAlias.prenoms,
@@ -1046,6 +1049,19 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
     .select()
     .from(paiementLignesTable)
     .where(eq(paiementLignesTable.paiementId, paiementId));
+  const versementsLivraison = row.livraisonId
+    ? await db
+      .select({ id: paiementsTable.id })
+      .from(paiementsTable)
+      .where(and(
+        eq(paiementsTable.livraisonId, row.livraisonId),
+        inArray(paiementsTable.statut, ["effectue", "confirme"]),
+      ))
+      .orderBy(asc(paiementsTable.createdAt), asc(paiementsTable.id))
+    : [];
+  const numeroVersement = row.livraisonId
+    ? versementsLivraison.findIndex((versement) => versement.id === row.id) + 1
+    : 0;
 
   const campagne = await getCampagneEnCours(cooperativeId);
   const { doc, endPromise } = makePdfDoc();
@@ -1111,7 +1127,33 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
     y += 4;
   }
   y += 10;
-  if (row.montantAPayerFcfa) {
+  const montantLivraison = row.livraisonMontantNetFcfa != null
+    ? Number(row.livraisonMontantNetFcfa)
+    : null;
+  const montantRestantLivraison = row.livraisonMontantRestant != null
+    ? Number(row.livraisonMontantRestant)
+    : null;
+  const livraisonEstReglee = (row.livraisonStatutPaiement ?? "")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toUpperCase() === "PAYE";
+  if (row.livraisonId && montantLivraison != null && montantRestantLivraison != null) {
+    const statutLivraison = livraisonEstReglee ? "RÉGLÉE" : "PARTIELLE";
+    const payMontants: Array<[string, string, string]> = [
+      [`Règlement${numeroVersement > 0 ? ` ${numeroVersement}` : ""}`, formaterFCFA(Number(row.montantFcfa)), "#f0fdf4"],
+      ["Reste dû", formaterFCFA(Math.max(0, montantRestantLivraison)), livraisonEstReglee ? "#f0fdf4" : "#fff7ed"],
+    ];
+    for (const [label, val, bg] of payMontants) {
+      doc.rect(MARGIN, y, 370, 18).fill(bg);
+      doc.fontSize(9).fillColor("black").font("Helvetica").text(label, MARGIN + 8, y + 5, { width: 250, lineBreak: false });
+      doc.font("Helvetica-Bold").text(val, MARGIN + 265, y + 5, { width: 100, align: "right", lineBreak: false });
+      y += 18;
+    }
+    doc.rect(MARGIN, y, 370, 18).fill(livraisonEstReglee ? "#dcfce7" : "#dbeafe");
+    doc.fontSize(9).fillColor(livraisonEstReglee ? "#166534" : "#1d4ed8").font("Helvetica-Bold")
+      .text(`Statut livraison : ${statutLivraison}`, MARGIN + 8, y + 5, { width: 350, lineBreak: false });
+    y += 18;
+  } else if (row.montantAPayerFcfa) {
     const payMontants: Array<[string, string, string]> = [
       ["Montant dû",    formaterFCFA(parseFloat(row.montantAPayerFcfa)),    "#f9fafb"],
       ["Montant versé", formaterFCFA(parseFloat(row.montantVerseFcfa ?? "0")), "#f0fdf4"],
@@ -1126,7 +1168,7 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
   }
   doc.rect(MARGIN, y, 370, 26).fill(VERT);
   doc.fontSize(11).fillColor("white").font("Helvetica-Bold")
-    .text("MONTANT PAYÉ", MARGIN + 8, y + 8, { width: 200, lineBreak: false });
+    .text(row.livraisonId ? "MONTANT DU RÈGLEMENT" : "MONTANT PAYÉ", MARGIN + 8, y + 8, { width: 200, lineBreak: false });
   doc.text(formaterFCFA(row.montantFcfa), MARGIN + 218, y + 8, { width: 145, align: "right", lineBreak: false });
   y += 34;
   const payStatutColor: Record<string, string> = { effectue: "#16a34a", confirme: "#16a34a", en_attente: "#f59e0b", echec: "#ef4444", rejete: "#ef4444" };
