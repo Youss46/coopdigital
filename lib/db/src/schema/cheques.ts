@@ -10,6 +10,7 @@ export const chequesEmisTable = pgTable("cheques_emis", {
   montantFcfa:      integer("montant_fcfa").notNull(),
   compteBancaireId: integer("compte_bancaire_id"),
   paiementId:       integer("paiement_id"),
+  paiementLigneId:  integer("paiement_ligne_id"),
   membreId:         integer("membre_id"),
   livraisonId:      integer("livraison_id"),
   dateEmission:     date("date_emission", { mode: "string" }).notNull(),

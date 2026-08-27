@@ -23,6 +23,11 @@ export const lotsTable = makeTable("lots");
 export const exportateursTable = makeTable("exportateurs");
 export const usersTable = makeTable("users");
 export const paiementsTable = makeTable("paiements");
+export const paiementLignesTable = {
+  ...makeTable("paiement_lignes"),
+  id: {}, paiementId: {}, modePaiement: {}, montantFcfa: {},
+  referenceTransaction: {}, telephone: {}, numeroCheque: {}, banque: {}, dateEcheance: {},
+};
 export const intrantsTable = makeTable("intrants");
 export const distributionsIntrantsTable = makeTable("distributions_intrants");
 export const remboursementsIntrantsTable = makeTable("remboursements_intrants");

@@ -9,6 +9,7 @@ export * from "./avances";
 export * from "./campagnes";
 export * from "./livraisons";
 export * from "./paiements";
+export * from "./paiement_lignes";
 export * from "./lots";
 export * from "./stocks";
 export * from "./exportateurs";

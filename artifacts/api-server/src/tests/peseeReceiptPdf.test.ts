@@ -257,13 +257,15 @@ describe("generateRecuPaiement (real PDF generation) — receipt number in PDF o
   });
 
   /**
-   * Configure db.select for two consecutive calls:
+   * Configure db.select for three consecutive calls:
    *  call 1 → main paiement join query  (returns [row])
-   *  call 2 → getCampagneEnCours query  (returns [] — no campaign)
+   *  call 2 → paiement lignes query     (returns [] — legacy payment)
+   *  call 3 → getCampagneEnCours query  (returns [] — no campaign)
    */
   function setupDbSelect(row: Record<string, unknown>) {
     vi.mocked(db.select)
       .mockReturnValueOnce(makeSelectChain([row]) as unknown as ReturnType<typeof db.select>)
+      .mockReturnValueOnce(makeSelectChain([])  as unknown as ReturnType<typeof db.select>)
       .mockReturnValueOnce(makeSelectChain([])  as unknown as ReturnType<typeof db.select>);
   }
 

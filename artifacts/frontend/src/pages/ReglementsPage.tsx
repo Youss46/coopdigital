@@ -14,6 +14,7 @@ import {
   ListPaiementsPeriode,
   type PaiementListItem,
   type ValiderPaiementInputModePaiement,
+  type VentilationPaiementInput,
   getListPaiementsQueryKey,
   getGetPaiementsStatsQueryKey,
 } from "@workspace/api-client-react";
@@ -33,6 +34,14 @@ function telProducteur(p: PaiementListItem) {
 }
 function isBonCarburant(p: PaiementListItem) {
   return !!p.bonCarburantId;
+}
+function montantEspeces(p: PaiementListItem) {
+  if (p.lignes?.length) {
+    return p.lignes
+      .filter((ligne) => ligne.modePaiement === "especes")
+      .reduce((total, ligne) => total + ligne.montantFcfa, 0);
+  }
+  return p.modePaiement === "especes" ? (p.montantNetFcfa ?? p.montantFcfa ?? 0) : 0;
 }
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
@@ -116,7 +125,7 @@ function ModalValidation({
 }: {
   paiement: PaiementListItem;
   onClose: () => void;
-  onConfirm: (ref: string, telephone: string, mode?: string) => void;
+  onConfirm: (ref: string, telephone: string, mode?: string, ventilations?: VentilationPaiementInput[]) => void;
   loading: boolean;
   sessionCaisseOuverte?: boolean | null;
   isDelegue?: boolean;
@@ -124,6 +133,18 @@ function ModalValidation({
   const [ref, setRef] = useState("");
   const [telephone, setTelephone] = useState(telProducteur(paiement) ?? "");
   const [touched, setTouched] = useState(false);
+  const montantNet = paiement.montantNetFcfa ?? paiement.montantFcfa;
+  const [multiMoyens, setMultiMoyens] = useState(false);
+  const [ventilations, setVentilations] = useState<Array<{
+    modePaiement: VentilationPaiementInput["modePaiement"];
+    montantFcfa: string;
+    numeroCheque: string;
+    banque: string;
+    dateEcheance: string;
+  }>>([
+    { modePaiement: "especes", montantFcfa: String(montantNet), numeroCheque: "", banque: "", dateEcheance: "" },
+    { modePaiement: "cheque", montantFcfa: "0", numeroCheque: "", banque: "", dateEcheance: "" },
+  ]);
   const isCarburant = isBonCarburant(paiement);
   // Pré-remplir avec le mode déjà fixé sur le paiement (livraisons normales)
   // Pour les bons carburant ou les paiements sans mode, laisser la sélection libre
@@ -139,8 +160,26 @@ function ModalValidation({
   const isEspeces = selectedMode === "especes";
   const sessionBloquee = isEspeces && sessionCaisseOuverte === false;
   const refManquante = isMobile && !ref.trim();
+  const totalVentile = ventilations.reduce((total, ligne) => total + (Number(ligne.montantFcfa) || 0), 0);
+  const ventilationIncorrecte = multiMoyens && totalVentile !== montantNet;
 
   function handleConfirm() {
+    if (multiMoyens) {
+      if (ventilationIncorrecte || ventilations.some((ligne) => !Number.isInteger(Number(ligne.montantFcfa)) || Number(ligne.montantFcfa) <= 0)) {
+        setTouched(true);
+        return;
+      }
+      onConfirm("", "", undefined, ventilations.map((ligne) => ({
+        modePaiement: ligne.modePaiement,
+        montantFcfa: Number(ligne.montantFcfa),
+        ...(ligne.modePaiement === "cheque" ? {
+          numeroCheque: ligne.numeroCheque || null,
+          banque: ligne.banque || null,
+          dateEcheance: ligne.dateEcheance || null,
+        } : {}),
+      })));
+      return;
+    }
     if (modeManquant) { setTouched(true); return; }
     if (sessionBloquee) return;
     if (refManquante) { setTouched(true); return; }
@@ -193,7 +232,61 @@ function ModalValidation({
               Mode de paiement
               {!isDelegue && !modePreset && <span className="text-red-500 font-semibold ml-1">*</span>}
             </label>
-            {modePreset ? (
+            {!isDelegue && (
+              <label className="flex items-center gap-2 mb-2 text-xs text-gray-600 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={multiMoyens}
+                  onChange={(e) => { setMultiMoyens(e.target.checked); setTouched(false); }}
+                  className="accent-green-700"
+                />
+                Répartir entre plusieurs moyens
+              </label>
+            )}
+            {multiMoyens ? (
+              <div className="space-y-2">
+                {ventilations.map((ligne, index) => (
+                  <div key={index} className="rounded-lg border border-gray-200 bg-white p-2.5 space-y-2">
+                    <div className="flex gap-2">
+                      <select
+                        value={ligne.modePaiement}
+                        onChange={(e) => setVentilations((old) => old.map((item, i) => i === index ? { ...item, modePaiement: e.target.value as VentilationPaiementInput["modePaiement"] } : item))}
+                        className="flex-1 border border-gray-200 rounded-lg px-2 py-2 text-xs"
+                      >
+                        {MODES_CARBURANT.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                      </select>
+                      <input
+                        type="number"
+                        min="1"
+                        value={ligne.montantFcfa}
+                        onChange={(e) => setVentilations((old) => old.map((item, i) => i === index ? { ...item, montantFcfa: e.target.value } : item))}
+                        className="w-32 border border-gray-200 rounded-lg px-2 py-2 text-xs text-right"
+                        placeholder="Montant"
+                      />
+                      {ventilations.length > 2 && (
+                        <button type="button" onClick={() => setVentilations((old) => old.filter((_, i) => i !== index))} className="text-gray-400 hover:text-red-500">
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                    {ligne.modePaiement === "cheque" && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <input value={ligne.numeroCheque} onChange={(e) => setVentilations((old) => old.map((item, i) => i === index ? { ...item, numeroCheque: e.target.value } : item))} placeholder="N° du chèque" className="border border-gray-200 rounded-lg px-2 py-2 text-xs" />
+                        <input value={ligne.banque} onChange={(e) => setVentilations((old) => old.map((item, i) => i === index ? { ...item, banque: e.target.value } : item))} placeholder="Banque (optionnel)" className="border border-gray-200 rounded-lg px-2 py-2 text-xs" />
+                      </div>
+                    )}
+                  </div>
+                ))}
+                <button type="button" onClick={() => setVentilations((old) => [...old, { modePaiement: "cheque", montantFcfa: "0", numeroCheque: "", banque: "", dateEcheance: "" }])} className="text-xs font-medium text-green-700 hover:text-green-800">
+                  + Ajouter un moyen
+                </button>
+                <div className={`flex justify-between text-xs font-semibold px-1 ${ventilationIncorrecte ? "text-red-600" : "text-green-700"}`}>
+                  <span>Total ventilé</span>
+                  <span>{fmt(totalVentile)} / {fmt(montantNet)}</span>
+                </div>
+                {touched && ventilationIncorrecte && <p className="text-xs text-red-500">Le total des moyens doit correspondre au net à payer.</p>}
+              </div>
+            ) : modePreset ? (
               /* Mode pré-sélectionné — lecture seule */
               <div className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-700">
                 {MODES_CARBURANT.find((m) => m.value === modePreset)?.label ?? modePreset}
@@ -468,7 +561,13 @@ function ModalRecu({ paiement, onClose }: { paiement: PaiementListItem; onClose:
             </div>
             <div className="px-4 py-2.5 flex justify-between">
               <span className="text-gray-500">Mode</span>
-              <ModeBadge mode={paiement.modePaiement} />
+              {paiement.lignes && paiement.lignes.length > 1 ? (
+                <div className="flex flex-wrap justify-end gap-1">
+                  {paiement.lignes.map((ligne) => (
+                    <span key={ligne.id} className="text-xs text-gray-700">{MODE_CONFIG[ligne.modePaiement]?.label ?? ligne.modePaiement} : {fmt(ligne.montantFcfa)}</span>
+                  ))}
+                </div>
+              ) : <ModeBadge mode={paiement.modePaiement} />}
             </div>
             {paiement.referenceTransaction && (
               <div className="px-4 py-2.5 flex justify-between">
@@ -603,7 +702,7 @@ export default function ReglementsPage() {
     qc.invalidateQueries({ queryKey: getGetPaiementsStatsQueryKey() });
   }
 
-  async function handleValider(ref: string, telephone: string, mode?: ValiderPaiementInputModePaiement) {
+  async function handleValider(ref: string, telephone: string, mode?: ValiderPaiementInputModePaiement, ventilations?: VentilationPaiementInput[]) {
     if (modal?.type !== "valider") return;
     // Le backend n'accepte modePaiement que si : (a) pas de mode pré-sélectionné, ou (b) bon carburant
     const hasPresetMode = !!modal.paiement.modePaiement;
@@ -616,16 +715,18 @@ export default function ReglementsPage() {
           referenceTransaction: ref || null,
           telephone: telephone || null,
           ...(sendMode ? { modePaiement: mode } : {}),
+          ...(ventilations ? { ventilations } : {}),
         },
       });
       invalidateAll();
       // Rafraîchir le solde caisse délégué après validation espèces
       const modeEffectif = mode ?? modal.paiement.modePaiement;
-      if (isDelegue && modeEffectif === "especes") {
+      const contientEspeces = ventilations?.some((ligne) => ligne.modePaiement === "especes") || modeEffectif === "especes";
+      if (isDelegue && contientEspeces) {
         qc.invalidateQueries({ queryKey: ["caisse-delegue-solde", utilisateur?.id] });
       }
       // Rafraîchir le statut session Caisse Centrale après validation
-      if (!isDelegue && modeEffectif === "especes") {
+      if (!isDelegue && contientEspeces) {
         qc.invalidateQueries({ queryKey: ["caisse-centrale-session"] });
       }
       setModal(null);
@@ -682,13 +783,13 @@ export default function ReglementsPage() {
 
   // Calcul alerte solde : si le plus petit paiement en attente > solde
   const paiementsEnAttente = (paiements ?? []).filter(
-    (p) => p.statut === "en_attente" && p.modePaiement === "especes",
+    (p) => p.statut === "en_attente" && montantEspeces(p) > 0,
   );
   const plusPetitMontant = paiementsEnAttente.length > 0
-    ? Math.min(...paiementsEnAttente.map((p) => p.montantNetFcfa ?? p.montantFcfa ?? 0))
+    ? Math.min(...paiementsEnAttente.map((p) => montantEspeces(p)))
     : null;
   const totalEspecesEnAttente = paiementsEnAttente.reduce(
-    (acc, p) => acc + (p.montantNetFcfa ?? p.montantFcfa ?? 0), 0,
+    (acc, p) => acc + montantEspeces(p), 0,
   );
   const soldeCaisse = caisseDelegue?.caisse?.solde ?? null;
   const alerteSolde = isDelegue && soldeCaisse !== null && plusPetitMontant !== null && soldeCaisse < plusPetitMontant;
@@ -963,7 +1064,7 @@ export default function ReglementsPage() {
         <ModalValidation
           paiement={modal.paiement}
           onClose={() => setModal(null)}
-          onConfirm={(ref, telephone, mode) => void handleValider(ref, telephone, mode as ValiderPaiementInputModePaiement | undefined)}
+          onConfirm={(ref, telephone, mode, ventilations) => void handleValider(ref, telephone, mode as ValiderPaiementInputModePaiement | undefined, ventilations)}
           loading={validerMut.isPending}
           sessionCaisseOuverte={isDelegue ? sessionDelegueOuverte : sessionCentraleOuverte}
           isDelegue={isDelegue}

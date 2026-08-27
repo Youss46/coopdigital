@@ -973,6 +973,34 @@ export const ValiderPaiementInputModePaiement = {
   wave: 'wave',
 } as const;
 
+export type VentilationPaiementInputModePaiement = typeof VentilationPaiementInputModePaiement[keyof typeof VentilationPaiementInputModePaiement];
+
+
+export const VentilationPaiementInputModePaiement = {
+  especes: 'especes',
+  cheque: 'cheque',
+  virement: 'virement',
+  orange_money: 'orange_money',
+  mtn_momo: 'mtn_momo',
+  wave: 'wave',
+} as const;
+
+export interface VentilationPaiementInput {
+  modePaiement: VentilationPaiementInputModePaiement;
+  /** @minimum 1 */
+  montantFcfa: number;
+  /** @nullable */
+  referenceTransaction?: string | null;
+  /** @nullable */
+  telephone?: string | null;
+  /** @nullable */
+  numeroCheque?: string | null;
+  /** @nullable */
+  banque?: string | null;
+  /** @nullable */
+  dateEcheance?: string | null;
+}
+
 export interface ValiderPaiementInput {
   referenceTransaction?: string | null;
   dateReglement?: string | null;
@@ -980,6 +1008,11 @@ export interface ValiderPaiementInput {
   /** Permet de corriger le mode de règlement au moment de la validation. Uniquement accepté pour les paiements liés à un bon carburant (bonCarburantId présent).
    */
   modePaiement?: ValiderPaiementInputModePaiement;
+  /**
+     * Ventilation du montant entre plusieurs moyens de règlement.
+     * @minItems 1
+     */
+  ventilations?: VentilationPaiementInput[];
 }
 
 /**
@@ -994,6 +1027,7 @@ export const PaiementListItemModePaiement = {
   especes: 'especes',
   wave: 'wave',
   cheque: 'cheque',
+  virement: 'virement',
 } as const;
 
 export type PaiementListItemStatut = typeof PaiementListItemStatut[keyof typeof PaiementListItemStatut];
@@ -1007,6 +1041,35 @@ export const PaiementListItemStatut = {
   en_cours: 'en_cours',
   effectue: 'effectue',
 } as const;
+
+export type PaiementLigneModePaiement = typeof PaiementLigneModePaiement[keyof typeof PaiementLigneModePaiement];
+
+
+export const PaiementLigneModePaiement = {
+  especes: 'especes',
+  cheque: 'cheque',
+  virement: 'virement',
+  orange_money: 'orange_money',
+  mtn_momo: 'mtn_momo',
+  wave: 'wave',
+} as const;
+
+export interface PaiementLigne {
+  id: number;
+  paiementId: number;
+  modePaiement: PaiementLigneModePaiement;
+  montantFcfa: number;
+  /** @nullable */
+  referenceTransaction?: string | null;
+  /** @nullable */
+  telephone?: string | null;
+  /** @nullable */
+  numeroCheque?: string | null;
+  /** @nullable */
+  banque?: string | null;
+  /** @nullable */
+  dateEcheance?: string | null;
+}
 
 export interface PaiementListItem {
   id: number;
@@ -1061,6 +1124,7 @@ export interface PaiementListItem {
   agentSaisiseurId?: number | null;
   /** @nullable */
   agentSaisiseurNom?: string | null;
+  lignes?: PaiementLigne[];
 }
 
 export type PaiementsStatsEnAttente = {

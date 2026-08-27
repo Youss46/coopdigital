@@ -3177,7 +3177,7 @@ export const ListPaiementsResponseItem = zod.object({
   "bonCarburantNumero": zod.string().nullish(),
   "membreId": zod.number().nullish(),
   "montantFcfa": zod.number(),
-  "modePaiement": zod.union([zod.literal('orange_money'),zod.literal('mtn_momo'),zod.literal('especes'),zod.literal('wave'),zod.literal('cheque'),zod.literal(null)]).nullish(),
+  "modePaiement": zod.union([zod.literal('orange_money'),zod.literal('mtn_momo'),zod.literal('especes'),zod.literal('wave'),zod.literal('cheque'),zod.literal('virement'),zod.literal(null)]).nullish(),
   "referenceTransaction": zod.string().nullish(),
   "statut": zod.enum(['en_attente', 'confirme', 'echec', 'rejete', 'en_cours', 'effectue']),
   "createdAt": zod.string(),
@@ -3198,7 +3198,18 @@ export const ListPaiementsResponseItem = zod.object({
   "montantNetFcfa": zod.number().nullish(),
   "agentId": zod.number().nullish(),
   "agentSaisiseurId": zod.number().nullish(),
-  "agentSaisiseurNom": zod.string().nullish()
+  "agentSaisiseurNom": zod.string().nullish(),
+  "lignes": zod.array(zod.object({
+  "id": zod.number(),
+  "paiementId": zod.number(),
+  "modePaiement": zod.enum(['especes', 'cheque', 'virement', 'orange_money', 'mtn_momo', 'wave']),
+  "montantFcfa": zod.number(),
+  "referenceTransaction": zod.string().nullish(),
+  "telephone": zod.string().nullish(),
+  "numeroCheque": zod.string().nullish(),
+  "banque": zod.string().nullish(),
+  "dateEcheance": zod.string().nullish()
+})).optional()
 })
 export const ListPaiementsResponse = zod.array(ListPaiementsResponseItem)
 
@@ -3210,11 +3221,24 @@ export const ValiderPaiementParams = zod.object({
   "id": zod.coerce.number()
 })
 
+
+
+
+
 export const ValiderPaiementBody = zod.object({
   "referenceTransaction": zod.string().nullish(),
   "dateReglement": zod.string().nullish(),
   "telephone": zod.string().nullish(),
-  "modePaiement": zod.enum(['especes', 'cheque', 'virement', 'orange_money', 'mtn_momo', 'wave']).nullish().describe('Permet de corriger le mode de règlement au moment de la validation. Uniquement accepté pour les paiements liés à un bon carburant (bonCarburantId présent).\n')
+  "modePaiement": zod.enum(['especes', 'cheque', 'virement', 'orange_money', 'mtn_momo', 'wave']).nullish().describe('Permet de corriger le mode de règlement au moment de la validation. Uniquement accepté pour les paiements liés à un bon carburant (bonCarburantId présent).\n'),
+  "ventilations": zod.array(zod.object({
+  "modePaiement": zod.enum(['especes', 'cheque', 'virement', 'orange_money', 'mtn_momo', 'wave']),
+  "montantFcfa": zod.number().min(1),
+  "referenceTransaction": zod.string().nullish(),
+  "telephone": zod.string().nullish(),
+  "numeroCheque": zod.string().nullish(),
+  "banque": zod.string().nullish(),
+  "dateEcheance": zod.string().nullish()
+})).min(1).optional().describe('Ventilation du montant entre plusieurs moyens de règlement.')
 })
 
 export const ValiderPaiementResponse = zod.object({
@@ -3224,7 +3248,7 @@ export const ValiderPaiementResponse = zod.object({
   "bonCarburantNumero": zod.string().nullish(),
   "membreId": zod.number().nullish(),
   "montantFcfa": zod.number(),
-  "modePaiement": zod.union([zod.literal('orange_money'),zod.literal('mtn_momo'),zod.literal('especes'),zod.literal('wave'),zod.literal('cheque'),zod.literal(null)]).nullish(),
+  "modePaiement": zod.union([zod.literal('orange_money'),zod.literal('mtn_momo'),zod.literal('especes'),zod.literal('wave'),zod.literal('cheque'),zod.literal('virement'),zod.literal(null)]).nullish(),
   "referenceTransaction": zod.string().nullish(),
   "statut": zod.enum(['en_attente', 'confirme', 'echec', 'rejete', 'en_cours', 'effectue']),
   "createdAt": zod.string(),
@@ -3245,7 +3269,18 @@ export const ValiderPaiementResponse = zod.object({
   "montantNetFcfa": zod.number().nullish(),
   "agentId": zod.number().nullish(),
   "agentSaisiseurId": zod.number().nullish(),
-  "agentSaisiseurNom": zod.string().nullish()
+  "agentSaisiseurNom": zod.string().nullish(),
+  "lignes": zod.array(zod.object({
+  "id": zod.number(),
+  "paiementId": zod.number(),
+  "modePaiement": zod.enum(['especes', 'cheque', 'virement', 'orange_money', 'mtn_momo', 'wave']),
+  "montantFcfa": zod.number(),
+  "referenceTransaction": zod.string().nullish(),
+  "telephone": zod.string().nullish(),
+  "numeroCheque": zod.string().nullish(),
+  "banque": zod.string().nullish(),
+  "dateEcheance": zod.string().nullish()
+})).optional()
 })
 
 
@@ -3270,7 +3305,7 @@ export const RejeterPaiementResponse = zod.object({
   "bonCarburantNumero": zod.string().nullish(),
   "membreId": zod.number().nullish(),
   "montantFcfa": zod.number(),
-  "modePaiement": zod.union([zod.literal('orange_money'),zod.literal('mtn_momo'),zod.literal('especes'),zod.literal('wave'),zod.literal('cheque'),zod.literal(null)]).nullish(),
+  "modePaiement": zod.union([zod.literal('orange_money'),zod.literal('mtn_momo'),zod.literal('especes'),zod.literal('wave'),zod.literal('cheque'),zod.literal('virement'),zod.literal(null)]).nullish(),
   "referenceTransaction": zod.string().nullish(),
   "statut": zod.enum(['en_attente', 'confirme', 'echec', 'rejete', 'en_cours', 'effectue']),
   "createdAt": zod.string(),
@@ -3291,7 +3326,18 @@ export const RejeterPaiementResponse = zod.object({
   "montantNetFcfa": zod.number().nullish(),
   "agentId": zod.number().nullish(),
   "agentSaisiseurId": zod.number().nullish(),
-  "agentSaisiseurNom": zod.string().nullish()
+  "agentSaisiseurNom": zod.string().nullish(),
+  "lignes": zod.array(zod.object({
+  "id": zod.number(),
+  "paiementId": zod.number(),
+  "modePaiement": zod.enum(['especes', 'cheque', 'virement', 'orange_money', 'mtn_momo', 'wave']),
+  "montantFcfa": zod.number(),
+  "referenceTransaction": zod.string().nullish(),
+  "telephone": zod.string().nullish(),
+  "numeroCheque": zod.string().nullish(),
+  "banque": zod.string().nullish(),
+  "dateEcheance": zod.string().nullish()
+})).optional()
 })
 
 

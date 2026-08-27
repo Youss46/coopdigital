@@ -15,6 +15,7 @@ import {
   ecrituresComptablesTable,
   planComptableTable,
   paiementsTable,
+  paiementLignesTable,
   bulletinsPaieTable,
   lignesBulletinTable,
   personnelTable,
@@ -1041,6 +1042,10 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
     .leftJoin(saisiseurPayAlias, eq(paiementsTable.agentSaisiseurId, saisiseurPayAlias.id))
     .where(eq(paiementsTable.id, paiementId));
   if (!row) throw new Error("Paiement introuvable");
+  const paiementLignes = await db
+    .select()
+    .from(paiementLignesTable)
+    .where(eq(paiementLignesTable.paiementId, paiementId));
 
   const campagne = await getCampagneEnCours(cooperativeId);
   const { doc, endPromise } = makePdfDoc();
@@ -1070,6 +1075,7 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
   y += 14;
   const payModeLabel: Record<string, string> = {
     orange_money: "Orange Money", mtn_momo: "MTN MoMo", especes: "Espèces",
+    cheque: "Chèque", virement: "Virement bancaire", wave: "Wave",
   };
   const payDetails: Array<[string, string]> = [
     ["N° Reçu",              ref],
@@ -1088,6 +1094,21 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
     doc.fontSize(8).fillColor(GRIS).font("Helvetica").text(label, MARGIN + 6, y + 4, { width: 160, lineBreak: false });
     doc.fontSize(9).fillColor("black").font("Helvetica-Bold").text(val, MARGIN + 170, y + 4, { width: 190, lineBreak: false });
     y += 16;
+  }
+  if (paiementLignes.length > 1) {
+    y += 6;
+    doc.fontSize(9).fillColor(VERT).font("Helvetica-Bold").text("VENTILATION DU RÈGLEMENT", MARGIN, y);
+    y += 14;
+    for (const ligne of paiementLignes) {
+      const mode = payModeLabel[ligne.modePaiement] ?? ligne.modePaiement;
+      const details = ligne.modePaiement === "cheque" && ligne.numeroCheque
+        ? ` — N° ${ligne.numeroCheque}${ligne.banque ? ` (${ligne.banque})` : ""}`
+        : "";
+      doc.fontSize(8).fillColor(GRIS).font("Helvetica").text(`${mode}${details}`, MARGIN + 6, y + 4, { width: 230, lineBreak: false });
+      doc.fontSize(9).fillColor("black").font("Helvetica-Bold").text(formaterFCFA(ligne.montantFcfa), MARGIN + 265, y + 4, { width: 100, align: "right", lineBreak: false });
+      y += 16;
+    }
+    y += 4;
   }
   y += 10;
   if (row.montantAPayerFcfa) {

@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { db, paiementsTable, membresTable, livraisonsTable, fournisseursTable, usersTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable, caissesTable, bonsCarburantTable } from "@workspace/db";
+import { db, paiementsTable, paiementLignesTable, membresTable, livraisonsTable, fournisseursTable, usersTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable, caissesTable, sessionsCaisseTable, mouvementsCaisseTable, chequesEmisTable, bonsCarburantTable } from "@workspace/db";
 import { eq, desc, and, or, sql, gte, lt, lte, inArray, isNull, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { envoyerPushGroupePortail, envoyerPushGroupe } from "../services/pushService";
@@ -7,6 +7,7 @@ import { proposerEcrituresDansTransaction, resolveCompteDetteProducteur } from "
 import { verifierCaisseEspeces, debiterCaisseParResponsable, enregistrerMouvement, getSessionActive } from "../services/caisseService.js";
 import { notifierParRole } from "../services/notificationService.js";
 import { logger } from "../lib/logger.js";
+import type { ComptabiliteTransaction } from "../services/comptabiliteService.js";
 
 // ─── Helper ─────────────────────────────────────────────────────────────────
 
@@ -292,8 +293,20 @@ const SELECT_FIELDS = {
   agentSaisiseurNom: saisiseurUserAlias.nom,
 };
 
+async function attachPaiementLignes<T extends { id: number }>(rows: T[]) {
+  if (rows.length === 0) return rows.map((row) => ({ ...row, lignes: [] as typeof paiementLignesTable.$inferSelect[] }));
+  const lignes = await db
+    .select()
+    .from(paiementLignesTable)
+    .where(inArray(paiementLignesTable.paiementId, rows.map((row) => row.id)));
+  return rows.map((row) => ({
+    ...row,
+    lignes: lignes.filter((ligne) => ligne.paiementId === row.id),
+  }));
+}
+
 async function fetchEnrichedPaiement(id: number) {
-  const [row] = await db
+  const rows = await db
     .select(SELECT_FIELDS)
     .from(paiementsTable)
     .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
@@ -303,7 +316,7 @@ async function fetchEnrichedPaiement(id: number) {
     .leftJoin(saisiseurUserAlias, eq(paiementsTable.agentSaisiseurId, saisiseurUserAlias.id))
     .where(eq(paiementsTable.id, id))
     .limit(1);
-  return row ?? null;
+  return (await attachPaiementLignes(rows))[0] ?? null;
 }
 
 // ─── GET /paiements ──────────────────────────────────────────────────────────
@@ -374,7 +387,7 @@ export async function listPaiements(req: Request, res: Response): Promise<void> 
       .orderBy(desc(paiementsTable.createdAt))
       .limit(limit);
 
-    res.json(paiements);
+    res.json(await attachPaiementLignes(paiements));
   } catch (err) {
     req.log.error({ err }, "Erreur listPaiements");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
@@ -495,7 +508,130 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
   }
 
   const MODES_VALIDES = ["especes", "cheque", "virement", "orange_money", "mtn_momo", "wave"] as const;
-  const body = (req.body ?? {}) as { referenceTransaction?: string | null; telephone?: string | null; modePaiement?: string | null };
+
+type VentilationPaiement = {
+  modePaiement: typeof MODES_VALIDES[number];
+  montantFcfa: number;
+  referenceTransaction?: string | null;
+  telephone?: string | null;
+  numeroCheque?: string | null;
+  banque?: string | null;
+  dateEcheance?: string | null;
+};
+
+async function debiterCaisseDansTransaction(
+  tx: ComptabiliteTransaction,
+  cooperativeId: number,
+  userId: number | undefined,
+  montantFcfa: number,
+  paiementId: number,
+  responsableId?: number,
+) {
+  const [caisse] = await tx
+    .select()
+    .from(caissesTable)
+    .where(and(
+      eq(caissesTable.cooperativeId, cooperativeId),
+      eq(caissesTable.actif, true),
+      responsableId ? eq(caissesTable.responsableId, responsableId) : eq(caissesTable.typeCaisse, "centrale"),
+    ))
+    .limit(1);
+  if (!caisse) {
+    throw new Error(responsableId
+      ? "Aucune caisse ne vous est assignée. Contactez votre administrateur."
+      : "Aucune caisse centrale n'est configurée pour cette coopérative.");
+  }
+
+  const [session] = await tx
+    .select()
+    .from(sessionsCaisseTable)
+    .where(and(
+      eq(sessionsCaisseTable.caisseId, caisse.id),
+      eq(sessionsCaisseTable.statut, "ouverte"),
+    ))
+    .limit(1);
+  if (!session) {
+    throw new Error("Aucune session de caisse ouverte. Ouvrez une session dans la page Caisse avant de valider des paiements en espèces.");
+  }
+
+  const solde = parseFloat(String(caisse.soldeActuelFcfa));
+  const montant = Math.round(montantFcfa);
+  if (solde < montant) {
+    throw new Error(`Solde caisse insuffisant. Disponible : ${solde.toLocaleString("fr-FR")} FCFA, requis : ${montant.toLocaleString("fr-FR")} FCFA`);
+  }
+  const nouveauSolde = solde - montant;
+  await tx.insert(mouvementsCaisseTable).values({
+    caisseId: caisse.id,
+    sessionId: session.id,
+    cooperativeId,
+    type: "sortie",
+    motif: "paiement_producteur",
+    montantFcfa: montant.toString(),
+    libelle: `Paiement producteur — règlement #${paiementId}`,
+    referenceOperation: `PAI-${paiementId}`,
+    soldeApresFcfa: nouveauSolde.toString(),
+    enregistrePar: userId ?? null,
+  });
+  await tx.update(caissesTable)
+    .set({ soldeActuelFcfa: nouveauSolde.toString() })
+    .where(eq(caissesTable.id, caisse.id));
+}
+
+async function debiterMobileDansTransaction(
+  tx: ComptabiliteTransaction,
+  cooperativeId: number,
+  mode: string,
+  montantFcfa: number,
+  paiementId: number,
+  userId: number | undefined,
+  referenceTransaction?: string | null,
+) {
+  const [compte] = await tx
+    .select()
+    .from(comptesMobilesMarchandsTable)
+    .where(and(
+      eq(comptesMobilesMarchandsTable.cooperativeId, cooperativeId),
+      eq(comptesMobilesMarchandsTable.operateur, mode as "wave" | "orange_money" | "mtn_momo"),
+      eq(comptesMobilesMarchandsTable.actif, true),
+    ))
+    .limit(1);
+  if (!compte) throw new Error(`Aucun compte Mobile Marchand ${mode} actif n'est configuré.`);
+  const solde = parseFloat(String(compte.soldeActuelFcfa));
+  const montant = Math.round(montantFcfa);
+  if (solde < montant) {
+    throw new Error(`Solde Mobile Money insuffisant. Disponible : ${solde.toLocaleString("fr-FR")} FCFA, requis : ${montant.toLocaleString("fr-FR")} FCFA.`);
+  }
+  const nouveauSolde = solde - montant;
+  await tx.insert(mouvementsMobileMarchandTable).values({
+    compteId: compte.id,
+    cooperativeId,
+    type: "debit",
+    motif: "paiement_producteur",
+    montantFcfa: montant.toString(),
+    libelle: `Paiement producteur — règlement #${paiementId}`,
+    reference: referenceTransaction ?? null,
+    dateOperation: new Date().toISOString().slice(0, 10),
+    soldeApresFcfa: nouveauSolde.toString(),
+    enregistrePar: userId ?? null,
+  });
+  await tx.update(comptesMobilesMarchandsTable)
+    .set({ soldeActuelFcfa: nouveauSolde.toString() })
+    .where(eq(comptesMobilesMarchandsTable.id, compte.id));
+}
+  const body = (req.body ?? {}) as {
+    referenceTransaction?: string | null;
+    telephone?: string | null;
+    modePaiement?: string | null;
+    ventilations?: Array<{
+      modePaiement?: string;
+      montantFcfa?: number;
+      referenceTransaction?: string | null;
+      telephone?: string | null;
+      numeroCheque?: string | null;
+      banque?: string | null;
+      dateEcheance?: string | null;
+    }>;
+  };
 
   try {
     // Vérification appartenance + statut
@@ -535,6 +671,184 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
     // Le mode peut être fourni si : (a) bon carburant, ou (b) paiement sans mode pré-sélectionné (pesée groupée)
     const isBonCarburantPaiement = !!row.paiement.bonCarburantId;
     const hasNoMode = row.paiement.modePaiement === null;
+    if (body.ventilations !== undefined) {
+      if (!Array.isArray(body.ventilations) || body.ventilations.length === 0) {
+        res.status(400).json({ erreur: "Ajoutez au moins un moyen de règlement." });
+        return;
+      }
+      if (body.modePaiement) {
+        res.status(400).json({ erreur: "Utilisez soit modePaiement, soit ventilations, pas les deux." });
+        return;
+      }
+
+      const lignes: VentilationPaiement[] = [];
+      for (const ligne of body.ventilations) {
+        const modeLigne = ligne.modePaiement;
+        const montant = Number(ligne.montantFcfa);
+        if (!modeLigne || !MODES_VALIDES.includes(modeLigne as typeof MODES_VALIDES[number])) {
+          res.status(400).json({ erreur: `Mode de paiement invalide. Valeurs acceptées : ${MODES_VALIDES.join(", ")}.` });
+          return;
+        }
+        if (!Number.isSafeInteger(montant) || montant <= 0) {
+          res.status(400).json({ erreur: "Chaque montant de ventilation doit être un entier strictement positif." });
+          return;
+        }
+        if (
+          (modeLigne === "orange_money" || modeLigne === "mtn_momo" || modeLigne === "wave")
+          && !ligne.referenceTransaction?.trim()
+        ) {
+          res.status(400).json({ erreur: "La référence de transaction est obligatoire pour chaque paiement mobile money." });
+          return;
+        }
+        lignes.push({
+          modePaiement: modeLigne as typeof MODES_VALIDES[number],
+          montantFcfa: montant,
+          referenceTransaction: ligne.referenceTransaction ?? null,
+          telephone: ligne.telephone ?? null,
+          numeroCheque: ligne.numeroCheque ?? null,
+          banque: ligne.banque ?? null,
+          dateEcheance: ligne.dateEcheance ?? null,
+        });
+      }
+
+      const totalVentile = lignes.reduce((total, ligne) => total + ligne.montantFcfa, 0);
+      if (totalVentile !== row.paiement.montantFcfa) {
+        res.status(400).json({
+          erreur: `Le total ventilé (${totalVentile.toLocaleString("fr-FR")} FCFA) doit être égal au montant à régler (${row.paiement.montantFcfa.toLocaleString("fr-FR")} FCFA).`,
+        });
+        return;
+      }
+      if (req.user?.role === "delegue" && lignes.some((ligne) => ligne.modePaiement !== "especes")) {
+        res.status(403).json({
+          erreur: "Un délégué ne peut valider que des paiements en espèces.",
+          message: "Les chèques, virements et paiements mobile money doivent être validés par un Directeur, Comptable ou PCA.",
+        });
+        return;
+      }
+
+      const isBonCarburant = !!row.paiement.bonCarburantId;
+      const compteDebitPaiement = isBonCarburant
+        ? "6042"
+        : await resolveCompteDetteProducteur(cooperativeId, row.compteDetteProducteur);
+      const isMembreBaseCentrale = !row.membreDelegueId;
+      const lignesEspeces = lignes.filter((ligne) => ligne.modePaiement === "especes");
+      const lignesMobiles = lignes.filter((ligne) =>
+        ligne.modePaiement === "orange_money" || ligne.modePaiement === "mtn_momo" || ligne.modePaiement === "wave",
+      );
+      const nouveauStatut = lignes.every((ligne) => ligne.modePaiement === "especes") ? "effectue" : "confirme";
+
+      try {
+        await db.transaction(async (tx) => {
+          const [paiementMisAJour] = await tx
+            .update(paiementsTable)
+            .set({
+              statut: nouveauStatut,
+              validePar: userId ?? null,
+              dateValidation: new Date(),
+              referenceTransaction: lignes.length === 1 ? lignes[0]?.referenceTransaction ?? null : null,
+              modePaiement: lignes.length === 1 ? lignes[0]!.modePaiement : null,
+            })
+            .where(and(eq(paiementsTable.id, id), eq(paiementsTable.statut, "en_attente")))
+            .returning({ id: paiementsTable.id });
+          if (!paiementMisAJour) throw new PaiementDejaTraiteError();
+
+          if (row.paiement.livraisonId) {
+            await tx.update(livraisonsTable)
+              .set({ statutPaiement: "PAYÉ" })
+              .where(eq(livraisonsTable.id, row.paiement.livraisonId));
+          }
+
+          const lignesInserees = await tx.insert(paiementLignesTable).values(
+            lignes.map((ligne) => ({
+              paiementId: id,
+              modePaiement: ligne.modePaiement,
+              montantFcfa: ligne.montantFcfa,
+              referenceTransaction: ligne.referenceTransaction ?? null,
+              telephone: ligne.telephone ?? null,
+              numeroCheque: ligne.numeroCheque ?? null,
+              banque: ligne.banque ?? null,
+              dateEcheance: ligne.dateEcheance ?? null,
+            })),
+          ).returning({ id: paiementLignesTable.id });
+
+          if (lignesEspeces.length > 0) {
+            const montantEspeces = lignesEspeces.reduce((total, ligne) => total + ligne.montantFcfa, 0);
+            if (req.user?.role === "delegue") {
+              await debiterCaisseDansTransaction(tx, cooperativeId, userId, montantEspeces, id, userId);
+            } else if (isMembreBaseCentrale) {
+              await debiterCaisseDansTransaction(tx, cooperativeId, userId, montantEspeces, id);
+            }
+          }
+
+          for (const ligne of lignesMobiles) {
+            await debiterMobileDansTransaction(
+              tx, cooperativeId, ligne.modePaiement, ligne.montantFcfa, id, userId, ligne.referenceTransaction,
+            );
+          }
+
+          for (let index = 0; index < lignes.length; index += 1) {
+            const ligne = lignes[index]!;
+            const ligneInseree = lignesInserees[index]!;
+            if (ligne.modePaiement === "cheque") {
+              await tx.insert(chequesEmisTable).values({
+                cooperativeId,
+                numeroCheque: ligne.numeroCheque ?? null,
+                beneficiaire: `${row.nom ?? ""} ${row.prenoms ?? ""}`.trim() || `PAI-${id}`,
+                montantFcfa: ligne.montantFcfa,
+                paiementId: id,
+                paiementLigneId: ligneInseree.id,
+                membreId: row.paiement.membreId ?? null,
+                livraisonId: row.paiement.livraisonId ?? null,
+                dateEmission: new Date().toISOString().slice(0, 10),
+                dateEcheance: ligne.dateEcheance ?? null,
+                statut: "emis",
+                createdBy: userId ?? null,
+              });
+            }
+
+            const compteCredit = ligne.modePaiement === "especes"
+              ? "571"
+              : ligne.modePaiement === "orange_money" || ligne.modePaiement === "mtn_momo" || ligne.modePaiement === "wave"
+              ? "552"
+              : "521";
+            await proposerEcrituresDansTransaction(tx, cooperativeId, [{
+              source: "paiement",
+              sourceId: id,
+              libelle: isBonCarburant
+                ? `Carburant – Bon PAI-${id} (${ligne.modePaiement})`
+                : `Paiement producteur – ${`${row.nom ?? ""} ${row.prenoms ?? ""}`.trim() || `PAI-${id}`} (${ligne.modePaiement})`,
+              compteDebit: compteDebitPaiement,
+              compteCredit,
+              montantFcfa: ligne.montantFcfa,
+              date: new Date().toISOString().slice(0, 10),
+              numeroPiece: `PAI-${id}`,
+              tiersId: isBonCarburant ? undefined : (row.paiement.membreId ?? undefined),
+              tiersType: isBonCarburant ? undefined : "membre",
+            }]);
+          }
+        });
+      } catch (err) {
+        if (err instanceof PaiementDejaTraiteError) {
+          res.status(err.status).json({ erreur: err.message });
+          return;
+        }
+        const message = err instanceof Error ? err.message : "Impossible de valider le règlement";
+        if (/insuffisant|Aucune caisse|session de caisse|Mobile Marchand/i.test(message)) {
+          res.status(422).json({ erreur: message });
+          return;
+        }
+        throw err;
+      }
+
+      if (row.paiement.membreId) void envoyerPushGroupePortail([row.paiement.membreId], {
+        title: "✅ Paiement validé",
+        body: `${new Intl.NumberFormat("fr-FR").format(row.paiement.montantFcfa)} FCFA — règlement ventilé`,
+        url: "/paiements",
+      });
+      const updated = await fetchEnrichedPaiement(id);
+      res.json(updated);
+      return;
+    }
     if (body.modePaiement && !isBonCarburantPaiement && !hasNoMode) {
       res.status(400).json({
         erreur: "Le mode de paiement ne peut être modifié que pour les règlements sans mode pré-sélectionné ou pour les bons carburant.",

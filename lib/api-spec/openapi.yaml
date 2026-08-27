@@ -7541,6 +7541,33 @@ components:
             Permet de corriger le mode de règlement au moment de la validation.
             Uniquement accepté pour les paiements liés à un bon carburant
             (bonCarburantId présent).
+        ventilations:
+          type: array
+          minItems: 1
+          description: Ventilation du montant entre plusieurs moyens de règlement.
+          items:
+            $ref: "#/components/schemas/VentilationPaiementInput"
+
+    VentilationPaiementInput:
+      type: object
+      required: [modePaiement, montantFcfa]
+      properties:
+        modePaiement:
+          type: string
+          enum: [especes, cheque, virement, orange_money, mtn_momo, wave]
+        montantFcfa:
+          type: integer
+          minimum: 1
+        referenceTransaction:
+          type: ["string", "null"]
+        telephone:
+          type: ["string", "null"]
+        numeroCheque:
+          type: ["string", "null"]
+        banque:
+          type: ["string", "null"]
+        dateEcheance:
+          type: ["string", "null"]
 
     PaiementListItem:
       type: object
@@ -7560,7 +7587,7 @@ components:
           type: integer
         modePaiement:
           type: ["string", "null"]
-          enum: [orange_money, mtn_momo, especes, wave, cheque, null]
+          enum: [orange_money, mtn_momo, especes, wave, cheque, virement, null]
         referenceTransaction:
           type: ["string", "null"]
         statut:
@@ -7603,6 +7630,34 @@ components:
         agentSaisiseurId:
           type: ["integer", "null"]
         agentSaisiseurNom:
+          type: ["string", "null"]
+        lignes:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaiementLigne"
+
+    PaiementLigne:
+      type: object
+      required: [id, paiementId, modePaiement, montantFcfa]
+      properties:
+        id:
+          type: integer
+        paiementId:
+          type: integer
+        modePaiement:
+          type: string
+          enum: [especes, cheque, virement, orange_money, mtn_momo, wave]
+        montantFcfa:
+          type: integer
+        referenceTransaction:
+          type: ["string", "null"]
+        telephone:
+          type: ["string", "null"]
+        numeroCheque:
+          type: ["string", "null"]
+        banque:
+          type: ["string", "null"]
+        dateEcheance:
           type: ["string", "null"]
 
     PaiementsStats:
