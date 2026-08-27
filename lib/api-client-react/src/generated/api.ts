@@ -55,6 +55,7 @@ import type {
   BalanceSagePreparation,
   BalanceSagePreparationInput,
   BalanceSagePreview,
+  BalanceSageSuggestionsResponse,
   BilanCampagneResult,
   BilanEtat,
   BonCarburant,
@@ -4107,6 +4108,76 @@ export const usePrepareBalanceSageReprise = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getPrepareBalanceSageRepriseMutationOptions(options));
+    }
+
+export const getSuggestBalanceSageCounterpartiesUrl = (id: number,) => {
+
+
+
+
+  return `/api/comptabilite/balances-sage/imports/${id}/suggestions-contreparties`
+}
+
+/**
+ * @summary Suggérer des comptes de contrepartie avec Claude
+ */
+export const suggestBalanceSageCounterparties = async (id: number, options?: RequestInit): Promise<BalanceSageSuggestionsResponse> => {
+
+  return customFetch<BalanceSageSuggestionsResponse>(getSuggestBalanceSageCounterpartiesUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getSuggestBalanceSageCounterpartiesMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof suggestBalanceSageCounterparties>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof suggestBalanceSageCounterparties>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['suggestBalanceSageCounterparties'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof suggestBalanceSageCounterparties>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  suggestBalanceSageCounterparties(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SuggestBalanceSageCounterpartiesMutationResult = NonNullable<Awaited<ReturnType<typeof suggestBalanceSageCounterparties>>>
+
+    export type SuggestBalanceSageCounterpartiesMutationError = ErrorType<void>
+
+    /**
+ * @summary Suggérer des comptes de contrepartie avec Claude
+ */
+export const useSuggestBalanceSageCounterparties = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof suggestBalanceSageCounterparties>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof suggestBalanceSageCounterparties>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getSuggestBalanceSageCounterpartiesMutationOptions(options));
     }
 
 export const getValidateBalanceSageRepriseUrl = (id: number,) => {

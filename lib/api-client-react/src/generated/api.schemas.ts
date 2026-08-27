@@ -1537,6 +1537,24 @@ export interface BalanceSagePreparation {
   ecritures: BalanceSagePreparationEcrituresItem[];
 }
 
+export interface BalanceSageContrepartieSuggestion {
+  numeroCompte: string;
+  libelle: string;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  score: number;
+  raison: string;
+}
+
+export interface BalanceSageSuggestionsResponse {
+  disponible: boolean;
+  message?: string;
+  /** @maxItems 3 */
+  suggestions: BalanceSageContrepartieSuggestion[];
+}
+
 export interface MargeCollecte {
   caVentesFcfa: number;
   coutAchatsFcfa: number;

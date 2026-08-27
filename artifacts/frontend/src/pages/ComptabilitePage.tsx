@@ -2412,6 +2412,14 @@ interface BalanceSagePreparation {
   import: BalanceSageImport; totalDebiteur: number; totalCrediteur: number; nombreEcritures: number;
   ecritures: Array<{ compteDebit: string; compteCredit: string; montantFcfa: number; libelle: string }>;
 }
+interface BalanceSageContrepartieSuggestion {
+  numeroCompte: string; libelle: string; score: number; raison: string;
+}
+interface BalanceSageSuggestionsResponse {
+  disponible: boolean;
+  suggestions: BalanceSageContrepartieSuggestion[];
+  message?: string;
+}
 
 function OngletImportBalances() {
   const { toast } = useToast();
@@ -2425,6 +2433,9 @@ function OngletImportBalances() {
   const [detail, setDetail] = useState<BalanceSageDetail | null>(null);
   const [contrepartie, setContrepartie] = useState("");
   const [preparation, setPreparation] = useState<BalanceSagePreparation | null>(null);
+  const [suggestions, setSuggestions] = useState<BalanceSageContrepartieSuggestion[]>([]);
+  const [suggestionMessage, setSuggestionMessage] = useState("");
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [showImport, setShowImport] = useState(false);
 
@@ -2448,6 +2459,7 @@ function OngletImportBalances() {
       const value = await apiFetch<BalanceSageDetail>(`/api/comptabilite/balances-sage/imports/${id}`);
       setImportSelectionne(id); setDetail(value);
       setPreparation(null);
+      setSuggestions([]); setSuggestionMessage("");
       if (value.compteContrepartie) setContrepartie(value.compteContrepartie);
     } catch (err) {
       toast({ title: "Impossible de charger l'import", description: (err as Error).message, variant: "destructive" });
@@ -2494,6 +2506,20 @@ function OngletImportBalances() {
       void auditQuery.refetch();
       toast({ title: "Préparation impossible", description: (err as Error).message, variant: "destructive" });
     } finally { setActionLoading(false); }
+  };
+
+  const handleSuggest = async () => {
+    if (!detail) return;
+    setSuggestionsLoading(true);
+    setSuggestionMessage("");
+    try {
+      const value = await apiPost<BalanceSageSuggestionsResponse>(`/api/comptabilite/balances-sage/imports/${detail.id}/suggestions-contreparties`, {});
+      setSuggestions(value.suggestions);
+      setSuggestionMessage(value.message ?? (value.suggestions.length ? "Sélectionnez une suggestion pour la reprendre dans le formulaire." : ""));
+    } catch (err) {
+      setSuggestions([]);
+      setSuggestionMessage((err as Error).message || "La suggestion Claude est indisponible. Vous pouvez saisir le compte manuellement.");
+    } finally { setSuggestionsLoading(false); }
   };
 
   const handleValidate = async () => {
@@ -2639,7 +2665,39 @@ function OngletImportBalances() {
            )}
           <div className="overflow-x-auto max-h-80 border rounded-lg"><table className="w-full text-xs"><thead className="sticky top-0 bg-gray-50"><tr><th className="text-left p-2">Compte</th><th className="text-left p-2">Libellé</th><th className="text-right p-2">Solde débiteur</th><th className="text-right p-2">Solde créditeur</th><th className="text-left p-2">Contrôle</th></tr></thead><tbody>{detail.lignes.map((line) => <tr key={line.numeroLigne} className="border-t"><td className="p-2 font-mono">{line.numeroCompte}</td><td className="p-2">{line.libelle}</td><td className="p-2 text-right">{FCFA(line.soldeDebiteur)}</td><td className="p-2 text-right">{FCFA(line.soldeCrediteur)}</td><td className={`p-2 ${line.erreur ? "text-amber-700" : "text-green-700"}`}>{line.erreur ?? "OK"}</td></tr>)}</tbody></table></div>
           {detail.mode === "reprise" && detail.statut !== "validee" && (
-            <div className="border-t pt-4 space-y-3"><div><h4 className="font-semibold text-sm">Préparer les à-nouveaux</h4><p className="text-xs text-gray-500">Le compte de contrepartie doit être présent dans le plan comptable actif.</p></div><div className="flex flex-wrap gap-2"><input value={contrepartie} onChange={(e) => setContrepartie(e.target.value)} placeholder="Compte de contrepartie (ex. 110)" className="border rounded-lg px-3 py-2 text-sm font-mono" /><button onClick={handlePrepare} disabled={actionLoading || detail.statut === "preparee"} className="px-3 py-2 rounded-lg text-white text-sm disabled:opacity-40" style={{ backgroundColor: VERT }}>{detail.statut === "preparee" ? "Reprise préparée" : "Préparer pour contrôle"}</button></div></div>
+            <div className="border-t pt-4 space-y-3">
+              <div>
+                <h4 className="font-semibold text-sm">Préparer les à-nouveaux</h4>
+                <p className="text-xs text-gray-500">Le compte doit être présent dans le plan comptable actif. Claude peut proposer des comptes à partir de ce plan, mais le choix reste à confirmer par le comptable.</p>
+              </div>
+              {detail.statut !== "preparee" && (
+                <div className="space-y-2">
+                  <button onClick={handleSuggest} disabled={suggestionsLoading || actionLoading} className="px-3 py-2 rounded-lg border border-purple-200 bg-purple-50 text-purple-800 text-sm font-medium disabled:opacity-50">
+                    <span className="inline-flex items-center gap-1.5">{suggestionsLoading ? <RefreshCw size={14} className="animate-spin" /> : <Sparkles size={14} />} Suggérer avec Claude</span>
+                  </button>
+                  {suggestions.length > 0 && (
+                    <div className="grid gap-2 md:grid-cols-3">
+                      {suggestions.map((suggestion) => (
+                        <button key={suggestion.numeroCompte} onClick={() => setContrepartie(suggestion.numeroCompte)} className={`text-left rounded-lg border p-3 transition-colors ${contrepartie === suggestion.numeroCompte ? "border-purple-500 bg-purple-50 ring-1 ring-purple-300" : "border-gray-200 hover:border-purple-300 hover:bg-purple-50/40"}`}>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono font-semibold text-sm text-gray-900">{suggestion.numeroCompte}</span>
+                            <span className="text-xs font-medium text-purple-700">{suggestion.score}%</span>
+                          </div>
+                          <p className="text-xs text-gray-600 mt-1">{suggestion.libelle}</p>
+                          <p className="text-xs text-gray-500 mt-2">{suggestion.raison}</p>
+                          <span className="text-xs text-purple-700 mt-2 inline-block">{contrepartie === suggestion.numeroCompte ? "Sélectionné" : "Utiliser ce compte"}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {suggestionMessage && <p className="text-xs text-gray-500">{suggestionMessage}</p>}
+                </div>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <input value={contrepartie} onChange={(e) => setContrepartie(e.target.value)} placeholder="Compte de contrepartie" className="border rounded-lg px-3 py-2 text-sm font-mono" />
+                <button onClick={handlePrepare} disabled={actionLoading || detail.statut === "preparee"} className="px-3 py-2 rounded-lg text-white text-sm disabled:opacity-40" style={{ backgroundColor: VERT }}>{detail.statut === "preparee" ? "Reprise préparée" : "Préparer pour contrôle"}</button>
+              </div>
+            </div>
           )}
           {preparation && detail.statut === "preparee" && <div className="border rounded-lg bg-purple-50/50 p-4 space-y-3"><div className="flex justify-between text-sm"><span>Total débiteur : <strong>{FCFA(preparation.totalDebiteur)}</strong></span><span>Total créditeur : <strong>{FCFA(preparation.totalCrediteur)}</strong></span></div><p className="text-xs text-purple-800">{preparation.nombreEcritures} écritures seront ajoutées comme à-nouveaux. Contrôlez la liste puis validez.</p><div className="max-h-44 overflow-y-auto text-xs space-y-1">{preparation.ecritures.map((entry, i) => <div key={i} className="flex justify-between gap-3"><span>{entry.compteDebit} → {entry.compteCredit}</span><span className="font-medium">{FCFA(entry.montantFcfa)}</span></div>)}</div><button onClick={handleValidate} disabled={actionLoading} className="px-4 py-2 rounded-lg text-white text-sm disabled:opacity-50" style={{ backgroundColor: VERT }}>{actionLoading ? "Validation…" : "Valider définitivement la reprise"}</button></div>}
         </div>

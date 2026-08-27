@@ -1280,6 +1280,32 @@ export const PrepareBalanceSageRepriseResponse = zod.object({
 
 
 /**
+ * @summary Suggérer des comptes de contrepartie avec Claude
+ */
+export const SuggestBalanceSageCounterpartiesParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const suggestBalanceSageCounterpartiesResponseSuggestionsItemScoreMin = 0;
+export const suggestBalanceSageCounterpartiesResponseSuggestionsItemScoreMax = 100;
+
+export const suggestBalanceSageCounterpartiesResponseSuggestionsMax = 3;
+
+
+
+export const SuggestBalanceSageCounterpartiesResponse = zod.object({
+  "disponible": zod.boolean(),
+  "message": zod.string().optional(),
+  "suggestions": zod.array(zod.object({
+  "numeroCompte": zod.string(),
+  "libelle": zod.string(),
+  "score": zod.number().min(suggestBalanceSageCounterpartiesResponseSuggestionsItemScoreMin).max(suggestBalanceSageCounterpartiesResponseSuggestionsItemScoreMax),
+  "raison": zod.string()
+})).max(suggestBalanceSageCounterpartiesResponseSuggestionsMax)
+})
+
+
+/**
  * @summary Valider définitivement les à-nouveaux
  */
 export const ValidateBalanceSageRepriseParams = zod.object({

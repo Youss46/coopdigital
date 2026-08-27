@@ -60,6 +60,7 @@ import {
   prepareBalanceSageReprise,
   validateBalanceSageReprise,
   listBalanceSageRepriseAudit,
+  suggestBalanceSageCounterparties,
 } from "../controllers/balanceSageController";
 
 const router: IRouter = Router();
@@ -75,6 +76,7 @@ router.post("/comptabilite/balances-sage/imports", checkPermission("comptabilite
 router.get("/comptabilite/balances-sage/imports", checkPermission("comptabilite", "voir_balance"), listBalanceSageImports);
 router.get("/comptabilite/balances-sage/imports/:id", checkPermission("comptabilite", "voir_balance"), getBalanceSageImport);
 router.get("/comptabilite/balances-sage/reprises/audit", checkPermission("comptabilite", "voir_balance"), listBalanceSageRepriseAudit);
+router.post("/comptabilite/balances-sage/imports/:id/suggestions-contreparties", checkPermission("comptabilite", "importer_balance"), suggestBalanceSageCounterparties);
 router.post("/comptabilite/balances-sage/imports/:id/preparer-reprise", checkPermission("comptabilite", "importer_balance"), prepareBalanceSageReprise);
 router.post("/comptabilite/balances-sage/imports/:id/valider-reprise", checkPermission("comptabilite", "valider_reprise_balance"), validateBalanceSageReprise);
 router.get("/comptabilite/balance-auxiliaire", checkPermission("comptabilite", "voir_balance"), getBalanceAuxiliaire);

@@ -87,6 +87,7 @@ export const commissionsMembresDelaguesTable = makeTable("commissions_membres_de
 export const bonsReceptionMembresDeleguesTable = makeTable("bons_reception_membres_delegues");
 export const balanceSageImportsTable = makeTable("balance_sage_imports");
 export const balanceSageLignesTable = makeTable("balance_sage_lignes");
+export const balanceSageRepriseAuditTable = makeTable("balance_sage_reprise_audit");
 export const certificationsTable = makeTable("certifications");
 export const certificationsMembresTable = makeTable("certifications_membres");
 export const primesDistributionsTable = {

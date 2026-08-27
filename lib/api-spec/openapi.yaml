@@ -1161,6 +1161,28 @@ paths:
         "422":
           description: Balance non équilibrée ou compte inconnu
 
+  /comptabilite/balances-sage/imports/{id}/suggestions-contreparties:
+    post:
+      operationId: suggestBalanceSageCounterparties
+      tags: [comptabilite]
+      summary: Suggérer des comptes de contrepartie avec Claude
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Suggestions vérifiées contre le plan comptable actif
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BalanceSageSuggestionsResponse"
+        "404":
+          description: Import introuvable
+        "422":
+          description: Import non compatible ou sans ligne analysable
+
   /comptabilite/balances-sage/imports/{id}/valider-reprise:
     post:
       operationId: validateBalanceSageReprise
@@ -8282,6 +8304,27 @@ components:
               compteCredit: { type: string }
               montantFcfa: { type: integer }
               libelle: { type: string }
+
+    BalanceSageContrepartieSuggestion:
+      type: object
+      required: [numeroCompte, libelle, score, raison]
+      properties:
+        numeroCompte: { type: string }
+        libelle: { type: string }
+        score: { type: integer, minimum: 0, maximum: 100 }
+        raison: { type: string }
+
+    BalanceSageSuggestionsResponse:
+      type: object
+      required: [disponible, suggestions]
+      properties:
+        disponible: { type: boolean }
+        message: { type: string }
+        suggestions:
+          type: array
+          maxItems: 3
+          items:
+            $ref: "#/components/schemas/BalanceSageContrepartieSuggestion"
 
     MargeCollecte:
       type: object
