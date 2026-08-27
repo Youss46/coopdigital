@@ -305,9 +305,9 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
   // MODULE — CHÈQUES ÉMIS
   cheques: {
     lire:      ["pca", "directeur", "comptable", "caissier", "auditeur"],
-    creer:     ["pca", "directeur", "comptable", "caissier"],
-    modifier:  ["pca", "directeur", "comptable", "caissier"],
-    encaisser: ["pca", "directeur", "comptable", "caissier"],
+    creer:     ["pca", "directeur", "comptable"],
+    modifier:  ["pca", "directeur", "comptable"],
+    encaisser: ["pca", "directeur", "comptable"],
     rejeter:   ["pca", "directeur", "comptable"],
     annuler:   ["pca", "directeur", "comptable"],
   },
@@ -316,7 +316,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
   banque: {
     voir:             ["pca", "directeur", "comptable", "caissier", "auditeur"],
     creer:            ["pca", "directeur"],
-    enregistrer_mvt:  ["pca", "directeur", "comptable", "caissier"],
+    enregistrer_mvt:  ["pca", "directeur", "comptable"],
     rapprocher:       ["pca", "directeur", "comptable"],
   },
 

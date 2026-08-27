@@ -64,7 +64,7 @@ export default function BanquePage() {
   const { toast }       = useToast();
   const { utilisateur } = useAuth();
   const role       = utilisateur?.role ?? "";
-  const canMouvement = ["pca", "directeur", "comptable", "caissier"].includes(role);
+  const canMouvement = ["pca", "directeur", "comptable"].includes(role);
   const canRapprocher = ["pca", "directeur", "comptable"].includes(role);
   const canEdit    = canMouvement || canRapprocher;
   const canCreate  = ["pca", "directeur"].includes(role);
