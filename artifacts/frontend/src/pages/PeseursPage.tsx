@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Scale, Plus, Loader2, X, Eye, EyeOff, KeyRound, Building2, Users } from "lucide-react";
+import { Scale, Plus, Loader2, X, Eye, EyeOff, KeyRound, Building2, Users, Trash2 } from "lucide-react";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok = () => localStorage.getItem("coop_token") ?? "";
@@ -251,6 +251,7 @@ export default function PeseursPage() {
   const qc = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
   const [resetPeseur, setResetPeseur] = useState<Peseur | null>(null);
+  const [suppressionErreur, setSuppressionErreur] = useState("");
   const [search, setSearch] = useState("");
   const [filtreRattachement, setFiltreRattachement] = useState<"tous" | "cooperative" | "delegue">("tous");
 
@@ -270,6 +271,25 @@ export default function PeseursPage() {
       apiFetch(`/api/users/peseurs/${id}/activer`, { method: "PUT", body: JSON.stringify({ actif }) }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["peseurs-admin"] }),
   });
+
+  const supprimerPeseur = useMutation({
+    mutationFn: (id: number) =>
+      apiFetch(`/api/users/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      setSuppressionErreur("");
+      void qc.invalidateQueries({ queryKey: ["peseurs-admin"] });
+    },
+    onError: (error: Error) => setSuppressionErreur(error.message),
+  });
+
+  function handleSupprimer(peseur: Peseur) {
+    const nomComplet = `${peseur.prenoms} ${peseur.nom}`;
+    if (!window.confirm(`Supprimer définitivement le compte peseur de ${nomComplet} ? Cette action est irréversible.`)) {
+      return;
+    }
+    setSuppressionErreur("");
+    supprimerPeseur.mutate(peseur.id);
+  }
 
   const filtered = peseurs.filter(p => {
     const s = search.toLowerCase();
@@ -330,6 +350,12 @@ export default function PeseursPage() {
         </div>
       </div>
 
+      {suppressionErreur && (
+        <div role="alert" style={{ marginBottom: 16, padding: "10px 12px", borderRadius: 8, background: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c", fontSize: ".82rem" }}>
+          {suppressionErreur}
+        </div>
+      )}
+
       {/* Liste */}
       <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>
         {isLoading ? (
@@ -382,6 +408,14 @@ export default function PeseursPage() {
                 <button onClick={() => setResetPeseur(p)}
                   style={{ padding: "5px 8px", borderRadius: 7, border: "1px solid #e5e7eb", background: "#f9fafb", color: "#6b7280", cursor: "pointer", display: "flex", alignItems: "center" }}>
                   <KeyRound size={14} />
+                </button>
+                <button
+                  onClick={() => handleSupprimer(p)}
+                  disabled={supprimerPeseur.isPending}
+                  title="Supprimer ce compte peseur"
+                  aria-label={`Supprimer le compte de ${p.prenoms} ${p.nom}`}
+                  style={{ padding: "5px 8px", borderRadius: 7, border: "1px solid #fecaca", background: "#fffafa", color: "#dc2626", cursor: supprimerPeseur.isPending ? "wait" : "pointer", display: "flex", alignItems: "center" }}>
+                  {supprimerPeseur.isPending ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
                 </button>
               </div>
             </div>
