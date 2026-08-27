@@ -172,6 +172,9 @@ function ModalValidation({
   const refManquante = isMobile && !ref.trim();
   const totalVentile = ventilations.reduce((total, ligne) => total + parseMontantSaisi(ligne.montantFcfa), 0);
   const ventilationIncorrecte = multiMoyens && totalVentile !== montantNet;
+  const ventilationEspecesBloquee = multiMoyens
+    && ventilations.some((ligne) => ligne.modePaiement === "especes")
+    && sessionCaisseOuverte === false;
 
   function updateMontantVentilation(index: number, value: string) {
     const montant = parseMontantSaisi(value);
@@ -419,9 +422,9 @@ function ModalValidation({
             </button>
             <button
               onClick={handleConfirm}
-              disabled={loading || sessionBloquee || modeManquant}
+              disabled={loading || (multiMoyens ? ventilationEspecesBloquee : sessionBloquee || modeManquant)}
               className="flex-1 py-2.5 rounded-xl text-white text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-1.5"
-              style={{ backgroundColor: (sessionBloquee || modeManquant) ? "#9ca3af" : "#1a4731" }}
+              style={{ backgroundColor: (multiMoyens ? ventilationEspecesBloquee : sessionBloquee || modeManquant) ? "#9ca3af" : "#1a4731" }}
             >
               {loading ? (
                 <Loader2 size={15} className="animate-spin" />
