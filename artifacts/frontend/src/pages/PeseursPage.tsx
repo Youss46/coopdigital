@@ -46,6 +46,61 @@ function InitialesBadge({ nom, prenoms }: { nom: string; prenoms: string }) {
   );
 }
 
+interface SupprimerPeseurModalProps {
+  peseur: Peseur;
+  onConfirm: () => void;
+  onCancel: () => void;
+  loading: boolean;
+}
+
+function SupprimerPeseurModal({ peseur, onConfirm, onCancel, loading }: SupprimerPeseurModalProps) {
+  return (
+    <div
+      role="presentation"
+      onMouseDown={(event) => { if (event.target === event.currentTarget) onCancel(); }}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="supprimer-peseur-title"
+        style={{ background: "#fff", borderRadius: 16, boxShadow: "0 24px 48px rgba(0,0,0,.18)", width: "100%", maxWidth: 390 }}
+      >
+        <div style={{ padding: "20px 24px", borderBottom: "1px solid #f1f5f9" }}>
+          <h3 id="supprimer-peseur-title" style={{ margin: 0, fontWeight: 800, color: "#111827", fontSize: "1rem" }}>
+            Supprimer le compte
+          </h3>
+        </div>
+        <div style={{ padding: "20px 24px" }}>
+          <p style={{ margin: 0, color: "#4b5563", fontSize: ".88rem", lineHeight: 1.55 }}>
+            Voulez-vous vraiment supprimer le compte de{" "}
+            <strong style={{ color: "#111827" }}>{peseur.prenoms} {peseur.nom}</strong>
+            {" "}? Cette action est irréversible.
+          </p>
+        </div>
+        <div style={{ padding: "0 24px 20px", display: "flex", gap: 12 }}>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={loading}
+            style={{ flex: 1, padding: "10px", borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", color: "#374151", fontWeight: 600, fontSize: ".86rem", cursor: loading ? "not-allowed" : "pointer" }}
+          >
+            Annuler
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={loading}
+            style={{ flex: 1, padding: "10px", borderRadius: 8, border: "none", background: "#dc2626", color: "#fff", fontWeight: 700, fontSize: ".86rem", cursor: loading ? "wait" : "pointer", opacity: loading ? .7 : 1 }}
+          >
+            {loading ? "Suppression…" : "Supprimer"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Modal création ─────────────────────────────────────────────────────────
 function CreerPeseurModal({ onClose, delegues }: { onClose: () => void; delegues: Delegue[] }) {
   const qc = useQueryClient();
@@ -251,6 +306,7 @@ export default function PeseursPage() {
   const qc = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
   const [resetPeseur, setResetPeseur] = useState<Peseur | null>(null);
+  const [suppressionCible, setSuppressionCible] = useState<Peseur | null>(null);
   const [suppressionErreur, setSuppressionErreur] = useState("");
   const [search, setSearch] = useState("");
   const [filtreRattachement, setFiltreRattachement] = useState<"tous" | "cooperative" | "delegue">("tous");
@@ -282,13 +338,16 @@ export default function PeseursPage() {
     onError: (error: Error) => setSuppressionErreur(error.message),
   });
 
-  function handleSupprimer(peseur: Peseur) {
-    const nomComplet = `${peseur.prenoms} ${peseur.nom}`;
-    if (!window.confirm(`Supprimer définitivement le compte peseur de ${nomComplet} ? Cette action est irréversible.`)) {
-      return;
-    }
+  function ouvrirSuppression(peseur: Peseur) {
     setSuppressionErreur("");
-    supprimerPeseur.mutate(peseur.id);
+    setSuppressionCible(peseur);
+  }
+
+  function confirmerSuppression() {
+    if (!suppressionCible) return;
+    supprimerPeseur.mutate(suppressionCible.id, {
+      onSuccess: () => setSuppressionCible(null),
+    });
   }
 
   const filtered = peseurs.filter(p => {
@@ -410,7 +469,7 @@ export default function PeseursPage() {
                   <KeyRound size={14} />
                 </button>
                 <button
-                  onClick={() => handleSupprimer(p)}
+                  onClick={() => ouvrirSuppression(p)}
                   disabled={supprimerPeseur.isPending}
                   title="Supprimer ce compte peseur"
                   aria-label={`Supprimer le compte de ${p.prenoms} ${p.nom}`}
@@ -425,6 +484,14 @@ export default function PeseursPage() {
 
       {showCreate && <CreerPeseurModal onClose={() => setShowCreate(false)} delegues={delegues} />}
       {resetPeseur && <ResetMdpModal peseur={resetPeseur} onClose={() => setResetPeseur(null)} />}
+      {suppressionCible && (
+        <SupprimerPeseurModal
+          peseur={suppressionCible}
+          onConfirm={confirmerSuppression}
+          onCancel={() => { if (!supprimerPeseur.isPending) setSuppressionCible(null); }}
+          loading={supprimerPeseur.isPending}
+        />
+      )}
     </div>
   );
 }
