@@ -1439,16 +1439,6 @@ export interface GrandLivrePage {
   limit: number;
 }
 
-export type BalanceLigneType = typeof BalanceLigneType[keyof typeof BalanceLigneType];
-
-
-export const BalanceLigneType = {
-  actif: 'actif',
-  passif: 'passif',
-  charge: 'charge',
-  produit: 'produit',
-} as const;
-
 export interface BalanceLigne {
   numeroCompte: string;
   libelle: string;
