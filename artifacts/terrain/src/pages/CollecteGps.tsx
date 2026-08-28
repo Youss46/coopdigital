@@ -202,7 +202,12 @@ export default function CollecteGps() {
         gps.restore(draft.points, draft.history ?? []);
         setGpsFinalized(draft.finalized);
         setAutoMode(draft.autoMode === true);
-        setAutoPaused(draft.autoPaused === true);
+        // Les anciens brouillons pouvaient sélectionner le mode automatique
+        // sans avoir de bouton de démarrage explicite. Avec le nouveau parcours,
+        // un brouillon sans point doit attendre l'action de l'agent.
+        setAutoPaused(draft.points.length === 0 && draft.autoMode === true
+          ? true
+          : draft.autoPaused === true);
       }).catch(() => {}).finally(() => {
         if (active) setDraftLoaded(true);
       }),
@@ -349,9 +354,18 @@ export default function CollecteGps() {
       return;
     }
     setAutoMode(nextAutoMode);
-    setAutoPaused(false);
+    setAutoPaused(nextAutoMode);
     gps.resetAutoCapture();
   }, [gps.points.length, gps.resetAutoCapture]);
+
+  const handleStartAutoMapping = useCallback(() => {
+    if (!gps.currentPos) {
+      setGpsErreurPoints("Position GPS indisponible. Attendez l'acquisition du signal avant de démarrer.");
+      return;
+    }
+    setAutoPaused(false);
+    setGpsErreurPoints(null);
+  }, [gps.currentPos]);
 
   const handleRecapValidate = useCallback(() => {
     setShowGpsRecap(false);
@@ -795,7 +809,7 @@ export default function CollecteGps() {
             )}
             {autoMode && gps.points.length === 0 && (
               <div style={{ background: "#2563eb18", border: "1px solid #2563eb44", borderRadius: 8, padding: "8px 10px", fontSize: ".78rem", color: "#60a5fa", marginBottom: 10 }}>
-                🛰️ Mode automatique prêt — marchez autour de la parcelle. Le premier point sera ajouté dès qu'une position précise est disponible.
+                🛰️ Mode automatique sélectionné — appuyez sur « Démarrer » puis marchez autour de la parcelle. Le premier point sera ajouté dès qu'une position précise sera disponible.
               </div>
             )}
             {autoMode && gps.autoIgnoredAccuracy !== null && (
@@ -823,7 +837,16 @@ export default function CollecteGps() {
                 ⏹ Arrêter
               </button>
 
-              {autoMode && gps.points.length > 0 ? (
+              {autoMode && gps.points.length === 0 ? (
+                <button
+                  onClick={handleStartAutoMapping}
+                  disabled={!gps.currentPos}
+                  className="t-btn"
+                  style={{ flex: 2, padding: "12px", background: "#2563eb22", color: "#60a5fa", border: "1px solid #2563eb66", fontWeight: 700, opacity: gps.currentPos ? 1 : 0.45 }}
+                >
+                  ▶ Démarrer le mapping automatique
+                </button>
+              ) : autoMode && gps.points.length > 0 ? (
                 <button
                   onClick={() => setAutoPaused((paused) => !paused)}
                   className="t-btn"
