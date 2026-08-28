@@ -49,13 +49,13 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
 
   // MODULE M03 — STOCKS
   stocks: {
-    lire:                ["pca", "directeur", "magasinier", "auditeur"],
+    lire:                ["pca", "directeur", "magasinier", "responsable_tracabilite", "auditeur"],
     entree:              ["pca", "directeur", "magasinier"],
     sortie:              ["pca", "directeur", "magasinier"],
     creer_entrepot:      ["pca", "directeur"],
     modifier_entrepot:   ["pca", "directeur"],
     supprimer_entrepot:  ["pca"],
-    voir_alertes:        ["pca", "directeur", "magasinier"],
+    voir_alertes:        ["pca", "directeur", "magasinier", "responsable_tracabilite"],
   },
 
   // MODULE M04 — AVANCES & PAIEMENTS

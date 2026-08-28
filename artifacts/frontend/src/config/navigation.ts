@@ -47,7 +47,7 @@ export const NAV_ITEMS: NavItemConfig[] = [
   { href: "/missions",               label: "Missions terrain",          roles: ["responsable_tracabilite"],                                                   category: "Traçabilité" },
 
   // ── Stocks ───────────────────────────────────────────────────────────────────
-  { href: "/stocks",                 label: "Stocks",                    roles: ["pca","directeur","magasinier","auditeur"],                                    category: "Stocks" },
+  { href: "/stocks",                 label: "Stocks",                    roles: ["pca","directeur","magasinier","responsable_tracabilite","auditeur"],              category: "Stocks" },
   { href: "/entrepots",              label: "Entrepôts délégués",        roles: ["pca","directeur","auditeur"],                                               category: "Stocks" },
   { href: "/mon-entrepot",           label: "Mon entrepôt",              roles: ["delegue"],                                                                   category: "Stocks" },
   { href: "/refus",                  label: "Stocks refoulés",           roles: ["pca","directeur","magasinier","auditeur"],                                    category: "Stocks" },
