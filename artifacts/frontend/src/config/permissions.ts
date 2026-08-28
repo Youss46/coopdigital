@@ -191,11 +191,11 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
 
   equipements: {
     lire:              ["pca", "directeur", "comptable", "auditeur"],
-    creer:             ["pca", "directeur"],
-    modifier:          ["pca", "directeur"],
-    supprimer:         ["pca"],
-    generer_dotations: ["pca", "directeur"],
-    maintenance:       ["pca", "directeur"],
+    creer:             ["pca", "directeur", "comptable"],
+    modifier:          ["pca", "directeur", "comptable"],
+    supprimer:         ["pca", "directeur", "comptable"],
+    generer_dotations: ["pca", "directeur", "comptable"],
+    maintenance:       ["pca", "directeur", "comptable"],
   },
 
   refus: {
