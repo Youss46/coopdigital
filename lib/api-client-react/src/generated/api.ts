@@ -49,6 +49,7 @@ import type {
   AvancesEncours,
   Bailleur,
   BailleurInput,
+  BalanceAuxiliaireLigne,
   BalanceLigne,
   BalanceSageImport,
   BalanceSageImportDetail,
@@ -78,6 +79,8 @@ import type {
   ComparaisonCampagne,
   ComposanteSalaire,
   CompteResultat,
+  CompteTiers,
+  ComptesTiersInput,
   ConfigAnomalies,
   ConfigAnomaliesInput,
   ConfigComptable,
@@ -144,6 +147,7 @@ import type {
   EvaluerMembreBody,
   EvolutionScore,
   ExpedierLotInput,
+  ExportBalanceAuxiliaireSageParams,
   ExportateurDetail,
   ExportateurHistorique,
   ExportateurInput,
@@ -163,6 +167,7 @@ import type {
   GetAuditUserIdParams,
   GetAvancesParams,
   GetAvancesPersonnelParams,
+  GetBalanceAuxiliaireParams,
   GetBalanceParams,
   GetBalances200,
   GetBalancesAlertes200,
@@ -228,6 +233,7 @@ import type {
   LigneBudgetSubvention,
   LigneEcheancier,
   ListBalanceSageImportsParams,
+  ListComptesTiersParams,
   ListEcrituresEnAttenteParams,
   ListFournisseursParams,
   ListIntrantsParams,
@@ -343,6 +349,7 @@ import type {
   UpdateBalanceBody,
   UpdateCertificationBody,
   UpdateChauffeurBody,
+  UpdateComptesTiers200,
   UpdateConfigBody,
   UpdateConfigComptableInput,
   UpdateConfigPeseeBody,
@@ -3727,6 +3734,332 @@ export function useGetBalance<TData = Awaited<ReturnType<typeof getBalance>>, TE
 
 
 
+
+export const getGetBalanceAuxiliaireUrl = (params?: GetBalanceAuxiliaireParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/comptabilite/balance-auxiliaire?${stringifiedParams}` : `/api/comptabilite/balance-auxiliaire`
+}
+
+/**
+ * @summary Balance auxiliaire par tiers
+ */
+export const getBalanceAuxiliaire = async (params?: GetBalanceAuxiliaireParams, options?: RequestInit): Promise<BalanceAuxiliaireLigne[]> => {
+
+  return customFetch<BalanceAuxiliaireLigne[]>(getGetBalanceAuxiliaireUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBalanceAuxiliaireQueryKey = (params?: GetBalanceAuxiliaireParams,) => {
+    return [
+    `/api/comptabilite/balance-auxiliaire`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetBalanceAuxiliaireQueryOptions = <TData = Awaited<ReturnType<typeof getBalanceAuxiliaire>>, TError = ErrorType<void>>(params?: GetBalanceAuxiliaireParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBalanceAuxiliaire>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBalanceAuxiliaireQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBalanceAuxiliaire>>> = ({ signal }) => getBalanceAuxiliaire(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBalanceAuxiliaire>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBalanceAuxiliaireQueryResult = NonNullable<Awaited<ReturnType<typeof getBalanceAuxiliaire>>>
+export type GetBalanceAuxiliaireQueryError = ErrorType<void>
+
+
+/**
+ * @summary Balance auxiliaire par tiers
+ */
+
+export function useGetBalanceAuxiliaire<TData = Awaited<ReturnType<typeof getBalanceAuxiliaire>>, TError = ErrorType<void>>(
+ params?: GetBalanceAuxiliaireParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBalanceAuxiliaire>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBalanceAuxiliaireQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getExportBalanceAuxiliaireSageUrl = (params: ExportBalanceAuxiliaireSageParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/comptabilite/balance-auxiliaire/export?${stringifiedParams}` : `/api/comptabilite/balance-auxiliaire/export`
+}
+
+/**
+ * @summary Exporter les écritures auxiliaires au format Sage
+ */
+export const exportBalanceAuxiliaireSage = async (params: ExportBalanceAuxiliaireSageParams, options?: RequestInit): Promise<string> => {
+
+  return customFetch<string>(getExportBalanceAuxiliaireSageUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExportBalanceAuxiliaireSageQueryKey = (params?: ExportBalanceAuxiliaireSageParams,) => {
+    return [
+    `/api/comptabilite/balance-auxiliaire/export`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getExportBalanceAuxiliaireSageQueryOptions = <TData = Awaited<ReturnType<typeof exportBalanceAuxiliaireSage>>, TError = ErrorType<ErrorResponse>>(params: ExportBalanceAuxiliaireSageParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportBalanceAuxiliaireSage>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportBalanceAuxiliaireSageQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportBalanceAuxiliaireSage>>> = ({ signal }) => exportBalanceAuxiliaireSage(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportBalanceAuxiliaireSage>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ExportBalanceAuxiliaireSageQueryResult = NonNullable<Awaited<ReturnType<typeof exportBalanceAuxiliaireSage>>>
+export type ExportBalanceAuxiliaireSageQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Exporter les écritures auxiliaires au format Sage
+ */
+
+export function useExportBalanceAuxiliaireSage<TData = Awaited<ReturnType<typeof exportBalanceAuxiliaireSage>>, TError = ErrorType<ErrorResponse>>(
+ params: ExportBalanceAuxiliaireSageParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportBalanceAuxiliaireSage>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getExportBalanceAuxiliaireSageQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListComptesTiersUrl = (params?: ListComptesTiersParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/comptabilite/comptes-tiers?${stringifiedParams}` : `/api/comptabilite/comptes-tiers`
+}
+
+/**
+ * @summary Lister les comptes personnalisés des tiers
+ */
+export const listComptesTiers = async (params?: ListComptesTiersParams, options?: RequestInit): Promise<CompteTiers[]> => {
+
+  return customFetch<CompteTiers[]>(getListComptesTiersUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListComptesTiersQueryKey = (params?: ListComptesTiersParams,) => {
+    return [
+    `/api/comptabilite/comptes-tiers`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListComptesTiersQueryOptions = <TData = Awaited<ReturnType<typeof listComptesTiers>>, TError = ErrorType<unknown>>(params?: ListComptesTiersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listComptesTiers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListComptesTiersQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listComptesTiers>>> = ({ signal }) => listComptesTiers(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listComptesTiers>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListComptesTiersQueryResult = NonNullable<Awaited<ReturnType<typeof listComptesTiers>>>
+export type ListComptesTiersQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Lister les comptes personnalisés des tiers
+ */
+
+export function useListComptesTiers<TData = Awaited<ReturnType<typeof listComptesTiers>>, TError = ErrorType<unknown>>(
+ params?: ListComptesTiersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listComptesTiers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListComptesTiersQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateComptesTiersUrl = (tiersType: 'membre' | 'membre_delegue' | 'delegue' | 'personnel' | 'exportateur' | 'fournisseur_ext',
+    tiersId: number,) => {
+
+
+
+
+  return `/api/comptabilite/comptes-tiers/${tiersType}/${tiersId}`
+}
+
+/**
+ * @summary Remplacer les comptes Sage d'un tiers
+ */
+export const updateComptesTiers = async (tiersType: 'membre' | 'membre_delegue' | 'delegue' | 'personnel' | 'exportateur' | 'fournisseur_ext',
+    tiersId: number,
+    comptesTiersInput: ComptesTiersInput, options?: RequestInit): Promise<UpdateComptesTiers200> => {
+
+  return customFetch<UpdateComptesTiers200>(getUpdateComptesTiersUrl(tiersType,tiersId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      comptesTiersInput,)
+  }
+);}
+
+
+
+
+export const getUpdateComptesTiersMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateComptesTiers>>, TError,{tiersType: 'membre' | 'membre_delegue' | 'delegue' | 'personnel' | 'exportateur' | 'fournisseur_ext';tiersId: number;data: BodyType<ComptesTiersInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateComptesTiers>>, TError,{tiersType: 'membre' | 'membre_delegue' | 'delegue' | 'personnel' | 'exportateur' | 'fournisseur_ext';tiersId: number;data: BodyType<ComptesTiersInput>}, TContext> => {
+
+const mutationKey = ['updateComptesTiers'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateComptesTiers>>, {tiersType: 'membre' | 'membre_delegue' | 'delegue' | 'personnel' | 'exportateur' | 'fournisseur_ext';tiersId: number;data: BodyType<ComptesTiersInput>}> = (props) => {
+          const {tiersType,tiersId,data} = props ?? {};
+
+          return  updateComptesTiers(tiersType,tiersId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateComptesTiersMutationResult = NonNullable<Awaited<ReturnType<typeof updateComptesTiers>>>
+    export type UpdateComptesTiersMutationBody = BodyType<ComptesTiersInput>
+    export type UpdateComptesTiersMutationError = ErrorType<void>
+
+    /**
+ * @summary Remplacer les comptes Sage d'un tiers
+ */
+export const useUpdateComptesTiers = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateComptesTiers>>, TError,{tiersType: 'membre' | 'membre_delegue' | 'delegue' | 'personnel' | 'exportateur' | 'fournisseur_ext';tiersId: number;data: BodyType<ComptesTiersInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateComptesTiers>>,
+        TError,
+        {tiersType: 'membre' | 'membre_delegue' | 'delegue' | 'personnel' | 'exportateur' | 'fournisseur_ext';tiersId: number;data: BodyType<ComptesTiersInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateComptesTiersMutationOptions(options));
+    }
 
 export const getPreviewBalanceSageUrl = () => {
 

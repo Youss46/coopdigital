@@ -1141,6 +1141,92 @@ export const GetBalanceResponse = zod.array(GetBalanceResponseItem)
 
 
 /**
+ * @summary Balance auxiliaire par tiers
+ */
+export const GetBalanceAuxiliaireQueryParams = zod.object({
+  "exercice": zod.coerce.number().optional(),
+  "tiersType": zod.enum(['membre', 'membre_delegue', 'delegue', 'personnel', 'exportateur', 'fournisseur_ext']).optional()
+})
+
+export const GetBalanceAuxiliaireResponseItem = zod.object({
+  "tiersId": zod.number(),
+  "nom": zod.string(),
+  "prenoms": zod.string(),
+  "code": zod.string(),
+  "totalDu": zod.number(),
+  "totalPaye": zod.number(),
+  "totalIntrantsDus": zod.number(),
+  "totalIntrantsRemb": zod.number(),
+  "soldeNet": zod.number(),
+  "compteAuxiliaire": zod.string().nullable(),
+  "comptesAuxiliaires": zod.array(zod.object({
+  "compteCollectif": zod.string(),
+  "numeroCompte": zod.string()
+}))
+})
+export const GetBalanceAuxiliaireResponse = zod.array(GetBalanceAuxiliaireResponseItem)
+
+
+/**
+ * @summary Exporter les écritures auxiliaires au format Sage
+ */
+export const ExportBalanceAuxiliaireSageQueryParams = zod.object({
+  "exercice": zod.coerce.number()
+})
+
+
+/**
+ * @summary Lister les comptes personnalisés des tiers
+ */
+export const ListComptesTiersQueryParams = zod.object({
+  "tiersType": zod.enum(['membre', 'membre_delegue', 'delegue', 'personnel', 'exportateur', 'fournisseur_ext']).optional()
+})
+
+export const ListComptesTiersResponseItem = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "tiersType": zod.string(),
+  "tiersId": zod.number(),
+  "compteCollectif": zod.string(),
+  "numeroCompte": zod.string(),
+  "actif": zod.boolean()
+})
+export const ListComptesTiersResponse = zod.array(ListComptesTiersResponseItem)
+
+
+/**
+ * @summary Remplacer les comptes Sage d'un tiers
+ */
+export const UpdateComptesTiersParams = zod.object({
+  "tiersType": zod.enum(['membre', 'membre_delegue', 'delegue', 'personnel', 'exportateur', 'fournisseur_ext']),
+  "tiersId": zod.coerce.number()
+})
+
+export const updateComptesTiersBodyComptesItemNumeroCompteMax = 20;
+
+
+
+export const UpdateComptesTiersBody = zod.object({
+  "comptes": zod.array(zod.object({
+  "compteCollectif": zod.string(),
+  "numeroCompte": zod.string().max(updateComptesTiersBodyComptesItemNumeroCompteMax)
+}))
+})
+
+export const UpdateComptesTiersResponse = zod.object({
+  "comptes": zod.array(zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "tiersType": zod.string(),
+  "tiersId": zod.number(),
+  "compteCollectif": zod.string(),
+  "numeroCompte": zod.string(),
+  "actif": zod.boolean()
+}))
+})
+
+
+/**
  * @summary Prévisualiser une balance Sage
  */
 export const PreviewBalanceSageBody = zod.object({

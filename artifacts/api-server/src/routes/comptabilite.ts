@@ -21,6 +21,9 @@ import {
   getStatutsExercices,
   getGrandLivreTiers,
   getBalanceAuxiliaire,
+  listComptesTiers,
+  updateComptesTiers,
+  exportBalanceAuxiliaireSage,
   suggestRegularisations,
   listRegularisations,
   createRegularisation,
@@ -80,6 +83,9 @@ router.get("/comptabilite/balances-sage/reprises/audit", checkPermission("compta
 router.post("/comptabilite/balances-sage/imports/:id/suggestions-contreparties", checkPermission("comptabilite", "importer_balance"), suggestBalanceSageCounterparties);
 router.post("/comptabilite/balances-sage/imports/:id/preparer-reprise", checkPermission("comptabilite", "importer_balance"), prepareBalanceSageReprise);
 router.post("/comptabilite/balances-sage/imports/:id/valider-reprise", checkPermission("comptabilite", "valider_reprise_balance"), validateBalanceSageReprise);
+router.get("/comptabilite/comptes-tiers", checkPermission("comptabilite", "voir_balance"), listComptesTiers);
+router.put("/comptabilite/comptes-tiers/:tiersType/:tiersId", checkPermission("comptabilite", "modifier_config"), updateComptesTiers);
+router.get("/comptabilite/balance-auxiliaire/export", checkPermission("comptabilite", "voir_balance"), exportBalanceAuxiliaireSage);
 router.get("/comptabilite/balance-auxiliaire", checkPermission("comptabilite", "voir_balance"), getBalanceAuxiliaire);
 router.get("/comptabilite/journal",        checkPermission("comptabilite", "lire"), getJournalComptable);
 router.get("/comptabilite/journal/export", checkPermission("comptabilite", "lire"), exportJournalCsv);

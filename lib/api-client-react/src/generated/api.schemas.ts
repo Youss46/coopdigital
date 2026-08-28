@@ -1531,6 +1531,46 @@ export interface BalanceLigne {
   soldeCrediteur: number;
 }
 
+export interface CompteTiers {
+  id: number;
+  cooperativeId: number;
+  tiersType: string;
+  tiersId: number;
+  compteCollectif: string;
+  numeroCompte: string;
+  actif: boolean;
+}
+
+export type ComptesTiersInputComptesItem = {
+  compteCollectif: string;
+  /** @maxLength 20 */
+  numeroCompte: string;
+};
+
+export interface ComptesTiersInput {
+  comptes: ComptesTiersInputComptesItem[];
+}
+
+export type BalanceAuxiliaireLigneComptesAuxiliairesItem = {
+  compteCollectif: string;
+  numeroCompte: string;
+};
+
+export interface BalanceAuxiliaireLigne {
+  tiersId: number;
+  nom: string;
+  prenoms: string;
+  code: string;
+  totalDu: number;
+  totalPaye: number;
+  totalIntrantsDus: number;
+  totalIntrantsRemb: number;
+  soldeNet: number;
+  /** @nullable */
+  compteAuxiliaire: string | null;
+  comptesAuxiliaires: BalanceAuxiliaireLigneComptesAuxiliairesItem[];
+}
+
 export interface BalanceSageMapping {
   numeroCompte: number;
   libelle: number;
@@ -5035,6 +5075,47 @@ limit?: number;
 
 export type GetBalanceParams = {
 exercice?: number;
+};
+
+export type GetBalanceAuxiliaireParams = {
+exercice?: number;
+tiersType?: GetBalanceAuxiliaireTiersType;
+};
+
+export type GetBalanceAuxiliaireTiersType = typeof GetBalanceAuxiliaireTiersType[keyof typeof GetBalanceAuxiliaireTiersType];
+
+
+export const GetBalanceAuxiliaireTiersType = {
+  membre: 'membre',
+  membre_delegue: 'membre_delegue',
+  delegue: 'delegue',
+  personnel: 'personnel',
+  exportateur: 'exportateur',
+  fournisseur_ext: 'fournisseur_ext',
+} as const;
+
+export type ExportBalanceAuxiliaireSageParams = {
+exercice: number;
+};
+
+export type ListComptesTiersParams = {
+tiersType?: ListComptesTiersTiersType;
+};
+
+export type ListComptesTiersTiersType = typeof ListComptesTiersTiersType[keyof typeof ListComptesTiersTiersType];
+
+
+export const ListComptesTiersTiersType = {
+  membre: 'membre',
+  membre_delegue: 'membre_delegue',
+  delegue: 'delegue',
+  personnel: 'personnel',
+  exportateur: 'exportateur',
+  fournisseur_ext: 'fournisseur_ext',
+} as const;
+
+export type UpdateComptesTiers200 = {
+  comptes: CompteTiers[];
 };
 
 export type PreviewBalanceSageBody = {

@@ -1038,6 +1038,115 @@ paths:
         "401":
           description: Non authentifié
 
+  /comptabilite/balance-auxiliaire:
+    get:
+      operationId: getBalanceAuxiliaire
+      tags: [comptabilite]
+      summary: Balance auxiliaire par tiers
+      parameters:
+        - name: exercice
+          in: query
+          schema: { type: integer }
+        - name: tiersType
+          in: query
+          schema:
+            type: string
+            enum: [membre, membre_delegue, delegue, personnel, exportateur, fournisseur_ext]
+      responses:
+        "200":
+          description: Soldes des tiers avec leurs comptes Sage
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BalanceAuxiliaireLigne"
+        "401":
+          description: Non authentifié
+
+  /comptabilite/balance-auxiliaire/export:
+    get:
+      operationId: exportBalanceAuxiliaireSage
+      tags: [comptabilite]
+      summary: Exporter les écritures auxiliaires au format Sage
+      parameters:
+        - name: exercice
+          in: query
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Fichier CSV prêt pour l'import Sage
+          content:
+            text/csv:
+              schema:
+                type: string
+        "422":
+          description: Des comptes tiers sont manquants
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /comptabilite/comptes-tiers:
+    get:
+      operationId: listComptesTiers
+      tags: [comptabilite]
+      summary: Lister les comptes personnalisés des tiers
+      parameters:
+        - name: tiersType
+          in: query
+          schema:
+            type: string
+            enum: [membre, membre_delegue, delegue, personnel, exportateur, fournisseur_ext]
+      responses:
+        "200":
+          description: Correspondances de comptes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CompteTiers"
+
+  /comptabilite/comptes-tiers/{tiersType}/{tiersId}:
+    put:
+      operationId: updateComptesTiers
+      tags: [comptabilite]
+      summary: Remplacer les comptes Sage d'un tiers
+      parameters:
+        - name: tiersType
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [membre, membre_delegue, delegue, personnel, exportateur, fournisseur_ext]
+        - name: tiersId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ComptesTiersInput"
+      responses:
+        "200":
+          description: Comptes enregistrés
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [comptes]
+                properties:
+                  comptes:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CompteTiers"
+        "409":
+          description: Numéro déjà affecté à un autre tiers
+
   /comptabilite/balances-sage/preview:
     post:
       operationId: previewBalanceSage
@@ -8281,6 +8390,54 @@ components:
           type: integer
         soldeCrediteur:
           type: integer
+
+    CompteTiers:
+      type: object
+      required: [id, cooperativeId, tiersType, tiersId, compteCollectif, numeroCompte, actif]
+      properties:
+        id: { type: integer }
+        cooperativeId: { type: integer }
+        tiersType: { type: string }
+        tiersId: { type: integer }
+        compteCollectif: { type: string }
+        numeroCompte: { type: string }
+        actif: { type: boolean }
+
+    ComptesTiersInput:
+      type: object
+      required: [comptes]
+      properties:
+        comptes:
+          type: array
+          items:
+            type: object
+            required: [compteCollectif, numeroCompte]
+            properties:
+              compteCollectif: { type: string }
+              numeroCompte: { type: string, maxLength: 20 }
+
+    BalanceAuxiliaireLigne:
+      type: object
+      required: [tiersId, nom, prenoms, code, totalDu, totalPaye, totalIntrantsDus, totalIntrantsRemb, soldeNet, compteAuxiliaire, comptesAuxiliaires]
+      properties:
+        tiersId: { type: integer }
+        nom: { type: string }
+        prenoms: { type: string }
+        code: { type: string }
+        totalDu: { type: integer }
+        totalPaye: { type: integer }
+        totalIntrantsDus: { type: integer }
+        totalIntrantsRemb: { type: integer }
+        soldeNet: { type: integer }
+        compteAuxiliaire: { type: ["string", "null"] }
+        comptesAuxiliaires:
+          type: array
+          items:
+            type: object
+            required: [compteCollectif, numeroCompte]
+            properties:
+              compteCollectif: { type: string }
+              numeroCompte: { type: string }
 
     BalanceSageMapping:
       type: object

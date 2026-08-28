@@ -1,6 +1,6 @@
 import { type Request, type Response } from "express";
 import { checkEcriture, creerAnomalies } from "../services/anomalieService";
-import { db, ecrituresComptablesTable, planComptableTable, exercicesTable, configComptableTable, ecrituresEnAttenteTable, membresTable, usersTable, personnelTable, exportateursTable, fournisseursTable, campagnesTable, livraisonsTable, paiementsTable } from "@workspace/db";
+import { db, ecrituresComptablesTable, planComptableTable, exercicesTable, configComptableTable, ecrituresEnAttenteTable, membresTable, usersTable, personnelTable, exportateursTable, fournisseursTable, campagnesTable, livraisonsTable, paiementsTable, comptesTiersTable } from "@workspace/db";
 import { eq, and, gte, lte, sql, desc, asc, inArray } from "drizzle-orm";
 import { CreateEcritureManuelleBody } from "@workspace/api-zod";
 import { assignerNumeroPiece, assignerNumerosPieces } from "../lib/numeroPiece";
@@ -21,6 +21,27 @@ const coopId = (req: import("express").Request): number => {
 
 function exerciceCourant(): number {
   return new Date().getFullYear();
+}
+
+const TIERS_TYPES = ["membre", "membre_delegue", "delegue", "personnel", "exportateur", "fournisseur_ext"] as const;
+type TiersType = typeof TIERS_TYPES[number];
+
+const COMPTES_COLLECTIFS_PAR_TYPE: Record<TiersType, readonly string[]> = {
+  membre: ["401", "4091", "4092"],
+  membre_delegue: ["401", "4091", "4092"],
+  delegue: ["401", "4091", "4092"],
+  personnel: ["421"],
+  exportateur: ["411", "4111"],
+  fournisseur_ext: ["401"],
+};
+
+function isTiersType(value: string): value is TiersType {
+  return (TIERS_TYPES as readonly string[]).includes(value);
+}
+
+function csvCell(value: string | number | null | undefined): string {
+  const text = value == null ? "" : String(value);
+  return /[;"\r\n]/.test(text) ? `"${text.replace(/"/g, "\"\"")}"` : text;
 }
 
 export async function getGrandLivre(req: Request, res: Response): Promise<void> {
@@ -1409,12 +1430,18 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
     const coop      = coopId(req);
     const exercice  = req.query["exercice"]  ? parseInt(String(req.query["exercice"])) : undefined;
     const tiersType = (req.query["tiersType"] as string) || "membre";
+    if (!isTiersType(tiersType)) {
+      res.status(400).json({ erreur: "type de tiers invalide" });
+      return;
+    }
     const exerciceCond = exercice ? sql`AND e.exercice = ${exercice}` : sql``;
 
     type Row = {
       tiersId: number; nom: string; prenoms: string; code: string;
       totalDu: number; totalPaye: number;
       totalIntrantsDus: number; totalIntrantsRemb: number; soldeNet: number;
+      comptesAuxiliaires?: Array<{ compteCollectif: string; numeroCompte: string }>;
+      compteAuxiliaire?: string | null;
     };
 
     let result: { rows: Row[] };
@@ -1668,10 +1695,235 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
       `);
     }
 
-    res.json(result.rows);
+    const mappings = await db
+      .select({
+        tiersType: comptesTiersTable.tiersType,
+        tiersId: comptesTiersTable.tiersId,
+        compteCollectif: comptesTiersTable.compteCollectif,
+        numeroCompte: comptesTiersTable.numeroCompte,
+      })
+      .from(comptesTiersTable)
+      .where(and(
+        eq(comptesTiersTable.cooperativeId, coop),
+        eq(comptesTiersTable.actif, true),
+      ));
+
+    const mappingsByTier = new Map<string, Array<{ compteCollectif: string; numeroCompte: string }>>();
+    for (const mapping of mappings) {
+      const key = `${mapping.tiersType}:${mapping.tiersId}`;
+      const current = mappingsByTier.get(key) ?? [];
+      current.push({ compteCollectif: mapping.compteCollectif, numeroCompte: mapping.numeroCompte });
+      mappingsByTier.set(key, current);
+    }
+
+    res.json(result.rows.map((row) => {
+      const comptesAuxiliaires = mappingsByTier.get(`${tiersType}:${row.tiersId}`) ?? [];
+      const preferredCollectifs = COMPTES_COLLECTIFS_PAR_TYPE[tiersType];
+      const compteAuxiliaire =
+        preferredCollectifs.map((compte) => comptesAuxiliaires.find((item) => item.compteCollectif === compte)?.numeroCompte)
+          .find((numero): numero is string => Boolean(numero)) ?? null;
+      return { ...row, comptesAuxiliaires, compteAuxiliaire };
+    }));
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getBalanceAuxiliaire");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+// ─── Comptes personnalisés des tiers pour les exports Sage ───────────────────
+export async function listComptesTiers(req: Request, res: Response): Promise<void> {
+  try {
+    const tiersType = req.query["tiersType"] ? String(req.query["tiersType"]) : undefined;
+    if (tiersType && !isTiersType(tiersType)) {
+      res.status(400).json({ erreur: "type de tiers invalide" });
+      return;
+    }
+
+    const conditions = [
+      eq(comptesTiersTable.cooperativeId, coopId(req)),
+      eq(comptesTiersTable.actif, true),
+    ];
+    if (tiersType) conditions.push(eq(comptesTiersTable.tiersType, tiersType));
+
+    res.json(await db.select().from(comptesTiersTable).where(and(...conditions)));
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "Erreur listComptesTiers");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+export async function updateComptesTiers(req: Request, res: Response): Promise<void> {
+  try {
+    const coop = coopId(req);
+    const tiersType = String(req.params["tiersType"] ?? "");
+    const tiersId = Number(req.params["tiersId"]);
+    if (!isTiersType(tiersType) || !Number.isInteger(tiersId) || tiersId <= 0) {
+      res.status(400).json({ erreur: "tiers invalide" });
+      return;
+    }
+
+    const input = req.body as { comptes?: unknown };
+    if (!Array.isArray(input.comptes)) {
+      res.status(400).json({ erreur: "Le champ comptes est obligatoire" });
+      return;
+    }
+
+    const comptes = input.comptes.map((item) => {
+      const value = item as { compteCollectif?: unknown; numeroCompte?: unknown };
+      return {
+        compteCollectif: String(value.compteCollectif ?? "").trim(),
+        numeroCompte: String(value.numeroCompte ?? "").trim().toUpperCase(),
+      };
+    });
+    const allowed = COMPTES_COLLECTIFS_PAR_TYPE[tiersType];
+    const seenCollectifs = new Set<string>();
+    const seenNumeros = new Set<string>();
+
+    for (const compte of comptes) {
+      if (!allowed.includes(compte.compteCollectif)) {
+        res.status(400).json({ erreur: `Le compte collectif ${compte.compteCollectif || "vide"} n'est pas autorisé pour ce type de tiers` });
+        return;
+      }
+      if (!/^[A-Z0-9][A-Z0-9._-]{0,19}$/.test(compte.numeroCompte)) {
+        res.status(400).json({ erreur: "Un numéro de compte doit contenir au plus 20 caractères alphanumériques" });
+        return;
+      }
+      if (seenCollectifs.has(compte.compteCollectif)) {
+        res.status(400).json({ erreur: "Un compte collectif ne peut apparaître qu'une seule fois par tiers" });
+        return;
+      }
+      if (seenNumeros.has(compte.numeroCompte)) {
+        res.status(400).json({ erreur: "Un numéro de compte ne peut apparaître qu'une seule fois" });
+        return;
+      }
+      seenCollectifs.add(compte.compteCollectif);
+      seenNumeros.add(compte.numeroCompte);
+    }
+
+    if (comptes.length > 0) {
+      const existing = await db.select({
+        tiersType: comptesTiersTable.tiersType,
+        tiersId: comptesTiersTable.tiersId,
+        numeroCompte: comptesTiersTable.numeroCompte,
+      })
+        .from(comptesTiersTable)
+        .where(and(
+          eq(comptesTiersTable.cooperativeId, coop),
+          inArray(comptesTiersTable.numeroCompte, comptes.map((item) => item.numeroCompte)),
+        ));
+      const conflict = existing.find((item) => item.tiersType !== tiersType || item.tiersId !== tiersId);
+      if (conflict) {
+        res.status(409).json({ erreur: `Le numéro de compte ${conflict.numeroCompte} est déjà affecté à un autre tiers` });
+        return;
+      }
+    }
+
+    const saved = await db.transaction(async (tx) => {
+      await tx.delete(comptesTiersTable).where(and(
+        eq(comptesTiersTable.cooperativeId, coop),
+        eq(comptesTiersTable.tiersType, tiersType),
+        eq(comptesTiersTable.tiersId, tiersId),
+      ));
+      if (comptes.length === 0) return [];
+      return tx.insert(comptesTiersTable).values(comptes.map((compte) => ({
+        cooperativeId: coop,
+        tiersType,
+        tiersId,
+        compteCollectif: compte.compteCollectif,
+        numeroCompte: compte.numeroCompte,
+      }))).returning();
+    });
+
+    res.json({ comptes: saved });
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "Erreur updateComptesTiers");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+export async function exportBalanceAuxiliaireSage(req: Request, res: Response): Promise<void> {
+  try {
+    const coop = coopId(req);
+    const exercice = req.query["exercice"] ? parseInt(String(req.query["exercice"])) : exerciceCourant();
+    if (!Number.isInteger(exercice)) {
+      res.status(400).json({ erreur: "exercice invalide" });
+      return;
+    }
+
+    const [ecritures, mappings] = await Promise.all([
+      db.select().from(ecrituresComptablesTable).where(and(
+        eq(ecrituresComptablesTable.cooperativeId, coop),
+        eq(ecrituresComptablesTable.exercice, exercice),
+      )).orderBy(asc(ecrituresComptablesTable.dateEcriture), asc(ecrituresComptablesTable.id)),
+      db.select().from(comptesTiersTable).where(and(
+        eq(comptesTiersTable.cooperativeId, coop),
+        eq(comptesTiersTable.actif, true),
+      )),
+    ]);
+
+    const mappingByTier = new Map<string, Map<string, string>>();
+    for (const mapping of mappings) {
+      const key = `${mapping.tiersType}:${mapping.tiersId}`;
+      const byCollectif = mappingByTier.get(key) ?? new Map<string, string>();
+      byCollectif.set(mapping.compteCollectif, mapping.numeroCompte);
+      mappingByTier.set(key, byCollectif);
+    }
+
+    const missing = new Set<string>();
+    const lines: string[][] = [];
+    const headers = [
+      "Date", "Journal", "N° pièce", "Libellé", "Compte général",
+      "Compte Sage", "Code tiers", "Type tiers", "Débit", "Crédit",
+    ];
+
+    for (const ecriture of ecritures) {
+      const tierKey = ecriture.tiersId && ecriture.tiersType
+        ? `${ecriture.tiersType}:${ecriture.tiersId}`
+        : null;
+      const byCollectif = tierKey ? mappingByTier.get(tierKey) : undefined;
+      const codeTiers = ecriture.tiersId && ecriture.tiersType
+        ? `${ecriture.tiersType}-${ecriture.tiersId}`
+        : "";
+      const side = (compte: string, debit: number, credit: number) => {
+        const mapped = byCollectif?.get(compte);
+        if (tierKey && ["401", "4091", "4092", "411", "4111", "421"].includes(compte) && !mapped) {
+          missing.add(`${codeTiers} (${compte})`);
+        }
+        lines.push([
+          ecriture.dateEcriture,
+          ecriture.source.toUpperCase(),
+          ecriture.numeroPiece ?? "",
+          ecriture.libelle,
+          compte,
+          mapped ?? compte,
+          codeTiers,
+          ecriture.tiersType ?? "",
+          String(debit),
+          String(credit),
+        ]);
+      };
+      side(ecriture.compteDebit, ecriture.montantFcfa, 0);
+      side(ecriture.compteCredit, 0, ecriture.montantFcfa);
+    }
+
+    if (missing.size > 0) {
+      res.status(422).json({
+        erreur: "Certains tiers utilisés dans les écritures n'ont pas de compte Sage configuré",
+        tiersSansCompte: [...missing].sort(),
+      });
+      return;
+    }
+
+    const csv = [headers, ...lines].map((line) => line.map(csvCell).join(";")).join("\r\n") + "\r\n";
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="coopdigital_sage_${exercice}.csv"`);
+    res.send(`\uFEFF${csv}`);
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "Erreur exportBalanceAuxiliaireSage");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }

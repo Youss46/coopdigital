@@ -15,6 +15,7 @@ export * from "./stocks";
 export * from "./exportateurs";
 export * from "./communication";
 export * from "./comptabilite";
+export * from "./comptesTiers";
 export * from "./salaires";
 export * from "./parts_sociales";
 export * from "./refus";

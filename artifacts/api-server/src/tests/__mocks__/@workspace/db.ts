@@ -93,6 +93,11 @@ export const bonsReceptionMembresDeleguesTable = makeTable("bons_reception_membr
 export const balanceSageImportsTable = makeTable("balance_sage_imports");
 export const balanceSageLignesTable = makeTable("balance_sage_lignes");
 export const balanceSageRepriseAuditTable = makeTable("balance_sage_reprise_audit");
+export const comptesTiersTable = {
+  ...makeTable("comptes_tiers"),
+  cooperativeId: {}, tiersType: {}, tiersId: {}, compteCollectif: {},
+  numeroCompte: {}, actif: {}, id: {},
+};
 export const certificationsTable = makeTable("certifications");
 export const certificationsMembresTable = makeTable("certifications_membres");
 export const primesDistributionsTable = {

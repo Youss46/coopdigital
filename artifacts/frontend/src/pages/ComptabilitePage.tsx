@@ -2717,23 +2717,29 @@ interface BalanceAuxLigne {
   tiersId: number; nom: string; prenoms: string; code: string;
   totalDu: number; totalPaye: number;
   totalIntrantsDus: number; totalIntrantsRemb: number; soldeNet: number;
+  compteAuxiliaire: string | null;
+  comptesAuxiliaires: Array<{ compteCollectif: string; numeroCompte: string }>;
 }
 
 const TYPES_TIERS = [
-  { id: "membre",         label: "Membres",        labelDu: "Dû au membre",      labelPaye: "Payé",    showIntrants: true,  lienBase: "/membres/" },
-  { id: "membre_delegue", label: "Membres délégués", labelDu: "Dû au membre-délégué", labelPaye: "Payé", showIntrants: false, lienBase: "/membres/" },
-  { id: "delegue",        label: "Délégués",        labelDu: "Dû au délégué",     labelPaye: "Payé",    showIntrants: false, lienBase: null },
-  { id: "personnel",      label: "Personnel",       labelDu: "Salaire dû (421)",  labelPaye: "Versé",   showIntrants: false, lienBase: null },
-  { id: "exportateur",    label: "Exportateurs",    labelDu: "Créance (4111)",     labelPaye: "Encaissé", showIntrants: false, lienBase: null },
-  { id: "fournisseur_ext", label: "Fournisseurs ext.", labelDu: "Dû fournisseur (401)", labelPaye: "Payé", showIntrants: false, lienBase: null },
+  { id: "membre",         label: "Membres",        labelDu: "Dû au membre",      labelPaye: "Payé",    showIntrants: true,  lienBase: "/membres/", comptes: ["401", "4091", "4092"] },
+  { id: "membre_delegue", label: "Membres délégués", labelDu: "Dû au membre-délégué", labelPaye: "Payé", showIntrants: false, lienBase: "/membres/", comptes: ["401", "4091", "4092"] },
+  { id: "delegue",        label: "Délégués",        labelDu: "Dû au délégué",     labelPaye: "Payé",    showIntrants: false, lienBase: null, comptes: ["401", "4091", "4092"] },
+  { id: "personnel",      label: "Personnel",       labelDu: "Salaire dû (421)",  labelPaye: "Versé",   showIntrants: false, lienBase: null, comptes: ["421"] },
+  { id: "exportateur",    label: "Exportateurs",    labelDu: "Créance (4111)",     labelPaye: "Encaissé", showIntrants: false, lienBase: null, comptes: ["411", "4111"] },
+  { id: "fournisseur_ext", label: "Fournisseurs ext.", labelDu: "Dû fournisseur (401)", labelPaye: "Payé", showIntrants: false, lienBase: null, comptes: ["401"] },
 ] as const;
 type TiersType = typeof TYPES_TIERS[number]["id"];
 
 function OngletBalanceAuxiliaire() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const anneeActuelle = new Date().getFullYear();
   const [exercice, setExercice]   = useState(anneeActuelle);
   const [recherche, setRecherche] = useState("");
   const [tiersType, setTiersType] = useState<TiersType>("membre");
+  const [edition, setEdition] = useState<{ tiersId: number; valeurs: Record<string, string> } | null>(null);
+  const [sauvegardeEnCours, setSauvegardeEnCours] = useState(false);
   const annees = Array.from({ length: 5 }, (_, i) => anneeActuelle - i);
   const typeMeta = TYPES_TIERS.find(t => t.id === tiersType)!;
 
@@ -2753,6 +2759,67 @@ function OngletBalanceAuxiliaire() {
   });
 
   const totalSolde = list.reduce((s, l) => s + l.soldeNet, 0);
+
+  const ouvrirEdition = (ligne: BalanceAuxLigne) => {
+    const valeurs: Record<string, string> = {};
+    typeMeta.comptes.forEach((compte) => {
+      valeurs[compte] = ligne.comptesAuxiliaires?.find((item) => item.compteCollectif === compte)?.numeroCompte ?? "";
+    });
+    setEdition({ tiersId: ligne.tiersId, valeurs });
+  };
+
+  const enregistrerComptes = async () => {
+    if (!edition) return;
+    setSauvegardeEnCours(true);
+    try {
+      await apiPut(`/api/comptabilite/comptes-tiers/${tiersType}/${edition.tiersId}`, {
+        comptes: typeMeta.comptes
+          .map((compteCollectif) => ({
+            compteCollectif,
+            numeroCompte: edition.valeurs[compteCollectif]?.trim() ?? "",
+          }))
+          .filter((item) => item.numeroCompte.length > 0),
+      });
+      await queryClient.invalidateQueries({ queryKey: ["balance-aux", exercice, tiersType] });
+      setEdition(null);
+      toast({ title: "Comptes du tiers enregistrés" });
+    } catch (error) {
+      toast({
+        title: "Impossible d'enregistrer les comptes",
+        description: error instanceof Error ? error.message : "Vérifiez les numéros saisis.",
+        variant: "destructive",
+      });
+    } finally {
+      setSauvegardeEnCours(false);
+    }
+  };
+
+  const handleExportSage = async () => {
+    try {
+      const response = await fetch(`${_BASE}/api/comptabilite/balance-auxiliaire/export?exercice=${exercice}`, {
+        headers: { Authorization: `Bearer ${tok()}` },
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({})) as { erreur?: string; tiersSansCompte?: string[] };
+        const detail = payload.tiersSansCompte?.slice(0, 3).join(", ");
+        throw new Error(`${payload.erreur ?? response.statusText}${detail ? ` : ${detail}` : ""}`);
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `coopdigital_sage_${exercice}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "Export Sage généré", description: "Le fichier CSV est prêt à être importé dans Sage." });
+    } catch (error) {
+      toast({
+        title: "Export Sage impossible",
+        description: error instanceof Error ? error.message : "Des comptes tiers sont peut-être manquants.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleExport = () => void exportExcel(
     `balance_auxiliaire_${tiersType}_${exercice}.xlsx`,
@@ -2820,11 +2887,26 @@ function OngletBalanceAuxiliaire() {
         </div>
         <div className="col-span-2 flex min-w-0 flex-wrap items-center justify-between gap-3 sm:col-span-2 sm:justify-end">
           <p className="text-sm text-gray-500">{list.length} {typeMeta.label.toLowerCase()}</p>
-          <button onClick={handleExport} disabled={list.length === 0}
-            className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-1.5 disabled:opacity-40">
-            <Download size={14} /> Exporter Excel
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={handleExport} disabled={list.length === 0}
+              className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-1.5 disabled:opacity-40">
+              <Download size={14} /> Exporter Excel
+            </button>
+            <button onClick={() => void handleExportSage()}
+              className="px-3 py-2 rounded-lg text-sm font-medium text-white flex items-center gap-1.5 hover:opacity-90"
+              style={{ backgroundColor: VERT }}>
+              <FileSpreadsheet size={14} /> Export Sage CSV
+            </button>
+          </div>
         </div>
+      </div>
+
+      <div className="mb-5 flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-800">
+        <FileText size={16} className="mt-0.5 shrink-0" />
+        <p>
+          Les comptes collectifs CoopDigital restent inchangés. Utilisez <strong>Modifier</strong> pour associer
+          chaque tiers à son ou ses comptes détaillés Sage. L’export est bloqué si une écriture utilise un compte tiers non paramétré.
+        </p>
       </div>
 
       {isLoading ? (
@@ -2858,6 +2940,7 @@ function OngletBalanceAuxiliaire() {
                   const positif = l.soldeNet >= 0;
                   const intrantsNet = l.totalIntrantsDus - l.totalIntrantsRemb;
                   return (
+                    <>
                     <tr key={l.tiersId} className="border-b border-gray-50 hover:bg-gray-50/50">
                       <td className="px-4 py-3">
                         <div className="font-medium text-gray-800">{l.nom} {l.prenoms}</div>
@@ -2871,6 +2954,21 @@ function OngletBalanceAuxiliaire() {
                       <td className={`px-4 py-3 text-right font-bold ${positif ? "text-green-700" : "text-red-600"}`}>
                         {positif ? "+" : ""}{FCFA(l.soldeNet)}
                       </td>
+                      <td className="px-3 py-3 min-w-[170px]">
+                        <div className="flex items-center justify-end gap-2">
+                          {l.compteAuxiliaire ? (
+                            <span className="font-mono text-xs text-gray-700">{l.compteAuxiliaire}</span>
+                          ) : (
+                            <span className="text-xs text-amber-600">Non paramétré</span>
+                          )}
+                          <button
+                            onClick={() => ouvrirEdition(l)}
+                            className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                          >
+                            <Pencil size={12} /> Modifier
+                          </button>
+                        </div>
+                      </td>
                       <td className="px-3 py-3">
                         {typeMeta.lienBase && (
                           <Link href={`${typeMeta.lienBase}${l.tiersId}`}
@@ -2880,6 +2978,46 @@ function OngletBalanceAuxiliaire() {
                         )}
                       </td>
                     </tr>
+                    {edition?.tiersId === l.tiersId && (
+                      <tr className="border-b border-blue-100 bg-blue-50/60">
+                        <td colSpan={typeMeta.showIntrants ? 7 : 6} className="px-4 py-4">
+                          <div className="flex flex-wrap items-end gap-3">
+                            {typeMeta.comptes.map((compteCollectif) => (
+                              <label key={compteCollectif} className="min-w-[150px]">
+                                <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-blue-800">
+                                  Compte collectif {compteCollectif}
+                                </span>
+                                <input
+                                  value={edition.valeurs[compteCollectif] ?? ""}
+                                  onChange={(event) => setEdition((current) => current ? {
+                                    ...current,
+                                    valeurs: { ...current.valeurs, [compteCollectif]: event.target.value.toUpperCase() },
+                                  } : current)}
+                                  placeholder={`Ex. ${compteCollectif}000001`}
+                                  maxLength={20}
+                                  className="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                              </label>
+                            ))}
+                            <div className="flex gap-2">
+                              <button onClick={() => void enregistrerComptes()} disabled={sauvegardeEnCours}
+                                className="rounded-lg px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                                style={{ backgroundColor: VERT }}>
+                                {sauvegardeEnCours ? "Enregistrement…" : "Enregistrer"}
+                              </button>
+                              <button onClick={() => setEdition(null)} disabled={sauvegardeEnCours}
+                                className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600">
+                                Annuler
+                              </button>
+                            </div>
+                          </div>
+                          <p className="mt-2 text-xs text-blue-700">
+                            Laissez un champ vide pour retirer cette correspondance. Les numéros sont uniques dans la coopérative.
+                          </p>
+                        </td>
+                      </tr>
+                    )}
+                    </>
                   );
                 })}
               </tbody>
@@ -2889,6 +3027,7 @@ function OngletBalanceAuxiliaire() {
                     TOTAUX ({list.length})
                   </td>
                   <td colSpan={typeMeta.showIntrants ? 3 : 2} className="hidden lg:table-cell"></td>
+                  <td></td>
                   <td className={`px-4 py-3 text-right font-bold ${totalSolde >= 0 ? "text-green-700" : "text-red-600"}`}>
                     {totalSolde >= 0 ? "+" : ""}{FCFA(totalSolde)}
                   </td>
