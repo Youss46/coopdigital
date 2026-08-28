@@ -2660,6 +2660,34 @@ export async function generateBonLivraison(expeditionId: number, cooperativeId: 
     .leftJoin(membresTable, eq(expeditionLotsTable.membreId, membresTable.id))
     .where(eq(expeditionLotsTable.expeditionId, expeditionId));
 
+  // Les producteurs d'un lot sont déterminés par ses livraisons rattachées.
+  // expedition_lots.membre_id est absent sur les lots consolidés, notamment
+  // lorsqu'un même lot regroupe plusieurs producteurs.
+  const lotIds = lots
+    .map((lot) => lot.lotId)
+    .filter((lotId): lotId is number => lotId !== null);
+  const producteurRows = lotIds.length > 0
+    ? await db
+        .select({
+          lotId:        lotLivraisonsTable.lotId,
+          membreNom:    membresTable.nom,
+          membrePrenoms: membresTable.prenoms,
+        })
+        .from(lotLivraisonsTable)
+        .innerJoin(livraisonsTable, eq(livraisonsTable.id, lotLivraisonsTable.livraisonId))
+        .innerJoin(membresTable, eq(membresTable.id, livraisonsTable.membreId))
+        .where(inArray(lotLivraisonsTable.lotId, lotIds))
+    : [];
+
+  const producteursParLot = new Map<number, string[]>();
+  for (const row of producteurRows) {
+    const nom = `${row.membreNom ?? ""} ${row.membrePrenoms ?? ""}`.trim();
+    if (!nom) continue;
+    const producteurs = producteursParLot.get(row.lotId) ?? [];
+    if (!producteurs.includes(nom)) producteurs.push(nom);
+    producteursParLot.set(row.lotId, producteurs);
+  }
+
   const { doc, endPromise } = makePdfDoc();
   const W = PAGE_W - 2 * MARGIN;
 
@@ -2777,10 +2805,19 @@ export async function generateBonLivraison(expeditionId: number, cooperativeId: 
     totalPoidsLots += poids;
     totalSacs += l.nombreSacs ?? 0;
 
+    const producteurs = l.lotId !== null
+      ? producteursParLot.get(l.lotId) ?? []
+      : [];
+    const producteur = producteurs.length > 0
+      ? producteurs.join(", ")
+      : l.membreNom
+        ? `${l.membreNom} ${l.membrePrenoms ?? ""}`.trim()
+        : "—";
+
     if (idx % 2 === 0) doc.rect(MARGIN, y, lCols.reduce((a, b) => a + b, 0), 16).fill("#f0fdf4");
     ligneTableau(doc, [
       l.lotId ? `#${l.lotId}` : "—",
-      l.membreNom ? `${l.membreNom} ${l.membrePrenoms ?? ""}`.trim() : "—",
+      producteur,
       poids > 0 ? formaterNombre(poids) : "—",
       l.certificatEudr ?? "—",
       l.parcelleOrigine ?? "—",
