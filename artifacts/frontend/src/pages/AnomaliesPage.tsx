@@ -498,40 +498,40 @@ function TabConfig({ peutConfigurer }: { peutConfigurer: boolean }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5 max-w-2xl">
-      <Section title="🚚 Livraisons">
+      <ConfigSection title="🚚 Livraisons">
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Poids maximum par livraison" field="poids_max_livraison_kg" unit="kg" min={0} />
-          <Field label="Multiplicateur moyenne membre" field="poids_moyen_multiplicateur" unit="x" min={1} step={0.5} />
-          <Field label="Délai minimum entre livraisons" field="delai_min_entre_livraisons_h" unit="h" min={0} />
+          <ConfigField label="Poids maximum par livraison" field="poids_max_livraison_kg" unit="kg" min={0} disabled={!peutConfigurer} value={numVal("poids_max_livraison_kg")} onChange={(v) => setNum("poids_max_livraison_kg", v)} />
+          <ConfigField label="Multiplicateur moyenne membre" field="poids_moyen_multiplicateur" unit="x" min={1} step={0.5} disabled={!peutConfigurer} value={numVal("poids_moyen_multiplicateur")} onChange={(v) => setNum("poids_moyen_multiplicateur", v)} />
+          <ConfigField label="Délai minimum entre livraisons" field="delai_min_entre_livraisons_h" unit="h" min={0} disabled={!peutConfigurer} value={numVal("delai_min_entre_livraisons_h")} onChange={(v) => setNum("delai_min_entre_livraisons_h", v)} />
         </div>
-      </Section>
+      </ConfigSection>
 
-      <Section title="💰 Avances">
+      <ConfigSection title="💰 Avances">
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Montant maximum par avance" field="avance_max_fcfa" unit="FCFA" min={0} />
+          <ConfigField label="Montant maximum par avance" field="avance_max_fcfa" unit="FCFA" min={0} disabled={!peutConfigurer} value={numVal("avance_max_fcfa")} onChange={(v) => setNum("avance_max_fcfa", v)} />
         </div>
-        <Toggle label="Bloquer si avance en retard existante" field="avance_si_retard_existant" />
-      </Section>
+        <ConfigToggle label="Bloquer si avance en retard existante" disabled={!peutConfigurer} value={boolVal("avance_si_retard_existant")} onChange={(v) => setBool("avance_si_retard_existant", v)} />
+      </ConfigSection>
 
-      <Section title="📦 Stocks">
+      <ConfigSection title="📦 Stocks">
         <div className="grid grid-cols-2 gap-4">
-          <Field label="% maximum par sortie unique" field="sortie_max_pct_stock" unit="%" min={0} max={100} />
+          <ConfigField label="% maximum par sortie unique" field="sortie_max_pct_stock" unit="%" min={0} max={100} disabled={!peutConfigurer} value={numVal("sortie_max_pct_stock")} onChange={(v) => setNum("sortie_max_pct_stock", v)} />
         </div>
-      </Section>
+      </ConfigSection>
 
-      <Section title="💳 Paiements">
-        <Toggle label="Bloquer paiement sans livraison associée" field="paiement_sans_livraison" />
+      <ConfigSection title="💳 Paiements">
+        <ConfigToggle label="Bloquer paiement sans livraison associée" disabled={!peutConfigurer} value={boolVal("paiement_sans_livraison")} onChange={(v) => setBool("paiement_sans_livraison", v)} />
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Fenêtre détection doublon" field="doublon_paiement_delai_h" unit="h" min={0} />
+          <ConfigField label="Fenêtre détection doublon" field="doublon_paiement_delai_h" unit="h" min={0} disabled={!peutConfigurer} value={numVal("doublon_paiement_delai_h")} onChange={(v) => setNum("doublon_paiement_delai_h", v)} />
         </div>
-      </Section>
+      </ConfigSection>
 
-      <Section title="📒 Comptabilité">
+      <ConfigSection title="📒 Comptabilité">
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Montant écriture alerte" field="ecriture_montant_max_fcfa" unit="FCFA" min={0} />
-          <Field label="Tolérance écart réconciliation" field="ecart_reconciliation_pct" unit="%" min={0} max={100} step={0.1} />
+          <ConfigField label="Montant écriture alerte" field="ecriture_montant_max_fcfa" unit="FCFA" min={0} disabled={!peutConfigurer} value={numVal("ecriture_montant_max_fcfa")} onChange={(v) => setNum("ecriture_montant_max_fcfa", v)} />
+          <ConfigField label="Tolérance écart réconciliation" field="ecart_reconciliation_pct" unit="%" min={0} max={100} step={0.1} disabled={!peutConfigurer} value={numVal("ecart_reconciliation_pct")} onChange={(v) => setNum("ecart_reconciliation_pct", v)} />
         </div>
-      </Section>
+      </ConfigSection>
 
       {peutConfigurer && (
         <button
