@@ -14,7 +14,7 @@ import {
   detacherLot,
   genererNumeroExpedition,
 } from "../services/expeditionsService";
-import { generateBonLivraison, generateRapportEudrPdf, generateConstatReception } from "../services/pdfService";
+import { generateBonLivraison, generateBordereauTransport, generateRapportEudrPdf, generateConstatReception } from "../services/pdfService";
 
 export async function handleProchainNumero(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
@@ -259,6 +259,26 @@ export async function handleBonLivraison(req: Request, res: Response): Promise<v
     res.end(pdfBuffer);
   } catch (err: unknown) {
     req.log.error({ err }, "handleBonLivraison");
+    const msg = err instanceof Error ? err.message : "Erreur interne";
+    res.status(400).json({ erreur: msg });
+  }
+}
+
+export async function handleBordereauTransport(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(403).json({ erreur: "Coopérative non associée" }); return; }
+  try {
+    const id = parseInt(String(req.params["id"]), 10);
+    if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+    const pdfBuffer = await generateBordereauTransport(id, cooperativeId);
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="bordereau-transport-${id}.pdf"`,
+      "Content-Length": String(pdfBuffer.length),
+    });
+    res.end(pdfBuffer);
+  } catch (err: unknown) {
+    req.log.error({ err }, "handleBordereauTransport");
     const msg = err instanceof Error ? err.message : "Erreur interne";
     res.status(400).json({ erreur: msg });
   }

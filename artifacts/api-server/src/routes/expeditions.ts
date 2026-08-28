@@ -14,6 +14,7 @@ import {
   handleRattacherLot,
   handleDetacherLot,
   handleBonLivraison,
+  handleBordereauTransport,
   handleRapportEudrPdf,
   handleProchainNumero,
   handleConstatReception,
@@ -109,6 +110,12 @@ router.get(
   "/expeditions/:id/bon-livraison",
   checkPermission("expeditions", "lire"),
   handleBonLivraison,
+);
+
+router.get(
+  "/expeditions/:id/bordereau-transport",
+  checkPermission("expeditions", "lire"),
+  handleBordereauTransport,
 );
 
 router.get(

@@ -98,6 +98,7 @@ export default function ExpeditionDetailPage() {
   const [showReception, setShowReception] = useState(false);
   const [showLotsPanel, setShowLotsPanel] = useState(false);
   const [downloadingBL, setDownloadingBL] = useState(false);
+  const [downloadingBordereau, setDownloadingBordereau] = useState(false);
   const [downloadingEudr, setDownloadingEudr] = useState(false);
   const [downloadingConstat, setDownloadingConstat] = useState(false);
   const [poidsRecu, setPoidsRecu] = useState("");
@@ -533,9 +534,9 @@ export default function ExpeditionDetailPage() {
       {/* Documents */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm flex items-center gap-2">
+          <CardTitle className="text-sm flex flex-col items-start gap-2 sm:flex-row sm:items-center">
             <FileText className="h-4 w-4" /> Documents
-            <div className="ml-auto flex gap-2">
+            <div className="w-full sm:ml-auto sm:w-auto flex flex-wrap gap-2">
               {!lotsNonMembres && (
                 <Button
                   variant="outline"
@@ -595,6 +596,35 @@ export default function ExpeditionDetailPage() {
               >
                 <Download className="h-3 w-3" />
                 {downloadingBL ? "Génération…" : "Bon de livraison"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 h-7 text-xs border-indigo-700 text-indigo-700 hover:bg-indigo-50"
+                disabled={downloadingBordereau}
+                onClick={async () => {
+                  setDownloadingBordereau(true);
+                  try {
+                    const res = await fetch(`${BASE}/api/expeditions/${id}/bordereau-transport`, {
+                      headers: token ? { Authorization: `Bearer ${token}` } : {},
+                    });
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `bordereau-transport-${String(exp.numeroExpedition ?? id)}.pdf`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  } catch {
+                    toast({ title: "Erreur", description: "Impossible de générer le bordereau de transport.", variant: "destructive" });
+                  } finally {
+                    setDownloadingBordereau(false);
+                  }
+                }}
+              >
+                <Download className="h-3 w-3" />
+                {downloadingBordereau ? "Génération…" : "Bordereau transport"}
               </Button>
               {Boolean(exp.poidsRecuPortKg) && (
                 <Button

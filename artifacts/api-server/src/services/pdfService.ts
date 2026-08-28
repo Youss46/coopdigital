@@ -2844,6 +2844,151 @@ export async function generateBonLivraison(expeditionId: number, cooperativeId: 
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Bordereau de transport — Expédition au port
+// ─────────────────────────────────────────────────────────────────────────────
+export async function generateBordereauTransport(expeditionId: number, cooperativeId: number): Promise<Buffer> {
+  const [exp] = await db
+    .select()
+    .from(expeditionsTable)
+    .where(and(eq(expeditionsTable.id, expeditionId), eq(expeditionsTable.cooperativeId, cooperativeId)));
+  if (!exp) throw new Error("Expédition introuvable");
+
+  const lots = await db
+    .select({
+      lotId:         expeditionLotsTable.lotId,
+      poidsKg:       expeditionLotsTable.poidsKg,
+      nombreSacs:    expeditionLotsTable.nombreSacs,
+      membreNom:     membresTable.nom,
+      membrePrenoms: membresTable.prenoms,
+    })
+    .from(expeditionLotsTable)
+    .leftJoin(membresTable, eq(expeditionLotsTable.membreId, membresTable.id))
+    .where(eq(expeditionLotsTable.expeditionId, expeditionId));
+
+  const { doc, endPromise } = makePdfDoc();
+  const W = PAGE_W - 2 * MARGIN;
+
+  await drawHeader(doc, cooperativeId, {
+    titre_document: "BORDEREAU DE TRANSPORT",
+    reference: exp.numeroExpedition,
+  });
+
+  let y = doc.y;
+  doc.rect(MARGIN, y, W, 30).fill("#eff6ff").stroke("#bfdbfe");
+  doc.fontSize(11).fillColor("#1e3a8a").font("Helvetica-Bold")
+    .text(`Expédition ${exp.numeroExpedition}`, MARGIN + 10, y + 9, { width: W / 2 - 10, lineBreak: false });
+  const dateDepart = exp.dateDepart ? formaterDateHeure(exp.dateDepart) : "Non renseignée";
+  doc.fontSize(8).fillColor("#475569").font("Helvetica")
+    .text(`Départ : ${dateDepart}`, MARGIN + W / 2, y + 10, { width: W / 2 - 10, align: "right", lineBreak: false });
+  y += 42;
+
+  const colW = (W - 16) / 2;
+  doc.rect(MARGIN, y, colW, 92).fill("#f8fafc").stroke("#e2e8f0");
+  doc.fontSize(8).fillColor(GRIS).font("Helvetica-Bold")
+    .text("ITINÉRAIRE", MARGIN + 8, y + 8, { width: colW - 16, lineBreak: false });
+  doc.fontSize(9).fillColor("black").font("Helvetica")
+    .text(`Départ : ${exp.lieuDepart ?? "Magasin central"}`, MARGIN + 8, y + 25, { width: colW - 16 });
+  doc.text(`Destination : Port de ${exp.port}`, MARGIN + 8, y + 41, { width: colW - 16 });
+  doc.text(`Entrepôt : ${exp.entrepotDestination ?? "—"}`, MARGIN + 8, y + 57, { width: colW - 16 });
+  doc.text(`Exportateur : ${exp.exportateurNom ?? "—"}`, MARGIN + 8, y + 73, { width: colW - 16 });
+
+  const transportX = MARGIN + colW + 16;
+  doc.rect(transportX, y, colW, 92).fill("#f8fafc").stroke("#e2e8f0");
+  doc.fontSize(8).fillColor(GRIS).font("Helvetica-Bold")
+    .text("TRANSPORT", transportX + 8, y + 8, { width: colW - 16, lineBreak: false });
+  doc.fontSize(9).fillColor("black").font("Helvetica")
+    .text(`Véhicule : ${exp.immatriculation ?? "—"}`, transportX + 8, y + 25, { width: colW - 16 });
+  doc.text(`Chauffeur : ${exp.nomChauffeur ?? "—"}`, transportX + 8, y + 41, { width: colW - 16 });
+  doc.text(`Téléphone : ${exp.telephoneChauffeur ?? "—"}`, transportX + 8, y + 57, { width: colW - 16 });
+  doc.text(`Transporteur : ${exp.transporteur ?? (exp.typeVehicule === "propre" ? "Flotte propre" : "—")}`, transportX + 8, y + 73, { width: colW - 16 });
+  y += 108;
+
+  doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold").text("CHARGE TRANSPORTÉE", MARGIN, y);
+  y += 16;
+  const chargeFields: Array<[string, string]> = [
+    ["Poids chargé", exp.poidsChargeKg ? `${formaterNombre(parseFloat(String(exp.poidsChargeKg)))} kg` : "—"],
+    ["Nombre de sacs", exp.nombreSacs != null ? String(exp.nombreSacs) : "—"],
+    ["Bon de transport", exp.numeroBonTransport ?? "—"],
+    ["Contrat export", exp.numeroContratExport ?? "—"],
+  ];
+  for (const [ri, [label, val]] of chargeFields.entries()) {
+    if (ri % 2 === 0) doc.rect(MARGIN, y, W, 17).fill("#f8fafc");
+    doc.fontSize(8).fillColor(GRIS).font("Helvetica")
+      .text(label, MARGIN + 6, y + 4, { width: 160, lineBreak: false });
+    doc.fontSize(8).fillColor("black").font("Helvetica-Bold")
+      .text(val, MARGIN + 170, y + 4, { width: W - 176, lineBreak: false });
+    y += 17;
+  }
+  y += 12;
+
+  doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold").text("DÉTAIL DES LOTS", MARGIN, y);
+  y += 16;
+  const lotCols = [65, 215, 90, 95];
+  const lotHeaders = ["Lot #", "Producteur", "Poids (kg)", "Sacs"];
+  ligneTableau(doc, lotHeaders, lotCols, MARGIN, y, VERT);
+  y += 18;
+
+  let totalPoids = 0;
+  let totalSacs = 0;
+  for (const [idx, lot] of lots.entries()) {
+    if (y > 720) {
+      doc.addPage();
+      await drawHeader(doc, cooperativeId, {
+        titre_document: "BORDEREAU DE TRANSPORT (suite)",
+        reference: exp.numeroExpedition,
+      });
+      y = doc.y;
+      ligneTableau(doc, lotHeaders, lotCols, MARGIN, y, VERT);
+      y += 18;
+    }
+    const poids = lot.poidsKg ? parseFloat(String(lot.poidsKg)) : 0;
+    const sacs = lot.nombreSacs ?? 0;
+    totalPoids += poids;
+    totalSacs += sacs;
+    if (idx % 2 === 0) doc.rect(MARGIN, y, lotCols.reduce((a, b) => a + b, 0), 16).fill("#eff6ff");
+    ligneTableau(doc, [
+      lot.lotId ? `#${lot.lotId}` : "—",
+      lot.membreNom ? `${lot.membreNom} ${lot.membrePrenoms ?? ""}`.trim() : "—",
+      poids > 0 ? formaterNombre(poids) : "—",
+      sacs > 0 ? String(sacs) : "—",
+    ], lotCols, MARGIN, y);
+    y += 16;
+  }
+  if (lots.length === 0) {
+    doc.fontSize(8).fillColor(GRIS).font("Helvetica")
+      .text("Aucun lot rattaché à cette expédition.", MARGIN, y + 4);
+    y += 20;
+  }
+
+  y += 4;
+  doc.rect(MARGIN, y, lotCols.reduce((a, b) => a + b, 0), 18).fill("#1e3a8a");
+  doc.fontSize(9).fillColor("white").font("Helvetica-Bold")
+    .text("TOTAL", MARGIN + 6, y + 5, { width: lotCols[0]! + lotCols[1]! - 6, lineBreak: false });
+  doc.text(totalPoids > 0 ? `${formaterNombre(totalPoids)} kg` : "—", MARGIN + lotCols[0]! + lotCols[1]!, y + 5, {
+    width: lotCols[2]! - 6, lineBreak: false,
+  });
+  doc.text(totalSacs > 0 ? String(totalSacs) : "—", MARGIN + lotCols[0]! + lotCols[1]! + lotCols[2]!, y + 5, {
+    width: lotCols[3]! - 6, lineBreak: false,
+  });
+
+  y = Math.max(y + 54, 660);
+  const sigW = Math.floor(W / 3) - 10;
+  const signatures = ["Responsable expédition", "Chauffeur", "Réceptionnaire port"];
+  signatures.forEach((label, i) => {
+    const sx = MARGIN + i * (sigW + 15);
+    doc.fontSize(8).fillColor(GRIS).font("Helvetica")
+      .text(label, sx, y, { width: sigW, align: "center", lineBreak: false });
+    doc.rect(sx, y + 14, sigW, 42).stroke("#cbd5e1");
+    doc.fontSize(7).fillColor("#94a3b8").font("Helvetica")
+      .text("Nom & signature", sx, y + 48, { width: sigW, align: "center", lineBreak: false });
+  });
+
+  await addFooters(doc, cooperativeId);
+  doc.end();
+  return endPromise;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Fiche EUDR individuelle — un seul lot
 // ─────────────────────────────────────────────────────────────────────────────
 export async function generateLotEudrPdf(lotId: number, cooperativeId: number): Promise<Buffer> {
