@@ -65,6 +65,7 @@ vi.mock("../controllers/comptabiliteController.js", () => ({
   rejeterEcritureEnAttente: okHandler,
   validerToutEcrituresEnAttente: okHandler,
   listRegularisations: okHandler,
+  suggestRegularisations: okHandler,
   createRegularisation: okHandler,
   deleteRegularisation: okHandler,
   apercuCloture: okHandler,
@@ -84,7 +85,7 @@ vi.mock("../middlewares/tenantGuard.js", () => ({
 }));
 
 describe("montage des routes et périmètre du comptable", () => {
-  let server: Server;
+  let server: Server | undefined;
   let baseUrl: string;
   let app: express.Express;
 
@@ -102,7 +103,12 @@ describe("montage des routes et périmètre du comptable", () => {
       });
     });
 
-    const address = server.address();
+    const startedServer = server;
+    if (!startedServer) {
+      throw new Error("Serveur de test indisponible");
+    }
+
+    const address = startedServer.address();
     if (!address || typeof address === "string") {
       throw new Error("Serveur de test indisponible");
     }
@@ -110,8 +116,11 @@ describe("montage des routes et périmètre du comptable", () => {
   });
 
   afterAll(async () => {
+    const serverToClose = server;
+    if (!serverToClose || !serverToClose.listening) return;
+
     await new Promise<void>((resolve, reject) => {
-      server.close((error) => (error ? reject(error) : resolve()));
+      serverToClose.close((error) => (error ? reject(error) : resolve()));
     });
   });
 
