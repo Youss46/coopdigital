@@ -1,8 +1,8 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { authMiddleware } from "../middlewares/auth";
 
-// Rôles autorisés à approuver / annuler les bons de carburant
-const ROLES_APPROBATEUR = ["pca", "directeur"];
+// Le magasinier gère les bons de carburant de bout en bout, comme le PCA.
+const ROLES_APPROBATEUR = ["pca", "directeur", "magasinier"];
 
 // Rôles autorisés à configurer les stations-service
 const ROLES_GESTIONNAIRE_STATION = ["pca", "directeur", "admin"];

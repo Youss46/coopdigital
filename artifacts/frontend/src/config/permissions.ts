@@ -207,7 +207,10 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     lire:        ["pca", "directeur", "magasinier", "auditeur"],
     creer_bon:   ["pca", "directeur", "magasinier"],
     soumettre:   ["pca", "directeur", "magasinier"],
-    approuver:   ["pca", "directeur"],
+    traiter:     ["pca", "directeur", "magasinier"],
+    approuver:   ["pca", "directeur", "magasinier"],
+    utiliser:    ["pca", "directeur", "magasinier"],
+    annuler:     ["pca", "directeur", "magasinier"],
   },
 
   missions: {

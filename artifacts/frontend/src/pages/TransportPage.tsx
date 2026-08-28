@@ -1532,7 +1532,8 @@ function statutBonBadge(statut: string) {
   );
 }
 
-const ROLES_APPROBATEUR = ["pca", "directeur"];
+// Le magasinier gère les bons de carburant de bout en bout, comme le PCA.
+const ROLES_APPROBATEUR = ["pca", "directeur", "magasinier"];
 const ROLES_EMETTEUR    = ["pca", "directeur", "magasinier"];
 
 function TabCarburant() {
