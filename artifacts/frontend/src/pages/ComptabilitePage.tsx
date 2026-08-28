@@ -2808,10 +2808,10 @@ function OngletBalanceAuxiliaire() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `coopdigital_sage_${exercice}.csv`;
+      link.download = `coopdigital_sage_${exercice}.xml`;
       link.click();
       URL.revokeObjectURL(url);
-      toast({ title: "Export Sage généré", description: "Le fichier CSV est prêt à être importé dans Sage." });
+      toast({ title: "Export Sage généré", description: "Le fichier XML est prêt à être importé dans Sage." });
     } catch (error) {
       toast({
         title: "Export Sage impossible",
@@ -2895,7 +2895,7 @@ function OngletBalanceAuxiliaire() {
             <button onClick={() => void handleExportSage()}
               className="px-3 py-2 rounded-lg text-sm font-medium text-white flex items-center gap-1.5 hover:opacity-90"
               style={{ backgroundColor: VERT }}>
-              <FileSpreadsheet size={14} /> Export Sage CSV
+              <FileSpreadsheet size={14} /> Export Sage XML
             </button>
           </div>
         </div>

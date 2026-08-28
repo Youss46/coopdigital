@@ -39,9 +39,43 @@ function isTiersType(value: string): value is TiersType {
   return (TIERS_TYPES as readonly string[]).includes(value);
 }
 
-function csvCell(value: string | number | null | undefined): string {
+function xmlEscape(value: string | number | null | undefined): string {
   const text = value == null ? "" : String(value);
-  return /[;"\r\n]/.test(text) ? `"${text.replace(/"/g, "\"\"")}"` : text;
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function xmlElement(name: string, value: string | number | null | undefined, indent: string): string {
+  const text = value == null ? "" : String(value);
+  return text.length === 0
+    ? `${indent}<${name}/>`
+    : `${indent}<${name}>${xmlEscape(text)}</${name}>`;
+}
+
+export function buildSageXml(exercice: number, lines: readonly (readonly string[])[]): string {
+  const fields = [
+    "Date", "Journal", "NumeroPiece", "Libelle", "CompteGeneral",
+    "CompteSage", "CodeTiers", "TypeTiers", "Debit", "Credit",
+  ] as const;
+  const body = lines.flatMap((line) => [
+    "    <Ecriture>",
+    ...fields.map((field, index) => xmlElement(field, line[index] ?? "", "      ")),
+    "    </Ecriture>",
+  ]);
+
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    `<ExportSage exercice="${xmlEscape(exercice)}" source="CoopDigital">`,
+    "  <Ecritures>",
+    ...body,
+    "  </Ecritures>",
+    "</ExportSage>",
+    "",
+  ].join("\r\n");
 }
 
 export async function getGrandLivre(req: Request, res: Response): Promise<void> {
@@ -1874,10 +1908,6 @@ export async function exportBalanceAuxiliaireSage(req: Request, res: Response): 
 
     const missing = new Set<string>();
     const lines: string[][] = [];
-    const headers = [
-      "Date", "Journal", "N° pièce", "Libellé", "Compte général",
-      "Compte Sage", "Code tiers", "Type tiers", "Débit", "Crédit",
-    ];
 
     for (const ecriture of ecritures) {
       const tierKey = ecriture.tiersId && ecriture.tiersType
@@ -1917,10 +1947,10 @@ export async function exportBalanceAuxiliaireSage(req: Request, res: Response): 
       return;
     }
 
-    const csv = [headers, ...lines].map((line) => line.map(csvCell).join(";")).join("\r\n") + "\r\n";
-    res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename="coopdigital_sage_${exercice}.csv"`);
-    res.send(`\uFEFF${csv}`);
+    const xml = buildSageXml(exercice, lines);
+    res.setHeader("Content-Type", "application/xml; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="coopdigital_sage_${exercice}.xml"`);
+    res.send(xml);
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur exportBalanceAuxiliaireSage");

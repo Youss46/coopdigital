@@ -1076,9 +1076,9 @@ paths:
           schema: { type: integer }
       responses:
         "200":
-          description: Fichier CSV prêt pour l'import Sage
+          description: Fichier XML prêt pour l'import Sage
           content:
-            text/csv:
+            application/xml:
               schema:
                 type: string
         "422":
