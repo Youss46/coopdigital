@@ -1553,7 +1553,7 @@ function TabCarburant() {
   const chauffeursQ = useGetChauffeurs();
   const chauffeurs  = chauffeursQ.data?.chauffeurs ?? [];
 
-  const tok = () => localStorage.getItem("terrain_token") ?? localStorage.getItem("auth_token") ?? "";
+  const tok = () => localStorage.getItem("coop_token") ?? "";
   const stationsQ = useQuery<{ stations: StationAdminRow[] }>({
     queryKey: ["transport-stations-select"],
     queryFn:  () => fetch(`${BASE}/api/transport/stations-carburant`, {
@@ -2473,7 +2473,7 @@ function TabStationsCarburant() {
   const { data, isLoading } = useQuery<{ stations: StationAdminRow[] }>({
     queryKey: QK,
     queryFn: () => fetch(`${BASE}/api/transport/stations-carburant`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("terrain_token") ?? localStorage.getItem("auth_token") ?? ""}` },
+      headers: { Authorization: `Bearer ${localStorage.getItem("coop_token") ?? ""}` },
     }).then(r => r.json() as Promise<{ stations: StationAdminRow[] }>),
   });
 
@@ -2483,7 +2483,7 @@ function TabStationsCarburant() {
 
   const authHeader = () => ({
     "Content-Type": "application/json",
-    Authorization: `Bearer ${localStorage.getItem("terrain_token") ?? localStorage.getItem("auth_token") ?? ""}`,
+    Authorization: `Bearer ${localStorage.getItem("coop_token") ?? ""}`,
   });
 
   const saveMut = useMutation({
@@ -2544,7 +2544,7 @@ function TabStationsCarburant() {
   const previewQuery = useQuery<{ stations: PreviewRow[] }>({
     queryKey: [...QK, "preview"],
     queryFn: () => fetch(`${BASE}/api/transport/stations-carburant/historique-preview`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("terrain_token") ?? localStorage.getItem("auth_token") ?? ""}` },
+      headers: { Authorization: `Bearer ${localStorage.getItem("coop_token") ?? ""}` },
     }).then(r => r.json() as Promise<{ stations: PreviewRow[] }>),
     enabled: showPreview,
     staleTime: 0,
