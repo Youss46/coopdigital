@@ -84,6 +84,55 @@ vi.mock("../middlewares/tenantGuard.js", () => ({
   tenantGuard: (_req: Request, _res: ExpressResponse, next: () => void) => next(),
 }));
 
+async function closeTestServer(server: Server | undefined): Promise<void> {
+  if (!server || !server.listening) return;
+
+  await new Promise<void>((resolve, reject) => {
+    server.close((error) => (error ? reject(error) : resolve()));
+  });
+}
+
+function listenForTest(app: express.Express, port: number): Promise<Server> {
+  return new Promise((resolve, reject) => {
+    const server = app.listen(port, "127.0.0.1");
+    server.once("listening", () => resolve(server));
+    server.once("error", reject);
+  });
+}
+
+describe("nettoyage après un échec de démarrage du serveur", () => {
+  let server: Server | undefined;
+  let occupiedServer: Server | undefined;
+  let listenError: unknown;
+
+  beforeAll(async () => {
+    occupiedServer = await listenForTest(express(), 0);
+    const address = occupiedServer.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Serveur de test indisponible");
+    }
+
+    try {
+      server = await listenForTest(express(), address.port);
+    } catch (error) {
+      listenError = error;
+    } finally {
+      await closeTestServer(occupiedServer);
+      occupiedServer = undefined;
+    }
+  });
+
+  afterAll(async () => {
+    await closeTestServer(server);
+    await closeTestServer(occupiedServer);
+  });
+
+  it("ne masque pas l'erreur d'écoute avec une erreur de nettoyage", () => {
+    expect(listenError).toMatchObject({ code: "EADDRINUSE" });
+    expect(server).toBeUndefined();
+  });
+});
+
 describe("montage des routes et périmètre du comptable", () => {
   let server: Server | undefined;
   let baseUrl: string;
@@ -116,12 +165,7 @@ describe("montage des routes et périmètre du comptable", () => {
   });
 
   afterAll(async () => {
-    const serverToClose = server;
-    if (!serverToClose || !serverToClose.listening) return;
-
-    await new Promise<void>((resolve, reject) => {
-      serverToClose.close((error) => (error ? reject(error) : resolve()));
-    });
+    await closeTestServer(server);
   });
 
   function tokenFor(role: string): string {
