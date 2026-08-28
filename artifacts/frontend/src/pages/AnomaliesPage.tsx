@@ -370,6 +370,86 @@ function TabListe({ peutTraiter }: { peutTraiter: boolean }) {
   );
 }
 
+const CONFIG_INPUT_CLS = "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white";
+
+function ConfigSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+      <h3 className="font-semibold text-gray-800 text-sm border-b border-gray-100 pb-2">{title}</h3>
+      {children}
+    </div>
+  );
+}
+
+function ConfigField({
+  label, field, unit, min, max, step, disabled, value, onChange,
+}: {
+  label: string;
+  field: keyof ConfigAnomalies;
+  unit?: string;
+  min?: number;
+  max?: number;
+  step?: number;
+  disabled: boolean;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const className = CONFIG_INPUT_CLS + (disabled ? " opacity-60 cursor-not-allowed" : "");
+  const isNumericInput = field.includes("poids") || field.includes("montant") || field === "avance_max_fcfa";
+
+  return (
+    <div>
+      <label className="block text-xs font-medium text-gray-600 mb-1">{label}{unit ? ` (${unit})` : ""}</label>
+      {isNumericInput ? (
+        <NumericInput
+          decimal={false}
+          disabled={disabled}
+          className={className}
+          value={value}
+          min={min}
+          max={max}
+          step={step ?? 1}
+          onChange={onChange}
+        />
+      ) : (
+        <input
+          type="number"
+          disabled={disabled}
+          className={className}
+          value={value}
+          min={min}
+          max={max}
+          step={step ?? 1}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      )}
+    </div>
+  );
+}
+
+function ConfigToggle({
+  label, disabled, value, onChange,
+}: {
+  label: string;
+  disabled: boolean;
+  value: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-sm text-gray-700">{label}</span>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => onChange(!value)}
+        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${value ? "bg-green-600" : "bg-gray-200"} ${disabled ? "opacity-60 cursor-not-allowed" : ""}`}
+      >
+        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow ${value ? "translate-x-6" : "translate-x-1"}`} />
+      </button>
+    </div>
+  );
+}
+
 // ─── Tab 3 : Configuration ────────────────────────────────────────────────────
 function TabConfig({ peutConfigurer }: { peutConfigurer: boolean }) {
   const qc = useQueryClient();
@@ -415,54 +495,6 @@ function TabConfig({ peutConfigurer }: { peutConfigurer: boolean }) {
       },
     });
   };
-
-  const INPUT_CLS = "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white";
-
-  const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-      <h3 className="font-semibold text-gray-800 text-sm border-b border-gray-100 pb-2">{title}</h3>
-      {children}
-    </div>
-  );
-
-  const Field = ({ label, field, unit, min, max, step }: { label: string; field: keyof ConfigAnomalies; unit?: string; min?: number; max?: number; step?: number }) => (
-    <div>
-      <label className="block text-xs font-medium text-gray-600 mb-1">{label}{unit ? ` (${unit})` : ""}</label>
-      {field.includes("poids") || field.includes("montant") || field === "avance_max_fcfa" ? <NumericInput
-        decimal={false}
-        disabled={!peutConfigurer}
-        className={INPUT_CLS + (peutConfigurer ? "" : " opacity-60 cursor-not-allowed")}
-        value={numVal(field)}
-        min={min}
-        max={max}
-        step={step ?? 1}
-        onChange={(v) => setNum(String(field), v)}
-      /> : <input
-        type="number"
-        disabled={!peutConfigurer}
-        className={INPUT_CLS + (peutConfigurer ? "" : " opacity-60 cursor-not-allowed")}
-        value={numVal(field)}
-        min={min}
-        max={max}
-        step={step ?? 1}
-        onChange={(e) => setNum(String(field), e.target.value)}
-      />}
-    </div>
-  );
-
-  const Toggle = ({ label, field }: { label: string; field: keyof ConfigAnomalies }) => (
-    <div className="flex items-center justify-between">
-      <span className="text-sm text-gray-700">{label}</span>
-      <button
-        type="button"
-        disabled={!peutConfigurer}
-        onClick={() => setBool(String(field), !boolVal(field))}
-        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${boolVal(field) ? "bg-green-600" : "bg-gray-200"} ${!peutConfigurer ? "opacity-60 cursor-not-allowed" : ""}`}
-      >
-        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow ${boolVal(field) ? "translate-x-6" : "translate-x-1"}`} />
-      </button>
-    </div>
-  );
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5 max-w-2xl">
