@@ -1334,6 +1334,8 @@ export interface VenteDetail {
   exportateurNom?: string | null;
   /** @nullable */
   lotId?: number | null;
+  /** @nullable */
+  expeditionId?: number | null;
   poidsKg: string;
   prixUnitaireFcfa: number;
   montantTotalFcfa: number;
@@ -1384,6 +1386,8 @@ export interface MouvementStock {
   entrepotNom?: string | null;
   /** @nullable */
   lotId?: number | null;
+  /** @nullable */
+  expeditionId?: number | null;
   type: MouvementStockType;
   poidsKg: string;
   /** @nullable */
@@ -1400,6 +1404,7 @@ export interface MouvementStock {
 export interface MouvementInput {
   entrepotId: number;
   lotId?: number;
+  expeditionId?: number;
   poidsKg: number;
   nombreSacs?: number;
   prixUnitaireFcfa?: number;
@@ -1437,10 +1442,28 @@ export interface ExportateurInput {
 export interface VenteInput {
   exportateurId: number;
   lotId?: number;
+  expeditionId?: number;
   poidsKg: number;
   prixUnitaireFcfa: number;
   dateVente: string;
   dateEcheanceReglement?: string;
+}
+
+export type StockReceptionneLotsItem = {
+  lotId: number;
+  poidsKg?: number;
+};
+
+export interface StockReceptionne {
+  expeditionId: number;
+  numeroExpedition: string;
+  port: string;
+  dateReception: string;
+  poidsRecuPortKg: number;
+  poidsAcceptePortKg: number;
+  poidsVenduKg: number;
+  poidsDisponibleKg: number;
+  lots: StockReceptionneLotsItem[];
 }
 
 export interface EncaissementInput {

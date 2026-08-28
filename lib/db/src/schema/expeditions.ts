@@ -69,6 +69,9 @@ export const expeditionsTable = pgTable("expeditions", {
   // Réception port
   dateArriveePort:      timestamp("date_arrivee_port", { withTimezone: true }),
   poidsRecuPortKg:      numeric("poids_recu_port_kg", { precision: 12, scale: 2 }),
+  // Quantité commercialisable après réception : poids reçu moins poids refoulé.
+  // Persistée pour éviter de recalculer à partir de lignes de refus historisées.
+  poidsAcceptePortKg:   numeric("poids_accepte_port_kg", { precision: 12, scale: 2 }),
   nombreSacsRecuPort:   integer("nombre_sacs_recu_port"),
   numeroRecepissePort:  varchar("numero_recepisse_port", { length: 100 }),
   nomReceptionnaire:    varchar("nom_receptionnaire", { length: 200 }),

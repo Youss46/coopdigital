@@ -946,6 +946,13 @@
       "when": 1788483100000,
       "tag": "0134_bons_carburant_montant_autorise",
       "breakpoints": true
+    },
+    {
+      "idx": 135,
+      "version": "7",
+      "when": 1788483200000,
+      "tag": "0135_ventes_quantite_acceptee_port",
+      "breakpoints": true
     }
   ]
 }

@@ -328,6 +328,7 @@ import type {
   StatistiquesPesee,
   StatsCarburant,
   StatsCertifications,
+  StockReceptionne,
   Subvention,
   SubventionAvecBailleur,
   SubventionDetail,
@@ -3197,6 +3198,83 @@ export const useCreateVente = <TError = ErrorType<ErrorResponse>,
       > => {
       return useMutation(getCreateVenteMutationOptions(options));
     }
+
+export const getGetStocksReceptionnesUrl = () => {
+
+
+
+
+  return `/api/ventes/stocks-receptionnes`
+}
+
+/**
+ * @summary Quantités acceptées disponibles après réception au port
+ */
+export const getStocksReceptionnes = async ( options?: RequestInit): Promise<StockReceptionne[]> => {
+
+  return customFetch<StockReceptionne[]>(getGetStocksReceptionnesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetStocksReceptionnesQueryKey = () => {
+    return [
+    `/api/ventes/stocks-receptionnes`
+    ] as const;
+    }
+
+
+export const getGetStocksReceptionnesQueryOptions = <TData = Awaited<ReturnType<typeof getStocksReceptionnes>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStocksReceptionnes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetStocksReceptionnesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStocksReceptionnes>>> = ({ signal }) => getStocksReceptionnes({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStocksReceptionnes>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetStocksReceptionnesQueryResult = NonNullable<Awaited<ReturnType<typeof getStocksReceptionnes>>>
+export type GetStocksReceptionnesQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Quantités acceptées disponibles après réception au port
+ */
+
+export function useGetStocksReceptionnes<TData = Awaited<ReturnType<typeof getStocksReceptionnes>>, TError = ErrorType<ErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStocksReceptionnes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetStocksReceptionnesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getGetCreancesUrl = () => {
 

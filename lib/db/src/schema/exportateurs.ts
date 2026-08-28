@@ -21,6 +21,8 @@ export const ventesExportateursTable = pgTable("ventes_exportateurs", {
   id: serial("id").primaryKey(),
   exportateurId: integer("exportateur_id").notNull().references(() => exportateursTable.id),
   lotId: integer("lot_id").references(() => lotsTable.id),
+  // Nullable to preserve sales created before the port-reception workflow.
+  expeditionId: integer("expedition_id"),
   campagneId: integer("campagne_id").references(() => campagnesTable.id),
 
   // Enrichissements livraison exportateur GESTCOOP

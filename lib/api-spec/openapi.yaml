@@ -862,6 +862,27 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /ventes/stocks-receptionnes:
+    get:
+      operationId: getStocksReceptionnes
+      tags: [exportateurs]
+      summary: Quantités acceptées disponibles après réception au port
+      responses:
+        "200":
+          description: Réceptions port disponibles à la vente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StockReceptionne"
+        "403":
+          description: Coopérative non autorisée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /ventes/creances:
     get:
       operationId: getCreances
@@ -8129,6 +8150,8 @@ components:
           type: ["string", "null"]
         lotId:
           type: ["integer", "null"]
+        expeditionId:
+          type: ["integer", "null"]
         type:
           type: string
           enum: [entree, sortie]
@@ -8152,6 +8175,8 @@ components:
         entrepotId:
           type: integer
         lotId:
+          type: integer
+        expeditionId:
           type: integer
         poidsKg:
           type: number
@@ -8224,6 +8249,8 @@ components:
           type: ["string", "null"]
         lotId:
           type: ["integer", "null"]
+        expeditionId:
+          type: ["integer", "null"]
         poidsKg:
           type: string
         prixUnitaireFcfa:
@@ -8252,6 +8279,8 @@ components:
           type: integer
         lotId:
           type: integer
+        expeditionId:
+          type: integer
         poidsKg:
           type: number
         prixUnitaireFcfa:
@@ -8260,6 +8289,37 @@ components:
           type: string
         dateEcheanceReglement:
           type: string
+
+    StockReceptionne:
+      type: object
+      required: [expeditionId, numeroExpedition, port, dateReception, poidsRecuPortKg, poidsAcceptePortKg, poidsVenduKg, poidsDisponibleKg, lots]
+      properties:
+        expeditionId:
+          type: integer
+        numeroExpedition:
+          type: string
+        port:
+          type: string
+        dateReception:
+          type: string
+        poidsRecuPortKg:
+          type: number
+        poidsAcceptePortKg:
+          type: number
+        poidsVenduKg:
+          type: number
+        poidsDisponibleKg:
+          type: number
+        lots:
+          type: array
+          items:
+            type: object
+            required: [lotId]
+            properties:
+              lotId:
+                type: integer
+              poidsKg:
+                type: number
 
     EncaissementInput:
       type: object

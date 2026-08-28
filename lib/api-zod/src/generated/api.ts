@@ -765,6 +765,7 @@ export const GetLotTracabiliteResponse = zod.object({
   "exportateurId": zod.number(),
   "exportateurNom": zod.string().nullish(),
   "lotId": zod.number().nullish(),
+  "expeditionId": zod.number().nullish(),
   "poidsKg": zod.string(),
   "prixUnitaireFcfa": zod.number(),
   "montantTotalFcfa": zod.number(),
@@ -825,6 +826,7 @@ export const GetMouvementsStockResponseItem = zod.object({
   "entrepotId": zod.number(),
   "entrepotNom": zod.string().nullish(),
   "lotId": zod.number().nullish(),
+  "expeditionId": zod.number().nullish(),
   "type": zod.enum(['entree', 'sortie']),
   "poidsKg": zod.string(),
   "nombreSacs": zod.number().nullish(),
@@ -842,6 +844,7 @@ export const GetMouvementsStockResponse = zod.array(GetMouvementsStockResponseIt
 export const EntreeStockBody = zod.object({
   "entrepotId": zod.number(),
   "lotId": zod.number().optional(),
+  "expeditionId": zod.number().optional(),
   "poidsKg": zod.number(),
   "nombreSacs": zod.number().optional(),
   "prixUnitaireFcfa": zod.number().optional(),
@@ -855,6 +858,7 @@ export const EntreeStockBody = zod.object({
 export const SortieStockBody = zod.object({
   "entrepotId": zod.number(),
   "lotId": zod.number().optional(),
+  "expeditionId": zod.number().optional(),
   "poidsKg": zod.number(),
   "nombreSacs": zod.number().optional(),
   "prixUnitaireFcfa": zod.number().optional(),
@@ -932,6 +936,7 @@ export const GetExportateurByIdResponse = zod.object({
   "exportateurId": zod.number(),
   "exportateurNom": zod.string().nullish(),
   "lotId": zod.number().nullish(),
+  "expeditionId": zod.number().nullish(),
   "poidsKg": zod.string(),
   "prixUnitaireFcfa": zod.number(),
   "montantTotalFcfa": zod.number(),
@@ -959,6 +964,7 @@ export const GetVentesResponseItem = zod.object({
   "exportateurId": zod.number(),
   "exportateurNom": zod.string().nullish(),
   "lotId": zod.number().nullish(),
+  "expeditionId": zod.number().nullish(),
   "poidsKg": zod.string(),
   "prixUnitaireFcfa": zod.number(),
   "montantTotalFcfa": zod.number(),
@@ -978,11 +984,32 @@ export const GetVentesResponse = zod.array(GetVentesResponseItem)
 export const CreateVenteBody = zod.object({
   "exportateurId": zod.number(),
   "lotId": zod.number().optional(),
+  "expeditionId": zod.number().optional(),
   "poidsKg": zod.number(),
   "prixUnitaireFcfa": zod.number(),
   "dateVente": zod.string(),
   "dateEcheanceReglement": zod.string().optional()
 })
+
+
+/**
+ * @summary Quantités acceptées disponibles après réception au port
+ */
+export const GetStocksReceptionnesResponseItem = zod.object({
+  "expeditionId": zod.number(),
+  "numeroExpedition": zod.string(),
+  "port": zod.string(),
+  "dateReception": zod.string(),
+  "poidsRecuPortKg": zod.number(),
+  "poidsAcceptePortKg": zod.number(),
+  "poidsVenduKg": zod.number(),
+  "poidsDisponibleKg": zod.number(),
+  "lots": zod.array(zod.object({
+  "lotId": zod.number(),
+  "poidsKg": zod.number().optional()
+}))
+})
+export const GetStocksReceptionnesResponse = zod.array(GetStocksReceptionnesResponseItem)
 
 
 /**
@@ -997,6 +1024,7 @@ export const GetCreancesResponse = zod.object({
   "exportateurId": zod.number(),
   "exportateurNom": zod.string().nullish(),
   "lotId": zod.number().nullish(),
+  "expeditionId": zod.number().nullish(),
   "poidsKg": zod.string(),
   "prixUnitaireFcfa": zod.number(),
   "montantTotalFcfa": zod.number(),
@@ -1026,6 +1054,7 @@ export const EncaisserVenteResponse = zod.object({
   "exportateurId": zod.number(),
   "exportateurNom": zod.string().nullish(),
   "lotId": zod.number().nullish(),
+  "expeditionId": zod.number().nullish(),
   "poidsKg": zod.string(),
   "prixUnitaireFcfa": zod.number(),
   "montantTotalFcfa": zod.number(),

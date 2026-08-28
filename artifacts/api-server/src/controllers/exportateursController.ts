@@ -1,14 +1,16 @@
 import { type Request, type Response } from "express";
-import { db, exportateursTable, ventesExportateursTable, traitementsRefusTable, lotsTable, campagnesTable } from "@workspace/db";
-import { eq, sql, desc, and, lte } from "drizzle-orm";
+import { db, exportateursTable, ventesExportateursTable, traitementsRefusTable, lotsTable, campagnesTable, expeditionsTable, expeditionLotsTable } from "@workspace/db";
+import { eq, sql, desc, and, lte, inArray } from "drizzle-orm";
 import { CreateExportateurBody, CreateVenteBody, EncaisserVenteBody } from "@workspace/api-zod";
 import { generateEcrituresVente, generateEcrituresEncaissement } from "../services/comptabiliteService";
+import { calculerPoidsDisponibleVente } from "../services/venteReceptionService";
 
 const venteSelect = {
   id: ventesExportateursTable.id,
   exportateurId: ventesExportateursTable.exportateurId,
   exportateurNom: exportateursTable.nom,
   lotId: ventesExportateursTable.lotId,
+  expeditionId: ventesExportateursTable.expeditionId,
   poidsKg: ventesExportateursTable.poidsKg,
   prixUnitaireFcfa: ventesExportateursTable.prixUnitaireFcfa,
   montantTotalFcfa: ventesExportateursTable.montantTotalFcfa,
@@ -166,6 +168,91 @@ export async function listVentes(req: Request, res: Response): Promise<void> {
   }
 }
 
+export async function listStocksReceptionnes(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
+  try {
+    const expeditions = await db
+      .select({
+        expeditionId: expeditionsTable.id,
+        numeroExpedition: expeditionsTable.numeroExpedition,
+        port: expeditionsTable.port,
+        dateReception: expeditionsTable.dateArriveePort,
+        poidsRecuPortKg: expeditionsTable.poidsRecuPortKg,
+        poidsAcceptePortKg: expeditionsTable.poidsAcceptePortKg,
+      })
+      .from(expeditionsTable)
+      .where(and(
+        eq(expeditionsTable.cooperativeId, cooperativeId),
+        eq(expeditionsTable.statut, "receptionne"),
+      ))
+      .orderBy(desc(expeditionsTable.dateArriveePort));
+
+    if (expeditions.length === 0) {
+      res.json([]);
+      return;
+    }
+
+    const expeditionIds = expeditions.map((expedition) => expedition.expeditionId);
+    const [soldRows, lotRows] = await Promise.all([
+      db
+        .select({
+          expeditionId: ventesExportateursTable.expeditionId,
+          poidsVenduKg: sql<number>`coalesce(sum(${ventesExportateursTable.poidsKg}), 0)::float8`,
+        })
+        .from(ventesExportateursTable)
+        .where(inArray(ventesExportateursTable.expeditionId, expeditionIds))
+        .groupBy(ventesExportateursTable.expeditionId),
+      db
+        .select({
+          expeditionId: expeditionLotsTable.expeditionId,
+          lotId: expeditionLotsTable.lotId,
+          poidsKg: expeditionLotsTable.poidsKg,
+        })
+        .from(expeditionLotsTable)
+        .where(inArray(expeditionLotsTable.expeditionId, expeditionIds)),
+    ]);
+
+    const soldByExpedition = new Map(
+      soldRows.map((row) => [row.expeditionId, Number(row.poidsVenduKg ?? 0)]),
+    );
+    const lotsByExpedition = new Map<number, Array<{ lotId: number; poidsKg: number }>>();
+    for (const row of lotRows) {
+      if (row.lotId == null) continue;
+      const lots = lotsByExpedition.get(row.expeditionId) ?? [];
+      lots.push({ lotId: row.lotId, poidsKg: Number(row.poidsKg ?? 0) });
+      lotsByExpedition.set(row.expeditionId, lots);
+    }
+
+    const result = expeditions.flatMap((expedition) => {
+      const accepte = Number(expedition.poidsAcceptePortKg ?? 0);
+      const vendu = soldByExpedition.get(expedition.expeditionId) ?? 0;
+      const disponible = Math.max(0, Math.round((accepte - vendu) * 100) / 100);
+      if (accepte <= 0 || disponible <= 0) return [];
+      return [{
+        expeditionId: expedition.expeditionId,
+        numeroExpedition: expedition.numeroExpedition,
+        port: expedition.port,
+        dateReception: expedition.dateReception?.toISOString() ?? "",
+        poidsRecuPortKg: Number(expedition.poidsRecuPortKg ?? 0),
+        poidsAcceptePortKg: accepte,
+        poidsVenduKg: Math.round(vendu * 100) / 100,
+          poidsDisponibleKg: calculerPoidsDisponibleVente(accepte, vendu),
+        lots: lotsByExpedition.get(expedition.expeditionId) ?? [],
+      }];
+    });
+
+    res.json(result);
+  } catch (err) {
+    req.log.error({ err }, "Erreur listStocksReceptionnes");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
 export async function createVente(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
   if (!cooperativeId) {
@@ -180,12 +267,16 @@ export async function createVente(req: Request, res: Response): Promise<void> {
   }
 
   try {
-    const { exportateurId, lotId, poidsKg, prixUnitaireFcfa, dateVente, dateEcheanceReglement } = parse.data;
+    const { exportateurId, lotId, expeditionId, poidsKg, prixUnitaireFcfa, dateVente, dateEcheanceReglement } = parse.data;
     const nombreSacs = typeof req.body.nombreSacs === "number" && req.body.nombreSacs > 0 ? req.body.nombreSacs as number : undefined;
 
     const [exp] = await db.select({ id: exportateursTable.id }).from(exportateursTable)
       .where(and(eq(exportateursTable.id, exportateurId), eq(exportateursTable.cooperativeId, cooperativeId))).limit(1);
     if (!exp) { res.status(403).json({ erreur: "Exportateur introuvable ou non autorisé" }); return; }
+    if (!Number.isFinite(poidsKg) || poidsKg <= 0) {
+      res.status(400).json({ erreur: "Le poids vendu doit être strictement positif" });
+      return;
+    }
     const montantTotalFcfa = Math.round(poidsKg * prixUnitaireFcfa);
 
     // Rattacher à la campagne active de la coopérative
@@ -196,11 +287,114 @@ export async function createVente(req: Request, res: Response): Promise<void> {
       .orderBy(desc(campagnesTable.dateOuverture))
       .limit(1);
 
+    let resolvedLotId = lotId ?? null;
+    if (expeditionId != null) {
+      const [expedition] = await db
+        .select({
+          id: expeditionsTable.id,
+          statut: expeditionsTable.statut,
+          cooperativeId: expeditionsTable.cooperativeId,
+          exportateurId: expeditionsTable.exportateurId,
+          poidsAcceptePortKg: expeditionsTable.poidsAcceptePortKg,
+        })
+        .from(expeditionsTable)
+        .where(and(eq(expeditionsTable.id, expeditionId), eq(expeditionsTable.cooperativeId, cooperativeId)))
+        .limit(1);
+
+      if (!expedition) {
+        res.status(404).json({ erreur: "Expédition introuvable ou non autorisée" });
+        return;
+      }
+      if (expedition.statut !== "receptionne") {
+        res.status(409).json({ erreur: "Une expédition en litige ou non réceptionnée n'est pas vendable" });
+        return;
+      }
+      if (expedition.exportateurId != null && expedition.exportateurId !== exportateurId) {
+        res.status(400).json({ erreur: "L'exportateur ne correspond pas à celui de l'expédition" });
+        return;
+      }
+
+      const expeditionLotRows = await db
+        .select({ lotId: expeditionLotsTable.lotId })
+        .from(expeditionLotsTable)
+        .where(eq(expeditionLotsTable.expeditionId, expeditionId));
+      const lotIds = expeditionLotRows.flatMap((row) => row.lotId == null ? [] : [row.lotId]);
+      if (resolvedLotId != null && !lotIds.includes(resolvedLotId)) {
+        res.status(400).json({ erreur: "Le lot ne fait pas partie de cette expédition" });
+        return;
+      }
+      if (resolvedLotId == null && lotIds.length === 1) resolvedLotId = lotIds[0]!;
+
+      const available = await db.transaction(async (tx) => {
+        const [lockedExpedition] = await tx
+          .select({ poidsAcceptePortKg: expeditionsTable.poidsAcceptePortKg, statut: expeditionsTable.statut })
+          .from(expeditionsTable)
+          .where(and(eq(expeditionsTable.id, expeditionId), eq(expeditionsTable.cooperativeId, cooperativeId)))
+          .for("update")
+          .limit(1);
+        if (!lockedExpedition || lockedExpedition.statut !== "receptionne") return null;
+        const [sold] = await tx
+          .select({ poidsVenduKg: sql<number>`coalesce(sum(${ventesExportateursTable.poidsKg}), 0)::float8` })
+          .from(ventesExportateursTable)
+          .where(eq(ventesExportateursTable.expeditionId, expeditionId));
+        const accepted = Number(lockedExpedition.poidsAcceptePortKg ?? 0);
+        const alreadySold = Number(sold?.poidsVenduKg ?? 0);
+        const remaining = Math.round((accepted - alreadySold) * 100) / 100;
+        if (poidsKg > remaining + 0.001) return { created: undefined, remaining };
+        const [created] = await tx
+          .insert(ventesExportateursTable)
+          .values({
+            exportateurId,
+            lotId: resolvedLotId,
+            expeditionId,
+            campagneId: campagneActive?.id ?? null,
+            poidsKg: String(poidsKg),
+            prixUnitaireFcfa,
+            montantTotalFcfa,
+            dateVente,
+            dateEcheanceReglement: dateEcheanceReglement ?? null,
+            montantRecuFcfa: 0,
+            soldeDuFcfa: montantTotalFcfa,
+            statut: "en_attente",
+          })
+          .returning();
+        return { created, remaining };
+      });
+
+      if (!available) {
+        res.status(409).json({ erreur: "L'expédition n'est plus disponible à la vente" });
+        return;
+      }
+      if (!available.created) {
+        res.status(409).json({
+          erreur: `Quantité acceptée disponible insuffisante (${Math.max(0, available.remaining).toFixed(2)} kg)`,
+        });
+        return;
+      }
+      const vente = available.created;
+
+      const [detail] = await db
+        .select(venteSelect)
+        .from(ventesExportateursTable)
+        .leftJoin(exportateursTable, eq(exportateursTable.id, ventesExportateursTable.exportateurId))
+        .where(eq(ventesExportateursTable.id, vente.id));
+      void generateEcrituresVente(cooperativeId, {
+        venteId: vente.id,
+        exportateurId,
+        exportateurNom: detail?.exportateurNom ?? `exp-${exportateurId}`,
+        montantFcfa: montantTotalFcfa,
+        dateVente,
+      });
+      res.status(201).json(detail);
+      return;
+    }
+
     const [vente] = await db
       .insert(ventesExportateursTable)
       .values({
         exportateurId,
         lotId: lotId ?? null,
+        expeditionId: null,
         campagneId: campagneActive?.id ?? null,
         poidsKg: String(poidsKg),
         prixUnitaireFcfa,

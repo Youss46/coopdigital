@@ -6,6 +6,7 @@ import {
   createExportateur,
   getExportateurById,
   listVentes,
+  listStocksReceptionnes,
   createVente,
   encaisserVente,
   getCreances,
@@ -21,6 +22,7 @@ router.post("/exportateurs", checkPermission("exportateurs", "creer"), createExp
 router.get("/exportateurs/:id", checkPermission("exportateurs", "lire"), getExportateurById);
 
 router.get("/ventes/creances", checkPermission("creances", "lire"), getCreances);
+router.get("/ventes/stocks-receptionnes", checkPermission("exportateurs", "lire"), listStocksReceptionnes);
 router.get("/ventes", checkPermission("exportateurs", "lire"), listVentes);
 router.post("/ventes", checkPermission("exportateurs", "creer"), createVente);
 router.put("/ventes/:id/encaissement", checkPermission("creances", "enregistrer_encaissement"), encaisserVente);

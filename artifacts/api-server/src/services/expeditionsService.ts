@@ -1,4 +1,5 @@
 import { db, expeditionsTable, expeditionLotsTable, expeditionHistoriqueTable, campagnesTable, membresTable, livraisonsTable, exportateursTable, vehiculesTable, chauffeursTable, lotsTable, lotLivraisonsTable, parcellesTable, ventesExportateursTable, entrepotsTable, mouvementsStockTable, traitementsRefusTable } from "@workspace/db";
+import { calculerPoidsAcceptePort } from "./venteReceptionService";
 import { eq, and, desc, sql, count, notInArray, inArray } from "drizzle-orm";
 import { proposerEcriture } from "./comptabiliteService";
 import { notifExpeditionArriveePort, notifExpeditionLitige } from "./notificationService.js";
@@ -766,6 +767,8 @@ export async function confirmerReception(
 
   const poidsCharge = parseFloat(String(exp.poidsChargeKg ?? "0"));
   const poidsRecu   = input.poidsRecuPortKg;
+  const poidsRefoule = input.poidsRefuleKg ?? 0;
+  const poidsAccepte = calculerPoidsAcceptePort(poidsRecu, poidsRefoule);
   const ecartPoids  = poidsCharge - poidsRecu;
   const tauxEcart   = poidsCharge > 0 ? Math.abs(ecartPoids) / poidsCharge : 0;
 
@@ -791,6 +794,7 @@ export async function confirmerReception(
   await db.update(expeditionsTable).set({
     statut:             nouveauStatut,
     poidsRecuPortKg:    String(poidsRecu),
+    poidsAcceptePortKg: String(poidsAccepte),
     nombreSacsRecuPort: sacsRecus,
     ecartPoidsKg:       String(ecartPoids),
     motifEcart:         (input.motifEcart as typeof expeditionsTable.$inferSelect["motifEcart"]) ?? null,
@@ -811,15 +815,14 @@ export async function confirmerReception(
   });
 
   // ── Enregistrement du stock refoulé si présent ──────────────────────────────
-  const poidsRefule = input.poidsRefuleKg ?? 0;
-  if (poidsRefule > 0) {
+  if (poidsRefoule > 0) {
     const dateRefus = (input.dateArriveePort ?? new Date().toISOString()).split("T")[0]!;
     await db.insert(traitementsRefusTable).values({
       cooperativeId,
       expeditionId,
       sourceType:          "reception_port",
       dateRefus,
-      poidsRefuleKg:       String(poidsRefule),
+      poidsRefuleKg:       String(poidsRefoule),
       nombreSacsRefoules:  input.nombreSacsRefoules ?? 0,
       motifRefus:          input.motifRefus ?? null,
       statut:              "en_attente",

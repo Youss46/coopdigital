@@ -69,6 +69,7 @@ const STATUT_ICON: Record<string, React.ReactNode> = {
 
 const VENTE_INIT = {
   lotId:                  "",
+  expeditionId:           "",
   exportateurId:          "",
   poidsKg:                "",
   prixUnitaireFcfa:       "",
@@ -101,6 +102,18 @@ interface LivraisonDispo {
   poidsKg: string;
 }
 
+interface StockReceptionne {
+  expeditionId: number;
+  numeroExpedition: string;
+  port: string;
+  dateReception: string;
+  poidsRecuPortKg: number;
+  poidsAcceptePortKg: number;
+  poidsVenduKg: number;
+  poidsDisponibleKg: number;
+  lots: Array<{ lotId: number; poidsKg: number }>;
+}
+
 interface EntrepotItem {
   id: number;
   nom: string;
@@ -122,7 +135,7 @@ export default function VentesPage() {
   const [modalEncaisse, setModalEncaisse]     = useState<number | null>(null);
   const [montantEncaisse, setMontantEncaisse] = useState("");
   const [form, setForm]                       = useState(VENTE_INIT);
-  const [sourceStock, setSourceStock]         = useState<"lots" | "fournisseur">("lots");
+  const [sourceStock, setSourceStock]         = useState<"lots" | "reception" | "fournisseur">("lots");
   const [formFourn, setFormFourn]             = useState(VENTE_FOURN_INIT);
   const [submittingFourn, setSubmittingFourn] = useState(false);
   const [selectedLivIds, setSelectedLivIds]   = useState<Set<number>>(new Set());
@@ -147,6 +160,11 @@ export default function VentesPage() {
     queryKey: ["ventes-stock-fournisseurs"],
     queryFn:  () => apiFetch("/api/fournisseurs/stock-disponible", token),
     enabled:  modalVente && sourceStock === "fournisseur",
+  });
+  const { data: stocksReceptionnes = [] } = useQuery<StockReceptionne[]>({
+    queryKey: ["ventes-stocks-receptionnes"],
+    queryFn:  () => apiFetch("/api/ventes/stocks-receptionnes", token),
+    enabled:  modalVente && sourceStock === "reception",
   });
 
   const { data: entrepotsMembres = [] } = useQuery<EntrepotItem[]>({
@@ -386,6 +404,17 @@ export default function VentesPage() {
     }));
   }
 
+  function handleReceptionChange(expeditionId: string) {
+    const reception = stocksReceptionnes.find(e => String(e.expeditionId) === expeditionId);
+    const lotId = reception?.lots.length === 1 ? String(reception.lots[0]!.lotId) : "";
+    setForm(f => ({
+      ...f,
+      expeditionId,
+      lotId,
+      poidsKg: reception ? reception.poidsDisponibleKg.toFixed(2) : "",
+    }));
+  }
+
   function handleSubmitVente() {
     if (!form.exportateurId) { toast({ title: "Exportateur requis", variant: "destructive" }); return; }
     if (!form.poidsKg || parseFloat(form.poidsKg) <= 0) { toast({ title: "Poids requis", variant: "destructive" }); return; }
@@ -396,6 +425,7 @@ export default function VentesPage() {
       data: {
         exportateurId:         parseInt(form.exportateurId),
         lotId:                 form.lotId ? parseInt(form.lotId) : undefined,
+        expeditionId:          form.expeditionId ? parseInt(form.expeditionId) : undefined,
         poidsKg:               parseFloat(form.poidsKg),
         prixUnitaireFcfa:      parseInt(form.prixUnitaireFcfa),
         nombreSacs:            form.nombreSacs ? parseInt(form.nombreSacs) : undefined,
@@ -407,7 +437,7 @@ export default function VentesPage() {
 
   // Filtrage local
   const ventesFiltered = (ventes as {
-    id: number; exportateurId: number; exportateurNom: string | null; lotId: number | null;
+    id: number; exportateurId: number; exportateurNom: string | null; lotId: number | null; expeditionId: number | null;
     poidsKg: string; prixUnitaireFcfa: number; montantTotalFcfa: number;
     dateVente: string; dateEcheanceReglement: string | null;
     montantRecuFcfa: number; soldeDuFcfa: number; statut: string;
@@ -572,14 +602,19 @@ export default function VentesPage() {
                     <tr key={v.id} className={`hover:bg-gray-50 transition-colors ${isEnRetard ? "bg-red-50/30" : ""}`}>
                       <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{formaterDate(v.dateVente)}</td>
                       <td className="px-4 py-3">
-                        {v.lotId ? (
-                          <span className="inline-flex items-center gap-1.5 text-xs font-mono text-gray-700 bg-gray-100 px-2 py-0.5 rounded">
-                            <Package size={11} className="text-gray-500" />
-                            LOT-{String(v.lotId).padStart(4, "0")}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400 text-xs">—</span>
-                        )}
+                        <div className="flex flex-col items-start gap-1">
+                          {v.lotId ? (
+                            <span className="inline-flex items-center gap-1.5 text-xs font-mono text-gray-700 bg-gray-100 px-2 py-0.5 rounded">
+                              <Package size={11} className="text-gray-500" />
+                              LOT-{String(v.lotId).padStart(4, "0")}
+                            </span>
+                          ) : !v.expeditionId ? (
+                            <span className="text-gray-400 text-xs">—</span>
+                          ) : null}
+                          {v.expeditionId && (
+                            <span className="text-[11px] text-blue-700 font-medium">⚓ EXP-{String(v.expeditionId).padStart(4, "0")}</span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 font-medium text-gray-900">{v.exportateurNom ?? "—"}</td>
                       <td className="px-4 py-3 text-right text-gray-700 whitespace-nowrap">{parseFloat(v.poidsKg).toLocaleString("fr-FR")} kg</td>
@@ -634,10 +669,16 @@ export default function VentesPage() {
               {/* Toggle source */}
               <div className="flex rounded-lg border border-gray-200 overflow-hidden">
                 <button
-                  onClick={() => setSourceStock("lots")}
+                  onClick={() => { setSourceStock("lots"); setModeConstitution("existant"); }}
                   className={`flex-1 py-2 text-sm font-medium transition ${sourceStock === "lots" ? "bg-green-700 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}
                 >
                   📦 Lots membres
+                </button>
+                <button
+                  onClick={() => { setSourceStock("reception"); setModeConstitution("existant"); setForm(f => ({ ...f, lotId: "", expeditionId: "", poidsKg: "" })); }}
+                  className={`flex-1 py-2 text-sm font-medium transition border-l border-gray-200 ${sourceStock === "reception" ? "bg-blue-700 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}
+                >
+                  ⚓ Réceptions port
                 </button>
                 <button
                   onClick={() => setSourceStock("fournisseur")}
@@ -647,7 +688,8 @@ export default function VentesPage() {
                 </button>
               </div>
 
-              {sourceStock === "lots" ? (<>
+              {sourceStock !== "fournisseur" ? (<>
+                {sourceStock === "lots" ? (<>
                 {/* Sous-toggle : lot existant vs constitution auto */}
                 <div className="flex rounded-lg border border-gray-200 overflow-hidden">
                   <button
@@ -772,6 +814,56 @@ export default function VentesPage() {
                   </div>
                 )}
 
+                </>) : (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Réception au port *</label>
+                    <select
+                      value={form.expeditionId}
+                      onChange={e => handleReceptionChange(e.target.value)}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    >
+                      <option value="">— Sélectionner une réception acceptée —</option>
+                      {stocksReceptionnes.map(reception => (
+                        <option key={reception.expeditionId} value={String(reception.expeditionId)}>
+                          {reception.numeroExpedition} · {reception.port} · {reception.poidsDisponibleKg.toLocaleString("fr-FR")} kg disponibles
+                        </option>
+                      ))}
+                    </select>
+                    {stocksReceptionnes.length === 0 && (
+                      <p className="text-xs text-orange-600 mt-1">⚠️ Aucune quantité acceptée disponible. Les réceptions en litige ne sont pas vendables.</p>
+                    )}
+                    {form.expeditionId && (() => {
+                      const reception = stocksReceptionnes.find(e => String(e.expeditionId) === form.expeditionId);
+                      if (!reception) return null;
+                      return (
+                        <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-blue-800 font-medium">{reception.numeroExpedition} · réceptionnée le {formaterDate(reception.dateReception)}</span>
+                            <span className="text-blue-900 font-bold">{reception.poidsDisponibleKg.toLocaleString("fr-FR")} kg disponibles</span>
+                          </div>
+                          <p className="text-xs text-blue-700">
+                            Reçu : {reception.poidsRecuPortKg.toLocaleString("fr-FR")} kg · accepté : {reception.poidsAcceptePortKg.toLocaleString("fr-FR")} kg · déjà vendu : {reception.poidsVenduKg.toLocaleString("fr-FR")} kg
+                          </p>
+                          {reception.lots.length > 1 && (
+                            <select
+                              value={form.lotId}
+                              onChange={e => setForm(f => ({ ...f, lotId: e.target.value }))}
+                              className="w-full border border-blue-200 rounded-lg px-2 py-1.5 text-xs bg-white"
+                            >
+                              <option value="">— Expédition consolidée (plusieurs lots) —</option>
+                              {reception.lots.map(lot => (
+                                <option key={lot.lotId} value={String(lot.lotId)}>
+                                  LOT-{String(lot.lotId).padStart(4, "0")} · {lot.poidsKg.toLocaleString("fr-FR")} kg
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+
                 {/* Exportateur */}
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Exportateur *</label>
@@ -828,7 +920,9 @@ export default function VentesPage() {
                 </div>
 
                 <p className="text-xs text-gray-400 border-t border-gray-100 pt-3">
-                  Les écritures comptables sont générées automatiquement. Le lot sélectionné sera marqué comme <strong>vendu</strong>.
+                  Les écritures comptables sont générées automatiquement.
+                  {sourceStock === "lots" && <> Le lot sélectionné sera marqué comme <strong>vendu</strong>.</>}
+                  {sourceStock === "reception" && <> La vente est plafonnée à la quantité acceptée restante de la réception.</>}
                 </p>
               </>) : (<>
                 {/* ── Formulaire Stock Fournisseur ── */}
@@ -939,7 +1033,7 @@ export default function VentesPage() {
               >
                 Annuler
               </button>
-              {sourceStock === "lots" ? (
+              {sourceStock !== "fournisseur" ? (
                 modeConstitution === "auto" ? (
                   <button onClick={handleSubmitVenteAuto} disabled={submittingAuto || !autoPreview}
                     className="flex-1 py-2.5 text-white rounded-lg text-sm font-medium bg-[#1a4731] hover:bg-green-900 disabled:opacity-50">
