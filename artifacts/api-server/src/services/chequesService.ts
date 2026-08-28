@@ -158,41 +158,59 @@ export async function encaisserCheque(
   data: { compteBancaireId: number; dateEncaissement?: string },
   userId: number,
 ) {
-  const cheque = await getCheque(id, cooperativeId);
-  if (!cheque) throw new Error("Chèque introuvable");
-  if (cheque.statut !== "emis") throw new Error("Seul un chèque émis peut être encaissé");
+  return db.transaction(async (tx) => {
+    const [cheque] = await tx
+      .select()
+      .from(chequesEmisTable)
+      .where(and(
+        eq(chequesEmisTable.id, id),
+        eq(chequesEmisTable.cooperativeId, cooperativeId),
+      ))
+      .for("update")
+      .limit(1);
 
-  const dateEnc = data.dateEncaissement ?? today();
-  const beneficiaire = cheque.beneficiaire;
+    if (!cheque) throw new Error("Chèque introuvable");
+    if (cheque.statut !== "emis") throw new Error("Seul un chèque émis peut être encaissé");
 
-  const { mouvement } = await enregistrerMouvement(data.compteBancaireId, cooperativeId, {
-    type:           "debit",
-    motif:          "paiement_cheque",
-    montantFcfa:    cheque.montantFcfa,
-    libelle:        `Chèque encaissé — ${beneficiaire}${cheque.numeroCheque ? ` n°${cheque.numeroCheque}` : ""}`,
-    reference:      cheque.numeroCheque ?? undefined,
-    dateOperation:  dateEnc,
-    userId,
-  });
+    const dateEnc = data.dateEncaissement ?? today();
+    const beneficiaire = cheque.beneficiaire;
 
-  await db
-    .update(chequesEmisTable)
-    .set({
-      statut:           "encaisse",
+    const { mouvement } = await enregistrerMouvement(data.compteBancaireId, cooperativeId, {
+      type:           "debit",
+      motif:          "paiement_cheque",
+      montantFcfa:    cheque.montantFcfa,
+      libelle:        `Chèque encaissé — ${beneficiaire}${cheque.numeroCheque ? ` n°${cheque.numeroCheque}` : ""}`,
+      reference:      cheque.numeroCheque ?? undefined,
+      dateOperation:  dateEnc,
+      userId,
+    }, tx);
+
+    const [updated] = await tx
+      .update(chequesEmisTable)
+      .set({
+        statut:           "encaisse",
+        dateEncaissement: dateEnc,
+        compteBancaireId: data.compteBancaireId,
+        mouvementBanqueId: mouvement.id,
+      })
+      .where(and(eq(chequesEmisTable.id, id), eq(chequesEmisTable.cooperativeId, cooperativeId)))
+      .returning();
+
+    if (cheque.paiementId) {
+      await tx
+        .update(paiementsTable)
+        .set({ statut: "effectue", dateValidation: new Date() })
+        .where(eq(paiementsTable.id, cheque.paiementId));
+    }
+
+    return updated ?? {
+      ...cheque,
+      statut: "encaisse" as const,
       dateEncaissement: dateEnc,
       compteBancaireId: data.compteBancaireId,
       mouvementBanqueId: mouvement.id,
-    })
-    .where(and(eq(chequesEmisTable.id, id), eq(chequesEmisTable.cooperativeId, cooperativeId)));
-
-  if (cheque.paiementId) {
-    await db
-      .update(paiementsTable)
-      .set({ statut: "effectue", dateValidation: new Date() })
-      .where(eq(paiementsTable.id, cheque.paiementId));
-  }
-
-  return { ...cheque, statut: "encaisse" as const, dateEncaissement: dateEnc };
+    };
+  });
 }
 
 // ─── Rejet ────────────────────────────────────────────────────────────────────

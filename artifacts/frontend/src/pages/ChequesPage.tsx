@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MoneyInput } from "@/components/ui/money-input";
 import {
@@ -56,6 +56,7 @@ interface CompteBancaire {
   id: number;
   nom: string;
   banque: string;
+  numero_compte?: string | null;
   solde_actuel_fcfa: string;
 }
 
@@ -114,7 +115,12 @@ export default function ChequesPage() {
     queryKey: ["cheques", filtreStatut],
     queryFn: () => apiFetch<Cheque[]>(url),
   });
-  const { data: comptes = [] } = useQuery<CompteBancaire[]>({
+  const {
+    data: comptes = [],
+    isLoading: comptesLoading,
+    isError: comptesError,
+    refetch: refetchComptes,
+  } = useQuery<CompteBancaire[]>({
     queryKey: ["banque-comptes"],
     queryFn: () => apiFetch<CompteBancaire[]>("/api/banque"),
   });
@@ -128,6 +134,7 @@ export default function ChequesPage() {
 
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: ["cheques"] });
+    void qc.invalidateQueries({ queryKey: ["banque-comptes"] });
     setChequeSelectionne(null);
   };
 
@@ -393,6 +400,9 @@ export default function ChequesPage() {
         <ModalEncaisser
           cheque={modalEncaisser}
           comptes={comptes}
+           comptesLoading={comptesLoading}
+           comptesError={comptesError}
+           onRetryComptes={() => { void refetchComptes(); }}
           onClose={() => setModalEncaisser(null)}
           onSubmit={d => mutEncaisser.mutate({ id: modalEncaisser.id, data: d })}
           isPending={mutEncaisser.isPending}
@@ -656,16 +666,37 @@ function ModalEditer({
 // ── Encaisser chèque ──────────────────────────────────────────────────────────
 
 function ModalEncaisser({
-  cheque, comptes, onClose, onSubmit, isPending, error,
+  cheque, comptes, comptesLoading, comptesError, onRetryComptes,
+  onClose, onSubmit, isPending, error,
 }: {
-  cheque: Cheque; comptes: { id: number; nom: string; banque: string; solde_actuel_fcfa: string }[];
+  cheque: Cheque;
+  comptes: CompteBancaire[];
+  comptesLoading: boolean;
+  comptesError: boolean;
+  onRetryComptes: () => void;
   onClose: () => void;
   onSubmit: (d: { compteBancaireId: number; dateEncaissement?: string }) => void;
   isPending: boolean; error?: string;
 }) {
   const today = new Date().toISOString().slice(0, 10);
-  const [compteBancaireId, setCompteBancaireId] = useState<number>(cheque.compteBancaireId ?? (comptes[0]?.id ?? 0));
+  const [compteBancaireId, setCompteBancaireId] = useState<number | "">(
+    cheque.compteBancaireId ?? "",
+  );
   const [dateEncaissement, setDateEncaissement] = useState(today);
+
+  useEffect(() => {
+    if (comptesLoading) return;
+    setCompteBancaireId(current => {
+      if (current !== "" && comptes.some(c => c.id === current)) return current;
+      if (cheque.compteBancaireId && comptes.some(c => c.id === cheque.compteBancaireId)) {
+        return cheque.compteBancaireId;
+      }
+      return comptes.length === 1 ? comptes[0].id : "";
+    });
+  }, [comptes, comptesLoading, cheque.compteBancaireId]);
+
+  const compteSelectionne = comptes.find(c => c.id === compteBancaireId);
+  const peutConfirmer = !comptesLoading && !comptesError && !!compteSelectionne;
 
   return (
     <ModalShell title="Confirmer l'encaissement" onClose={onClose}>
@@ -688,16 +719,38 @@ function ModalEncaisser({
             <select
               className="w-full border border-gray-200 rounded-lg pl-8 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 appearance-none"
               value={compteBancaireId}
-              onChange={e => setCompteBancaireId(parseInt(e.target.value))}
+              disabled={comptesLoading || comptesError || comptes.length === 0}
+              onChange={e => setCompteBancaireId(e.target.value ? parseInt(e.target.value, 10) : "")}
             >
-              <option value="">— Choisir un compte —</option>
+              <option value="">
+                {comptesLoading ? "— Chargement des comptes —" : "— Choisir un compte —"}
+              </option>
               {comptes.map(c => (
                 <option key={c.id} value={c.id}>
-                  {c.nom} ({c.banque}) — {new Intl.NumberFormat("fr-FR").format(parseFloat(c.solde_actuel_fcfa))} FCFA
+                  {c.nom} ({c.banque})
+                  {c.numero_compte ? ` ···${c.numero_compte.slice(-4)}` : ""}
+                  {" — "}
+                  {new Intl.NumberFormat("fr-FR").format(parseFloat(c.solde_actuel_fcfa))} FCFA
                 </option>
               ))}
             </select>
           </div>
+          {comptesError && (
+            <div className="mt-1 flex items-center justify-between gap-2 text-xs text-red-600">
+              <span>Impossible de charger les comptes bancaires.</span>
+              <button type="button" onClick={onRetryComptes} className="font-medium underline">
+                Réessayer
+              </button>
+            </div>
+          )}
+          {!comptesLoading && !comptesError && comptes.length === 0 && (
+            <p className="mt-1 text-xs text-amber-700">
+              Aucun compte bancaire actif n'est disponible pour cet encaissement.
+            </p>
+          )}
+          {!comptesLoading && !comptesError && comptes.length > 1 && !compteSelectionne && (
+            <p className="mt-1 text-xs text-amber-700">Sélectionnez le compte à débiter.</p>
+          )}
         </Field>
         <Field label="Date d'encaissement *">
           <div className="relative">
@@ -717,8 +770,10 @@ function ModalEncaisser({
           Annuler
         </button>
         <button
-          onClick={() => onSubmit({ compteBancaireId, dateEncaissement })}
-          disabled={isPending || !compteBancaireId}
+           onClick={() => {
+             if (compteSelectionne) onSubmit({ compteBancaireId: compteSelectionne.id, dateEncaissement });
+           }}
+           disabled={isPending || !peutConfirmer}
           className="flex-1 bg-green-600 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {isPending && <Loader2 size={14} className="animate-spin" />} Confirmer l'encaissement

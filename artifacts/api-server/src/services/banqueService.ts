@@ -1,7 +1,11 @@
 import { db, comptesBancairesTable, mouvementsBanqueTable, caissesTable, mouvementsCaisseTable } from "@workspace/db";
 import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
-import { proposerEcriture } from "./comptabiliteService.js";
+import {
+  proposerEcriture,
+  proposerEcrituresDansTransaction,
+  type ComptabiliteTransaction,
+} from "./comptabiliteService.js";
 
 // ─── Mapping motif → comptes OHADA ────────────────────────────────────────────
 // Crédit banque (argent entrant) : Débit 521 / Crédit [compte source]
@@ -124,11 +128,22 @@ export async function enregistrerMouvement(
     dateOperation?: string;
     dateValeur?: string;
     userId?: number;
-  }
+  },
+  tx?: ComptabiliteTransaction,
 ) {
-  const compte = await getCompte(compteId);
+  const executor = tx ?? db;
+  const [compte] = await executor
+    .select()
+    .from(comptesBancairesTable)
+    .where(and(
+      eq(comptesBancairesTable.id, compteId),
+      eq(comptesBancairesTable.cooperativeId, cooperativeId),
+    ))
+    .for("update")
+    .limit(1);
+
   if (!compte) throw new Error("Compte bancaire introuvable");
-  if (compte.cooperativeId !== cooperativeId) throw new Error("Accès refusé");
+  if (!compte.actif) throw new Error("Compte bancaire inactif");
 
   const montant    = Math.abs(data.montantFcfa);
   const soldeActuel = parseFloat(compte.soldeActuelFcfa as string);
@@ -138,7 +153,7 @@ export async function enregistrerMouvement(
 
   const dateOp = data.dateOperation ?? today();
 
-  const [mouvement] = await db
+  const [mouvement] = await executor
     .insert(mouvementsBanqueTable)
     .values({
       compteId,
@@ -155,14 +170,14 @@ export async function enregistrerMouvement(
     })
     .returning();
 
-  await db
+  await executor
     .update(comptesBancairesTable)
     .set({ soldeActuelFcfa: nouveauSolde.toString() })
     .where(eq(comptesBancairesTable.id, compteId));
 
   // Écriture comptable OHADA 521
   const comptes = comptesForMouvement(data.type, data.motif);
-  proposerEcriture(cooperativeId, {
+  const ecriture = {
     source:       "banque",
     sourceId:     mouvement?.id ?? undefined,
     libelle:      data.libelle ?? `Banque — ${data.motif}`,
@@ -170,7 +185,13 @@ export async function enregistrerMouvement(
     compteCredit: comptes.credit,
     montantFcfa:  montant,
     date:         dateOp,
-  }).catch((err) => logger.warn({ err }, "Écriture comptable banque non enregistrée"));
+  } as const;
+  if (tx) {
+    await proposerEcrituresDansTransaction(tx, cooperativeId, [ecriture]);
+  } else {
+    proposerEcriture(cooperativeId, ecriture)
+      .catch((err) => logger.warn({ err }, "Écriture comptable banque non enregistrée"));
+  }
 
   const soldeMini = parseFloat(compte.soldeMiniAlerteFcfa as string);
   let alerte: string | undefined;
