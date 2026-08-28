@@ -412,11 +412,6 @@ export default function CollecteGps() {
     if (gps.points.length < 3) { setErreur("Tracez au moins 3 points GPS pour délimiter la parcelle"); return; }
     if (hasSelfIntersection(gps.points)) { setErreur("Le contour se croise. Corrigez les points avant l'enregistrement."); return; }
     if (areaHa < 0.0001) { setErreur("La superficie calculée est nulle ou trop faible."); return; }
-    if (ecartPct > 75 && !probleme?.type) {
-      setErreur("La superficie GPS est très éloignée de la superficie déclarée. Vérifiez le contour ou signalez un problème terrain.");
-      setShowProbleme(true);
-      return;
-    }
     if (photos.length < MIN_PHOTOS) { setErreur(`Ajoutez au moins ${MIN_PHOTOS} photos de la parcelle`); return; }
     setSubmitting(true);
     setErreur(null);
@@ -578,7 +573,7 @@ export default function CollecteGps() {
             )}
             {ecartPct > 75 && (
               <div style={{ background: "#ef444422", border: "1px solid #ef444444", borderRadius: 8, padding: "8px 12px", fontSize: ".8rem", color: "#fca5a5", marginBottom: 14 }}>
-                🔴 Écart très important avec la superficie déclarée. Corrigez le contour ou indiquez un problème terrain avant l’enregistrement.
+                🔴 Écart très important avec la superficie déclarée. Vous pouvez valider la collecte ; vérifiez le contour ou signalez un problème terrain si nécessaire.
               </div>
             )}
             <div style={{ fontSize: ".8rem", color: "#64748b", marginBottom: 8 }}>Détail des côtés :</div>

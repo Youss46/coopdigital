@@ -185,9 +185,6 @@ export async function collecterParcelleAgent(
     .from(membresTable).where(eq(membresTable.id, membreId)).limit(1);
   const areaHa = polygonAreaHa(polygoneGps);
   const declaredHa = membre?.superficieHa ? Number(membre.superficieHa) : 0;
-  if (declaredHa > 0 && Math.abs(areaHa - declaredHa) / declaredHa > 0.75 && !data.probleme) {
-    throw new Error("La superficie GPS est très éloignée de la superficie déclarée. Vérifiez les points ou indiquez un problème terrain.");
-  }
   if (!data.photos || data.photos.length < 2) {
     throw new Error("Au moins 2 photos requises pour documenter la parcelle");
   }
