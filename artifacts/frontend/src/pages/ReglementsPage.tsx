@@ -263,7 +263,9 @@ function ModalValidation({
               <CreditCard size={18} style={{ color: "#1a4731" }} />
             </div>
             <div>
-              <h3 className="font-bold text-gray-900 text-sm">Confirmer le paiement</h3>
+              <h3 className="font-bold text-gray-900 text-sm">
+                {estLivraisonAvecSolde && montantDejaPaye > 0 ? "Régler le solde" : "Confirmer le paiement"}
+              </h3>
               <p className="text-xs text-gray-500">{nomProducteur(paiement)}</p>
             </div>
             <button onClick={onClose} className="ml-auto text-gray-400 hover:text-gray-600">
@@ -1333,6 +1335,7 @@ function PaiementRow({
   const showActions = p.statut === "en_attente";
   const showRecu = p.statut === "confirme" || p.statut === "effectue" || p.statut === "en_cours";
   const showRejet = p.statut === "rejete";
+  const isSoldePartiel = livraisonAvecSolde(p) && montantDejaPaye > 0;
   const isMobileMarchand = !!p.modePaiement && MODES_MOBILE_MARCHAND.has(p.modePaiement);
   const delegueBloque = isDelegue && isMobileMarchand;
   const isCarburant = isBonCarburant(p);
@@ -1371,7 +1374,9 @@ function PaiementRow({
             {livraisonAvecSolde(p) && (
               <>
                 <span className="text-green-700">Déjà versé : {fmt(montantDejaPaye)}</span>
-                <span className="text-blue-700 font-medium">Reste : {fmt(montantRestant)}</span>
+                <span className={`font-semibold ${isSoldePartiel ? "text-blue-700" : "text-gray-600"}`}>
+                  {isSoldePartiel ? "Solde à régler : " : "Reste : "}{fmt(montantRestant)}
+                </span>
               </>
             )}
           </div>
@@ -1405,11 +1410,11 @@ function PaiementRow({
             {showActions && peutValider && !delegueBloque && (
               <button
                 onClick={onValider}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white"
-                style={{ backgroundColor: "#1a4731" }}
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white whitespace-nowrap ${isSoldePartiel ? "bg-blue-600 hover:bg-blue-700" : ""}`}
+                style={isSoldePartiel ? undefined : { backgroundColor: "#1a4731" }}
               >
-                <CheckCircle2 size={12} />
-                Valider
+                {isSoldePartiel ? <Banknote size={12} /> : <CheckCircle2 size={12} />}
+                {isSoldePartiel ? "Régler le solde" : "Valider"}
               </button>
             )}
             {showActions && peutRejeter && (
