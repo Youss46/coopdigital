@@ -155,6 +155,16 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     gerer_avances:       ["pca", "directeur", "comptable"],
   },
 
+  // MODULE — ÉQUIPEMENTS & IMMOBILISATIONS
+  equipements: {
+    lire:              ["pca", "directeur", "comptable", "auditeur"],
+    creer:             ["pca", "directeur"],
+    modifier:          ["pca", "directeur"],
+    supprimer:         ["pca"],
+    generer_dotations: ["pca", "directeur"],
+    maintenance:       ["pca", "directeur"],
+  },
+
   // MODULE CAMPAGNES
   campagnes: {
     lire:       ["pca", "directeur", "comptable", "magasinier", "responsable_tracabilite", "delegue", "auditeur"],
@@ -451,7 +461,6 @@ const COMPTABLE_RESTRICTED_PATHS = [
   "/planning-collecte",
   "/formations",
   "/formations-rse",
-  "/equipements",
   "/previsions",
   "/communication",
   "/scoring",

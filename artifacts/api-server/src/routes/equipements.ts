@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { authMiddleware } from "../middlewares/auth.js";
+import { checkPermission } from "../middlewares/permissions.js";
 import {
   getCategoriesEquipements,
   getEquipements, postEquipement,
@@ -14,25 +15,25 @@ import {
 const router = Router();
 router.use(authMiddleware);
 
-router.get("/categories-equipements", getCategoriesEquipements);
+router.get("/categories-equipements", checkPermission("equipements", "lire"), getCategoriesEquipements);
 
 // Routes spécifiques AVANT les routes paramétrées
-router.get("/equipements/amortis", getEquipementsAmortis);
-router.get("/equipements/alertes", getEquipementsAlertes);
-router.get("/equipements/rapport-inventaire", getRapportInventaire);
-router.post("/equipements/generer-dotations", postGenererDotations);
-router.get("/equipements/categorie/:id", getEquipementsByCategorie);
+router.get("/equipements/amortis", checkPermission("equipements", "lire"), getEquipementsAmortis);
+router.get("/equipements/alertes", checkPermission("equipements", "lire"), getEquipementsAlertes);
+router.get("/equipements/rapport-inventaire", checkPermission("equipements", "lire"), getRapportInventaire);
+router.post("/equipements/generer-dotations", checkPermission("equipements", "generer_dotations"), postGenererDotations);
+router.get("/equipements/categorie/:id", checkPermission("equipements", "lire"), getEquipementsByCategorie);
 
 // CRUD
-router.get("/equipements", getEquipements);
-router.post("/equipements", postEquipement);
-router.get("/equipements/:id", getEquipementById);
-router.put("/equipements/:id", putEquipement);
-router.delete("/equipements/:id", deleteEquipement);
+router.get("/equipements", checkPermission("equipements", "lire"), getEquipements);
+router.post("/equipements", checkPermission("equipements", "creer"), postEquipement);
+router.get("/equipements/:id", checkPermission("equipements", "lire"), getEquipementById);
+router.put("/equipements/:id", checkPermission("equipements", "modifier"), putEquipement);
+router.delete("/equipements/:id", checkPermission("equipements", "supprimer"), deleteEquipement);
 
 // Sous-ressources
-router.get("/equipements/:id/tableau-amortissement", getTableauAmortissement);
-router.get("/equipements/:id/maintenances", getMaintenances);
-router.post("/equipements/:id/maintenance", postMaintenance);
+router.get("/equipements/:id/tableau-amortissement", checkPermission("equipements", "lire"), getTableauAmortissement);
+router.get("/equipements/:id/maintenances", checkPermission("equipements", "lire"), getMaintenances);
+router.post("/equipements/:id/maintenance", checkPermission("equipements", "maintenance"), postMaintenance);
 
 export default router;

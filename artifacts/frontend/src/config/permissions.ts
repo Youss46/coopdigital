@@ -189,6 +189,15 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     gerer_avances:       ["pca", "directeur", "comptable"],
   },
 
+  equipements: {
+    lire:              ["pca", "directeur", "comptable", "auditeur"],
+    creer:             ["pca", "directeur"],
+    modifier:          ["pca", "directeur"],
+    supprimer:         ["pca"],
+    generer_dotations: ["pca", "directeur"],
+    maintenance:       ["pca", "directeur"],
+  },
+
   refus: {
     lire:    ["pca", "directeur", "magasinier", "responsable_tracabilite", "auditeur"],
     traiter: ["pca", "directeur", "magasinier", "responsable_tracabilite"],

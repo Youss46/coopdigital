@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { usePermission } from "@/hooks/usePermission";
 import {
   useGetCategoriesEquipements, getGetCategoriesEquipementsQueryKey,
   useGetEquipements, getGetEquipementsQueryKey,
@@ -118,6 +119,10 @@ const EMPTY_FORM: EquipForm = {
 function OngletInventaire() {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const peutCreer = usePermission("equipements", "creer");
+  const peutModifier = usePermission("equipements", "modifier");
+  const peutSupprimer = usePermission("equipements", "supprimer");
+  const peutGerer = peutCreer || peutModifier || peutSupprimer;
   const [filtreCategorie, setFiltreCategorie] = useState<string>("tous");
   const [filtreStatut, setFiltreStatut] = useState<string>("tous");
   const [search, setSearch] = useState("");
@@ -233,6 +238,7 @@ function OngletInventaire() {
   const statutLabels: Record<string, string> = {
     actif: "Actif", hors_service: "Hors service", cede: "Cédé", vole: "Volé",
   };
+  const colSpan = peutGerer ? 9 : 8;
 
   return (
     <div className="space-y-4">
@@ -269,10 +275,12 @@ function OngletInventaire() {
             </SelectContent>
           </Select>
         </div>
-        <Button onClick={openCreate} className="bg-green-700 hover:bg-green-800 text-white">
-          <PlusCircle className="w-4 h-4 mr-2" />
-          Ajouter un équipement
-        </Button>
+        {peutCreer && (
+          <Button onClick={openCreate} className="bg-green-700 hover:bg-green-800 text-white">
+            <PlusCircle className="w-4 h-4 mr-2" />
+            Ajouter un équipement
+          </Button>
+        )}
       </div>
 
       {/* Tableau */}
@@ -288,15 +296,15 @@ function OngletInventaire() {
               <th className="px-3 py-2 text-right font-medium text-gray-600">VNC</th>
               <th className="px-3 py-2 text-center font-medium text-gray-600">Statut</th>
               <th className="px-3 py-2 text-left font-medium text-gray-600">Affecté à</th>
-              <th className="px-3 py-2 text-center font-medium text-gray-600">Actions</th>
+              {peutGerer && <th className="px-3 py-2 text-center font-medium text-gray-600">Actions</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {isLoading && (
-              <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400">Chargement…</td></tr>
+              <tr><td colSpan={colSpan} className="px-4 py-8 text-center text-gray-400">Chargement…</td></tr>
             )}
             {!isLoading && rows.length === 0 && (
-              <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400">Aucun équipement</td></tr>
+              <tr><td colSpan={colSpan} className="px-4 py-8 text-center text-gray-400">Aucun équipement</td></tr>
             )}
             {rows.map((e) => {
               const vPct = pct(e.valeur_nette_comptable_fcfa, e.valeur_acquisition_fcfa);
@@ -324,16 +332,22 @@ function OngletInventaire() {
                     </Badge>
                   </td>
                   <td className="px-3 py-2 text-gray-600 text-xs">{e.affecte_a ?? "—"}</td>
-                  <td className="px-3 py-2 text-center">
-                    <div className="flex gap-1 justify-center">
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(e)}>
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500" onClick={() => setConfirmDel(e.id)}>
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  </td>
+                  {peutGerer && (
+                    <td className="px-3 py-2 text-center">
+                      <div className="flex gap-1 justify-center">
+                        {peutModifier && (
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(e)}>
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                        {peutSupprimer && (
+                          <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500" onClick={() => setConfirmDel(e.id)}>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  )}
                 </tr>
               );
             })}
@@ -466,6 +480,7 @@ function OngletInventaire() {
 function OngletAmortissements() {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const peutGenererDotations = usePermission("equipements", "generer_dotations");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [annee, setAnnee] = useState(new Date().getFullYear());
   const [showTableau, setShowTableau] = useState(false);
@@ -537,14 +552,18 @@ function OngletAmortissements() {
               <Label>Exercice</Label>
               <Input type="number" value={annee} onChange={(e) => setAnnee(Number(e.target.value))} className="w-28" />
             </div>
-            <Button
-              className="bg-green-700 hover:bg-green-800 text-white"
-              disabled={dotMut.isPending}
-        onClick={() => dotMut.mutate({ data: { annee, mois: 12 } })}
-            >
-              <RefreshCw className={`w-4 h-4 mr-2 ${dotMut.isPending ? "animate-spin" : ""}`} />
-              Générer les dotations {annee}
-            </Button>
+            {peutGenererDotations ? (
+              <Button
+                className="bg-green-700 hover:bg-green-800 text-white"
+                disabled={dotMut.isPending}
+                onClick={() => dotMut.mutate({ data: { annee, mois: 12 } })}
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${dotMut.isPending ? "animate-spin" : ""}`} />
+                Générer les dotations {annee}
+              </Button>
+            ) : (
+              <span className="text-xs text-gray-500">Consultation uniquement pour ce rôle</span>
+            )}
           </div>
           <p className="text-xs text-gray-400 mt-2">La dotation est calculée en une fois par exercice et comptabilisée au 31/12.</p>
         </CardContent>
@@ -634,6 +653,7 @@ const EMPTY_MAINT: MaintForm = {
 function OngletMaintenance() {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const peutEnregistrerMaintenance = usePermission("equipements", "maintenance");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<MaintForm>(EMPTY_MAINT);
@@ -702,14 +722,18 @@ function OngletMaintenance() {
             </SelectContent>
           </Select>
         </div>
-        <Button
-          className="bg-green-700 hover:bg-green-800 text-white"
-          disabled={!selectedId}
-          onClick={() => setShowForm(true)}
-        >
-          <PlusCircle className="w-4 h-4 mr-2" />
-          Enregistrer maintenance
-        </Button>
+        {peutEnregistrerMaintenance ? (
+          <Button
+            className="bg-green-700 hover:bg-green-800 text-white"
+            disabled={!selectedId}
+            onClick={() => setShowForm(true)}
+          >
+            <PlusCircle className="w-4 h-4 mr-2" />
+            Enregistrer maintenance
+          </Button>
+        ) : (
+          <span className="text-xs text-gray-500">Historique en consultation uniquement</span>
+        )}
       </div>
 
       {/* Historique */}

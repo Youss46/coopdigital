@@ -86,7 +86,7 @@ export const NAV_ITEMS: NavItemConfig[] = [
   // ── RH & Social ──────────────────────────────────────────────────────────────
   { href: "/formations",             label: "Formations",                roles: ["pca","directeur","auditeur","delegue"],                                    category: "RH & Social" },
   { href: "/formations-rse",         label: "Formations RSE",            roles: ["pca","directeur","auditeur"],                                               category: "RH & Social" },
-  { href: "/equipements",            label: "Équipements",               roles: ["pca","directeur","auditeur"],                                               category: "RH & Social" },
+  { href: "/equipements",            label: "Équipements",               roles: ["pca","directeur","comptable","auditeur"],                                    category: "RH & Social" },
 
   // ── Archives ─────────────────────────────────────────────────────────────────
   { href: "/archives",               label: "Archives",                  roles: ["pca","directeur","auditeur"],                                               category: "Archives" },

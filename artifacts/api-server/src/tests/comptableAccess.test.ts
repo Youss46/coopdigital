@@ -69,4 +69,16 @@ describe("périmètre du comptable", () => {
     expect(hasPermission("comptable", "mobile_marchand", "creer")).toBe(false);
     expect(hasPermission("comptable", "avances", "octroyer")).toBe(true);
   });
+
+  it("autorise la consultation des équipements sans autoriser leur gestion", () => {
+    const { next } = runAccessCheck("/equipements", "comptable");
+
+    expect(next).toHaveBeenCalledOnce();
+    expect(hasPermission("comptable", "equipements", "lire")).toBe(true);
+    expect(hasPermission("comptable", "equipements", "creer")).toBe(false);
+    expect(hasPermission("comptable", "equipements", "modifier")).toBe(false);
+    expect(hasPermission("comptable", "equipements", "supprimer")).toBe(false);
+    expect(hasPermission("comptable", "equipements", "generer_dotations")).toBe(false);
+    expect(hasPermission("comptable", "equipements", "maintenance")).toBe(false);
+  });
 });
