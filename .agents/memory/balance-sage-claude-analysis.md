@@ -7,4 +7,4 @@ Une ligne Sage dont le compte est absent du plan coopératif peut être analysé
 
 **Why:** Bloquer toutes les lignes marquées d’une erreur empêchait le bouton Claude de fonctionner précisément lorsque l’import nécessitait une aide de rattachement.
 
-**How to apply:** Séparer l’éligibilité à l’analyse IA de l’éligibilité à la préparation comptable; la préparation doit toujours refuser les comptes inconnus ou les lignes invalides.
+**How to apply:** Séparer l’éligibilité à l’analyse IA de l’éligibilité à la préparation comptable; la préparation doit toujours refuser les comptes inconnus ou les lignes invalides. Les services IA doivent partager `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` et `ANTHROPIC_BASE_URL`, avec le même modèle par défaut.
