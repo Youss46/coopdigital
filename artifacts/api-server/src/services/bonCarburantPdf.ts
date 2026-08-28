@@ -14,7 +14,11 @@ function formaterDate(d: string | Date | null | undefined): string {
 
 function formaterFCFA(n: string | number | null | undefined): string {
   if (n == null) return "—";
-  return `${Math.round(Number(n)).toLocaleString("fr-FR")} FCFA`;
+  // PDFKit/Helvetica peut rendre U+202F et U+00A0 comme des barres obliques.
+  const montant = Math.round(Number(n))
+    .toLocaleString("fr-FR")
+    .replace(/[\u202F\u00A0]/g, " ");
+  return `${montant} FCFA`;
 }
 
 interface BonData {
