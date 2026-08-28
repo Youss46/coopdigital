@@ -5,6 +5,7 @@ import {
   listMissions,
   getMissionById,
   createMission,
+  deleteMission,
   demarrerMission,
   soumettreMission,
   collecterGpsMembre,
@@ -33,6 +34,7 @@ router.get("/missions",                 checkPermission("missions", "lire"),    
 router.post("/missions",                checkPermission("missions", "creer"),   createMission);
 router.get("/missions/:id/export-geojson", checkPermission("missions", "lire"),  exportMissionGeoJSON);
 router.get("/missions/:id",             checkPermission("missions", "lire"),    getMissionById);
+router.delete("/missions/:id",          checkPermission("missions", "supprimer"), deleteMission);
 router.post("/missions/:id/demarrer",   checkPermission("missions", "executer"), demarrerMission);
 router.post("/missions/:id/soumettre",  checkPermission("missions", "executer"), soumettreMission);
 router.get("/missions/:id/messages",    checkPermission("missions", "lire"),    getMessagesMission);

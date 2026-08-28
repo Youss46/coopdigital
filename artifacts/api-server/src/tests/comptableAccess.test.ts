@@ -99,4 +99,11 @@ describe("périmètre du comptable", () => {
       expect(hasPermission("comptable", "salaires", action)).toBe(true);
     }
   });
+
+  it("autorise la suppression des missions aux rôles de supervision terrain", () => {
+    for (const role of ["responsable_tracabilite", "pca", "directeur"]) {
+      expect(hasPermission(role, "missions", "supprimer")).toBe(true);
+    }
+    expect(hasPermission("agent_terrain", "missions", "supprimer")).toBe(false);
+  });
 });

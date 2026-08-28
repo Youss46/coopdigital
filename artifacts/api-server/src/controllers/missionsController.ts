@@ -335,6 +335,51 @@ export async function createMission(req: Request, res: Response): Promise<void> 
   }
 }
 
+// ── Supprimer une mission planifiée ────────────────────────────────────────────
+
+export async function deleteMission(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+
+  const missionId = parseInt(String(req.params["id"] ?? "0"));
+
+  try {
+    const [mission] = await db
+      .select({ id: missionsTerrainTable.id, statut: missionsTerrainTable.statut })
+      .from(missionsTerrainTable)
+      .where(and(
+        eq(missionsTerrainTable.id, missionId),
+        eq(missionsTerrainTable.cooperativeId, cooperativeId),
+      ))
+      .limit(1);
+
+    if (!mission) { res.status(404).json({ erreur: "Mission introuvable" }); return; }
+    if (mission.statut !== "planifiee") {
+      res.status(400).json({ erreur: "Seules les missions planifiées peuvent être supprimées" });
+      return;
+    }
+
+    await db.transaction(async (tx) => {
+      // messages_mission n'a pas de suppression en cascade dans le schéma SQL.
+      await tx.delete(messagesMissionTable)
+        .where(eq(messagesMissionTable.missionId, missionId));
+      // Suppression explicite pour rester compatible avec les anciennes bases.
+      await tx.delete(missionsMembresTable)
+        .where(eq(missionsMembresTable.missionId, missionId));
+      await tx.delete(missionsTerrainTable)
+        .where(and(
+          eq(missionsTerrainTable.id, missionId),
+          eq(missionsTerrainTable.cooperativeId, cooperativeId),
+        ));
+    });
+
+    res.json({ id: missionId, message: "Mission supprimée" });
+  } catch (err) {
+    req.log.error({ err }, "Erreur deleteMission");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
 // ── Démarrer une mission (agent) ──────────────────────────────────────────────
 
 export async function demarrerMission(req: Request, res: Response): Promise<void> {

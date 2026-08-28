@@ -50,6 +50,16 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     supprimer: ["pca", "directeur"],
   },
 
+  missions: {
+    lire:                ["pca", "directeur", "responsable_tracabilite", "agent_terrain"],
+    creer:               ["pca", "directeur", "responsable_tracabilite"],
+    modifier:            ["pca", "directeur", "responsable_tracabilite"],
+    supprimer:           ["pca", "directeur", "responsable_tracabilite"],
+    valider:             ["pca", "directeur", "responsable_tracabilite"],
+    executer:            ["agent_terrain"],
+    creer_agent_terrain: ["pca", "directeur", "responsable_tracabilite"],
+  },
+
   livraisons: {
     lire:      ["pca", "directeur", "comptable", "caissier", "responsable_tracabilite", "delegue", "magasinier", "auditeur"],
     // Les livraisons sont créées exclusivement par les parcours de pesée

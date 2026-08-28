@@ -31,6 +31,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     lire:                ["pca", "directeur", "responsable_tracabilite", "agent_terrain"],
     creer:               ["pca", "directeur", "responsable_tracabilite"],
     modifier:            ["pca", "directeur", "responsable_tracabilite"],
+    supprimer:           ["pca", "directeur", "responsable_tracabilite"],
     valider:             ["pca", "directeur", "responsable_tracabilite"],
     executer:            ["agent_terrain"],
     creer_agent_terrain: ["pca", "directeur", "responsable_tracabilite"],

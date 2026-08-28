@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   MapPin, Plus, Eye, Clock, CheckCircle, XCircle,
   ChevronLeft, Users, Target, Calendar, Loader2, AlertTriangle,
-  UserPlus, Copy, CheckCheck, Share2, Phone, Mail, MapPinned,
+  UserPlus, Copy, CheckCheck, Share2, Phone, Mail, MapPinned, Trash2,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermission } from "@/hooks/usePermission";
@@ -280,6 +280,7 @@ export default function MissionsPage() {
   const queryClient = useQueryClient();
   const { utilisateur } = useAuth();
   const peutCreer = usePermission("missions", "creer");
+  const peutSupprimer = usePermission("missions", "supprimer");
   const peutCreerAgent = usePermission("missions", "creer_agent_terrain");
   const estAgent = utilisateur?.role === "agent_terrain";
 
@@ -369,6 +370,16 @@ export default function MissionsPage() {
   const demarrerMission = useMutation({
     mutationFn: async (id: number) => {
       const r = await apiFetch(`/api/missions/${id}/demarrer`, { method: "POST" });
+      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as { erreur?: string }).erreur ?? "Erreur"); }
+      return r.json();
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["missions"] }),
+    onError: (e: Error) => alert(e.message),
+  });
+
+  const supprimerMission = useMutation({
+    mutationFn: async (id: number) => {
+      const r = await apiFetch(`/api/missions/${id}`, { method: "DELETE" });
       if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as { erreur?: string }).erreur ?? "Erreur"); }
       return r.json();
     },
@@ -603,6 +614,21 @@ export default function MissionsPage() {
                         <button onClick={() => navigate(`/missions/${m.id}`)}
                           className="flex-1 py-1.5 text-xs bg-yellow-500 text-white rounded-lg hover:bg-yellow-600">
                           Valider →
+                        </button>
+                      )}
+                      {peutSupprimer && m.statut === "planifiee" && (
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`Supprimer la mission « ${m.titre} » ?`)) {
+                              supprimerMission.mutate(m.id);
+                            }
+                          }}
+                          disabled={supprimerMission.isPending}
+                          aria-label={`Supprimer la mission ${m.titre}`}
+                          title="Supprimer la mission planifiée"
+                          className="flex items-center justify-center gap-1 px-3 py-1.5 text-xs border border-red-200 rounded-lg text-red-600 hover:bg-red-50 disabled:opacity-50"
+                        >
+                          <Trash2 size={12} />Supprimer
                         </button>
                       )}
                     </div>
