@@ -1,4 +1,4 @@
-- [Authenticated API cache isolation](terrain-auth-cache-isolation.md) — ne jamais mettre en cache les réponses API avec Authorization; les données restent strictement liées au compte connecté.
+- [Authenticated terrain cache isolation](terrain-auth-cache-isolation.md) — ne jamais mettre en cache les réponses API avec Authorization; les données restent strictement liées au compte mobile.
 - [Commission advance retention caps](commission-advance-retention-caps.md) — une avance ne peut être remboursée que dans la limite des commissions effectivement disponibles au paiement.
 - [Fresh DB migration baseline](migrate-fresh-db.md) — baseline 0000-0023 ne doit PAS être insérée sur DB vierge; ensureBaseline() détecte via `cooperatives` + DELETE entrées parasites.
 - [Orval inline body naming conflict](orval-inline-body-conflict.md) — inline requestBody génère PostXxxBody qui entre en collision avec generated/types; fixer avec $ref vers schéma nommé.
