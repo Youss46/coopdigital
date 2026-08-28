@@ -36,6 +36,7 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
   let memberId: number;
   let caisseId: number;
   let sessionId: number;
+  let ancienneSessionId: number;
   let sessionDate: string;
   let mobileAccountId: number;
   const paymentIds: number[] = [];
@@ -82,6 +83,15 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
       [cooperativeId, "Caisse ventilation atomique", "10000000"],
     );
     caisseId = caisse.rows[0].id;
+
+    const ancienneSession = await client.query(
+      `INSERT INTO sessions_caisse
+        (caisse_id, cooperative_id, date_session, solde_ouverture_fcfa, statut)
+       VALUES ($1, $2, CURRENT_DATE - INTERVAL '1 day', $3, 'ouverte')
+       RETURNING id`,
+      [caisseId, cooperativeId, "10000000"],
+    );
+    ancienneSessionId = ancienneSession.rows[0].id;
 
     const session = await client.query(
       `INSERT INTO sessions_caisse
@@ -139,6 +149,9 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
     ]);
     await client.query(`DELETE FROM sessions_caisse WHERE id = $1`, [
       sessionId,
+    ]);
+    await client.query(`DELETE FROM sessions_caisse WHERE id = $1`, [
+      ancienneSessionId,
     ]);
     await client.query(`DELETE FROM caisses WHERE id = $1`, [caisseId]);
     await client.query(
@@ -299,6 +312,28 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
         session_id: sessionId,
       }),
     ]);
+  });
+
+  it("rattache la part espèces à la session ouverte du jour malgré une ancienne session restée ouverte", async () => {
+    const paymentId = await createPayment(150_000);
+
+    const result = await validate(paymentId, { modePaiement: "especes" });
+
+    expect(result.statusCode).toBe(200);
+    await expect(journalMovementsFor([paymentId])).resolves.toEqual([
+      expect.objectContaining({
+        type: "sortie",
+        motif: "paiement_producteur",
+        montant_fcfa: "150000",
+        reference_operation: `PAI-${paymentId}`,
+        session_id: sessionId,
+        date_session: sessionDate,
+      }),
+    ]);
+    expect(await client.query(
+      `SELECT session_id FROM mouvements_caisse WHERE reference_operation = $1`,
+      [`PAI-${paymentId}`],
+    )).toMatchObject({ rows: [{ session_id: sessionId }] });
   });
 
   it("expose uniquement la part espèces d'une ventilation espèces et mobile money", async () => {

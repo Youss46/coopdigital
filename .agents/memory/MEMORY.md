@@ -85,3 +85,4 @@
 - [Fixtures PostgreSQL typées](postgres-fixture-parameter-types.md) — dans un INSERT de test, caster séparément les paramètres réutilisés entre colonnes integer et numeric.
 - [Références PDF des pesées](pdf-local-numbering.md) — les reçus et bordereaux affichent PES-S-<rang> avant tout identifiant legacy.
 - [Ordre des verrous des transferts de trésorerie](treasury-transfer-lock-order.md) — banque puis caisse dans les deux sens pour éviter les deadlocks.
+- [Date de session du journal de caisse](cash-journal-session-date.md) — les débits automatiques doivent cibler la session ouverte du jour, sinon le journal quotidien masque le mouvement.

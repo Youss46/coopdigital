@@ -577,7 +577,9 @@ async function debiterCaisseDansTransaction(
     .where(and(
       eq(sessionsCaisseTable.caisseId, caisse.id),
       eq(sessionsCaisseTable.statut, "ouverte"),
+            sql`${sessionsCaisseTable.dateSession} = CURRENT_DATE`,
     ))
+          .orderBy(desc(sessionsCaisseTable.id))
     .for("update")
     .limit(1);
   if (!session) {
