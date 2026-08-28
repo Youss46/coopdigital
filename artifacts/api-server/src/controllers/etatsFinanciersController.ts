@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { db, ecrituresComptablesTable, planComptableTable, ventesExportateursTable, livraisonsTable, avancesTable } from "@workspace/db";
+import { db, ecrituresComptablesTable, planComptableTable, ventesExportateursTable, livraisonsTable } from "@workspace/db";
 import { eq, sql, gte } from "drizzle-orm";
 
 class TenantError extends Error {
@@ -140,22 +140,42 @@ export async function getCompteResultat(req: Request, res: Response): Promise<vo
 export async function getFluxTresorerie(req: Request, res: Response): Promise<void> {
   try {
     const exercice = req.query["exercice"] ? parseInt(String(req.query["exercice"])) : exerciceCourant();
+    const cooperativeId = coopId(req);
+    const dateDebut = `${exercice}-01-01`;
+    const dateFin = `${exercice + 1}-01-01`;
 
     const rows = await db.execute(sql`
       SELECT
         COALESCE(SUM(CASE WHEN compte_debit = '521' AND source = 'paiement' THEN montant_fcfa ELSE 0 END), 0)::int AS "encaissementsExportateursFcfa",
         COALESCE(SUM(CASE WHEN compte_debit = '401' AND compte_credit IN ('521','552','571') AND source = 'paiement' THEN montant_fcfa ELSE 0 END), 0)::int AS "paiementsProducteursFcfa",
-        COALESCE(SUM(CASE WHEN compte_credit = '521' AND source = 'avance' THEN montant_fcfa ELSE 0 END), 0)::int AS "avancesOctroyes",
-        COALESCE(SUM(CASE WHEN compte_debit = '521' THEN montant_fcfa ELSE 0 END), 0)::int AS "totalEntrees",
-        COALESCE(SUM(CASE WHEN compte_credit = '521' THEN montant_fcfa ELSE 0 END), 0)::int AS "totalSorties"
+        COALESCE((
+          SELECT SUM(a.montant_octroye_fcfa)
+          FROM avances a
+          INNER JOIN membres m ON m.id = a.membre_id
+          WHERE m.cooperative_id = ${cooperativeId}
+            AND a.date_octroi >= ${dateDebut}
+            AND a.date_octroi < ${dateFin}
+        ), 0)::int AS "avancesOctroyes",
+        COALESCE((
+          SELECT SUM(r.montant_fcfa)
+          FROM remboursements_avances_membres r
+          INNER JOIN avances a ON a.id = r.avance_id
+          INNER JOIN membres m ON m.id = a.membre_id
+          WHERE m.cooperative_id = ${cooperativeId}
+            AND r.created_at >= ${dateDebut}
+            AND r.created_at < ${dateFin}
+        ), 0)::int AS "avancesRembourses",
+        COALESCE(SUM(CASE WHEN compte_debit IN ('521','552','571') THEN montant_fcfa ELSE 0 END), 0)::int AS "totalEntrees",
+        COALESCE(SUM(CASE WHEN compte_credit IN ('521','552','571') THEN montant_fcfa ELSE 0 END), 0)::int AS "totalSorties"
       FROM ecritures_comptables
-      WHERE cooperative_id = ${coopId(req)} AND exercice = ${exercice}
+      WHERE cooperative_id = ${cooperativeId} AND exercice = ${exercice}
     `);
 
     const r = rows.rows[0] as {
       encaissementsExportateursFcfa: number;
       paiementsProducteursFcfa: number;
       avancesOctroyes: number;
+      avancesRembourses: number;
       totalEntrees: number;
       totalSorties: number;
     };
@@ -163,11 +183,12 @@ export async function getFluxTresorerie(req: Request, res: Response): Promise<vo
     const encaissements = r?.encaissementsExportateursFcfa ?? 0;
     const paiements = r?.paiementsProducteursFcfa ?? 0;
     const avances = r?.avancesOctroyes ?? 0;
+    const avancesRembourses = r?.avancesRembourses ?? 0;
     const totalEntrees = r?.totalEntrees ?? 0;
     const totalSorties = r?.totalSorties ?? 0;
 
     const fluxOperationnels = encaissements - paiements;
-    const fluxFinancement = -avances;
+    const fluxFinancement = -avances + avancesRembourses;
 
     res.json({
       fluxOperationnelsFcfa: fluxOperationnels,
@@ -175,7 +196,7 @@ export async function getFluxTresorerie(req: Request, res: Response): Promise<vo
       encaissementsExportateursFcfa: encaissements,
       paiementsProducteursFcfa: paiements,
       avancesOctroyes: avances,
-      avancesRembourses: 0,
+      avancesRembourses,
       soldeDebutFcfa: 0,
       soldeFinalFcfa: totalEntrees - totalSorties,
       exercice,

@@ -3785,13 +3785,31 @@ export async function generateCompteResultatOHADA(cooperativeId: number, exercic
 // Tableau des flux de tresorerie OHADA
 // ─────────────────────────────────────────────────────────────────────────────
 export async function generateFluxTresoreiriePdf(cooperativeId: number, exercice: number): Promise<Buffer> {
+  const dateDebut = `${exercice}-01-01`;
+  const dateFin = `${exercice + 1}-01-01`;
   const rows = await db.execute(sql`
     SELECT
       COALESCE(SUM(CASE WHEN compte_debit  = '521' AND source = 'paiement'  THEN montant_fcfa ELSE 0 END), 0)::int AS "encaissementsExportateurs",
       COALESCE(SUM(CASE WHEN compte_debit = '401' AND compte_credit IN ('521','552','571') AND source = 'paiement' THEN montant_fcfa ELSE 0 END), 0)::int AS "paiementsProducteurs",
-      COALESCE(SUM(CASE WHEN compte_credit = '521' AND source = 'avance'    THEN montant_fcfa ELSE 0 END), 0)::int AS "avancesOctroyes",
-      COALESCE(SUM(CASE WHEN compte_debit  = '521' THEN montant_fcfa ELSE 0 END), 0)::int AS "totalEntrees",
-      COALESCE(SUM(CASE WHEN compte_credit = '521' THEN montant_fcfa ELSE 0 END), 0)::int AS "totalSorties"
+      COALESCE((
+        SELECT SUM(a.montant_octroye_fcfa)
+        FROM avances a
+        INNER JOIN membres m ON m.id = a.membre_id
+        WHERE m.cooperative_id = ${cooperativeId}
+          AND a.date_octroi >= ${dateDebut}
+          AND a.date_octroi < ${dateFin}
+      ), 0)::int AS "avancesOctroyes",
+      COALESCE((
+        SELECT SUM(r.montant_fcfa)
+        FROM remboursements_avances_membres r
+        INNER JOIN avances a ON a.id = r.avance_id
+        INNER JOIN membres m ON m.id = a.membre_id
+        WHERE m.cooperative_id = ${cooperativeId}
+          AND r.created_at >= ${dateDebut}
+          AND r.created_at < ${dateFin}
+      ), 0)::int AS "avancesRembourses",
+      COALESCE(SUM(CASE WHEN compte_debit IN ('521','552','571') THEN montant_fcfa ELSE 0 END), 0)::int AS "totalEntrees",
+      COALESCE(SUM(CASE WHEN compte_credit IN ('521','552','571') THEN montant_fcfa ELSE 0 END), 0)::int AS "totalSorties"
     FROM ecritures_comptables
     WHERE cooperative_id = ${cooperativeId} AND exercice = ${exercice}
   `);
@@ -3800,6 +3818,7 @@ export async function generateFluxTresoreiriePdf(cooperativeId: number, exercice
     encaissementsExportateurs: number;
     paiementsProducteurs: number;
     avancesOctroyes: number;
+    avancesRembourses: number;
     totalEntrees: number;
     totalSorties: number;
   };
@@ -3807,10 +3826,11 @@ export async function generateFluxTresoreiriePdf(cooperativeId: number, exercice
   const encaissements    = r?.encaissementsExportateurs ?? 0;
   const paiements        = r?.paiementsProducteurs      ?? 0;
   const avances          = r?.avancesOctroyes           ?? 0;
+  const avancesRembourses = r?.avancesRembourses        ?? 0;
   const totalEntrees     = r?.totalEntrees              ?? 0;
   const totalSorties     = r?.totalSorties              ?? 0;
   const fluxExploitation = encaissements - paiements;
-  const fluxFinancement  = -avances;
+  const fluxFinancement  = -avances + avancesRembourses;
   const soldeFinal       = totalEntrees - totalSorties;
 
   const { doc, endPromise } = makePdfDoc();
@@ -3866,6 +3886,7 @@ export async function generateFluxTresoreiriePdf(cooperativeId: number, exercice
   // Section II — Financement
   sectionTitre("II. FLUX DE FINANCEMENT");
   ligneDonnee("Avances consenties aux membres (decaissements)", -avances, "#fffbeb");
+  ligneDonnee("Remboursements d'avances", avancesRembourses, "#f0fdf4");
   doc.moveDown(0.3);
   ligneDonnee("= Flux net de financement", fluxFinancement, "#fef9c3", true,
     fluxFinancement >= 0 ? VERT : "#b45309");
