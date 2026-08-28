@@ -41,6 +41,16 @@ function comptesForMouvement(type: string, motif: string): CompteMapping {
 
 function today(): string { return new Date().toISOString().slice(0, 10); }
 
+// PDFKit/Helvetica encodes the narrow non-breaking spaces emitted by
+// Intl.NumberFormat("fr-FR") incorrectly in some mobile PDF readers.
+export function formatMontantPdf(n: number | string): string {
+  const montant = typeof n === "string" ? parseFloat(n) || 0 : n;
+  const formatted = new Intl.NumberFormat("fr-FR")
+    .format(montant)
+    .replace(/[\u202F\u00A0]/g, " ");
+  return `${formatted} FCFA`;
+}
+
 async function getCaisse(id: number) {
   const rows = await db.select().from(caissesTable).where(eq(caissesTable.id, id)).limit(1);
   return rows[0] ?? null;
@@ -678,8 +688,7 @@ export async function genererRapportPdf(caisseId: number, dateSession?: string):
   `);
   const session = sessionResult.rows[0];
 
-  const FCFA = (n: number | string) =>
-    new Intl.NumberFormat("fr-FR").format(typeof n === "string" ? parseFloat(n) || 0 : n) + " FCFA";
+  const FCFA = formatMontantPdf;
 
   const doc = new PDFDocument({ margin: 45, size: "A4", bufferPages: true });
   const chunks: Buffer[] = [];
