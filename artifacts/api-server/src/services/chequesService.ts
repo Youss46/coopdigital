@@ -6,7 +6,7 @@ import {
   livraisonsTable,
   membresTable,
 } from "@workspace/db";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { enregistrerMouvement } from "./banqueService.js";
 
 function today(): string { return new Date().toISOString().slice(0, 10); }
@@ -47,7 +47,17 @@ export async function listCheques(cooperativeId: number, statut?: string) {
           )
         : eq(chequesEmisTable.cooperativeId, cooperativeId),
     )
-    .orderBy(desc(chequesEmisTable.dateEmission));
+    .orderBy(
+      sql`CASE ${chequesEmisTable.statut}
+        WHEN 'emis' THEN 0
+        WHEN 'encaisse' THEN 1
+        WHEN 'rejete' THEN 2
+        WHEN 'annule' THEN 3
+        ELSE 4
+      END`,
+      desc(chequesEmisTable.dateEmission),
+      desc(chequesEmisTable.createdAt),
+    );
 
   return rows;
 }
