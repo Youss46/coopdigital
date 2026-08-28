@@ -80,6 +80,7 @@ export default function ExpeditionsPage() {
   const queryString = params.toString();
 
   const voitDelegues = ["pca", "directeur", "magasinier", "comptable", "auditeur"].includes(utilisateur?.role ?? "");
+  const peutCreer = ["pca", "directeur", "responsable_tracabilite"].includes(utilisateur?.role ?? "");
 
   const { data: expeditions = [], isLoading, refetch } = useQuery<ExpeditionRow[]>({
     queryKey: ["expeditions", filtreStatut, filtrePort, filtreType],
@@ -131,12 +132,14 @@ export default function ExpeditionsPage() {
             <p className="text-xs sm:text-sm text-gray-500">Suivi des expéditions de cacao vers le port</p>
           </div>
         </div>
-        <Link href="/expeditions/nouvelle">
-          <Button className="bg-green-700 hover:bg-green-800 gap-1.5 text-xs sm:text-sm px-3 sm:px-4 flex-shrink-0">
-            <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-            <span className="hidden xs:inline">Nouvelle </span>expédition
-          </Button>
-        </Link>
+        {peutCreer && (
+          <Link href="/expeditions/nouvelle">
+            <Button className="bg-green-700 hover:bg-green-800 gap-1.5 text-xs sm:text-sm px-3 sm:px-4 flex-shrink-0">
+              <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="hidden xs:inline">Nouvelle </span>expédition
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* KPIs */}

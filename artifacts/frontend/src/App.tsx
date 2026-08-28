@@ -302,7 +302,7 @@ function AppRoutes() {
         <ProtectedRoute component={FinancesTableauBordPage} />
       </Route>
       <Route path="/expeditions/nouvelle">
-        <ProtectedRoute component={NouvelleExpeditionPage} roles={["pca", "directeur"]} />
+        <ProtectedRoute component={NouvelleExpeditionPage} roles={["pca", "directeur", "responsable_tracabilite"]} />
       </Route>
       <Route path="/expeditions/:id">
         <ProtectedRoute component={ExpeditionDetailPage} roles={["pca", "directeur", "responsable_tracabilite", "auditeur"]} />
