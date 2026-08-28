@@ -3835,7 +3835,7 @@ export const getExportBalanceAuxiliaireSageUrl = (params: ExportBalanceAuxiliair
 }
 
 /**
- * @summary Exporter les écritures auxiliaires au format Sage
+ * @summary Exporter les écritures auxiliaires en XML pour rapprochement avec Sage 100 i7
  */
 export const exportBalanceAuxiliaireSage = async (params: ExportBalanceAuxiliaireSageParams, options?: RequestInit): Promise<string> => {
 
@@ -3882,7 +3882,7 @@ export type ExportBalanceAuxiliaireSageQueryError = ErrorType<ErrorResponse>
 
 
 /**
- * @summary Exporter les écritures auxiliaires au format Sage
+ * @summary Exporter les écritures auxiliaires en XML pour rapprochement avec Sage 100 i7
  */
 
 export function useExportBalanceAuxiliaireSage<TData = Awaited<ReturnType<typeof exportBalanceAuxiliaireSage>>, TError = ErrorType<ErrorResponse>>(

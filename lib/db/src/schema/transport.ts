@@ -96,7 +96,10 @@ export const bonsCarburantTable = pgTable("bons_carburant", {
   vehiculeId:         integer("vehicule_id").notNull().references(() => vehiculesTable.id),
   chauffeurId:        integer("chauffeur_id").references(() => chauffeursTable.id),
   typeCarburant:      varchar("type_carburant", { length: 20 }).notNull().default("gasoil"),
-  quantiteAutorisee:  numeric("quantite_autorisee", { precision: 10, scale: 3 }).notNull(),
+  // Les anciens bons sont exprimés uniquement en litres ; les nouveaux bons
+  // portent obligatoirement un montant autorisé validé par l'API.
+  quantiteAutorisee:  numeric("quantite_autorisee", { precision: 10, scale: 3 }),
+  montantAutoriseFcfa: numeric("montant_autorise_fcfa", { precision: 14, scale: 2 }),
   stationService:     varchar("station_service", { length: 255 }),
   motif:              text("motif"),
   dateEmission:       date("date_emission", { mode: "string" }).notNull(),

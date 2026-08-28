@@ -11492,7 +11492,7 @@ components:
 
     BonCarburant:
       type: object
-      required: [id, cooperative_id, numero, vehicule_id, type_carburant, quantite_autorisee, date_emission, statut, created_at]
+      required: [id, cooperative_id, numero, vehicule_id, type_carburant, montant_autorise_fcfa, date_emission, statut, created_at]
       properties:
         id:                  { type: integer }
         cooperative_id:      { type: integer }
@@ -11504,7 +11504,8 @@ components:
         chauffeur_id:        { type: integer, nullable: true }
         chauffeur_nom:       { type: string, nullable: true }
         type_carburant:      { type: string }
-        quantite_autorisee:  { type: number }
+        quantite_autorisee:  { type: number, nullable: true }
+        montant_autorise_fcfa: { type: number, nullable: true }
         station_service:     { type: string, nullable: true }
         motif:               { type: string, nullable: true }
         date_emission:       { type: string, format: date }
@@ -11522,11 +11523,12 @@ components:
 
     CreateBonCarburantBody:
       type: object
-      required: [vehicule_id, type_carburant, quantite_autorisee, date_emission]
+      required: [vehicule_id, type_carburant, montant_autorise_fcfa, date_emission]
       properties:
         vehicule_id:         { type: integer }
         chauffeur_id:        { type: integer }
         type_carburant:      { type: string }
+        montant_autorise_fcfa: { type: number }
         quantite_autorisee:  { type: number }
         station_service:     { type: string }
         motif:               { type: string }
@@ -11534,7 +11536,7 @@ components:
 
     UtiliserBonCarburantBody:
       type: object
-      required: [quantite_livree, date_utilisation]
+      required: [montant_fcfa, date_utilisation]
       properties:
         quantite_livree:  { type: number }
         prix_litre_fcfa:  { type: number }
@@ -11545,11 +11547,12 @@ components:
 
     StatsCarburant:
       type: object
-      required: [nb_bons, qte_autorisee_l, qte_livree_l, montant_total_fcfa, par_vehicule]
+      required: [nb_bons, qte_autorisee_l, qte_livree_l, montant_autorise_total_fcfa, montant_total_fcfa, par_vehicule]
       properties:
         nb_bons:            { type: integer }
         qte_autorisee_l:    { type: number }
         qte_livree_l:       { type: number }
+        montant_autorise_total_fcfa: { type: number }
         montant_total_fcfa: { type: number }
         par_vehicule:
           type: array
@@ -11561,6 +11564,7 @@ components:
               marque:          { type: string, nullable: true }
               nb_bons:         { type: integer }
               qte_livree_l:    { type: number }
+              montant_autorise_fcfa: { type: number }
               montant_fcfa:    { type: number }
 
     CreateEntretienVehiculeBody:

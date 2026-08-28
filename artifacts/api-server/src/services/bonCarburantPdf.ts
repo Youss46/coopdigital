@@ -22,7 +22,8 @@ interface BonData {
   numero: string;
   statut: string;
   typeCarburant: string;
-  quantiteAutorisee: string;
+  quantiteAutorisee: string | null;
+  montantAutoriseFcfa: string | null;
   quantiteLivree:    string | null;
   prixLitreFcfa:     string | null;
   montantFcfa:       string | null;
@@ -122,9 +123,9 @@ export async function generateBonCarburant(cooperativeId: number, bon: BonData):
   doc.fontSize(7).fillColor(GRIS).font("Helvetica").text("CARBURANT", rx + 8, y + 6);
   doc.fontSize(14).fillColor("#1d4ed8").font("Helvetica-Bold")
     .text(CARBURANT_LABELS[bon.typeCarburant] ?? bon.typeCarburant, rx + 8, y + 17);
-  doc.fontSize(7).fillColor(GRIS).font("Helvetica").text("QUANTITÉ AUTORISÉE", rx + 8, y + 38);
+  doc.fontSize(7).fillColor(GRIS).font("Helvetica").text("MONTANT AUTORISÉ", rx + 8, y + 38);
   doc.fontSize(16).fillColor("#111827").font("Helvetica-Bold")
-    .text(`${parseFloat(bon.quantiteAutorisee).toFixed(0)} L`, rx + 8, y + 49);
+    .text(formaterFCFA(bon.montantAutoriseFcfa), rx + 8, y + 49);
   doc.fontSize(7).fillColor(GRIS).font("Helvetica").text("DATE D'ÉMISSION", rx + 8, y + 70);
   doc.fontSize(9).fillColor("#111827").font("Helvetica")
     .text(formaterDate(bon.dateEmission), rx + 8, y + 79);
@@ -137,6 +138,7 @@ export async function generateBonCarburant(cooperativeId: number, bon: BonData):
     ["Approuvé par",     bon.approveParNom ?? "—"],
   ];
   const detailsRight: Array<[string, string]> = [
+    ["Qté autorisée",       bon.quantiteAutorisee ? `${parseFloat(bon.quantiteAutorisee).toFixed(2)} L` : "—"],
     ["Qté réellement servie", bon.quantiteLivree ? `${parseFloat(bon.quantiteLivree).toFixed(2)} L` : "—"],
     ["Prix au litre",         bon.prixLitreFcfa  ? `${parseFloat(bon.prixLitreFcfa).toFixed(0)} FCFA/L` : "—"],
     ["Montant total",         formaterFCFA(bon.montantFcfa)],

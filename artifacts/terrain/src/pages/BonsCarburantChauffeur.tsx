@@ -12,7 +12,8 @@ interface BonCarburant {
   numero: string;
   statut: string;
   type_carburant: string;
-  quantite_autorisee: number;
+  quantite_autorisee: number | null;
+  montant_autorise_fcfa: number | null;
   quantite_livree: number | null;
   prix_litre_fcfa: number | null;
   montant_fcfa: number | null;
@@ -26,6 +27,7 @@ interface BonCarburant {
 }
 
 interface UtiliserForm {
+  montant_fcfa: string;
   quantite_livree: string;
   prix_litre_fcfa: string;
   date_utilisation: string;
@@ -36,6 +38,7 @@ interface UtiliserForm {
 interface DemandeForm {
   vehicule_id: string;
   type_carburant: string;
+  montant_autorise_fcfa: string;
   quantite_demandee: string;
   motif: string;
   station_service: string;
@@ -106,7 +109,7 @@ const FILTER_TABS = [
 ];
 
 const EMPTY_DEMANDE: DemandeForm = {
-  vehicule_id: "", type_carburant: "gasoil", quantite_demandee: "", motif: "", station_service: "",
+  vehicule_id: "", type_carburant: "gasoil", montant_autorise_fcfa: "", quantite_demandee: "", motif: "", station_service: "",
 };
 
 export default function BonsCarburantChauffeur() {
@@ -124,7 +127,7 @@ export default function BonsCarburantChauffeur() {
   const [qrExpired, setQrExpired] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState<UtiliserForm>({
-    quantite_livree: "", prix_litre_fcfa: "",
+    montant_fcfa: "", quantite_livree: "", prix_litre_fcfa: "",
     date_utilisation: new Date().toISOString().split("T")[0]!,
     station_service: "", observations: "",
   });
@@ -151,6 +154,7 @@ export default function BonsCarburantChauffeur() {
       await apiPost("/chauffeur/bons-carburant/demande", {
         vehicule_id:       parseInt(demandeForm.vehicule_id),
         type_carburant:    demandeForm.type_carburant,
+        montant_autorise_fcfa: parseFloat(demandeForm.montant_autorise_fcfa),
         ...(demandeForm.quantite_demandee ? { quantite_demandee: parseFloat(demandeForm.quantite_demandee) } : {}),
         ...(demandeForm.motif             ? { motif: demandeForm.motif }                       : {}),
         ...(demandeForm.station_service   ? { station_service: demandeForm.station_service }   : {}),
@@ -222,17 +226,14 @@ export default function BonsCarburantChauffeur() {
 
   useEffect(() => { load(); }, [load]);
 
-  const montantEstime = form.quantite_livree && form.prix_litre_fcfa
-    ? Math.round(parseFloat(form.quantite_livree) * parseFloat(form.prix_litre_fcfa))
-    : null;
-
   async function handleUtiliser() {
-    if (!selected || !form.quantite_livree || !form.date_utilisation) return;
+    if (!selected || !form.montant_fcfa || !form.date_utilisation) return;
     setSubmitting(true);
     try {
       await apiPut(`/chauffeur/bons-carburant/${selected.id}/utiliser`, {
-        quantite_livree:  parseFloat(form.quantite_livree),
+        montant_fcfa:     parseFloat(form.montant_fcfa),
         date_utilisation: form.date_utilisation,
+        ...(form.quantite_livree ? { quantite_livree: parseFloat(form.quantite_livree) } : {}),
         ...(form.prix_litre_fcfa ? { prix_litre_fcfa: parseFloat(form.prix_litre_fcfa) } : {}),
         ...(form.station_service  ? { station_service: form.station_service }              : {}),
         ...(form.observations     ? { observations: form.observations }                    : {}),
@@ -360,8 +361,13 @@ export default function BonsCarburantChauffeur() {
 
                 {/* Data grid */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", rowGap: 4, columnGap: 16, fontSize: "0.78rem", marginBottom: 12 }}>
-                  <span style={{ color: "var(--t-muted)" }}>Qté autorisée</span>
-                  <span style={{ fontWeight: 700 }}>{bon.quantite_autorisee} L</span>
+                  <span style={{ color: "var(--t-muted)" }}>Montant autorisé</span>
+                  <span style={{ fontWeight: 700 }}>{bon.montant_autorise_fcfa != null ? `${bon.montant_autorise_fcfa.toLocaleString("fr-FR")} FCFA` : "Historique en litres"}</span>
+
+                  {bon.quantite_autorisee != null && <>
+                    <span style={{ color: "var(--t-muted)" }}>Qté indicative</span>
+                    <span style={{ fontWeight: 700 }}>{bon.quantite_autorisee} L</span>
+                  </>}
 
                   {bon.quantite_livree != null && <>
                     <span style={{ color: "var(--t-muted)" }}>Qté livrée</span>
@@ -396,7 +402,7 @@ export default function BonsCarburantChauffeur() {
                       onClick={() => {
                         setSelected(bon);
                         setForm({
-                          quantite_livree: "", prix_litre_fcfa: "",
+                           montant_fcfa: "", quantite_livree: "", prix_litre_fcfa: "",
                           date_utilisation: new Date().toISOString().split("T")[0]!,
                           station_service: bon.station_service ?? "", observations: "",
                         });
@@ -449,7 +455,7 @@ export default function BonsCarburantChauffeur() {
               <div>
                 <p style={{ fontWeight: 800, fontSize: "1.05rem", color: "var(--t-text)" }}>Retour station</p>
                 <p style={{ fontSize: "0.75rem", color: "var(--t-muted)", marginTop: 2 }}>
-                  Bon {selected.numero} · Autorisé : <strong>{selected.quantite_autorisee} L</strong>
+                   Bon {selected.numero} · Autorisé : <strong>{selected.montant_autorise_fcfa != null ? `${selected.montant_autorise_fcfa.toLocaleString("fr-FR")} FCFA` : "historique en litres"}</strong>
                 </p>
               </div>
               <button
@@ -462,11 +468,22 @@ export default function BonsCarburantChauffeur() {
 
             {/* Fields */}
             <div className="t-field">
-              <label className="t-label">Quantité livrée (L) *</label>
+                <label className="t-label">Montant consommé (FCFA) *</label>
                 <NumericInput
-                  decimal
+                   decimal={false}
                 className="t-input"
-                  min={0} step="any" placeholder="Ex: 45"
+                   min={1} step="1" placeholder="Ex: 47 500"
+                 value={form.montant_fcfa}
+                   onChange={value => setForm(f => ({ ...f, montant_fcfa: value }))}
+               />
+             </div>
+
+             <div className="t-field">
+               <label className="t-label">Quantité livrée (L)</label>
+                 <NumericInput
+                   decimal
+                 className="t-input"
+                   min={0} step="any" placeholder="Optionnel"
                 value={form.quantite_livree}
                   onChange={value => setForm(f => ({ ...f, quantite_livree: value }))}
               />
@@ -484,7 +501,7 @@ export default function BonsCarburantChauffeur() {
                 />
               </div>
               <div className="t-field">
-                <label className="t-label">Montant estimé</label>
+                 <label className="t-label">Montant saisi</label>
                 <div style={{
                   height: 56, display: "flex", alignItems: "center",
                   padding: "0 16px",
@@ -493,7 +510,7 @@ export default function BonsCarburantChauffeur() {
                   borderRadius: "var(--t-radius)",
                   fontWeight: 700, fontSize: "0.95rem", color: "var(--t-primary)",
                 }}>
-                  {montantEstime != null ? `${montantEstime.toLocaleString("fr-FR")} F` : "—"}
+                  {form.montant_fcfa ? `${parseFloat(form.montant_fcfa).toLocaleString("fr-FR")} F` : "—"}
                 </div>
               </div>
             </div>
@@ -540,7 +557,7 @@ export default function BonsCarburantChauffeur() {
               <button
                 className="t-btn t-btn--success t-btn--sm"
                 style={{ flex: 1 }}
-                disabled={!form.quantite_livree || !form.date_utilisation || submitting}
+                 disabled={!form.montant_fcfa || !form.date_utilisation || submitting}
                 onClick={handleUtiliser}
               >
                 {submitting ? "Enregistrement…" : "Confirmer"}
@@ -683,7 +700,7 @@ export default function BonsCarburantChauffeur() {
                     try {
                       await navigator.share({
                         title: `Bon carburant ${qrBon.numero}`,
-                        text: `Bon carburant ${qrBon.numero} — ${qrBon.quantite_autorisee} L`,
+                        text: `Bon carburant ${qrBon.numero} — ${qrBon.montant_autorise_fcfa != null ? `${qrBon.montant_autorise_fcfa.toLocaleString("fr-FR")} FCFA` : "historique en litres"}`,
                         url: stationUrl,
                       });
                     } catch {
@@ -763,11 +780,21 @@ export default function BonsCarburantChauffeur() {
                 </select>
               </div>
               <div className="t-field">
-                <label className="t-label">Quantité (L)</label>
+                  <label className="t-label">Montant autorisé (FCFA) *</label>
+                  <NumericInput
+                    decimal={false}
+                    className="t-input"
+                    min={1} step="1" placeholder="Ex : 50 000"
+                    value={demandeForm.montant_autorise_fcfa}
+                    onChange={value => setDemandeForm(f => ({ ...f, montant_autorise_fcfa: value }))}
+                  />
+                </div>
+                <div className="t-field">
+                  <label className="t-label">Quantité indicative (L)</label>
                 <NumericInput
                   decimal
                   className="t-input"
-                  min={1} step="any" placeholder="Ex : 50"
+                    min={0} step="any" placeholder="Optionnel"
                   value={demandeForm.quantite_demandee}
                   onChange={value => setDemandeForm(f => ({ ...f, quantite_demandee: value }))}
                 />
@@ -804,7 +831,7 @@ export default function BonsCarburantChauffeur() {
               <button
                 className="t-btn t-btn--primary t-btn--sm"
                 style={{ flex: 1 }}
-                disabled={!demandeForm.vehicule_id || submittingDemande}
+                disabled={!demandeForm.vehicule_id || !demandeForm.montant_autorise_fcfa || submittingDemande}
                 onClick={handleDemande}
               >
                 {submittingDemande ? "Envoi…" : <><Send size={14} /> Envoyer la demande</>}

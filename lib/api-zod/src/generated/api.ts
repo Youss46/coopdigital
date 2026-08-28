@@ -1168,7 +1168,7 @@ export const GetBalanceAuxiliaireResponse = zod.array(GetBalanceAuxiliaireRespon
 
 
 /**
- * @summary Exporter les écritures auxiliaires au format Sage
+ * @summary Exporter les écritures auxiliaires en XML pour rapprochement avec Sage 100 i7
  */
 export const ExportBalanceAuxiliaireSageQueryParams = zod.object({
   "exercice": zod.coerce.number()
@@ -6693,7 +6693,8 @@ export const GetBonsCarburantResponse = zod.object({
   "chauffeur_id": zod.number().nullish(),
   "chauffeur_nom": zod.string().nullish(),
   "type_carburant": zod.string(),
-  "quantite_autorisee": zod.number(),
+  "quantite_autorisee": zod.number().nullish(),
+  "montant_autorise_fcfa": zod.number().nullable(),
   "station_service": zod.string().nullish(),
   "motif": zod.string().nullish(),
   "date_emission": zod.coerce.date(),
@@ -6719,7 +6720,8 @@ export const CreateBonCarburantBody = zod.object({
   "vehicule_id": zod.number(),
   "chauffeur_id": zod.number().optional(),
   "type_carburant": zod.string(),
-  "quantite_autorisee": zod.number(),
+  "montant_autorise_fcfa": zod.number(),
+  "quantite_autorisee": zod.number().optional(),
   "station_service": zod.string().optional(),
   "motif": zod.string().optional(),
   "date_emission": zod.coerce.date()
@@ -6744,7 +6746,8 @@ export const GetBonCarburantResponse = zod.object({
   "chauffeur_id": zod.number().nullish(),
   "chauffeur_nom": zod.string().nullish(),
   "type_carburant": zod.string(),
-  "quantite_autorisee": zod.number(),
+  "quantite_autorisee": zod.number().nullish(),
+  "montant_autorise_fcfa": zod.number().nullable(),
   "station_service": zod.string().nullish(),
   "motif": zod.string().nullish(),
   "date_emission": zod.coerce.date(),
@@ -6780,7 +6783,8 @@ export const SoumettresBonCarburantResponse = zod.object({
   "chauffeur_id": zod.number().nullish(),
   "chauffeur_nom": zod.string().nullish(),
   "type_carburant": zod.string(),
-  "quantite_autorisee": zod.number(),
+  "quantite_autorisee": zod.number().nullish(),
+  "montant_autorise_fcfa": zod.number().nullable(),
   "station_service": zod.string().nullish(),
   "motif": zod.string().nullish(),
   "date_emission": zod.coerce.date(),
@@ -6816,7 +6820,8 @@ export const ApprouverBonCarburantResponse = zod.object({
   "chauffeur_id": zod.number().nullish(),
   "chauffeur_nom": zod.string().nullish(),
   "type_carburant": zod.string(),
-  "quantite_autorisee": zod.number(),
+  "quantite_autorisee": zod.number().nullish(),
+  "montant_autorise_fcfa": zod.number().nullable(),
   "station_service": zod.string().nullish(),
   "motif": zod.string().nullish(),
   "date_emission": zod.coerce.date(),
@@ -6842,9 +6847,9 @@ export const UtiliserBonCarburantParams = zod.object({
 })
 
 export const UtiliserBonCarburantBody = zod.object({
-  "quantite_livree": zod.number(),
+  "quantite_livree": zod.number().optional(),
   "prix_litre_fcfa": zod.number().optional(),
-  "montant_fcfa": zod.number().optional(),
+  "montant_fcfa": zod.number(),
   "date_utilisation": zod.coerce.date(),
   "station_service": zod.string().optional(),
   "observations": zod.string().optional()
@@ -6861,7 +6866,8 @@ export const UtiliserBonCarburantResponse = zod.object({
   "chauffeur_id": zod.number().nullish(),
   "chauffeur_nom": zod.string().nullish(),
   "type_carburant": zod.string(),
-  "quantite_autorisee": zod.number(),
+  "quantite_autorisee": zod.number().nullish(),
+  "montant_autorise_fcfa": zod.number().nullable(),
   "station_service": zod.string().nullish(),
   "motif": zod.string().nullish(),
   "date_emission": zod.coerce.date(),
@@ -6897,7 +6903,8 @@ export const AnnulerBonCarburantResponse = zod.object({
   "chauffeur_id": zod.number().nullish(),
   "chauffeur_nom": zod.string().nullish(),
   "type_carburant": zod.string(),
-  "quantite_autorisee": zod.number(),
+  "quantite_autorisee": zod.number().nullish(),
+  "montant_autorise_fcfa": zod.number().nullable(),
   "station_service": zod.string().nullish(),
   "motif": zod.string().nullish(),
   "date_emission": zod.coerce.date(),
@@ -6936,6 +6943,7 @@ export const GetStatsCarburantResponse = zod.object({
   "nb_bons": zod.number(),
   "qte_autorisee_l": zod.number(),
   "qte_livree_l": zod.number(),
+  "montant_autorise_total_fcfa": zod.number(),
   "montant_total_fcfa": zod.number(),
   "par_vehicule": zod.array(zod.object({
   "vehicule_id": zod.number().optional(),
@@ -6943,6 +6951,7 @@ export const GetStatsCarburantResponse = zod.object({
   "marque": zod.string().nullish(),
   "nb_bons": zod.number().optional(),
   "qte_livree_l": zod.number().optional(),
+  "montant_autorise_fcfa": zod.number().optional(),
   "montant_fcfa": zod.number().optional()
 }))
 })

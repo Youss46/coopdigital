@@ -705,7 +705,8 @@ function mapBon(row: Awaited<ReturnType<typeof getBonsCarburant>>[number], appro
     chauffeur_id:       b.chauffeurId ?? null,
     chauffeur_nom:      row.chauffeurNom ? `${row.chauffeurPrenoms ?? ""} ${row.chauffeurNom}`.trim() : null,
     type_carburant:     b.typeCarburant,
-    quantite_autorisee: b.quantiteAutorisee != null ? parseFloat(b.quantiteAutorisee) : 0,
+    quantite_autorisee: b.quantiteAutorisee != null ? parseFloat(b.quantiteAutorisee) : null,
+    montant_autorise_fcfa: b.montantAutoriseFcfa != null ? parseFloat(b.montantAutoriseFcfa) : null,
     station_service:    b.stationService ?? null,
     motif:              b.motif ?? null,
     date_emission:      b.dateEmission,
@@ -773,15 +774,20 @@ export async function handleCreateBonCarburant(req: Request, res: Response): Pro
     const cooperativeId = req.user?.cooperativeId;
     if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
     const userId = req.user!.id;
-    const body = req.body as { vehicule_id: number; chauffeur_id?: number; type_carburant: string; quantite_autorisee: number; station_service?: string; motif?: string; date_emission: string };
-    if (!body.vehicule_id || !body.type_carburant || !body.quantite_autorisee || !body.date_emission) {
+    const body = req.body as { vehicule_id: number; chauffeur_id?: number; type_carburant: string; montant_autorise_fcfa?: number; quantite_autorisee?: number; station_service?: string; motif?: string; date_emission: string };
+    const montantAutorise = Number(body.montant_autorise_fcfa);
+    if (!body.vehicule_id || !body.type_carburant || !Number.isFinite(montantAutorise) || montantAutorise <= 0 || !body.date_emission) {
       res.status(400).json({ erreur: "Champs requis manquants" }); return;
+    }
+    if (body.quantite_autorisee != null && (!Number.isFinite(Number(body.quantite_autorisee)) || Number(body.quantite_autorisee) <= 0)) {
+      res.status(400).json({ erreur: "La quantité autorisée doit être positive lorsqu'elle est fournie" }); return;
     }
     const bon = await createBonCarburant(cooperativeId, userId, {
       vehiculeId:        body.vehicule_id,
       chauffeurId:       body.chauffeur_id ?? null,
       typeCarburant:     body.type_carburant,
-      quantiteAutorisee: String(body.quantite_autorisee),
+      montantAutoriseFcfa: String(Math.round(montantAutorise)),
+      ...(body.quantite_autorisee != null ? { quantiteAutorisee: String(body.quantite_autorisee) } : {}),
       stationService:    body.station_service ?? null,
       motif:             body.motif ?? null,
       dateEmission:      body.date_emission,
@@ -831,12 +837,17 @@ export async function handleTraiterDemande(req: Request, res: Response): Promise
     const row = await getBonCarburant(cooperativeId, id);
     if (!row) { res.status(404).json({ erreur: "Bon introuvable" }); return; }
     if (row.bon.statut !== "demande") { res.status(400).json({ erreur: "Ce bon n'est pas une demande en attente" }); return; }
-    const body = req.body as { quantite_autorisee?: number };
-    if (!body.quantite_autorisee || body.quantite_autorisee <= 0) {
-      res.status(400).json({ erreur: "Quantité autorisée requise" }); return;
+    const body = req.body as { montant_autorise_fcfa?: number; quantite_autorisee?: number };
+    const montantAutorise = Number(body.montant_autorise_fcfa);
+    if (!Number.isFinite(montantAutorise) || montantAutorise <= 0) {
+      res.status(400).json({ erreur: "Montant autorisé requis" }); return;
+    }
+    if (body.quantite_autorisee != null && (!Number.isFinite(Number(body.quantite_autorisee)) || Number(body.quantite_autorisee) <= 0)) {
+      res.status(400).json({ erreur: "La quantité autorisée doit être positive lorsqu'elle est fournie" }); return;
     }
     await transitionBon(cooperativeId, id, "soumis", {
-      quantiteAutorisee: String(body.quantite_autorisee),
+      montantAutoriseFcfa: String(Math.round(montantAutorise)),
+      ...(body.quantite_autorisee != null ? { quantiteAutorisee: String(body.quantite_autorisee) } : {}),
     });
 
     // Notification push + in-app → PCA/directeur (fire-and-forget)
@@ -912,36 +923,41 @@ export async function handleUtiliserBonCarburant(req: Request, res: Response): P
     const row = await getBonCarburant(cooperativeId, id);
     if (!row) { res.status(404).json({ erreur: "Bon introuvable" }); return; }
     if (row.bon.statut !== "approuve") { res.status(400).json({ erreur: "Le bon doit être approuvé avant utilisation" }); return; }
-    const body = req.body as { quantite_livree: number; prix_litre_fcfa?: number; montant_fcfa?: number; date_utilisation: string; station_service?: string; observations?: string };
-    if (!body.quantite_livree || !body.date_utilisation) { res.status(400).json({ erreur: "quantite_livree et date_utilisation requis" }); return; }
-
-    // Calcul montant si non fourni
-    const montant = body.montant_fcfa != null ? body.montant_fcfa
-      : (body.prix_litre_fcfa != null ? Math.round(body.quantite_livree * body.prix_litre_fcfa) : null);
+    const body = req.body as { quantite_livree?: number; prix_litre_fcfa?: number; montant_fcfa?: number; date_utilisation: string; station_service?: string; observations?: string };
+    const montant = Number(body.montant_fcfa);
+    if (!Number.isFinite(montant) || montant <= 0 || !body.date_utilisation) {
+      res.status(400).json({ erreur: "montant_fcfa et date_utilisation requis" }); return;
+    }
+    if (body.quantite_livree != null && (!Number.isFinite(Number(body.quantite_livree)) || body.quantite_livree <= 0)) {
+      res.status(400).json({ erreur: "La quantité livrée doit être positive lorsqu'elle est fournie" }); return;
+    }
+    const montantArrondi = Math.round(montant);
+    if (row.bon.montantAutoriseFcfa != null && montantArrondi > Number(row.bon.montantAutoriseFcfa)) {
+      res.status(400).json({ erreur: "Le montant consommé ne peut pas dépasser le montant autorisé" }); return;
+    }
 
     const extra: Record<string, unknown> = {
-      quantiteLivree:  String(body.quantite_livree),
       dateUtilisation: body.date_utilisation,
+      montantFcfa: String(montantArrondi),
     };
+    if (body.quantite_livree != null) extra["quantiteLivree"] = String(body.quantite_livree);
     if (body.prix_litre_fcfa != null) extra["prixLitreFcfa"] = String(body.prix_litre_fcfa);
-    if (montant != null) extra["montantFcfa"] = String(montant);
     if (body.station_service)  extra["stationService"] = body.station_service;
     if (body.observations)     extra["observations"]   = body.observations;
 
     await transitionBon(cooperativeId, id, "utilise", extra);
 
     // Créer dépense automatiquement si montant connu + écriture comptable
-    if (montant && montant > 0) {
+    if (montantArrondi > 0) {
       const { createDepense } = await import("../services/transportService");
       const depense = await createDepense(cooperativeId, row.bon.vehiculeId, {
         type:           "carburant",
         dateDepense:    body.date_utilisation,
-        montantFcfa:    String(montant),
+        montantFcfa:    String(montantArrondi),
         libelle:        `Carburant — Bon ${row.bon.numero}`,
         fournisseur:    body.station_service ?? row.bon.stationService ?? null,
         referencePiece: row.bon.numero,
-        quantite:       String(body.quantite_livree),
-        unite:          "L",
+        ...(body.quantite_livree != null ? { quantite: String(body.quantite_livree), unite: "L" } : {}),
         missionId:      null,
       });
       // Écriture OHADA : 6042 Carburant / 521 Caisse
@@ -949,7 +965,7 @@ export async function handleUtiliserBonCarburant(req: Request, res: Response): P
         source: "transport", sourceId: depense.id,
         libelle: `Carburant — Bon ${row.bon.numero} (${body.quantite_livree} L)`,
         compteDebit: "6042", compteCredit: "521",
-        montantFcfa: Math.round(montant),
+        montantFcfa: montantArrondi,
         date: body.date_utilisation,
         numeroPiece: row.bon.numero,
       });
@@ -957,7 +973,7 @@ export async function handleUtiliserBonCarburant(req: Request, res: Response): P
 
     res.json(mapBon({
       ...row,
-      bon: { ...row.bon, statut: "utilise", quantiteLivree: String(body.quantite_livree), dateUtilisation: body.date_utilisation, updatedAt: new Date() },
+      bon: { ...row.bon, statut: "utilise", ...(body.quantite_livree != null ? { quantiteLivree: String(body.quantite_livree) } : {}), montantFcfa: String(montantArrondi), dateUtilisation: body.date_utilisation, updatedAt: new Date() },
     }));
   } catch (err) {
     req.log.error({ err }, "Erreur utiliserBonCarburant");
@@ -1021,6 +1037,7 @@ export async function handleGetBonCarburantPdf(req: Request, res: Response): Pro
       statut:           b.statut,
       typeCarburant:    b.typeCarburant,
       quantiteAutorisee: b.quantiteAutorisee,
+      montantAutoriseFcfa: b.montantAutoriseFcfa,
       quantiteLivree:   b.quantiteLivree,
       prixLitreFcfa:    b.prixLitreFcfa,
       montantFcfa:      b.montantFcfa,

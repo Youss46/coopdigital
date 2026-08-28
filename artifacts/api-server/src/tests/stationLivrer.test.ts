@@ -51,6 +51,7 @@ function makeApprouveBon(numero: string) {
       vehiculeId: 7,
       typeCarburant: "gasoil",
       quantiteAutorisee: "50.00",
+      montantAutoriseFcfa: "10000",
       stationService: null,
       motif: null,
       dateEmission: "2026-08-01",
@@ -139,6 +140,7 @@ describe("handleLivrerBonStation — QR rejection paths", () => {
       qr_payload: payload,
       qr_sig: sig,
       quantite_livree: 50,
+      montant_fcfa: 9500,
       date_utilisation: "2026-08-14",
     });
     const res = makeRes();
@@ -182,6 +184,7 @@ describe("handleLivrerBonStation — QR rejection paths", () => {
       qr_payload: payload,
       qr_sig: sig,
       quantite_livree: 50,
+      montant_fcfa: 9500,
       date_utilisation: "2026-08-14",
     });
     const res = makeRes();
@@ -204,6 +207,7 @@ describe("handleLivrerBonStation — QR rejection paths", () => {
       qr_payload: payload,
       qr_sig: sig,
       quantite_livree: 50,
+      montant_fcfa: 9500,
       date_utilisation: "2026-08-14",
     });
     const res = makeRes();
@@ -212,6 +216,49 @@ describe("handleLivrerBonStation — QR rejection paths", () => {
 
     expect(res._status).toBe(200);
     expect((res._body as { success: boolean }).success).toBe(true);
+    expect(mockTransitionBon).toHaveBeenCalledOnce();
+  });
+
+  it("rejects a consumed amount above the authorized ceiling", async () => {
+    const validExp = Date.now() + 60_000 * 60;
+    const { payload, sig } = buildQrPayload(NUMERO, validExp);
+
+    const req = makeReq(NUMERO, {
+      qr_payload: payload,
+      qr_sig: sig,
+      quantite_livree: 50,
+      montant_fcfa: 10001,
+      date_utilisation: "2026-08-14",
+    });
+    const res = makeRes();
+
+    await handleLivrerBonStation(req as Request, res as Response);
+
+    expect(res._status).toBe(400);
+    expect((res._body as { erreur: string }).erreur).toMatch(/dépasser|autorisé/i);
+    expect(mockTransitionBon).not.toHaveBeenCalled();
+  });
+
+  it("keeps legacy litre-only bon records usable when a consumed amount is supplied", async () => {
+    mockGetBonCarburantByNumero.mockResolvedValueOnce({
+      ...makeApprouveBon(NUMERO),
+      bon: { ...makeApprouveBon(NUMERO).bon, montantAutoriseFcfa: null },
+    });
+    const validExp = Date.now() + 60_000 * 60;
+    const { payload, sig } = buildQrPayload(NUMERO, validExp);
+
+    const req = makeReq(NUMERO, {
+      qr_payload: payload,
+      qr_sig: sig,
+      quantite_livree: 50,
+      montant_fcfa: 9500,
+      date_utilisation: "2026-08-14",
+    });
+    const res = makeRes();
+
+    await handleLivrerBonStation(req as Request, res as Response);
+
+    expect(res._status).toBe(200);
     expect(mockTransitionBon).toHaveBeenCalledOnce();
   });
 });

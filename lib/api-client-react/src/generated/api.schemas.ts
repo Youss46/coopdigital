@@ -4223,7 +4223,8 @@ export interface BonCarburant {
   chauffeur_id?: number | null;
   chauffeur_nom?: string | null;
   type_carburant: string;
-  quantite_autorisee: number;
+  quantite_autorisee?: number | null;
+  montant_autorise_fcfa: number | null;
   station_service?: string | null;
   motif?: string | null;
   date_emission: string;
@@ -4244,16 +4245,17 @@ export interface CreateBonCarburantBody {
   vehicule_id: number;
   chauffeur_id?: number;
   type_carburant: string;
-  quantite_autorisee: number;
+  montant_autorise_fcfa: number;
+  quantite_autorisee?: number;
   station_service?: string;
   motif?: string;
   date_emission: string;
 }
 
 export interface UtiliserBonCarburantBody {
-  quantite_livree: number;
+  quantite_livree?: number;
   prix_litre_fcfa?: number;
-  montant_fcfa?: number;
+  montant_fcfa: number;
   date_utilisation: string;
   station_service?: string;
   observations?: string;
@@ -4265,6 +4267,7 @@ export type StatsCarburantParVehiculeItem = {
   marque?: string | null;
   nb_bons?: number;
   qte_livree_l?: number;
+  montant_autorise_fcfa?: number;
   montant_fcfa?: number;
 };
 
@@ -4272,6 +4275,7 @@ export interface StatsCarburant {
   nb_bons: number;
   qte_autorisee_l: number;
   qte_livree_l: number;
+  montant_autorise_total_fcfa: number;
   montant_total_fcfa: number;
   par_vehicule: StatsCarburantParVehiculeItem[];
 }

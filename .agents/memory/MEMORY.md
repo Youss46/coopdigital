@@ -88,3 +88,4 @@
 - [Ordre des verrous des transferts de trésorerie](treasury-transfer-lock-order.md) — banque puis caisse dans les deux sens pour éviter les deadlocks.
 - [Date de session du journal de caisse](cash-journal-session-date.md) — les débits automatiques doivent cibler la session ouverte du jour, sinon le journal quotidien masque le mouvement.
 - [Analyse Claude des balances Sage](balance-sage-claude-analysis.md) — une ligne Sage mouvementée peut être analysée malgré un compte absent du plan; la préparation comptable garde le contrôle bloquant.
+- [Bons carburant saisis en montant](bons-carburant-montant.md) — montant autorisé et montant consommé pilotent le flux; litres/prix restent facultatifs pour les historiques et le détail.

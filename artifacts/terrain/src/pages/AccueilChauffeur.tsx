@@ -21,7 +21,8 @@ interface BonResume {
   id: number;
   numero: string;
   type_carburant: string;
-  quantite_autorisee: number;
+  quantite_autorisee: number | null;
+  montant_autorise_fcfa: number | null;
   station_service: string | null;
   immatriculation: string | null;
 }
@@ -370,7 +371,7 @@ function BonCard({
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ fontFamily: "monospace", fontWeight: 700, fontSize: "0.8rem", color: "var(--t-primary)" }}>{bon.numero}</p>
           <p style={{ fontSize: "0.8rem", color: "var(--t-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {bon.immatriculation ?? "—"} · <strong>{bon.quantite_autorisee} L</strong> {bon.type_carburant}
+            {bon.immatriculation ?? "—"} · <strong>{bon.montant_autorise_fcfa != null ? `${bon.montant_autorise_fcfa.toLocaleString("fr-FR")} FCFA` : "historique en litres"}</strong> {bon.type_carburant}
           </p>
           {bon.station_service && (
             <p style={{ fontSize: "0.75rem", color: "var(--t-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>

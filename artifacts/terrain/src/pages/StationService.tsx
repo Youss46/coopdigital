@@ -67,7 +67,8 @@ interface BonInfo {
   numero: string;
   statut: string;
   type_carburant: string;
-  quantite_autorisee: number;
+  quantite_autorisee: number | null;
+  montant_autorise_fcfa?: number | null;
   station_service: string | null;
   motif: string | null;
   date_emission: string;
@@ -81,7 +82,8 @@ interface BonInfo {
 interface QrData {
   v: number;
   num: string;
-  qte: number;
+  qte: number | null;
+  montant_autorise_fcfa: number | null;
   type: string;
   immat: string | null;
   chauffeur: string | null;
@@ -204,6 +206,7 @@ export default function StationService() {
   const verifGenRef = useRef(0);
 
   const [form, setForm] = useState({
+    montant_fcfa:      "",
     quantite_livree:  "",
     prix_litre_fcfa:  "",
     date_utilisation: new Date().toISOString().split("T")[0]!,
@@ -241,6 +244,7 @@ export default function StationService() {
     setBon({
       numero: rawData.num, statut: "approuve",
       type_carburant: rawData.type, quantite_autorisee: rawData.qte,
+      montant_autorise_fcfa: rawData.montant_autorise_fcfa ?? null,
       station_service: null, motif: rawData.motif,
       date_emission: rawData.date_em, immatriculation: rawData.immat,
       marque: rawData.marque, chauffeur_nom: rawData.chauffeur,
@@ -371,16 +375,17 @@ export default function StationService() {
 
   const handleLivrer = useCallback(async () => {
     if (!bon) return;
-    if (!form.quantite_livree || !form.date_utilisation) {
-      toast({ title: "Champs requis", description: "La quantité et la date sont obligatoires.", variant: "destructive" });
+    if (!form.montant_fcfa || !form.date_utilisation) {
+      toast({ title: "Champs requis", description: "Le montant et la date sont obligatoires.", variant: "destructive" });
       return;
     }
     setSubmitting(true);
     try {
       const body: Record<string, unknown> = {
-        quantite_livree:  parseFloat(form.quantite_livree),
+        montant_fcfa:     parseFloat(form.montant_fcfa),
         date_utilisation: form.date_utilisation,
       };
+      if (form.quantite_livree) body["quantite_livree"] = parseFloat(form.quantite_livree);
       if (form.prix_litre_fcfa) body["prix_litre_fcfa"] = parseFloat(form.prix_litre_fcfa);
       if (form.station_service)  body["station_service"]  = form.station_service;
       if (form.observations)     body["observations"]     = form.observations;
@@ -423,7 +428,7 @@ export default function StationService() {
           </h1>
           <p style={{ color: "var(--t-text)", fontSize: "0.95rem", lineHeight: 1.5 }}>
             Bon <strong>{bon.numero}</strong><br />
-            {form.quantite_livree} L de {TYPE_CARB[bon.type_carburant] ?? bon.type_carburant}
+            {form.montant_fcfa} FCFA{form.quantite_livree ? ` · ${form.quantite_livree} L` : ""} de {TYPE_CARB[bon.type_carburant] ?? bon.type_carburant}
           </p>
         </div>
         <button
@@ -433,7 +438,7 @@ export default function StationService() {
             setBon(null); setDone(false); setSearchValue(""); setTicketPhoto(null);
             setQrPayload(null); setQrSig(null); setQrVerified(null);
             setQrExpired(false); setQrExpiryMs(null);
-            setForm({ quantite_livree: "", prix_litre_fcfa: "", date_utilisation: new Date().toISOString().split("T")[0]!, station_service: "", observations: "" });
+            setForm({ montant_fcfa: "", quantite_livree: "", prix_litre_fcfa: "", date_utilisation: new Date().toISOString().split("T")[0]!, station_service: "", observations: "" });
           }}
         >
           Nouveau bon
@@ -626,9 +631,13 @@ export default function StationService() {
                   value={bon.immatriculation ?? "—"} sub={bon.marque ?? undefined} />
                 <InfoCell icon={<User size={15} color="var(--t-muted)" />} label="Chauffeur"
                   value={bon.chauffeur_nom ?? "—"} />
-                <InfoCell icon={<Droplets size={15} color="var(--t-info)" />} label="Carburant autorisé"
-                  value={`${bon.quantite_autorisee} L — ${TYPE_CARB[bon.type_carburant] ?? bon.type_carburant}`}
+                <InfoCell icon={<Droplets size={15} color="var(--t-info)" />} label="Montant autorisé"
+                  value={`${bon.montant_autorise_fcfa != null ? `${bon.montant_autorise_fcfa.toLocaleString("fr-FR")} FCFA` : "Historique en litres"} — ${TYPE_CARB[bon.type_carburant] ?? bon.type_carburant}`}
                   valueColor="var(--t-info)" />
+                {bon.quantite_autorisee != null && (
+                  <InfoCell icon={<Droplets size={15} color="var(--t-muted)" />} label="Quantité indicative"
+                    value={`${bon.quantite_autorisee} L`} />
+                )}
                 <InfoCell icon={<CalendarDays size={15} color="var(--t-muted)" />} label="Date d'émission"
                   value={fmt(bon.date_emission)} />
               </div>
@@ -659,13 +668,19 @@ export default function StationService() {
                   <Fuel size={16} color="var(--t-success)" /> Enregistrer la délivrance
                 </p>
 
-                {/* Quantité + Prix */}
+                {/* Montant + quantité/prix complémentaires */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
                   <div className="t-field">
-                    <label className="t-label">Quantité livrée (L) *</label>
+                    <label className="t-label">Montant consommé (FCFA) *</label>
                     <NumericInput decimal={false} className="t-input" style={{ height: 48, fontSize: "1rem" }}
-                      step="0.1" min="0" max={bon.quantite_autorisee + 1}
-                      placeholder={`Max ${bon.quantite_autorisee} L`}
+                      step="1" min="1" placeholder="Ex : 47 500"
+                      value={form.montant_fcfa}
+                      onChange={value => setForm(f => ({ ...f, montant_fcfa: value }))} />
+                  </div>
+                  <div className="t-field">
+                    <label className="t-label">Quantité livrée (L)</label>
+                    <NumericInput decimal className="t-input" style={{ height: 48, fontSize: "1rem" }}
+                      step="0.1" min="0" placeholder="Optionnel"
                       value={form.quantite_livree}
                       onChange={value => setForm(f => ({ ...f, quantite_livree: value }))} />
                   </div>
@@ -679,14 +694,14 @@ export default function StationService() {
                 </div>
 
                 {/* Montant total calculé */}
-                {form.quantite_livree && form.prix_litre_fcfa && (
+                {form.montant_fcfa && (
                   <div style={{
                     background: "var(--t-success-bg)", borderRadius: 10,
                     padding: "10px 16px", textAlign: "center", marginBottom: 12,
                   }}>
                     <p style={{ fontSize: "0.72rem", color: "var(--t-success)", marginBottom: 2 }}>Montant total</p>
                     <p style={{ fontSize: "1.3rem", fontWeight: 800, color: "var(--t-success)" }}>
-                      {Math.round(parseFloat(form.quantite_livree) * parseFloat(form.prix_litre_fcfa)).toLocaleString("fr-FR")} FCFA
+                      {Math.round(parseFloat(form.montant_fcfa)).toLocaleString("fr-FR")} FCFA
                     </p>
                   </div>
                 )}
@@ -752,7 +767,7 @@ export default function StationService() {
                 <button
                   className="t-btn t-btn--success"
                   onClick={handleLivrer}
-                  disabled={submitting || !form.quantite_livree || !form.date_utilisation}
+                  disabled={submitting || !form.montant_fcfa || !form.date_utilisation}
                 >
                   {submitting
                     ? <><Spinner color="#fff" size={18} /> Enregistrement…</>

@@ -1493,6 +1493,7 @@ interface BonForm {
   vehicule_id: string;
   chauffeur_id: string;
   type_carburant: string;
+  montant_autorise_fcfa: number | string;
   quantite_autorisee: number | string;
   station_service: string;
   motif: string;
@@ -1500,6 +1501,7 @@ interface BonForm {
 }
 
 interface UtiliserForm {
+  montant_fcfa: number | string;
   quantite_livree: number | string;
   prix_litre_fcfa: number | string;
   date_utilisation: string;
@@ -1511,6 +1513,7 @@ const EMPTY_BON_FORM: BonForm = {
   vehicule_id: "",
   chauffeur_id: "",
   type_carburant: "gasoil",
+  montant_autorise_fcfa: "",
   quantite_autorisee: "",
   station_service: "",
   motif: "",
@@ -1518,6 +1521,7 @@ const EMPTY_BON_FORM: BonForm = {
 };
 
 const EMPTY_UTILISER_FORM: UtiliserForm = {
+  montant_fcfa: "",
   quantite_livree: "",
   prix_litre_fcfa: "",
   date_utilisation: new Date().toISOString().split("T")[0],
@@ -1583,7 +1587,7 @@ function TabCarburant() {
   const [showUtiliser, setShowUtiliser]   = useState(false);
   const [showTraiter, setShowTraiter]     = useState(false);
   const [traiteBon, setTraiteBon]         = useState<BonCarburant | null>(null);
-  const [traiterQte, setTraiterQte]       = useState<string>("");
+  const [traiterMontant, setTraiterMontant] = useState<string>("");
   const [selectedBon, setSelectedBon]     = useState<BonCarburant | null>(null);
   const [form,   setForm]   = useState<BonForm>(EMPTY_BON_FORM);
   const [uForm,  setUForm]  = useState<UtiliserForm>(EMPTY_UTILISER_FORM);
@@ -1612,14 +1616,14 @@ function TabCarburant() {
   }});
 
   const traiterMut = useMutation({
-    mutationFn: ({ id, quantite_autorisee }: { id: number; quantite_autorisee: number }) =>
+      mutationFn: ({ id, montant_autorise_fcfa, quantite_autorisee }: { id: number; montant_autorise_fcfa: number; quantite_autorisee?: number }) =>
       fetch(`${BASE}/api/transport/carburant/bons/${id}/traiter`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("coop_token") ?? ""}`,
         },
-        body: JSON.stringify({ quantite_autorisee }),
+        body: JSON.stringify({ montant_autorise_fcfa, ...(quantite_autorisee != null ? { quantite_autorisee } : {}) }),
       }).then(async r => {
         if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as {erreur?:string}).erreur ?? "Erreur"); }
         return r.json();
@@ -1628,24 +1632,20 @@ function TabCarburant() {
       toast({ title: "Demande traitée — bon soumis pour approbation" });
       setShowTraiter(false);
       setTraiteBon(null);
-      setTraiterQte("");
+      setTraiterMontant("");
       invalidate();
     },
     onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
 
-  // Calcul montant auto
-  const montantEstime = uForm.quantite_livree !== "" && uForm.prix_litre_fcfa !== ""
-    ? Math.round(Number(uForm.quantite_livree) * Number(uForm.prix_litre_fcfa))
-    : null;
-
   function handleCreate() {
-    if (!form.vehicule_id || !form.quantite_autorisee || !form.date_emission) return;
+    if (!form.vehicule_id || !form.montant_autorise_fcfa || !form.date_emission) return;
     createMut.mutate({ data: {
       vehicule_id:        parseInt(form.vehicule_id),
       ...(form.chauffeur_id ? { chauffeur_id: parseInt(form.chauffeur_id) } : {}),
       type_carburant:     form.type_carburant,
-      quantite_autorisee: Number(form.quantite_autorisee),
+      montant_autorise_fcfa: Number(form.montant_autorise_fcfa),
+      ...(form.quantite_autorisee !== "" ? { quantite_autorisee: Number(form.quantite_autorisee) } : {}),
       ...(form.station_service ? { station_service: form.station_service } : {}),
       ...(form.motif           ? { motif: form.motif }                     : {}),
       date_emission: form.date_emission,
@@ -1653,12 +1653,12 @@ function TabCarburant() {
   }
 
   function handleUtiliser() {
-    if (!selectedBon || !uForm.quantite_livree || !uForm.date_utilisation) return;
+    if (!selectedBon || !uForm.montant_fcfa || !uForm.date_utilisation) return;
     utilMut.mutate({ id: selectedBon.id, data: {
-      quantite_livree:  Number(uForm.quantite_livree),
+      montant_fcfa:     Number(uForm.montant_fcfa),
       date_utilisation: uForm.date_utilisation,
+      ...(uForm.quantite_livree !== "" ? { quantite_livree: Number(uForm.quantite_livree) } : {}),
       ...(uForm.prix_litre_fcfa !== "" ? { prix_litre_fcfa: Number(uForm.prix_litre_fcfa) } : {}),
-      ...(montantEstime != null        ? { montant_fcfa: montantEstime }                     : {}),
       ...(uForm.station_service        ? { station_service: uForm.station_service }          : {}),
       ...(uForm.observations           ? { observations: uForm.observations }                : {}),
     }});
@@ -1691,7 +1691,7 @@ function TabCarburant() {
         <div className="space-y-4">
           {stats && (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                 <Card className="p-3">
                   <div className="text-xs text-gray-500">Bons utilisés</div>
                   <div className="text-2xl font-bold">{stats.nb_bons}</div>
@@ -1699,6 +1699,10 @@ function TabCarburant() {
                 <Card className="p-3">
                   <div className="text-xs text-gray-500">Qté autorisée</div>
                   <div className="text-2xl font-bold">{stats.qte_autorisee_l.toFixed(0)} <span className="text-sm font-normal">L</span></div>
+                </Card>
+                <Card className="p-3">
+                  <div className="text-xs text-gray-500">Montant autorisé</div>
+                  <div className="text-xl font-bold">{formatFcfa(stats.montant_autorise_total_fcfa)}</div>
                 </Card>
                 <Card className="p-3">
                   <div className="text-xs text-gray-500">Qté livrée</div>
@@ -1721,6 +1725,7 @@ function TabCarburant() {
                         <TableHead>Marque</TableHead>
                         <TableHead className="text-right">Bons</TableHead>
                         <TableHead className="text-right">Litres livrés</TableHead>
+                        <TableHead className="text-right">Montant autorisé</TableHead>
                         <TableHead className="text-right">Montant</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1731,11 +1736,12 @@ function TabCarburant() {
                           <TableCell className="text-sm">{v.marque ?? "—"}</TableCell>
                           <TableCell className="text-right">{v.nb_bons}</TableCell>
                           <TableCell className="text-right font-semibold">{(v.qte_livree_l ?? 0).toFixed(1)} L</TableCell>
+                          <TableCell className="text-right">{formatFcfa(v.montant_autorise_fcfa ?? 0)}</TableCell>
                           <TableCell className="text-right">{formatFcfa(v.montant_fcfa)}</TableCell>
                         </TableRow>
                       ))}
                       {stats.par_vehicule.length === 0 && (
-                        <TableRow><TableCell colSpan={5} className="text-center text-gray-400 py-6">Aucune donnée</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={6} className="text-center text-gray-400 py-6">Aucune donnée</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
@@ -1806,6 +1812,7 @@ function TabCarburant() {
                     <TableHead>Véhicule</TableHead>
                     <TableHead>Chauffeur</TableHead>
                     <TableHead>Carburant</TableHead>
+                    <TableHead className="text-right">Montant auto.</TableHead>
                     <TableHead className="text-right">Qté auto.</TableHead>
                     <TableHead className="text-right">Qté livrée</TableHead>
                     <TableHead>Station</TableHead>
@@ -1821,7 +1828,8 @@ function TabCarburant() {
                       <TableCell className="text-sm font-mono">{bon.immatriculation ?? "—"}</TableCell>
                       <TableCell className="text-sm">{bon.chauffeur_nom ?? "—"}</TableCell>
                       <TableCell className="text-sm">{CARBURANT_TYPES.find(t => t.value === bon.type_carburant)?.label ?? bon.type_carburant}</TableCell>
-                      <TableCell className="text-right text-sm font-semibold">{bon.quantite_autorisee} L</TableCell>
+                      <TableCell className="text-right text-sm font-semibold">{bon.montant_autorise_fcfa != null ? formatFcfa(bon.montant_autorise_fcfa) : "—"}</TableCell>
+                      <TableCell className="text-right text-sm">{bon.quantite_autorisee != null ? `${bon.quantite_autorisee} L` : "—"}</TableCell>
                       <TableCell className="text-right text-sm">{bon.quantite_livree != null ? `${bon.quantite_livree} L` : "—"}</TableCell>
                       <TableCell className="text-sm text-gray-500 max-w-[100px] truncate">{bon.station_service ?? "—"}</TableCell>
                       <TableCell>
@@ -1830,7 +1838,7 @@ function TabCarburant() {
                           {/* Action primaire sous le badge — toujours visible */}
                           {bon.statut === "demande" && peutTraiter && (
                             <Button size="sm" className="h-6 text-xs px-2 bg-orange-500 hover:bg-orange-600 text-white"
-                              onClick={() => { setTraiteBon(bon); setTraiterQte(bon.quantite_autorisee > 0 ? String(bon.quantite_autorisee) : ""); setShowTraiter(true); }}>
+                              onClick={() => { setTraiteBon(bon); setTraiterMontant(bon.montant_autorise_fcfa != null ? String(bon.montant_autorise_fcfa) : ""); setShowTraiter(true); }}>
                               <CheckCircle2 className="h-3 w-3 mr-1" /> Traiter
                             </Button>
                           )}
@@ -1883,7 +1891,7 @@ function TabCarburant() {
       )}
 
       {/* ── Dialog traitement demande ── */}
-      <Dialog open={showTraiter} onOpenChange={v => { setShowTraiter(v); if (!v) { setTraiteBon(null); setTraiterQte(""); } }}>
+      <Dialog open={showTraiter} onOpenChange={v => { setShowTraiter(v); if (!v) { setTraiteBon(null); setTraiterMontant(""); } }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Traiter la demande</DialogTitle>
@@ -1899,14 +1907,15 @@ function TabCarburant() {
                 <p><span className="text-gray-500">Carburant :</span> <strong>{CARBURANT_TYPES.find(t => t.value === traiteBon.type_carburant)?.label ?? traiteBon.type_carburant}</strong></p>
                 {traiteBon.motif && <p><span className="text-gray-500">Motif :</span> {traiteBon.motif}</p>}
                 {traiteBon.station_service && <p><span className="text-gray-500">Station :</span> {traiteBon.station_service}</p>}
-                {traiteBon.quantite_autorisee > 0 && <p><span className="text-gray-500">Qté demandée :</span> {traiteBon.quantite_autorisee} L</p>}
+                {traiteBon.montant_autorise_fcfa != null && <p><span className="text-gray-500">Montant demandé :</span> {formatFcfa(traiteBon.montant_autorise_fcfa)}</p>}
+                {traiteBon.quantite_autorisee != null && <p><span className="text-gray-500">Qté indicative :</span> {traiteBon.quantite_autorisee} L</p>}
               </div>
             )}
             <div>
-              <Label>Quantité autorisée (L) *</Label>
-               <NumericInput min={1} step="any" placeholder="Ex : 50"
-                value={traiterQte}
-                 onChange={setTraiterQte}
+              <Label>Montant autorisé (FCFA) *</Label>
+               <NumericInput decimal={false} min={1} step="1" placeholder="Ex : 50 000"
+                value={traiterMontant}
+                 onChange={setTraiterMontant}
                 autoFocus
               />
               <p className="text-xs text-gray-400 mt-1">Le bon sera soumis pour approbation PCA/directeur.</p>
@@ -1916,8 +1925,8 @@ function TabCarburant() {
             <Button variant="outline" onClick={() => setShowTraiter(false)}>Annuler</Button>
             <Button
               className="bg-orange-500 hover:bg-orange-600"
-              disabled={!traiterQte || parseFloat(traiterQte) <= 0 || traiterMut.isPending}
-              onClick={() => traiteBon && traiterMut.mutate({ id: traiteBon.id, quantite_autorisee: parseFloat(traiterQte) })}
+              disabled={!traiterMontant || parseFloat(traiterMontant) <= 0 || traiterMut.isPending}
+              onClick={() => traiteBon && traiterMut.mutate({ id: traiteBon.id, montant_autorise_fcfa: parseFloat(traiterMontant), ...(traiteBon.quantite_autorisee != null ? { quantite_autorisee: traiteBon.quantite_autorisee } : {}) })}
             >
               {traiterMut.isPending ? "Traitement…" : "Valider & soumettre"}
             </Button>
@@ -1964,8 +1973,13 @@ function TabCarburant() {
                 </Select>
               </div>
               <div>
-                <Label>Quantité autorisée (L) *</Label>
-                 <NumericInput min={1} step="any" placeholder="50" value={form.quantite_autorisee}
+                <Label>Montant autorisé (FCFA) *</Label>
+                 <NumericInput decimal={false} min={1} step="1" placeholder="50 000" value={form.montant_autorise_fcfa}
+                   onChange={v => setForm(f => ({ ...f, montant_autorise_fcfa: v }))} />
+              </div>
+              <div>
+                <Label>Quantité indicative (L)</Label>
+                 <NumericInput min={0} step="any" placeholder="Optionnel" value={form.quantite_autorisee}
                    onChange={v => setForm(f => ({ ...f, quantite_autorisee: v }))} />
               </div>
             </div>
@@ -1998,7 +2012,7 @@ function TabCarburant() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreate(false)}>Annuler</Button>
-            <Button onClick={handleCreate} disabled={!form.vehicule_id || !form.quantite_autorisee || createMut.isPending}>
+            <Button onClick={handleCreate} disabled={!form.vehicule_id || !form.montant_autorise_fcfa || createMut.isPending}>
               Créer le bon
             </Button>
           </DialogFooter>
@@ -2012,15 +2026,20 @@ function TabCarburant() {
             <DialogTitle>Enregistrer l'utilisation</DialogTitle>
             {selectedBon && (
               <p className="text-sm text-gray-500">
-                Bon {selectedBon.numero} — {selectedBon.immatriculation} — autorisé : <strong>{selectedBon.quantite_autorisee} L</strong>
+                Bon {selectedBon.numero} — {selectedBon.immatriculation} — autorisé : <strong>{selectedBon.montant_autorise_fcfa != null ? formatFcfa(selectedBon.montant_autorise_fcfa) : "historique en litres"}</strong>
               </p>
             )}
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Quantité réellement livrée (L) *</Label>
-                 <NumericInput min={0} step="any" placeholder="0" value={uForm.quantite_livree}
+                <Label>Montant réellement consommé (FCFA) *</Label>
+                 <NumericInput decimal={false} min={1} step="1" placeholder="Ex : 47 500" value={uForm.montant_fcfa}
+                   onChange={v => setUForm(f => ({ ...f, montant_fcfa: v }))} />
+              </div>
+              <div>
+                <Label>Quantité réellement livrée (L)</Label>
+                 <NumericInput min={0} step="any" placeholder="Optionnel" value={uForm.quantite_livree}
                    onChange={v => setUForm(f => ({ ...f, quantite_livree: v }))} />
               </div>
               <div>
@@ -2036,9 +2055,9 @@ function TabCarburant() {
                    onChange={v => setUForm(f => ({ ...f, prix_litre_fcfa: v }))} />
               </div>
               <div>
-                <Label>Montant estimé</Label>
+                  <Label>Montant saisi</Label>
                 <div className="h-9 flex items-center px-3 rounded-md border bg-gray-50 text-sm font-semibold">
-                  {montantEstime != null ? formatFcfa(montantEstime) : "—"}
+                  {uForm.montant_fcfa !== "" ? formatFcfa(Number(uForm.montant_fcfa)) : "—"}
                 </div>
               </div>
             </div>
@@ -2064,7 +2083,7 @@ function TabCarburant() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowUtiliser(false)}>Annuler</Button>
-            <Button onClick={handleUtiliser} disabled={!uForm.quantite_livree || !uForm.date_utilisation || utilMut.isPending}>
+            <Button onClick={handleUtiliser} disabled={!uForm.montant_fcfa || !uForm.date_utilisation || utilMut.isPending}>
               Enregistrer
             </Button>
           </DialogFooter>

@@ -72,7 +72,8 @@ export async function handleQrTokenBonStation(
     const qrData = {
       v: 1,
       num: b.numero,
-      qte: parseFloat(b.quantiteAutorisee),
+      qte: b.quantiteAutorisee != null ? parseFloat(b.quantiteAutorisee) : null,
+      montant_autorise_fcfa: b.montantAutoriseFcfa != null ? parseFloat(b.montantAutoriseFcfa) : null,
       type: b.typeCarburant,
       immat: row.immatriculation ?? null,
       chauffeur: row.chauffeurNom
@@ -115,7 +116,8 @@ export async function handleVerifierBonStation(
       numero: b.numero,
       statut: b.statut,
       type_carburant: b.typeCarburant,
-      quantite_autorisee: parseFloat(b.quantiteAutorisee),
+      quantite_autorisee: b.quantiteAutorisee != null ? parseFloat(b.quantiteAutorisee) : null,
+      montant_autorise_fcfa: b.montantAutoriseFcfa != null ? parseFloat(b.montantAutoriseFcfa) : null,
       station_service: b.stationService ?? null,
       motif: b.motif ?? null,
       date_emission: b.dateEmission,
@@ -160,7 +162,7 @@ export async function handleLivrerBonStation(
     type ModePaiement = typeof MODES_VALIDES[number];
 
     const body = req.body as {
-      quantite_livree: number;
+      quantite_livree?: number;
       prix_litre_fcfa?: number;
       montant_fcfa?: number;
       date_utilisation: string;
@@ -223,27 +225,30 @@ export async function handleLivrerBonStation(
       return;
     }
 
-    if (!body.quantite_livree || !body.date_utilisation) {
+    const montant = Number(body.montant_fcfa);
+    if (!Number.isFinite(montant) || montant <= 0 || !body.date_utilisation) {
       res
         .status(400)
-        .json({ erreur: "quantite_livree et date_utilisation requis" });
+        .json({ erreur: "montant_fcfa et date_utilisation requis" });
+      return;
+    }
+    if (body.quantite_livree != null && (!Number.isFinite(Number(body.quantite_livree)) || body.quantite_livree <= 0)) {
+      res.status(400).json({ erreur: "La quantité livrée doit être positive lorsqu'elle est fournie" });
+      return;
+    }
+    const montantArrondi = Math.round(montant);
+    if (row.bon.montantAutoriseFcfa != null && montantArrondi > Number(row.bon.montantAutoriseFcfa)) {
+      res.status(400).json({ erreur: "Le montant consommé ne peut pas dépasser le montant autorisé" });
       return;
     }
 
-    const montant =
-      body.montant_fcfa != null
-        ? body.montant_fcfa
-        : body.prix_litre_fcfa != null
-          ? Math.round(body.quantite_livree * body.prix_litre_fcfa)
-          : null;
-
     const extra: Record<string, unknown> = {
-      quantiteLivree: String(body.quantite_livree),
       dateUtilisation: body.date_utilisation,
+      montantFcfa: String(montantArrondi),
     };
+    if (body.quantite_livree != null) extra["quantiteLivree"] = String(body.quantite_livree);
     if (body.prix_litre_fcfa != null)
       extra["prixLitreFcfa"] = String(body.prix_litre_fcfa);
-    if (montant != null) extra["montantFcfa"] = String(montant);
     if (body.station_service) extra["stationService"] = body.station_service;
     if (body.observations) extra["observations"] = body.observations;
     if (body.ticket_url) extra["ticketUrl"] = body.ticket_url;
@@ -251,7 +256,7 @@ export async function handleLivrerBonStation(
     await transitionBon(row.bon.cooperativeId, row.bon.id, "utilise", extra);
 
     // Dépense véhicule (suivi consommation) + paiement en attente (validé dans ReglementsPage)
-    if (montant && montant > 0) {
+    if (montantArrondi > 0) {
       try {
         await createDepense(
           row.bon.cooperativeId,
@@ -259,19 +264,18 @@ export async function handleLivrerBonStation(
           {
             type: "carburant",
             dateDepense: body.date_utilisation,
-            montantFcfa: String(montant),
+            montantFcfa: String(montantArrondi),
             libelle: `Carburant — Bon ${row.bon.numero}`,
             fournisseur: body.station_service ?? row.bon.stationService ?? null,
             referencePiece: row.bon.numero,
-            quantite: String(body.quantite_livree),
-            unite: "L",
+            ...(body.quantite_livree != null ? { quantite: String(body.quantite_livree), unite: "L" } : {}),
             missionId: null,
           },
         );
         // Créer un règlement en attente — sera validé depuis ReglementsPage
         await db.insert(paiementsTable).values({
           bonCarburantId: row.bon.id,
-          montantFcfa: Math.round(montant),
+          montantFcfa: montantArrondi,
           modePaiement: modePaiement,
           statut: "en_attente",
         });
