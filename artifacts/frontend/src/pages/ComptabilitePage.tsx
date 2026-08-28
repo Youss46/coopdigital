@@ -3237,6 +3237,19 @@ const TYPES_REGUL = [
 
 type TypeRegul = typeof TYPES_REGUL[number]["code"];
 
+interface ClaudeRegularisationSuggestion {
+  type: TypeRegul;
+  typeLibelle: string;
+  compteRegul: string;
+  compteRegulLibelle: string;
+  compteContrepartie: string;
+  compteContrepartieLibelle: string;
+  libelle: string;
+  montantFcfa: number | null;
+  justification: string;
+  score: number;
+}
+
 interface LigneRegul {
   id: number; dateEcriture: string; libelle: string;
   compteDebit: string; compteCredit: string; montantFcfa: number;
@@ -3261,6 +3274,12 @@ function OngletCloture() {
   const [rMontant,   setRMontant]   = useState(0);
   const [rLoading,   setRLoading]   = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [suggestionSituation, setSuggestionSituation] = useState("");
+  const [suggestionPeriode, setSuggestionPeriode] = useState("");
+  const [suggestionMontant, setSuggestionMontant] = useState("");
+  const [regularisationSuggestions, setRegularisationSuggestions] = useState<ClaudeRegularisationSuggestion[]>([]);
+  const [regularisationSuggestionMessage, setRegularisationSuggestionMessage] = useState("");
+  const [regularisationSuggestionsLoading, setRegularisationSuggestionsLoading] = useState(false);
 
   // ── Affectation du résultat ────────────────────────────────────────────────
   const [dateAG, setDateAG]                 = useState(() => `${anneeActuelle}-03-31`);
@@ -3272,6 +3291,49 @@ function OngletCloture() {
   const handleSetRType = (code: TypeRegul) => {
     setRType(code);
     setRCompteRegul(TYPES_REGUL.find((t) => t.code === code)?.defaultRegul ?? code);
+  };
+
+  const handleSuggestRegularisations = async () => {
+    if (suggestionSituation.trim().length < 10) {
+      toast({ title: "Décrivez la situation à régulariser", description: "Indiquez par exemple la facture, la période et ce qui a déjà été enregistré.", variant: "destructive" });
+      return;
+    }
+    setRegularisationSuggestionsLoading(true);
+    setRegularisationSuggestionMessage("");
+    try {
+      const body: Record<string, unknown> = {
+        exercice: annee,
+        situation: suggestionSituation.trim(),
+      };
+      if (suggestionPeriode.trim()) body["periode"] = suggestionPeriode.trim();
+      if (suggestionMontant.trim()) body["montantFcfa"] = Number(suggestionMontant);
+      const value = await apiPost<{
+        disponible: boolean;
+        suggestions: ClaudeRegularisationSuggestion[];
+        message?: string;
+      }>("/api/comptabilite/regularisations/suggestions-claude", body);
+      setRegularisationSuggestions(value.suggestions);
+      setRegularisationSuggestionMessage(value.message ?? (value.suggestions.length
+        ? "Choisissez une proposition pour reprendre ses valeurs dans le formulaire."
+        : "Aucune proposition compatible n’a été trouvée."));
+    } catch (err) {
+      setRegularisationSuggestions([]);
+      setRegularisationSuggestionMessage((err as Error).message || "La suggestion Claude est indisponible. Vous pouvez saisir la régularisation manuellement.");
+    } finally {
+      setRegularisationSuggestionsLoading(false);
+    }
+  };
+
+  const handleUseRegularisationSuggestion = (suggestion: ClaudeRegularisationSuggestion) => {
+    handleSetRType(suggestion.type);
+    setRCompteRegul(suggestion.compteRegul);
+    setRCompte(suggestion.compteContrepartie);
+    setRLibelle(suggestion.libelle);
+    if (suggestion.montantFcfa !== null) {
+      setRMontant(suggestion.montantFcfa);
+      setSuggestionMontant(String(suggestion.montantFcfa));
+    }
+    setRegularisationSuggestionMessage("Proposition reprise dans le formulaire. Vérifiez-la puis cliquez sur « Enregistrer ».");
   };
 
   const regulQuery = useQuery({
@@ -3454,7 +3516,13 @@ function OngletCloture() {
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Exercice</label>
             <select value={annee}
-              onChange={(e) => { setAnnee(Number(e.target.value)); setConfirm(false); setResultat(null); }}
+              onChange={(e) => {
+                setAnnee(Number(e.target.value));
+                setConfirm(false);
+                setResultat(null);
+                setRegularisationSuggestions([]);
+                setRegularisationSuggestionMessage("");
+              }}
               className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700">
               {annees.map((a) => <option key={a} value={a}>{a}</option>)}
             </select>
@@ -3508,6 +3576,105 @@ function OngletCloture() {
           <p className="text-xs text-gray-400 mb-4">
             Rattachez à l'exercice {annee} les charges/produits non encore enregistrés ou à neutraliser (OHADA art. 59).
           </p>
+
+          {/* Assistant de proposition Claude */}
+          <div className="rounded-xl border border-purple-100 bg-purple-50/50 p-4 mb-5">
+            <div className="flex items-start gap-2 mb-3">
+              <Sparkles size={15} className="text-purple-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <h4 className="text-sm font-semibold text-purple-900">Proposer une régularisation avec Claude</h4>
+                <p className="text-xs text-purple-700 mt-1">
+                  Claude s’appuie uniquement sur le plan comptable actif de votre coopérative. La proposition doit être vérifiée et enregistrée manuellement.
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_13rem] gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Situation à régulariser *</label>
+                <textarea
+                  value={suggestionSituation}
+                  onChange={(e) => setSuggestionSituation(e.target.value)}
+                  rows={3}
+                  maxLength={3000}
+                  placeholder="Ex. Facture d’électricité de décembre 2025 reçue en janvier 2026, montant non encore enregistré."
+                  className="w-full border border-purple-100 bg-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Période concernée</label>
+                  <input
+                    value={suggestionPeriode}
+                    onChange={(e) => setSuggestionPeriode(e.target.value)}
+                    maxLength={200}
+                    placeholder="Ex. décembre 2025"
+                    className="w-full border border-purple-100 bg-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Montant (FCFA)</label>
+                  <MoneyInput
+                    value={suggestionMontant}
+                    onChange={setSuggestionMontant}
+                    placeholder="Laisser vide si inconnu"
+                    className="w-full border border-purple-100 bg-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => void handleSuggestRegularisations()}
+                disabled={regularisationSuggestionsLoading}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-purple-200 bg-white text-purple-800 text-sm font-medium hover:bg-purple-100 disabled:opacity-50"
+              >
+                {regularisationSuggestionsLoading
+                  ? <><RefreshCw size={14} className="animate-spin" /> Analyse en cours…</>
+                  : <><Sparkles size={14} /> Proposer avec Claude</>}
+              </button>
+              {regularisationSuggestionMessage && (
+                <p className="text-xs text-gray-600">{regularisationSuggestionMessage}</p>
+              )}
+            </div>
+            {regularisationSuggestions.length > 0 && (
+              <div className="grid gap-3 md:grid-cols-3 mt-4">
+                {regularisationSuggestions.map((suggestion, index) => {
+                  const typeInfo = TYPES_REGUL.find((type) => type.code === suggestion.type);
+                  const compteDebit = typeInfo?.debitSide === "contrepartie" ? suggestion.compteContrepartie : suggestion.compteRegul;
+                  const compteCredit = typeInfo?.debitSide === "contrepartie" ? suggestion.compteRegul : suggestion.compteContrepartie;
+                  return (
+                    <div key={`${suggestion.type}-${suggestion.compteRegul}-${suggestion.compteContrepartie}-${index}`} className="rounded-lg border border-purple-100 bg-white p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-purple-800">{suggestion.typeLibelle}</span>
+                        <span className="text-xs font-medium text-purple-700">{suggestion.score}%</span>
+                      </div>
+                      <p className="text-xs text-gray-700 mt-2">
+                        Débit <span className="font-mono font-semibold">{compteDebit}</span>
+                        {" "} / Crédit <span className="font-mono font-semibold">{compteCredit}</span>
+                      </p>
+                      <p className="text-[11px] text-gray-500 mt-1">
+                        {suggestion.compteRegul} — {suggestion.compteRegulLibelle}
+                      </p>
+                      <p className="text-[11px] text-gray-500">
+                        {suggestion.compteContrepartie} — {suggestion.compteContrepartieLibelle}
+                      </p>
+                      <p className="text-xs font-medium text-gray-800 mt-2">{suggestion.libelle}</p>
+                      <p className="text-xs text-gray-600 mt-1">{suggestion.montantFcfa === null ? "Montant à préciser" : FCFA(suggestion.montantFcfa)}</p>
+                      <p className="text-xs text-gray-500 mt-2">{suggestion.justification}</p>
+                      <button
+                        type="button"
+                        onClick={() => handleUseRegularisationSuggestion(suggestion)}
+                        className="mt-3 text-xs font-semibold text-purple-700 hover:text-purple-900 hover:underline"
+                      >
+                        Reprendre dans le formulaire
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
           {/* Formulaire ajout */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">

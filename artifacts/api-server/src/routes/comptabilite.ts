@@ -21,6 +21,7 @@ import {
   getStatutsExercices,
   getGrandLivreTiers,
   getBalanceAuxiliaire,
+  suggestRegularisations,
   listRegularisations,
   createRegularisation,
   deleteRegularisation,
@@ -91,6 +92,7 @@ router.get("/comptabilite/exercices",                  checkPermission("comptabi
 router.get("/comptabilite/cloture/apercu",             checkPermission("comptabilite", "voir_config"),              apercuCloture);
 router.post("/comptabilite/cloture",                   checkPermission("comptabilite", "modifier_config"),           cloturerExercice);
 router.get("/comptabilite/regularisations",            checkPermission("comptabilite", "voir_config"),              listRegularisations);
+router.post("/comptabilite/regularisations/suggestions-claude", checkPermission("comptabilite", "saisir_ecriture_manuelle"), suggestRegularisations);
 router.post("/comptabilite/regularisations",           checkPermission("comptabilite", "saisir_ecriture_manuelle"), createRegularisation);
 router.delete("/comptabilite/regularisations/:id",     checkPermission("comptabilite", "saisir_ecriture_manuelle"), deleteRegularisation);
 router.get("/comptabilite/historique-affectations",    checkPermission("comptabilite", "voir_config"),              getHistoriqueAffectations);
