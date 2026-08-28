@@ -1068,7 +1068,7 @@ paths:
     get:
       operationId: exportBalanceAuxiliaireSage
       tags: [comptabilite]
-      summary: Exporter les écritures auxiliaires au format Sage
+      summary: Exporter les écritures auxiliaires en XML pour rapprochement avec Sage 100 i7
       parameters:
         - name: exercice
           in: query
@@ -1076,7 +1076,7 @@ paths:
           schema: { type: integer }
       responses:
         "200":
-          description: Fichier XML prêt pour l'import Sage
+          description: Fichier XML structuré CoopDigital à valider avec le profil d'import Sage 100 i7
           content:
             application/xml:
               schema:

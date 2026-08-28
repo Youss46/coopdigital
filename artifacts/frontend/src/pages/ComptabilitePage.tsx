@@ -2811,7 +2811,10 @@ function OngletBalanceAuxiliaire() {
       link.download = `coopdigital_sage_${exercice}.xml`;
       link.click();
       URL.revokeObjectURL(url);
-      toast({ title: "Export Sage généré", description: "Le fichier XML est prêt à être importé dans Sage." });
+      toast({
+        title: "Export XML généré",
+        description: "Le fichier est prêt à être vérifié avec le profil d’import Sage 100 i7.",
+      });
     } catch (error) {
       toast({
         title: "Export Sage impossible",
@@ -2895,7 +2898,7 @@ function OngletBalanceAuxiliaire() {
             <button onClick={() => void handleExportSage()}
               className="px-3 py-2 rounded-lg text-sm font-medium text-white flex items-center gap-1.5 hover:opacity-90"
               style={{ backgroundColor: VERT }}>
-              <FileSpreadsheet size={14} /> Export Sage XML
+              <FileSpreadsheet size={14} /> Export XML pour Sage
             </button>
           </div>
         </div>
@@ -2906,6 +2909,8 @@ function OngletBalanceAuxiliaire() {
         <p>
           Les comptes collectifs CoopDigital restent inchangés. Utilisez <strong>Modifier</strong> pour associer
           chaque tiers à son ou ses comptes détaillés Sage. L’export est bloqué si une écriture utilise un compte tiers non paramétré.
+          Le fichier XML suit le contrat CoopDigital ; validez les balises, les dates et les codes tiers avec le profil
+          d’import de votre version Sage 100 i7 avant de l’importer dans un dossier de production.
         </p>
       </div>
 
