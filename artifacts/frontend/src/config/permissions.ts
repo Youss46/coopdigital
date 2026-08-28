@@ -35,8 +35,8 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
 
   stocks: {
     lire:               ["pca", "directeur", "magasinier", "responsable_tracabilite", "auditeur"],
-    entree:             ["pca", "directeur", "magasinier"],
-    sortie:             ["pca", "directeur", "magasinier"],
+    entree:             ["pca", "directeur"],
+    sortie:             ["pca", "directeur"],
     creer_entrepot:     ["pca", "directeur"],
     modifier_entrepot:  ["pca", "directeur"],
     supprimer_entrepot: ["pca"],
