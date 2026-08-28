@@ -468,9 +468,14 @@ export async function genererRapportIA(req: Request, res: Response): Promise<voi
     const kpis = await getKPIs(cooperativeId, resolvedCampagneId);
     const { system, user } = buildPrompt(kpis, sections);
 
-    const anthropic = new Anthropic({ apiKey: process.env["ANTHROPIC_API_KEY"] });
+    const apiKey = process.env["ANTHROPIC_API_KEY"];
+    const baseURL = process.env["ANTHROPIC_BASE_URL"];
+    const anthropic = new Anthropic({
+      apiKey,
+      ...(baseURL ? { baseURL } : {}),
+    });
     const stream = anthropic.messages.stream({
-      model: "claude-sonnet-4-5",
+      model: process.env["ANTHROPIC_MODEL"] ?? "claude-sonnet-4-5",
       max_tokens: 8192,
       system,
       messages: [{ role: "user", content: user }],

@@ -78,7 +78,9 @@ describe("suggestBalanceSageCounterparties", () => {
       suggestions: [{ numeroCompte: "110", score: 86, raison: "Compte présent dans le plan et cohérent avec une reprise.", libelle: "Report à nouveau" }],
     });
     expect(anthropicCreate).toHaveBeenCalledOnce();
-    const prompt = anthropicCreate.mock.calls[0]?.[0] as { messages: Array<{ content: string }> };
+    const requestOptions = anthropicCreate.mock.calls[0]?.[0] as { model: string; messages: Array<{ content: string }> };
+    expect(requestOptions.model).toBe("claude-sonnet-4-5");
+    const prompt = requestOptions;
     expect(prompt.messages[0]?.content).toContain("110 — Report à nouveau");
   });
 
