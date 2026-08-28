@@ -2,7 +2,6 @@ import { db, comptesBancairesTable, mouvementsBanqueTable, caissesTable, mouveme
 import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import {
-  proposerEcriture,
   proposerEcrituresDansTransaction,
   type ComptabiliteTransaction,
 } from "./comptabiliteService.js";
@@ -34,14 +33,6 @@ function comptesForMouvement(type: string, motif: string): { debit: string; cred
 }
 
 function today(): string { return new Date().toISOString().slice(0, 10); }
-
-async function getCompte(id: number) {
-  const rows = await db.select().from(comptesBancairesTable).where(eq(comptesBancairesTable.id, id)).limit(1);
-  return rows[0] ?? null;
-}
-
-// ─── CRUD Comptes ──────────────────────────────────────────────────────────────
-
 export async function listComptes(cooperativeId: number) {
   const rows = await db
     .select()
@@ -131,76 +122,80 @@ export async function enregistrerMouvement(
   },
   tx?: ComptabiliteTransaction,
 ) {
-  const executor = tx ?? db;
-  const [compte] = await executor
-    .select()
-    .from(comptesBancairesTable)
-    .where(and(
-      eq(comptesBancairesTable.id, compteId),
-      eq(comptesBancairesTable.cooperativeId, cooperativeId),
-    ))
-    .for("update")
-    .limit(1);
+  const enregistrerDansTransaction = async (executor: ComptabiliteTransaction) => {
+    const [compte] = await executor
+      .select()
+      .from(comptesBancairesTable)
+      .where(and(
+        eq(comptesBancairesTable.id, compteId),
+        eq(comptesBancairesTable.cooperativeId, cooperativeId),
+      ))
+      .for("update")
+      .limit(1);
 
-  if (!compte) throw new Error("Compte bancaire introuvable");
-  if (!compte.actif) throw new Error("Compte bancaire inactif");
+    if (!compte) throw new Error("Compte bancaire introuvable");
+    if (!compte.actif) throw new Error("Compte bancaire inactif");
 
-  const montant    = Math.abs(data.montantFcfa);
-  const soldeActuel = parseFloat(compte.soldeActuelFcfa as string);
-  const nouveauSolde = data.type === "credit"
-    ? soldeActuel + montant
-    : soldeActuel - montant;
+    const montant    = Math.abs(data.montantFcfa);
+    const soldeActuel = parseFloat(compte.soldeActuelFcfa as string);
+    const nouveauSolde = data.type === "credit"
+      ? soldeActuel + montant
+      : soldeActuel - montant;
 
-  const dateOp = data.dateOperation ?? today();
+    const dateOp = data.dateOperation ?? today();
 
-  const [mouvement] = await executor
-    .insert(mouvementsBanqueTable)
-    .values({
-      compteId,
-      cooperativeId,
-      type:           data.type,
-      motif:          data.motif,
-      montantFcfa:    montant.toString(),
-      libelle:        data.libelle ?? null,
-      reference:      data.reference ?? null,
-      dateOperation:  dateOp,
-      dateValeur:     data.dateValeur ?? null,
-      soldeApresFcfa: nouveauSolde.toString(),
-      enregistrePar:  data.userId ?? null,
-    })
-    .returning();
+    const [mouvement] = await executor
+      .insert(mouvementsBanqueTable)
+      .values({
+        compteId,
+        cooperativeId,
+        type:           data.type,
+        motif:          data.motif,
+        montantFcfa:    montant.toString(),
+        libelle:        data.libelle ?? null,
+        reference:      data.reference ?? null,
+        dateOperation:  dateOp,
+        dateValeur:     data.dateValeur ?? null,
+        soldeApresFcfa: nouveauSolde.toString(),
+        enregistrePar:  data.userId ?? null,
+      })
+      .returning();
 
-  await executor
-    .update(comptesBancairesTable)
-    .set({ soldeActuelFcfa: nouveauSolde.toString() })
-    .where(eq(comptesBancairesTable.id, compteId));
+    if (!mouvement) throw new Error("Le mouvement bancaire n'a pas pu être créé");
 
-  // Écriture comptable OHADA 521
-  const comptes = comptesForMouvement(data.type, data.motif);
-  const ecriture = {
-    source:       "banque",
-    sourceId:     mouvement?.id ?? undefined,
-    libelle:      data.libelle ?? `Banque — ${data.motif}`,
-    compteDebit:  comptes.debit,
-    compteCredit: comptes.credit,
-    montantFcfa:  montant,
-    date:         dateOp,
-  } as const;
-  if (tx) {
-    await proposerEcrituresDansTransaction(tx, cooperativeId, [ecriture]);
-  } else {
-    proposerEcriture(cooperativeId, ecriture)
-      .catch((err) => logger.warn({ err }, "Écriture comptable banque non enregistrée"));
-  }
+    await executor
+      .update(comptesBancairesTable)
+      .set({ soldeActuelFcfa: nouveauSolde.toString() })
+      .where(eq(comptesBancairesTable.id, compteId));
 
-  const soldeMini = parseFloat(compte.soldeMiniAlerteFcfa as string);
-  let alerte: string | undefined;
-  if (soldeMini > 0 && nouveauSolde < soldeMini) {
-    alerte = `⚠️ Solde banque sous le seuil d'alerte (${soldeMini.toLocaleString("fr-FR")} FCFA)`;
-    logger.warn({ compteId, nouveauSolde, soldeMini }, "Compte bancaire sous seuil minimum");
-  }
+    // Écriture comptable OHADA 521. Elle doit rester dans la même transaction
+    // que le mouvement et la mise à jour du solde.
+    const comptes = comptesForMouvement(data.type, data.motif);
+    await proposerEcrituresDansTransaction(executor, cooperativeId, [{
+      source:       "banque",
+      sourceId:     mouvement.id,
+      libelle:      data.libelle ?? `Banque — ${data.motif}`,
+      compteDebit:  comptes.debit,
+      compteCredit: comptes.credit,
+      montantFcfa:  montant,
+      date:         dateOp,
+    }]);
 
-  return { mouvement: mouvement!, alerte, soldeActuel: nouveauSolde };
+    const soldeMini = parseFloat(compte.soldeMiniAlerteFcfa as string);
+    let alerte: string | undefined;
+    if (soldeMini > 0 && nouveauSolde < soldeMini) {
+      alerte = `⚠️ Solde banque sous le seuil d'alerte (${soldeMini.toLocaleString("fr-FR")} FCFA)`;
+      logger.warn({ compteId, nouveauSolde, soldeMini }, "Compte bancaire sous seuil minimum");
+    }
+
+    return { mouvement, alerte, soldeActuel: nouveauSolde };
+  };
+
+  // Un appel imbriqué (par exemple l'encaissement d'un chèque) réutilise la
+  // transaction du parent. L'appel direct ouvre sa propre transaction.
+  return tx
+    ? enregistrerDansTransaction(tx)
+    : db.transaction(enregistrerDansTransaction);
 }
 
 // ─── Journal ──────────────────────────────────────────────────────────────────
@@ -307,39 +302,47 @@ export async function virementVersCaisse(
     userId?: number;
   }
 ) {
-  const [compteBancaire] = await db
-    .select().from(comptesBancairesTable)
-    .where(and(eq(comptesBancairesTable.id, compteBancaireId), eq(comptesBancairesTable.cooperativeId, cooperativeId)))
-    .limit(1);
-  if (!compteBancaire) throw new Error("Compte bancaire introuvable");
-
-  const [caisse] = await db
-    .select().from(caissesTable)
-    .where(and(eq(caissesTable.id, data.caisseId), eq(caissesTable.cooperativeId, cooperativeId)))
-    .limit(1);
-  if (!caisse) throw new Error("Caisse introuvable");
-
-  const sessionRows = await db.execute<{ id: number }>(sql`
-    SELECT id FROM sessions_caisse
-    WHERE caisse_id = ${data.caisseId} AND date_session = CURRENT_DATE AND statut = 'ouverte'
-    LIMIT 1
-  `);
-  const session = sessionRows.rows[0] ?? null;
-  if (!session) throw new Error(`Aucune session ouverte sur la caisse "${caisse.nom}". Ouvrez d'abord une session depuis la page Caisse.`);
-
-  const soldeBanque = parseFloat(String(compteBancaire.soldeActuelFcfa));
-  if (soldeBanque < data.montantFcfa) {
-    throw new Error(`Solde bancaire insuffisant (${new Intl.NumberFormat("fr-FR").format(soldeBanque)} FCFA disponible)`);
-  }
-
-  const dateOp = data.dateOperation ?? today();
-  const ref    = data.reference ?? `VIR-${Date.now()}`;
-  const userId = data.userId ?? null;
-
-  const nvSoldeBanque  = soldeBanque - data.montantFcfa;
-  const nvSoldeCaisse  = parseFloat(String(caisse.soldeActuelFcfa)) + data.montantFcfa;
-
   const result = await db.transaction(async (tx) => {
+    // Verrouiller les comptes avant de lire les soldes évite deux virements
+    // concurrents basés sur le même solde précédent.
+    const [compteBancaire] = await tx
+      .select().from(comptesBancairesTable)
+      .where(and(
+        eq(comptesBancairesTable.id, compteBancaireId),
+        eq(comptesBancairesTable.cooperativeId, cooperativeId),
+      ))
+      .for("update")
+      .limit(1);
+    if (!compteBancaire) throw new Error("Compte bancaire introuvable");
+    if (!compteBancaire.actif) throw new Error("Compte bancaire inactif");
+
+    const [caisse] = await tx
+      .select().from(caissesTable)
+      .where(and(eq(caissesTable.id, data.caisseId), eq(caissesTable.cooperativeId, cooperativeId)))
+      .for("update")
+      .limit(1);
+    if (!caisse) throw new Error("Caisse introuvable");
+
+    const sessionRows = await tx.execute<{ id: number }>(sql`
+      SELECT id FROM sessions_caisse
+      WHERE caisse_id = ${data.caisseId} AND date_session = CURRENT_DATE AND statut = 'ouverte'
+      LIMIT 1
+    `);
+    const session = sessionRows.rows[0] ?? null;
+    if (!session) throw new Error(`Aucune session ouverte sur la caisse "${caisse.nom}". Ouvrez d'abord une session depuis la page Caisse.`);
+
+    const soldeBanque = parseFloat(String(compteBancaire.soldeActuelFcfa));
+    if (soldeBanque < data.montantFcfa) {
+      throw new Error(`Solde bancaire insuffisant (${new Intl.NumberFormat("fr-FR").format(soldeBanque)} FCFA disponible)`);
+    }
+
+    const dateOp = data.dateOperation ?? today();
+    const ref    = data.reference ?? `VIR-${Date.now()}`;
+    const userId = data.userId ?? null;
+
+    const nvSoldeBanque  = soldeBanque - data.montantFcfa;
+    const nvSoldeCaisse  = parseFloat(String(caisse.soldeActuelFcfa)) + data.montantFcfa;
+
     const [mvtBanque] = await tx
       .insert(mouvementsBanqueTable)
       .values({
@@ -380,24 +383,33 @@ export async function virementVersCaisse(
       .set({ soldeActuelFcfa: nvSoldeCaisse.toString() })
       .where(eq(caissesTable.id, data.caisseId));
 
-    return { mvtBanque: mvtBanque!, mvtCaisse: mvtCaisse! };
-  });
+    if (!mvtBanque || !mvtCaisse) throw new Error("Le virement bancaire n'a pas pu être créé");
 
-  // Écriture comptable OHADA : 571 (Caisse) Débit / 521 (Banque) Crédit
-  proposerEcriture(cooperativeId, {
-    source:      "banque",
-    sourceId:    result.mvtCaisse.id,
-    libelle:     data.libelle ?? `Virement banque vers caisse ${caisse.nom}`,
-    compteDebit: "571", compteCredit: "521",
-    montantFcfa: data.montantFcfa, date: dateOp,
-  }).catch((err) => logger.warn({ err }, "Écriture comptable virement banque→caisse non enregistrée"));
+    await proposerEcrituresDansTransaction(tx, cooperativeId, [{
+      source:      "banque",
+      sourceId:    mvtCaisse.id,
+      libelle:     data.libelle ?? `Virement banque vers caisse ${caisse.nom}`,
+      compteDebit: "571",
+      compteCredit:"521",
+      montantFcfa: data.montantFcfa,
+      date:        dateOp,
+    }]);
+
+    return {
+      mvtBanque,
+      mvtCaisse,
+      nvSoldeBanque,
+      nvSoldeCaisse,
+      ref,
+    };
+  });
 
   return {
     mouvement_banque:  result.mvtBanque.id,
     mouvement_caisse:  result.mvtCaisse.id,
-    solde_banque:      nvSoldeBanque,
-    solde_caisse:      nvSoldeCaisse,
-    reference:         ref,
+    solde_banque:      result.nvSoldeBanque,
+    solde_caisse:      result.nvSoldeCaisse,
+    reference:         result.ref,
   };
 }
 
@@ -412,43 +424,53 @@ export async function debitBanqueForSalaire(
   reference: string | null,
   userId: number | null,
 ): Promise<{ nouveauSolde: number; alerte?: string }> {
-  const compte = await getCompte(compteId);
-  if (!compte) throw new Error("Compte bancaire introuvable");
-  if (compte.cooperativeId !== cooperativeId) throw new Error("Accès refusé");
+  return db.transaction(async (tx) => {
+    const [compte] = await tx
+      .select()
+      .from(comptesBancairesTable)
+      .where(and(
+        eq(comptesBancairesTable.id, compteId),
+        eq(comptesBancairesTable.cooperativeId, cooperativeId),
+      ))
+      .for("update")
+      .limit(1);
+    if (!compte) throw new Error("Compte bancaire introuvable");
+    if (!compte.actif) throw new Error("Compte bancaire inactif");
 
-  const montant = Math.abs(montantFcfa);
-  const soldeActuel = parseFloat(compte.soldeActuelFcfa as string);
-  const nouveauSolde = soldeActuel - montant;
+    const montant = Math.abs(montantFcfa);
+    const soldeActuel = parseFloat(compte.soldeActuelFcfa as string);
+    const nouveauSolde = soldeActuel - montant;
+    const dateOp = today();
 
-  const dateOp = today();
+    const [mouvement] = await tx.insert(mouvementsBanqueTable).values({
+      compteId,
+      cooperativeId,
+      type: "debit",
+      motif: "paiement_salaire",
+      montantFcfa: montant.toString(),
+      libelle,
+      reference: reference ?? null,
+      dateOperation: dateOp,
+      dateValeur: null,
+      soldeApresFcfa: nouveauSolde.toString(),
+      enregistrePar: userId ?? null,
+    }).returning();
+    if (!mouvement) throw new Error("Le débit bancaire n'a pas pu être créé");
 
-  await db.insert(mouvementsBanqueTable).values({
-    compteId,
-    cooperativeId,
-    type: "debit",
-    motif: "paiement_salaire",
-    montantFcfa: montant.toString(),
-    libelle,
-    reference: reference ?? null,
-    dateOperation: dateOp,
-    dateValeur: null,
-    soldeApresFcfa: nouveauSolde.toString(),
-    enregistrePar: userId ?? null,
+    await tx.update(comptesBancairesTable)
+      .set({ soldeActuelFcfa: nouveauSolde.toString() })
+      .where(eq(comptesBancairesTable.id, compteId));
+
+    const soldeMini = parseFloat(compte.soldeMiniAlerteFcfa as string);
+    let alerte: string | undefined;
+    if (soldeMini > 0 && nouveauSolde < soldeMini) {
+      alerte = `⚠️ Solde banque sous le seuil d'alerte (${soldeMini.toLocaleString("fr-FR")} FCFA)`;
+      logger.warn({ compteId, nouveauSolde, soldeMini }, "Compte bancaire sous seuil minimum après paiement salaire");
+    }
+
+    logger.info({ compteId, montant, nouveauSolde }, "Banque débitée (paiement salaire)");
+    return { nouveauSolde, alerte };
   });
-
-  await db.update(comptesBancairesTable)
-    .set({ soldeActuelFcfa: nouveauSolde.toString() })
-    .where(eq(comptesBancairesTable.id, compteId));
-
-  const soldeMini = parseFloat(compte.soldeMiniAlerteFcfa as string);
-  let alerte: string | undefined;
-  if (soldeMini > 0 && nouveauSolde < soldeMini) {
-    alerte = `⚠️ Solde banque sous le seuil d'alerte (${soldeMini.toLocaleString("fr-FR")} FCFA)`;
-    logger.warn({ compteId, nouveauSolde, soldeMini }, "Compte bancaire sous seuil minimum après paiement salaire");
-  }
-
-  logger.info({ compteId, montant, nouveauSolde }, "Banque débitée (paiement salaire)");
-  return { nouveauSolde, alerte };
 }
 
 // ─── Alertes solde ────────────────────────────────────────────────────────────

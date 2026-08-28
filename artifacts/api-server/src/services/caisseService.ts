@@ -2,7 +2,7 @@ import { db, caissesTable, sessionsCaisseTable, mouvementsCaisseTable, comptesMo
 import { eq, and, sql } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import PDFDocument from "pdfkit";
-import { proposerEcriture } from "./comptabiliteService.js";
+import { proposerEcriture, proposerEcrituresDansTransaction } from "./comptabiliteService.js";
 import type { ComptabiliteTransaction } from "./comptabiliteService.js";
 import { drawHeader, drawFooter } from "./pdfHeaderService.js";
 
@@ -178,66 +178,78 @@ export async function enregistrerMouvement(
   alerte?: string;
   soldeActuel: number;
 }> {
-  // Trouver la session ouverte
-  const session = await getSessionActive(caisseId);
-  if (!session) throw new Error("Aucune session ouverte pour cette caisse. Ouvrez d'abord une session.");
+  return db.transaction(async (tx) => {
+    // Le verrou doit être pris avant le calcul du nouveau solde : deux débits
+    // simultanés ne doivent jamais écraser la valeur calculée par l'autre.
+    const [caisse] = await tx
+      .select()
+      .from(caissesTable)
+      .where(eq(caissesTable.id, caisseId))
+      .for("update")
+      .limit(1);
+    if (!caisse) throw new Error("Caisse introuvable");
 
-  const caisse = await getCaisse(caisseId);
-  if (!caisse) throw new Error("Caisse introuvable");
+    const sessionRows = await tx.execute<{ id: number }>(sql`
+      SELECT id FROM sessions_caisse
+      WHERE caisse_id = ${caisseId} AND date_session = CURRENT_DATE AND statut = 'ouverte'
+      LIMIT 1
+    `);
+    const session = sessionRows.rows[0] ?? null;
+    if (!session) throw new Error("Aucune session ouverte pour cette caisse. Ouvrez d'abord une session.");
 
-  const soldeActuel = parseFloat(caisse.soldeActuelFcfa as string);
-  const montant     = Math.round(data.montantFcfa);
+    const soldeActuel = parseFloat(caisse.soldeActuelFcfa as string);
+    const montant     = Math.round(data.montantFcfa);
 
-  if (data.type === "sortie" && soldeActuel - montant < 0) {
-    throw new Error(`Solde insuffisant en caisse. Disponible : ${soldeActuel.toLocaleString("fr-FR")} FCFA`);
-  }
+    if (data.type === "sortie" && soldeActuel - montant < 0) {
+      throw new Error(`Solde insuffisant en caisse. Disponible : ${soldeActuel.toLocaleString("fr-FR")} FCFA`);
+    }
 
-  const nouveauSolde = data.type === "entree"
-    ? soldeActuel + montant
-    : soldeActuel - montant;
+    const nouveauSolde = data.type === "entree"
+      ? soldeActuel + montant
+      : soldeActuel - montant;
 
-  // Insérer le mouvement dans une transaction
-  const [mouvement] = await db.insert(mouvementsCaisseTable).values({
-    caisseId,
-    sessionId: session.id,
-    cooperativeId: caisse.cooperativeId,
-    type: data.type,
-    motif: data.motif,
-    montantFcfa: montant.toString(),
-    libelle: data.libelle ?? null,
-    referenceOperation: data.referenceOperation ?? null,
-    soldeApresFcfa: nouveauSolde.toString(),
-    enregistrePar: data.userId ?? null,
-  }).returning();
+    const [mouvement] = await tx.insert(mouvementsCaisseTable).values({
+      caisseId,
+      sessionId: session.id,
+      cooperativeId: caisse.cooperativeId,
+      type: data.type,
+      motif: data.motif,
+      montantFcfa: montant.toString(),
+      libelle: data.libelle ?? null,
+      referenceOperation: data.referenceOperation ?? null,
+      soldeApresFcfa: nouveauSolde.toString(),
+      enregistrePar: data.userId ?? null,
+    }).returning();
+    if (!mouvement) throw new Error("Le mouvement de caisse n'a pas pu être créé");
 
-  // Mettre à jour le solde de la caisse
-  await db.update(caissesTable)
-    .set({ soldeActuelFcfa: nouveauSolde.toString() })
-    .where(eq(caissesTable.id, caisseId));
+    await tx.update(caissesTable)
+      .set({ soldeActuelFcfa: nouveauSolde.toString() })
+      .where(eq(caissesTable.id, caisseId));
 
-  // Écriture comptable
-  const comptes = comptesForMouvement(data.type, data.motif);
-  if (!data.skipAccounting) {
-    proposerEcriture(caisse.cooperativeId, {
-      source:      "caisse",
-      sourceId:    mouvement?.id ?? undefined,
-      libelle:     data.libelle ?? `Caisse — ${data.motif}`,
-      compteDebit: data.compteDebitOverride ?? comptes.debit,
-      compteCredit:comptes.credit,
-      montantFcfa: montant,
-      date:        today(),
-    }).catch((err) => logger.warn({ err }, "Écriture comptable caisse non enregistrée"));
-  }
+    // L'écriture reste dans la même transaction afin qu'une erreur comptable
+    // annule aussi le mouvement et la variation de solde.
+    if (!data.skipAccounting) {
+      const comptes = comptesForMouvement(data.type, data.motif);
+      await proposerEcrituresDansTransaction(tx, caisse.cooperativeId, [{
+        source:      "caisse",
+        sourceId:    mouvement.id,
+        libelle:     data.libelle ?? `Caisse — ${data.motif}`,
+        compteDebit: data.compteDebitOverride ?? comptes.debit,
+        compteCredit:comptes.credit,
+        montantFcfa: montant,
+        date:        today(),
+      }]);
+    }
 
-  // Alerte fond minimum
-  const fondMin = parseFloat(caisse.fondCaisseMinimumFcfa as string);
-  let alerte: string | undefined;
-  if (fondMin > 0 && nouveauSolde < fondMin) {
-    alerte = `⚠️ Solde caisse sous le fond minimum (${fondMin.toLocaleString("fr-FR")} FCFA)`;
-    logger.warn({ caisseId, nouveauSolde, fondMin }, "Caisse sous fond minimum");
-  }
+    const fondMin = parseFloat(caisse.fondCaisseMinimumFcfa as string);
+    let alerte: string | undefined;
+    if (fondMin > 0 && nouveauSolde < fondMin) {
+      alerte = `⚠️ Solde caisse sous le fond minimum (${fondMin.toLocaleString("fr-FR")} FCFA)`;
+      logger.warn({ caisseId, nouveauSolde, fondMin }, "Caisse sous fond minimum");
+    }
 
-  return { mouvement: mouvement!, alerte, soldeActuel: nouveauSolde };
+    return { mouvement, alerte, soldeActuel: nouveauSolde };
+  });
 }
 
 // ─── Transfert inter-caisses ──────────────────────────────────────────────────
@@ -518,35 +530,51 @@ export async function virementVersBanque(
   const mt = Math.round(montantFcfa);
   if (mt <= 0) throw new Error("Le montant doit être positif");
 
-  const caisse = await getCaisse(caisseId);
-  if (!caisse) throw new Error("Caisse introuvable");
-  if (caisse.cooperativeId !== cooperativeId) throw new Error("Caisse non autorisée");
-
-  const session = await getSessionActive(caisseId);
-  if (!session) throw new Error(`Aucune session ouverte pour la caisse "${caisse.nom}". Ouvrez d'abord une session.`);
-
-  const [compteBancaire] = await db
-    .select()
-    .from(comptesBancairesTable)
-    .where(and(
-      eq(comptesBancairesTable.id, compteBancaireId),
-      eq(comptesBancairesTable.cooperativeId, cooperativeId),
-    ))
-    .limit(1);
-  if (!compteBancaire) throw new Error("Compte bancaire introuvable");
-
-  const soldeCaisse  = parseFloat(caisse.soldeActuelFcfa as string);
-  if (soldeCaisse < mt) {
-    throw new Error(`Solde insuffisant en caisse (${soldeCaisse.toLocaleString("fr-FR")} FCFA disponible)`);
-  }
-
-  const nvSoldeCaisse = soldeCaisse - mt;
-  const nvSoldeBanque = parseFloat(compteBancaire.soldeActuelFcfa as string) + mt;
-  const dateOp  = dateOperation ?? today();
-  const ref     = reference ?? `VIR-${Date.now()}`;
-  const lib     = libelle ?? `Dépôt en banque — ${compteBancaire.nom}`;
-
   const result = await db.transaction(async (tx) => {
+    // Les deux sens de virement verrouillent d'abord le compte bancaire puis
+    // la caisse. Cet ordre commun évite les deadlocks entre requêtes opposées.
+    const [compteBancaire] = await tx
+      .select()
+      .from(comptesBancairesTable)
+      .where(and(
+        eq(comptesBancairesTable.id, compteBancaireId),
+        eq(comptesBancairesTable.cooperativeId, cooperativeId),
+      ))
+      .for("update")
+      .limit(1);
+    if (!compteBancaire) throw new Error("Compte bancaire introuvable");
+    if (!compteBancaire.actif) throw new Error("Compte bancaire inactif");
+
+    const [caisse] = await tx
+      .select()
+      .from(caissesTable)
+      .where(and(
+        eq(caissesTable.id, caisseId),
+        eq(caissesTable.cooperativeId, cooperativeId),
+      ))
+      .for("update")
+      .limit(1);
+    if (!caisse) throw new Error("Caisse introuvable");
+
+    const sessionRows = await tx.execute<{ id: number }>(sql`
+      SELECT id FROM sessions_caisse
+      WHERE caisse_id = ${caisseId} AND date_session = CURRENT_DATE AND statut = 'ouverte'
+      LIMIT 1
+    `);
+    const session = sessionRows.rows[0] ?? null;
+    if (!session) throw new Error(`Aucune session ouverte pour la caisse "${caisse.nom}". Ouvrez d'abord une session.`);
+
+    const soldeCaisse  = parseFloat(caisse.soldeActuelFcfa as string);
+    if (soldeCaisse < mt) {
+      throw new Error(`Solde insuffisant en caisse (${soldeCaisse.toLocaleString("fr-FR")} FCFA disponible)`);
+    }
+
+    const nvSoldeCaisse = soldeCaisse - mt;
+    const nvSoldeBanque = parseFloat(compteBancaire.soldeActuelFcfa as string) + mt;
+    const dateOp  = dateOperation ?? today();
+    const ref     = reference ?? `VIR-${Date.now()}`;
+    const lib     = libelle ?? `Dépôt en banque — ${compteBancaire.nom}`;
+
     // 1. Sortie caisse
     const [mvtCaisse] = await tx
       .insert(mouvementsCaisseTable)
@@ -591,24 +619,33 @@ export async function virementVersBanque(
       .set({ soldeActuelFcfa: nvSoldeBanque.toString() })
       .where(eq(comptesBancairesTable.id, compteBancaireId));
 
-    return { mvtCaisse: mvtCaisse!, mvtBanque: mvtBanque! };
-  });
+    if (!mvtCaisse || !mvtBanque) throw new Error("Le virement caisse-banque n'a pas pu être créé");
 
-  // 3. Écriture OHADA : 521 Débit / 571 Crédit
-  proposerEcriture(cooperativeId, {
-    source:      "caisse",
-    sourceId:    result.mvtBanque.id,
-    libelle:     lib,
-    compteDebit: "521", compteCredit: "571",
-    montantFcfa: mt, date: dateOp,
-  }).catch((err) => logger.warn({ err }, "Écriture comptable virement caisse-banque non enregistrée"));
+    await proposerEcrituresDansTransaction(tx, cooperativeId, [{
+      source:      "caisse",
+      sourceId:    mvtBanque.id,
+      libelle:     lib,
+      compteDebit: "521",
+      compteCredit:"571",
+      montantFcfa: mt,
+      date:        dateOp,
+    }]);
+
+    return {
+      mvtCaisse,
+      mvtBanque,
+      nvSoldeCaisse,
+      nvSoldeBanque,
+      ref,
+    };
+  });
 
   return {
     mouvement_caisse: result.mvtCaisse.id,
     mouvement_banque: result.mvtBanque.id,
-    solde_caisse:     nvSoldeCaisse,
-    solde_banque:     nvSoldeBanque,
-    reference:        ref,
+    solde_caisse:     result.nvSoldeCaisse,
+    solde_banque:     result.nvSoldeBanque,
+    reference:        result.ref,
   };
 }
 

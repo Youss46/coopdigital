@@ -84,3 +84,4 @@
 - [Versements partiels livraison](paiement-versements-partiels.md) — le solde livraison est verrouillé; chaque versement est un paiement distinct et le reliquat redevient actionnable.
 - [Fixtures PostgreSQL typées](postgres-fixture-parameter-types.md) — dans un INSERT de test, caster séparément les paramètres réutilisés entre colonnes integer et numeric.
 - [Références PDF des pesées](pdf-local-numbering.md) — les reçus et bordereaux affichent PES-S-<rang> avant tout identifiant legacy.
+- [Ordre des verrous des transferts de trésorerie](treasury-transfer-lock-order.md) — banque puis caisse dans les deux sens pour éviter les deadlocks.
