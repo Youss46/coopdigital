@@ -686,6 +686,15 @@ function JournalCaisse({ caisses, initCaisseId }: { caisses: Caisse[] | null; in
   const [modalFermer, setModalFermer] = useState(false);
   const [modalVirementBanque, setModalVirementBanque] = useState(false);
 
+  // La liste des caisses arrive après le premier rendu. Sans cette
+  // synchronisation, l'onglet ouvert directement reste sans caisse sélectionnée.
+  useEffect(() => {
+    const nextId = initCaisseId ?? caisses?.[0]?.id;
+    if (nextId !== undefined && (caisseId === "" || initCaisseId !== undefined)) {
+      setCaisseId(nextId);
+    }
+  }, [caisses, initCaisseId]);
+
   const charger = useCallback(async (id?: number | "", d?: string) => {
     const cid = id ?? caisseId;
     const dt  = d  ?? date;
@@ -702,6 +711,12 @@ function JournalCaisse({ caisses, initCaisseId }: { caisses: Caisse[] | null; in
       toast({ title: "Erreur", description: e instanceof Error ? e.message : "Erreur", variant: "destructive" });
     } finally { setLoading(false); }
   }, [caisseId, date]);
+
+  // Le journal doit être visible après navigation ou changement de filtre,
+  // pas uniquement après un clic manuel sur « Charger ».
+  useEffect(() => {
+    if (caisseId) void charger();
+  }, [charger, caisseId]);
 
   const ouvrirSession = async () => {
     if (!caisseId) return;

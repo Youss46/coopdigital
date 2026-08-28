@@ -389,8 +389,8 @@ export async function getJournal(caisseId: number, opts?: { dateDebut?: string; 
     id: number; type: string; motif: string; montant_fcfa: string;
     libelle: string | null; reference_operation: string | null;
     solde_apres_fcfa: string | null; created_at: string;
-    enregistre_par_nom: string | null; session_id: number;
-    session_statut: string; date_session: string;
+    enregistre_par_nom: string | null; session_id: number | null;
+    session_statut: string | null; date_session: string | null;
   }>(sql`
     SELECT
       m.id, m.type, m.motif, m.montant_fcfa,
@@ -399,11 +399,17 @@ export async function getJournal(caisseId: number, opts?: { dateDebut?: string; 
       u.nom AS enregistre_par_nom,
       s.statut AS session_statut, s.date_session::text
     FROM mouvements_caisse m
-    JOIN sessions_caisse s ON s.id = m.session_id
+    LEFT JOIN sessions_caisse s ON s.id = m.session_id
     LEFT JOIN users u ON u.id = m.enregistre_par
     WHERE m.caisse_id = ${caisseId}
-      AND s.date_session BETWEEN ${dateD} AND ${dateF}
-    ORDER BY m.created_at
+      AND (
+        s.date_session BETWEEN ${dateD} AND ${dateF}
+        OR (
+          m.session_id IS NULL
+          AND m.created_at::date BETWEEN ${dateD} AND ${dateF}
+        )
+      )
+    ORDER BY m.created_at, m.id
   `);
 
   const mvts = result.rows;

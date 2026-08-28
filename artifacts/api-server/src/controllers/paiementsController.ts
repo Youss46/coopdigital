@@ -561,6 +561,16 @@ async function debiterCaisseDansTransaction(
       : "Aucune caisse centrale n'est configurée pour cette coopérative.");
   }
 
+  // Verrouiller les deux lignes pendant le versement évite qu'une validation
+  // concurrente calcule son mouvement à partir d'un solde obsolète.
+  const [caisseVerrouillee] = await tx
+    .select()
+    .from(caissesTable)
+    .where(eq(caissesTable.id, caisse.id))
+    .for("update")
+    .limit(1);
+  if (!caisseVerrouillee) throw new Error("Caisse introuvable.");
+
   const [session] = await tx
     .select()
     .from(sessionsCaisseTable)
@@ -568,12 +578,13 @@ async function debiterCaisseDansTransaction(
       eq(sessionsCaisseTable.caisseId, caisse.id),
       eq(sessionsCaisseTable.statut, "ouverte"),
     ))
+    .for("update")
     .limit(1);
   if (!session) {
     throw new Error("Aucune session de caisse ouverte. Ouvrez une session dans la page Caisse avant de valider des paiements en espèces.");
   }
 
-  const solde = parseFloat(String(caisse.soldeActuelFcfa));
+  const solde = parseFloat(String(caisseVerrouillee.soldeActuelFcfa));
   const montant = Math.round(montantFcfa);
   if (solde < montant) {
     throw new Error(`Solde caisse insuffisant. Disponible : ${solde.toLocaleString("fr-FR")} FCFA, requis : ${montant.toLocaleString("fr-FR")} FCFA`);

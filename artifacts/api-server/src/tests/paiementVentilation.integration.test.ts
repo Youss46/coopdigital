@@ -1,6 +1,7 @@
 import { pool } from "@workspace/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { validerPaiement } from "../controllers/paiementsController.js";
+import { getJournal } from "../services/caisseService.js";
 
 const enabled =
   process.env.RUN_POSTGRES_INTEGRATION === "1" &&
@@ -35,6 +36,7 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
   let memberId: number;
   let caisseId: number;
   let sessionId: number;
+  let sessionDate: string;
   let mobileAccountId: number;
   const paymentIds: number[] = [];
   const deliveryIds: number[] = [];
@@ -89,6 +91,11 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
       [caisseId, cooperativeId, "10000000"],
     );
     sessionId = session.rows[0].id;
+    sessionDate = session.rows[0].date_session
+      ?? (await client.query(
+        `SELECT date_session::text FROM sessions_caisse WHERE id = $1`,
+        [sessionId],
+      )).rows[0].date_session;
 
     const mobileAccount = await client.query(
       `INSERT INTO comptes_mobiles_marchands
@@ -242,6 +249,81 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
       accounting: accounting.rows[0].count,
     };
   }
+
+  async function journalMovementsFor(paymentIdsToFind: number[]) {
+    const journal = await getJournal(caisseId, {
+      dateDebut: sessionDate,
+      dateFin: sessionDate,
+    });
+    return journal.mouvements.filter((movement) =>
+      paymentIdsToFind.includes(Number(
+        movement.reference_operation?.replace(/^PAI-/, ""),
+      )),
+    );
+  }
+
+  it("expose un paiement espèces seul dans le Journal de caisse", async () => {
+    const paymentId = await createPayment(125_000);
+
+    const result = await validate(paymentId, { modePaiement: "especes" });
+
+    expect(result.statusCode).toBe(200);
+    await expect(journalMovementsFor([paymentId])).resolves.toEqual([
+      expect.objectContaining({
+        type: "sortie",
+        motif: "paiement_producteur",
+        montant_fcfa: "125000",
+        reference_operation: `PAI-${paymentId}`,
+        session_id: sessionId,
+        session_statut: "ouverte",
+        date_session: sessionDate,
+      }),
+    ]);
+  });
+
+  it("expose uniquement la part espèces d'une ventilation espèces et chèque", async () => {
+    const paymentId = await createPayment(200_000);
+
+    const result = await validate(paymentId, {
+      ventilations: [
+        { modePaiement: "especes", montantFcfa: 75_000 },
+        { modePaiement: "cheque", montantFcfa: 125_000, numeroCheque: "CHQ-JOURNAL-ESPECES" },
+      ],
+    });
+
+    expect(result.statusCode).toBe(200);
+    await expect(journalMovementsFor([paymentId])).resolves.toEqual([
+      expect.objectContaining({
+        montant_fcfa: "75000",
+        reference_operation: `PAI-${paymentId}`,
+        session_id: sessionId,
+      }),
+    ]);
+  });
+
+  it("expose uniquement la part espèces d'une ventilation espèces et mobile money", async () => {
+    const paymentId = await createPayment(200_000);
+
+    const result = await validate(paymentId, {
+      ventilations: [
+        { modePaiement: "especes", montantFcfa: 80_000 },
+        {
+          modePaiement: "orange_money",
+          montantFcfa: 120_000,
+          referenceTransaction: "OM-JOURNAL-ESPECES",
+        },
+      ],
+    });
+
+    expect(result.statusCode).toBe(200);
+    await expect(journalMovementsFor([paymentId])).resolves.toEqual([
+      expect.objectContaining({
+        montant_fcfa: "80000",
+        reference_operation: `PAI-${paymentId}`,
+        session_id: sessionId,
+      }),
+    ]);
+  });
 
   it("refuse un total ventilé incorrect avant tout mouvement financier", async () => {
     const paymentId = await createPayment(1_000);
@@ -437,6 +519,20 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
     )).toMatchObject({
       rows: [{ count: 2, total: "590000" }],
     });
+    await expect(journalMovementsFor([paymentId, remainderPaymentId])).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          montant_fcfa: "190000",
+          reference_operation: `PAI-${paymentId}`,
+          session_id: sessionId,
+        }),
+        expect.objectContaining({
+          montant_fcfa: "400000",
+          reference_operation: `PAI-${remainderPaymentId}`,
+          session_id: sessionId,
+        }),
+      ]),
+    );
     expect(await client.query(
       `SELECT count(*)::int AS count
        FROM paiement_lignes
@@ -692,6 +788,28 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
     expect(await client.query(
       `SELECT solde_actuel_fcfa FROM comptes_mobiles_marchands WHERE id = $1`,
       [mobileAccountId],
-    )).toMatchObject({ rows: [{ solde_actuel_fcfa: "600000" }] });
+    )).toMatchObject({ rows: [{ solde_actuel_fcfa: "480000" }] });
+  });
+
+  it("conserve les mouvements du Journal quand la session est clôturée", async () => {
+    const paymentId = await createPayment(42_000);
+
+    const result = await validate(paymentId, { modePaiement: "especes" });
+    expect(result.statusCode).toBe(200);
+
+    await client.query(
+      `UPDATE sessions_caisse SET statut = 'fermee' WHERE id = $1`,
+      [sessionId],
+    );
+
+    await expect(journalMovementsFor([paymentId])).resolves.toEqual([
+      expect.objectContaining({
+        montant_fcfa: "42000",
+        reference_operation: `PAI-${paymentId}`,
+        session_id: sessionId,
+        session_statut: "fermee",
+        date_session: sessionDate,
+      }),
+    ]);
   });
 });
