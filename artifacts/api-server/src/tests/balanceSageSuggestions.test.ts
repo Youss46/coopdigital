@@ -41,7 +41,7 @@ function setupDatabase() {
   vi.mocked(db.select)
     .mockReturnValueOnce(chain([{ id: 12, cooperativeId: 42, exercice: 2025, mode: "reprise" }]) as never)
     .mockReturnValueOnce(chain([
-      { numeroCompte: "101", libelle: "Capital", soldeDebiteur: 0, soldeCrediteur: 100000, erreur: null },
+      { numeroCompte: "101", libelle: "Capital", soldeDebiteur: 0, soldeCrediteur: 100000, compteConnu: true, erreur: null },
     ]) as never)
     .mockReturnValueOnce(chain([
       { numeroCompte: "101", libelle: "Capital" },
@@ -107,6 +107,41 @@ describe("suggestBalanceSageCounterparties", () => {
       disponible: false,
       suggestions: [],
       message: "La suggestion Claude n’a pas pu aboutir. Vous pouvez saisir le compte manuellement.",
+    });
+  });
+
+  it("analyse une ligne mouvementée dont le compte est absent du plan", async () => {
+    vi.mocked(db.select)
+      .mockReturnValueOnce(chain([{ id: 12, cooperativeId: 42, exercice: 2025, mode: "reprise" }]) as never)
+      .mockReturnValueOnce(chain([
+        {
+          numeroCompte: "512",
+          libelle: "Banque",
+          soldeDebiteur: 75000,
+          soldeCrediteur: 0,
+          compteConnu: false,
+          erreur: "Compte absent du plan comptable de la coopérative",
+        },
+      ]) as never)
+      .mockReturnValueOnce(chain([
+        { numeroCompte: "110", libelle: "Report à nouveau" },
+      ]) as never);
+    anthropicCreate.mockResolvedValue({
+      content: [{
+        type: "text",
+        text: JSON.stringify([{ numeroCompte: "110", score: 90, raison: "Contrepartie de reprise disponible dans le plan." }]),
+      }],
+    });
+    const res = response();
+
+    await suggestBalanceSageCounterparties(request(), res);
+
+    expect(anthropicCreate).toHaveBeenCalledOnce();
+    const prompt = anthropicCreate.mock.calls[0]?.[0] as { messages: Array<{ content: string }> };
+    expect(prompt.messages[0]?.content).toContain("512 — Banque — solde débiteur: 75000 FCFA");
+    expect(res.json).toHaveBeenCalledWith({
+      disponible: true,
+      suggestions: [{ numeroCompte: "110", score: 90, raison: "Contrepartie de reprise disponible dans le plan.", libelle: "Report à nouveau" }],
     });
   });
 });

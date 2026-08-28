@@ -136,12 +136,21 @@ export async function suggestBalanceSageCounterparties(req: Request, res: Respon
       libelle: balanceSageLignesTable.libelle,
       soldeDebiteur: balanceSageLignesTable.soldeDebiteur,
       soldeCrediteur: balanceSageLignesTable.soldeCrediteur,
+      compteConnu: balanceSageLignesTable.compteConnu,
       erreur: balanceSageLignesTable.erreur,
     }).from(balanceSageLignesTable)
       .where(eq(balanceSageLignesTable.importId, id))
       .orderBy(asc(balanceSageLignesTable.numeroLigne));
-    const lignesValides = lignes.filter((ligne) => !ligne.erreur && (ligne.soldeDebiteur > 0 || ligne.soldeCrediteur > 0));
-    if (!lignesValides.length) {
+    // Un compte absent du plan est une anomalie de rattachement, pas une
+    // anomalie de lecture : Claude peut quand même analyser son solde pour
+    // proposer une contrepartie. Les erreurs de données restent exclues.
+    const lignesAnalysables = lignes.filter((ligne) => {
+      const mouvementee = ligne.soldeDebiteur > 0 || ligne.soldeCrediteur > 0;
+      const compteAbsentDuPlan = !ligne.compteConnu
+        && ligne.erreur === "Compte absent du plan comptable de la coopérative";
+      return mouvementee && (!ligne.erreur || compteAbsentDuPlan);
+    });
+    if (!lignesAnalysables.length) {
       res.status(422).json({ erreur: "Aucune ligne valide et mouvementée à analyser" });
       return;
     }
@@ -171,7 +180,7 @@ export async function suggestBalanceSageCounterparties(req: Request, res: Respon
     const planText = comptesEligibles
       .map((compte) => `- ${compte.numeroCompte} — ${compte.libelle}`)
       .join("\n");
-    const balanceText = lignesValides
+    const balanceText = lignesAnalysables
       .map((ligne) => `- ${ligne.numeroCompte} — ${ligne.libelle} — solde débiteur: ${ligne.soldeDebiteur} FCFA — solde créditeur: ${ligne.soldeCrediteur} FCFA`)
       .join("\n");
     const system = `Tu es un expert-comptable SYSCOHADA spécialisé dans les reprises comptables de coopératives agricoles en Côte d'Ivoire.

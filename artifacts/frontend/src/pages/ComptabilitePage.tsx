@@ -2515,10 +2515,16 @@ function OngletImportBalances() {
     try {
       const value = await apiPost<BalanceSageSuggestionsResponse>(`/api/comptabilite/balances-sage/imports/${detail.id}/suggestions-contreparties`, {});
       setSuggestions(value.suggestions);
-      setSuggestionMessage(value.message ?? (value.suggestions.length ? "Sélectionnez une suggestion pour la reprendre dans le formulaire." : ""));
+      const message = value.message ?? (value.suggestions.length ? "Sélectionnez une suggestion pour la reprendre dans le formulaire." : "");
+      setSuggestionMessage(message);
+      if (!value.disponible && message) {
+        toast({ title: "Suggestion Claude indisponible", description: message, variant: "destructive" });
+      }
     } catch (err) {
       setSuggestions([]);
-      setSuggestionMessage((err as Error).message || "La suggestion Claude est indisponible. Vous pouvez saisir le compte manuellement.");
+      const message = (err as Error).message || "La suggestion Claude est indisponible. Vous pouvez saisir le compte manuellement.";
+      setSuggestionMessage(message);
+      toast({ title: "Suggestion Claude impossible", description: message, variant: "destructive" });
     } finally { setSuggestionsLoading(false); }
   };
 
