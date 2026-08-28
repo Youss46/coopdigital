@@ -90,16 +90,12 @@ export default defineConfig({
             handler: "NetworkOnly",
           },
           {
+            // Les réponses API sont authentifiées et liées à une coopérative.
+            // Ne jamais les partager via le cache du service worker : une
+            // réponse vide ou appartenant à un autre compte peut sinon être
+            // affichée à tort pendant 24 h.
             urlPattern: /^\/api\//,
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "api-cache-v1",
-              expiration: {
-                maxEntries: 200,
-                maxAgeSeconds: 60 * 60 * 24,
-              },
-              networkTimeoutSeconds: 10,
-            },
+            handler: "NetworkOnly",
           },
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\//,
