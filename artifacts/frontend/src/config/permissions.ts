@@ -179,13 +179,13 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
 
   salaires: {
     lire:                ["pca", "directeur", "comptable", "auditeur"],
-    creer_personnel:     ["pca", "directeur"],
+    creer_personnel:     ["pca", "directeur", "comptable"],
     modifier_personnel:  ["pca", "directeur", "comptable"],
-    supprimer_personnel: ["pca", "directeur"],
+    supprimer_personnel: ["pca", "directeur", "comptable"],
     generer_bulletins:   ["pca", "directeur", "comptable"],
-    valider_bulletins:   ["pca", "directeur"],
-    payer_bulletins:     ["pca", "directeur"],
-    supprimer_bulletin:  ["pca", "directeur"],
+    valider_bulletins:   ["pca", "directeur", "comptable"],
+    payer_bulletins:     ["pca", "directeur", "comptable"],
+    supprimer_bulletin:  ["pca", "directeur", "comptable"],
     gerer_avances:       ["pca", "directeur", "comptable"],
   },
 

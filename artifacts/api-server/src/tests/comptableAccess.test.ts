@@ -81,4 +81,22 @@ describe("périmètre du comptable", () => {
     expect(hasPermission("comptable", "equipements", "generer_dotations")).toBe(true);
     expect(hasPermission("comptable", "equipements", "maintenance")).toBe(true);
   });
+
+  it("autorise toutes les actions du comptable sur les salaires", () => {
+    const actions = [
+      "lire",
+      "creer_personnel",
+      "modifier_personnel",
+      "supprimer_personnel",
+      "generer_bulletins",
+      "valider_bulletins",
+      "payer_bulletins",
+      "supprimer_bulletin",
+      "gerer_avances",
+    ];
+
+    for (const action of actions) {
+      expect(hasPermission("comptable", "salaires", action)).toBe(true);
+    }
+  });
 });
