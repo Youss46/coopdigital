@@ -77,10 +77,10 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
   },
 
   exportateurs: {
-    lire:     ["pca", "directeur", "comptable", "auditeur"],
-    creer:    ["pca", "directeur"],
-    modifier: ["pca", "directeur"],
-    supprimer:["pca"],
+    lire:     ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
+    creer:    ["pca", "directeur", "responsable_tracabilite"],
+    modifier: ["pca", "directeur", "responsable_tracabilite"],
+    supprimer:["pca", "responsable_tracabilite"],
   },
 
   creances: {
