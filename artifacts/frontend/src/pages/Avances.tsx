@@ -2,7 +2,6 @@ import { useState, useRef } from "react";
 import { MoneyInput } from "@/components/ui/money-input";
 import {
   useGetAvances,
-  useGetAvancesEncours,
   useCreateAvance,
   useRembourserAvance,
   useGetMembres,
@@ -57,7 +56,6 @@ export default function Avances() {
   const [notifHorsLigne, setNotifHorsLigne] = useState<string | null>(null);
   const [filtreReportees, setFiltreReportees] = useState(false);
 
-  const { data: encours } = useGetAvancesEncours();
   const { data: avancesData, isLoading } = useGetAvances({ statut: filtreStatut || undefined });
   const { data: membresData } = useGetMembres({ limit: 200 });
 
@@ -78,6 +76,14 @@ export default function Avances() {
   const reporteeIds = new Set((reporteesData?.avances ?? []).map((a) => (a as { id: number }).id));
   const avances = filtreReportees ? avancesFiltrees.filter((a: Avance) => reporteeIds.has(a.id)) : avancesFiltrees;
   const membres = membresData?.membres ?? [];
+  const totaux = avances.reduce(
+    (acc, avance) => ({
+      totalOctroye: acc.totalOctroye + Number(avance.montantOctroyeFcfa ?? 0),
+      totalRembourse: acc.totalRembourse + Number(avance.montantRembourseFcfa ?? 0),
+      solde: acc.solde + Number(avance.soldeRestantFcfa ?? 0),
+    }),
+    { totalOctroye: 0, totalRembourse: 0, solde: 0 },
+  );
 
   const [form, setForm] = useState({
     membreId: "",
@@ -227,8 +233,8 @@ export default function Avances() {
         )}
       </div>
 
-      {/* Résumé en cours */}
-      {encours && (
+      {/* Résumé des avances affichées */}
+      {avancesData && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
             <div className="rounded-lg p-2" style={{ backgroundColor: "#1a473115" }}>
@@ -236,7 +242,7 @@ export default function Avances() {
             </div>
             <div>
               <p className="text-xs text-gray-500">Total octroyé</p>
-              <p className="font-bold text-gray-900 text-base">{formaterFCFA(encours.totalOctroye)}</p>
+              <p className="font-bold text-gray-900 text-base">{formaterFCFA(totaux.totalOctroye)}</p>
             </div>
           </div>
           <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
@@ -245,7 +251,7 @@ export default function Avances() {
             </div>
             <div>
               <p className="text-xs text-gray-500">Total remboursé</p>
-              <p className="font-bold text-gray-900 text-base">{formaterFCFA(encours.totalRembourse)}</p>
+              <p className="font-bold text-gray-900 text-base">{formaterFCFA(totaux.totalRembourse)}</p>
             </div>
           </div>
           <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
@@ -254,7 +260,7 @@ export default function Avances() {
             </div>
             <div>
               <p className="text-xs text-gray-500">Solde restant</p>
-              <p className="font-bold text-amber-700 text-base">{formaterFCFA(encours.soldeToral)}</p>
+              <p className="font-bold text-amber-700 text-base">{formaterFCFA(totaux.solde)}</p>
             </div>
           </div>
         </div>
