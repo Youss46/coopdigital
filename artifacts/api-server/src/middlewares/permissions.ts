@@ -395,7 +395,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
   // MODULE — EXPÉDITIONS PORT
   expeditions: {
     lire:         ["pca", "directeur", "responsable_tracabilite", "auditeur"],
-    creer:        ["pca", "directeur"],
+    creer:        ["pca", "directeur", "responsable_tracabilite"],
     modifier:     ["pca", "directeur", "responsable_tracabilite"],
     valider:      ["pca", "directeur"],
     litige:       ["pca", "directeur"],
