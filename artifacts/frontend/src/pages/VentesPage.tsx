@@ -126,8 +126,8 @@ export default function VentesPage() {
   const { token } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
-  const peutCreer   = usePermission("exportateurs", "creer");
-  const peutEncaisser = usePermission("creances", "enregistrer_encaissement");
+  const peutCreer   = usePermission("ventes", "creer");
+  const peutEncaisser = usePermission("ventes", "encaisser");
 
   const [filtreStatut, setFiltreStatut]       = useState("");
   const [filtreExport, setFiltreExport]       = useState("");
@@ -158,7 +158,7 @@ export default function VentesPage() {
   const { data: exportateurs = [] } = useGetExportateurs();
   const { data: lotsEnStock = [] } = useQuery<LotDisponible[]>({
     queryKey: ["ventes-lots-stock"],
-    queryFn:  () => apiFetch("/api/lots?statut=en_stock", token),
+     queryFn:  () => apiFetch("/api/ventes/lots-disponibles?statut=en_stock", token),
     enabled:  modalVente && sourceStock === "lots",
   });
 
@@ -175,7 +175,7 @@ export default function VentesPage() {
 
   const { data: entrepotsMembres = [] } = useQuery<EntrepotItem[]>({
     queryKey: ["ventes-entrepots"],
-    queryFn:  () => apiFetch("/api/entrepots", token),
+     queryFn:  () => apiFetch("/api/ventes/entrepots", token),
     enabled:  modalVente && sourceStock === "lots" && modeConstitution === "auto",
     select:   (data) => data.filter(e => !e.pourFournisseursExt),
   });
@@ -195,7 +195,7 @@ export default function VentesPage() {
     queryKey: ["stock-dispo-auto", modeConstitution],
     queryFn: async () => {
       const tok = token ?? localStorage.getItem("coop_token") ?? "";
-      const res = await fetch(`${BASE}/api/lots/preview-auto`, {
+      const res = await fetch(`${BASE}/api/ventes/preview-auto`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
         body: JSON.stringify({ quantiteCibleKg: Number.MAX_SAFE_INTEGER, pourFournisseurs: false }),
@@ -338,7 +338,7 @@ export default function VentesPage() {
     setAutoPreview(null);
     try {
       const tok = token ?? localStorage.getItem("coop_token") ?? "";
-      const res = await fetch(`${BASE}/api/lots/preview-auto`, {
+      const res = await fetch(`${BASE}/api/ventes/preview-auto`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
         body: JSON.stringify({ quantiteCibleKg: cible, pourFournisseurs: false }),

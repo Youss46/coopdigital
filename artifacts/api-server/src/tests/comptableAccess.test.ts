@@ -53,6 +53,13 @@ describe("périmètre du comptable", () => {
     expect(hasPermission("comptable", "tracabilite", "lire")).toBe(false);
   });
 
+  it("autorise toutes les actions de la page Vente cacao sans créer un exportateur", () => {
+    expect(hasPermission("comptable", "ventes", "lire")).toBe(true);
+    expect(hasPermission("comptable", "ventes", "creer")).toBe(true);
+    expect(hasPermission("comptable", "ventes", "encaisser")).toBe(true);
+    expect(hasPermission("comptable", "exportateurs", "creer")).toBe(false);
+  });
+
   it("autorise les opérations de trésorerie sans autoriser la création des comptes", () => {
     for (const [module, actionLecture, actionsEcriture] of [
       ["caisse", "voir", ["ouvrir_session", "enregistrer_mvt", "fermer_session"]],

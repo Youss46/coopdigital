@@ -90,6 +90,12 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     supprimer:["pca", "responsable_tracabilite"],
   },
 
+  ventes: {
+    lire:      ["pca", "directeur", "comptable", "auditeur"],
+    creer:     ["pca", "directeur", "comptable", "responsable_tracabilite"],
+    encaisser: ["pca", "directeur", "comptable"],
+  },
+
   creances: {
     lire:                      ["pca", "directeur", "comptable", "auditeur"],
     enregistrer_encaissement:  ["pca", "directeur", "comptable"],

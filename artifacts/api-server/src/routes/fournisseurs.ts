@@ -19,7 +19,7 @@ const router = Router();
 router.get("/fournisseurs/search", checkPermission("fournisseurs", "lire"), searchFournisseurs);
 router.get("/fournisseurs/rapport-type", checkPermission("fournisseurs", "lire"), getRapportTypeFournisseur);
 router.get("/fournisseurs/stock-disponible", checkPermission("exportateurs", "lire"), getStockFournisseurs);
-router.post("/fournisseurs/vente", checkPermission("exportateurs", "creer"), createVenteFournisseur);
+router.post("/fournisseurs/vente", checkPermission("ventes", "creer"), createVenteFournisseur);
 router.get("/fournisseurs", checkPermission("fournisseurs", "lire"), listFournisseurs);
 router.get("/fournisseurs/:id/livraisons-disponibles", checkPermission("exportateurs", "lire"), getLivraisonsDisponiblesFournisseur);
 router.get("/fournisseurs/:id", checkPermission("fournisseurs", "lire"), getFournisseurById);

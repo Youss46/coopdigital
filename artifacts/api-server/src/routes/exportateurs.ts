@@ -12,6 +12,8 @@ import {
   getCreances,
   signalerRefus,
 } from "../controllers/exportateursController";
+import { listLots, previewAutoLot } from "../controllers/lotsController";
+import { listEntrepotsHandler } from "../controllers/entrepotDelegueController";
 
 const router: IRouter = Router();
 
@@ -22,10 +24,13 @@ router.post("/exportateurs", checkPermission("exportateurs", "creer"), createExp
 router.get("/exportateurs/:id", checkPermission("exportateurs", "lire"), getExportateurById);
 
 router.get("/ventes/creances", checkPermission("creances", "lire"), getCreances);
-router.get("/ventes/stocks-receptionnes", checkPermission("exportateurs", "lire"), listStocksReceptionnes);
-router.get("/ventes", checkPermission("exportateurs", "lire"), listVentes);
-router.post("/ventes", checkPermission("exportateurs", "creer"), createVente);
-router.put("/ventes/:id/encaissement", checkPermission("creances", "enregistrer_encaissement"), encaisserVente);
+router.get("/ventes/lots-disponibles", checkPermission("ventes", "lire"), listLots);
+router.post("/ventes/preview-auto", checkPermission("ventes", "creer"), previewAutoLot);
+router.get("/ventes/entrepots", checkPermission("ventes", "lire"), listEntrepotsHandler);
+router.get("/ventes/stocks-receptionnes", checkPermission("ventes", "lire"), listStocksReceptionnes);
+router.get("/ventes", checkPermission("ventes", "lire"), listVentes);
+router.post("/ventes", checkPermission("ventes", "creer"), createVente);
+router.put("/ventes/:id/encaissement", checkPermission("ventes", "encaisser"), encaisserVente);
 router.post("/ventes/:id/refus", checkPermission("refus", "traiter"), signalerRefus);
 
 export default router;
