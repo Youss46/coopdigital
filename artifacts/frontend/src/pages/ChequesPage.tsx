@@ -174,7 +174,7 @@ export default function ChequesPage() {
   ];
 
   if (espace === "recus") {
-    return <ChequesRecusView onBackToEmis={() => setEspace("emis")} />;
+    return <ChequesRecusView onBackToEmis={() => setEspace("emis")} peutCreer={peutCreer} />;
   }
 
   return (
@@ -484,6 +484,31 @@ type ChequeRecu = {
   exportateurNom: string | null;
 };
 
+type VenteExportateurOption = {
+  id: number;
+  exportateurId: number;
+  exportateurNom: string | null;
+  montantTotalFcfa: number;
+  montantRecuFcfa: number;
+  soldeDuFcfa: number;
+  dateVente: string;
+  statut: string;
+};
+
+type ExportateurOption = {
+  id: number;
+  nom: string;
+};
+
+type CreerChequeRecuPayload = {
+  venteExportateurId: number;
+  numeroCheque: string;
+  banque: string;
+  montantFcfa: number;
+  dateReception: string;
+  dateEcheance: string | null;
+};
+
 const STATUTS_RECUS = {
   a_deposer: { label: "À déposer", color: "bg-amber-100 text-amber-800", icon: Clock },
   depose: { label: "Déposé", color: "bg-blue-100 text-blue-800", icon: Building2 },
@@ -492,7 +517,13 @@ const STATUTS_RECUS = {
   annule: { label: "Annulé", color: "bg-gray-100 text-gray-600", icon: Ban },
 } as const;
 
-function ChequesRecusView({ onBackToEmis }: { onBackToEmis: () => void }) {
+function ChequesRecusView({
+  onBackToEmis,
+  peutCreer,
+}: {
+  onBackToEmis: () => void;
+  peutCreer: boolean;
+}) {
   const qc = useQueryClient();
   const { utilisateur } = useAuth();
   const perms = PERMISSIONS["cheques"] ?? {};
@@ -506,6 +537,7 @@ function ChequesRecusView({ onBackToEmis }: { onBackToEmis: () => void }) {
   const [dateAction, setDateAction] = useState(new Date().toISOString().slice(0, 10));
   const [compteId, setCompteId] = useState("");
   const [motif, setMotif] = useState("");
+  const [modalCreer, setModalCreer] = useState(false);
 
   const url = filtre === "tous" ? "/api/cheques-recus" : `/api/cheques-recus?statut=${filtre}`;
   const { data: cheques = [], isLoading, isError } = useQuery<ChequeRecu[]>({
@@ -538,6 +570,16 @@ function ChequesRecusView({ onBackToEmis }: { onBackToEmis: () => void }) {
     },
     onSuccess: refresh,
   });
+  const mutCreer = useMutation({
+    mutationFn: (data: CreerChequeRecuPayload) =>
+      apiPost<ChequeRecu>("/api/cheques-recus", data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["cheques-recus"] });
+      void qc.invalidateQueries({ queryKey: ["ventes-exportateurs"] });
+      void qc.invalidateQueries({ queryKey: ["exportateurs"] });
+      setModalCreer(false);
+    },
+  });
 
   const totals = {
     a_deposer: cheques.filter(c => c.statut === "a_deposer"),
@@ -553,11 +595,19 @@ function ChequesRecusView({ onBackToEmis }: { onBackToEmis: () => void }) {
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-6">
       <EspaceTabs active="recus" onChange={value => value === "emis" && onBackToEmis()} />
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><CheckSquare className="text-emerald-600" size={24} />Chèques reçus</h1>
           <p className="text-sm text-gray-500 mt-1">Suivi des chèques remis par les exportateurs, de la réception à l'encaissement bancaire.</p>
         </div>
+        {peutCreer && (
+          <button
+            onClick={() => setModalCreer(true)}
+            className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700 shrink-0"
+          >
+            <Plus size={16} /> Nouveau chèque reçu
+          </button>
+        )}
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <KpiCard label="À déposer" value={totals.a_deposer.length} unit="chèque(s)" color="amber" icon={Clock} />
@@ -602,6 +652,14 @@ function ChequesRecusView({ onBackToEmis }: { onBackToEmis: () => void }) {
             })}</tbody>
           </table></div>
         </div>
+      )}
+      {modalCreer && (
+        <ModalCreerRecu
+          onClose={() => setModalCreer(false)}
+          onSubmit={data => mutCreer.mutate(data)}
+          isPending={mutCreer.isPending}
+          error={mutCreer.error?.message}
+        />
       )}
       {action && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -671,6 +729,197 @@ function ModalShell({ title, onClose, children }: { title: string; onClose: () =
         <div className="p-5 space-y-4">{children}</div>
       </div>
     </div>
+  );
+}
+
+// ── Créer chèque reçu ─────────────────────────────────────────────────────────
+
+function ModalCreerRecu({
+  onClose,
+  onSubmit,
+  isPending,
+  error,
+}: {
+  onClose: () => void;
+  onSubmit: (data: CreerChequeRecuPayload) => void;
+  isPending: boolean;
+  error?: string;
+}) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [exportateurId, setExportateurId] = useState("");
+  const [venteExportateurId, setVenteExportateurId] = useState("");
+  const [numeroCheque, setNumeroCheque] = useState("");
+  const [banque, setBanque] = useState("");
+  const [montantFcfa, setMontantFcfa] = useState(0);
+  const [dateReception, setDateReception] = useState(today);
+  const [dateEcheance, setDateEcheance] = useState("");
+
+  const { data: exportateurs = [], isLoading: exportateursLoading, isError: exportateursError } =
+    useQuery<ExportateurOption[]>({
+      queryKey: ["exportateurs"],
+      queryFn: () => apiFetch<ExportateurOption[]>("/api/exportateurs"),
+    });
+  const { data: ventes = [], isLoading: ventesLoading, isError: ventesError } =
+    useQuery<VenteExportateurOption[]>({
+      queryKey: ["ventes-exportateurs"],
+      queryFn: () => apiFetch<VenteExportateurOption[]>("/api/ventes"),
+    });
+
+  const ventesDisponibles = ventes.filter(v =>
+    String(v.exportateurId) === exportateurId &&
+    Number(v.soldeDuFcfa) > 0 &&
+    v.statut !== "refoule",
+  );
+  const venteSelectionnee = ventes.find(v => String(v.id) === venteExportateurId);
+  const chargement = exportateursLoading || ventesLoading;
+  const erreurChargement = exportateursError || ventesError;
+
+  const submit = () => {
+    if (!venteSelectionnee || !numeroCheque.trim() || !banque.trim() || montantFcfa <= 0) return;
+    onSubmit({
+      venteExportateurId: venteSelectionnee.id,
+      numeroCheque: numeroCheque.trim(),
+      banque: banque.trim(),
+      montantFcfa,
+      dateReception,
+      dateEcheance: dateEcheance || null,
+    });
+  };
+
+  return (
+    <ModalShell title="Nouveau chèque reçu" onClose={onClose}>
+      <div className="rounded-lg bg-emerald-50 border border-emerald-100 p-3 text-xs text-emerald-800">
+        Le chèque sera enregistré comme règlement de la vente sélectionnée. Il restera « À déposer » jusqu'à son dépôt puis son encaissement bancaire.
+      </div>
+      {erreurChargement && (
+        <p className="rounded-lg bg-red-50 border border-red-100 p-3 text-sm text-red-700">
+          Impossible de charger les exportateurs ou les ventes ouvertes.
+        </p>
+      )}
+      <div className="space-y-3">
+        <Field label="Exportateur *">
+          <select
+            value={exportateurId}
+            disabled={chargement || !!erreurChargement}
+            onChange={e => {
+              setExportateurId(e.target.value);
+              setVenteExportateurId("");
+              setMontantFcfa(0);
+            }}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-gray-50"
+          >
+            <option value="">— Sélectionner un exportateur —</option>
+            {exportateurs.map(exportateur => (
+              <option key={exportateur.id} value={String(exportateur.id)}>{exportateur.nom}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Vente à régler *">
+          <select
+            value={venteExportateurId}
+            disabled={!exportateurId || chargement}
+            onChange={e => {
+              const id = e.target.value;
+              const vente = ventesDisponibles.find(v => String(v.id) === id);
+              setVenteExportateurId(id);
+              setMontantFcfa(vente ? Number(vente.soldeDuFcfa) : 0);
+            }}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-gray-50"
+          >
+            <option value="">— Sélectionner une vente ouverte —</option>
+            {ventesDisponibles.map(vente => (
+              <option key={vente.id} value={String(vente.id)}>
+                Vente #{vente.id} · solde {fmt(Number(vente.soldeDuFcfa))}
+              </option>
+            ))}
+          </select>
+          {exportateurId && !chargement && ventesDisponibles.length === 0 && (
+            <p className="mt-1 text-xs text-amber-700">Cet exportateur n'a aucune vente avec un solde disponible.</p>
+          )}
+        </Field>
+        {venteSelectionnee && (
+          <div className="grid grid-cols-2 gap-3 rounded-lg bg-gray-50 p-3 text-xs text-gray-600">
+            <div><span className="block text-gray-400">Montant de la vente</span><strong>{fmt(Number(venteSelectionnee.montantTotalFcfa))}</strong></div>
+            <div><span className="block text-gray-400">Solde disponible</span><strong className="text-amber-700">{fmt(Number(venteSelectionnee.soldeDuFcfa))}</strong></div>
+          </div>
+        )}
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="N° du chèque *">
+            <div className="relative">
+              <Hash size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                value={numeroCheque}
+                onChange={e => setNumeroCheque(e.target.value)}
+                placeholder="Numéro unique"
+                className="w-full border border-gray-200 rounded-lg pl-8 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+          </Field>
+          <Field label="Banque émettrice *">
+            <input
+              value={banque}
+              onChange={e => setBanque(e.target.value)}
+              placeholder="Nom de la banque"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </Field>
+        </div>
+        <Field label="Montant du chèque *">
+          <div className="relative">
+            <MoneyInput
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 pr-14"
+              placeholder="0"
+              value={montantFcfa || ""}
+              onChange={value => setMontantFcfa(parseInt(value, 10) || 0)}
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">FCFA</span>
+          </div>
+          {venteSelectionnee && montantFcfa > Number(venteSelectionnee.soldeDuFcfa) && (
+            <p className="mt-1 text-xs text-red-600">Le montant ne peut pas dépasser le solde disponible de la vente.</p>
+          )}
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Date de réception *">
+            <input
+              type="date"
+              value={dateReception}
+              onChange={e => setDateReception(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
+            />
+          </Field>
+          <Field label="Date d'échéance">
+            <input
+              type="date"
+              value={dateEcheance}
+              onChange={e => setDateEcheance(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
+            />
+          </Field>
+        </div>
+      </div>
+      {error && <p className="text-red-600 text-sm">{error}</p>}
+      <div className="flex gap-3 pt-2">
+        <button onClick={onClose} className="flex-1 border border-gray-200 rounded-lg py-2.5 text-sm text-gray-600 hover:bg-gray-50">
+          Annuler
+        </button>
+        <button
+          onClick={submit}
+          disabled={
+            isPending ||
+            chargement ||
+            !venteSelectionnee ||
+            !numeroCheque.trim() ||
+            !banque.trim() ||
+            montantFcfa <= 0 ||
+            montantFcfa > Number(venteSelectionnee?.soldeDuFcfa ?? 0) ||
+            !dateReception
+          }
+          className="flex-1 bg-emerald-600 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"
+        >
+          {isPending && <Loader2 size={14} className="animate-spin" />} Enregistrer le chèque
+        </button>
+      </div>
+    </ModalShell>
   );
 }
 

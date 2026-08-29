@@ -3,11 +3,13 @@ import type { Server } from "node:http";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
+  creerChequeRecu,
   deposerChequeRecu,
   encaisserChequeRecu,
   rejeterChequeRecu,
   annulerChequeRecu,
 } = vi.hoisted(() => ({
+  creerChequeRecu: vi.fn(),
   deposerChequeRecu: vi.fn(),
   encaisserChequeRecu: vi.fn(),
   rejeterChequeRecu: vi.fn(),
@@ -15,6 +17,7 @@ const {
 }));
 
 vi.mock("../services/chequesRecusService.js", () => ({
+  creerChequeRecu,
   deposerChequeRecu,
   encaisserChequeRecu,
   rejeterChequeRecu,
@@ -64,6 +67,64 @@ afterAll(async () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+describe("POST /cheques-recus", () => {
+  it("crée un chèque reçu avec la coopérative et l'utilisateur connectés", async () => {
+    creerChequeRecu.mockResolvedValue({
+      id: 44,
+      cooperativeId: 7,
+      venteExportateurId: 18,
+      exportateurId: 6,
+      numeroCheque: "CHQ-44",
+      banque: "Banque test",
+      montantFcfa: 125000,
+      dateReception: "2026-08-29",
+      dateEcheance: null,
+      statut: "a_deposer",
+    });
+
+    const response = await fetch(`${baseUrl}/cheques-recus`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        venteExportateurId: 18,
+        numeroCheque: " CHQ-44 ",
+        banque: " Banque test ",
+        montantFcfa: 125000,
+        dateReception: "2026-08-29",
+      }),
+    });
+
+    expect(response.status).toBe(201);
+    expect(await response.json()).toMatchObject({
+      id: 44,
+      statut: "a_deposer",
+    });
+    expect(creerChequeRecu).toHaveBeenCalledWith(7, {
+      venteExportateurId: 18,
+      numeroCheque: "CHQ-44",
+      banque: "Banque test",
+      montantFcfa: 125000,
+      dateReception: "2026-08-29",
+      dateEcheance: null,
+      createdBy: 55,
+    });
+  });
+
+  it("refuse les données obligatoires manquantes avant d'appeler le service", async () => {
+    const response = await fetch(`${baseUrl}/cheques-recus`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ venteExportateurId: 18, montantFcfa: 125000 }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      erreur: "Vente, numéro, banque, montant et date de réception sont obligatoires",
+    });
+    expect(creerChequeRecu).not.toHaveBeenCalled();
+  });
 });
 
 describe("POST /cheques-recus/:id/deposer", () => {

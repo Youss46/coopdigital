@@ -177,6 +177,75 @@ export async function getChequesRecus(req: Request, res: Response): Promise<void
   }
 }
 
+export async function postCreerRecu(req: Request, res: Response): Promise<void> {
+  const cooperativeId = getCoop(req);
+  const userId = getUser(req);
+  if (!cooperativeId || !userId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
+  const body = (req.body ?? {}) as {
+    venteExportateurId?: number;
+    numeroCheque?: string;
+    banque?: string;
+    montantFcfa?: number;
+    dateReception?: string;
+    dateEcheance?: string | null;
+  };
+  const venteExportateurId = Number(body.venteExportateurId);
+  const montantFcfa = Number(body.montantFcfa);
+  const dateReception = body.dateReception?.trim() || new Date().toISOString().slice(0, 10);
+  if (
+    !Number.isInteger(venteExportateurId) ||
+    venteExportateurId <= 0 ||
+    !body.numeroCheque?.trim() ||
+    !body.banque?.trim() ||
+    !Number.isInteger(montantFcfa) ||
+    montantFcfa <= 0 ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(dateReception)
+  ) {
+    res.status(400).json({
+      erreur: "Vente, numéro, banque, montant et date de réception sont obligatoires",
+    });
+    return;
+  }
+
+  try {
+    const cheque = await recusSvc.creerChequeRecu(cooperativeId, {
+      venteExportateurId,
+      numeroCheque: body.numeroCheque.trim(),
+      banque: body.banque.trim(),
+      montantFcfa,
+      dateReception,
+      dateEcheance: body.dateEcheance?.trim() || null,
+      createdBy: userId,
+    });
+    res.status(201).json(cheque);
+  } catch (err) {
+    const msg = (err as Error).message;
+    if (msg === "Vente exportateur introuvable") {
+      res.status(404).json({ erreur: msg });
+      return;
+    }
+    if (
+      msg === "La vente est déjà réglée" ||
+      msg.startsWith("Le montant dépasse") ||
+      msg.includes("numéro de chèque") ||
+      msg.includes("duplicate key")
+    ) {
+      res.status(409).json({
+        erreur: msg.includes("duplicate key")
+          ? "Ce numéro de chèque existe déjà pour cette coopérative."
+          : msg,
+      });
+      return;
+    }
+    req.log.error({ err }, "Erreur postCreerRecu");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
 export async function postDeposerRecu(req: Request, res: Response): Promise<void> {
   const cooperativeId = getCoop(req);
   if (!cooperativeId) { res.status(403).json({ erreur: "Coopérative non associée à ce compte" }); return; }

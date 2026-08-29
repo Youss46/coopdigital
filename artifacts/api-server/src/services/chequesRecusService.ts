@@ -4,6 +4,7 @@ import {
   exportateursTable,
   ventesExportateursTable,
   paiementsTable,
+  paiementLignesTable,
 } from "@workspace/db";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { enregistrerMouvement } from "./banqueService.js";
@@ -76,6 +77,140 @@ export async function getChequeRecu(id: number, cooperativeId: number) {
     .where(and(eq(chequesRecusTable.id, id), eq(chequesRecusTable.cooperativeId, cooperativeId)))
     .limit(1);
   return row ?? null;
+}
+
+export type CreerChequeRecuInput = {
+  venteExportateurId: number;
+  numeroCheque: string;
+  banque: string;
+  montantFcfa: number;
+  dateReception: string;
+  dateEcheance?: string | null;
+  createdBy: number;
+};
+
+/**
+ * Enregistre un chèque reçu directement depuis la page de suivi.
+ *
+ * Le chèque est un règlement de vente à part entière : la vente, le paiement,
+ * la ligne de paiement, l'écriture 511/4111 et le suivi du chèque doivent
+ * réussir ou être annulés ensemble.
+ */
+export async function creerChequeRecu(
+  cooperativeId: number,
+  data: CreerChequeRecuInput,
+) {
+  return db.transaction(async (tx) => {
+    const [vente] = await tx
+      .select()
+      .from(ventesExportateursTable)
+      .where(eq(ventesExportateursTable.id, data.venteExportateurId))
+      .for("update")
+      .limit(1);
+    if (!vente) throw new Error("Vente exportateur introuvable");
+
+    const [exportateur] = await tx
+      .select({ id: exportateursTable.id, nom: exportateursTable.nom })
+      .from(exportateursTable)
+      .where(and(
+        eq(exportateursTable.id, vente.exportateurId),
+        eq(exportateursTable.cooperativeId, cooperativeId),
+      ))
+      .limit(1);
+    if (!exportateur) throw new Error("Vente exportateur introuvable");
+    if (vente.soldeDuFcfa <= 0) throw new Error("La vente est déjà réglée");
+    if (data.montantFcfa > vente.soldeDuFcfa) {
+      throw new Error(
+        `Le montant dépasse le solde de la vente (${vente.soldeDuFcfa.toLocaleString("fr-FR")} FCFA).`,
+      );
+    }
+
+    const [duplicate] = await tx
+      .select({ id: chequesRecusTable.id })
+      .from(chequesRecusTable)
+      .where(and(
+        eq(chequesRecusTable.cooperativeId, cooperativeId),
+        eq(chequesRecusTable.numeroCheque, data.numeroCheque),
+      ))
+      .limit(1);
+    if (duplicate) throw new Error("Ce numéro de chèque existe déjà pour cette coopérative");
+
+    const [paiement] = await tx.insert(paiementsTable).values({
+      libelle: `Encaissement vente exportateur #${vente.id}`,
+      modeReglement: "cheque",
+      montantAPayerFcfa: String(data.montantFcfa),
+      montantVerseFcfa: String(data.montantFcfa),
+      resteAPayerFcfa: "0",
+      montantFcfa: data.montantFcfa,
+      modePaiement: "cheque",
+      statut: "confirme",
+      validePar: data.createdBy,
+      dateValidation: new Date(),
+      agentSaisiseurId: data.createdBy,
+    }).returning({ id: paiementsTable.id });
+    if (!paiement) throw new Error("Le règlement de la vente n'a pas pu être créé");
+
+    const [paiementLigne] = await tx.insert(paiementLignesTable).values({
+      paiementId: paiement.id,
+      modePaiement: "cheque",
+      montantFcfa: data.montantFcfa,
+      numeroCheque: data.numeroCheque,
+      banque: data.banque,
+      dateEcheance: data.dateEcheance ?? null,
+    }).returning({ id: paiementLignesTable.id });
+    if (!paiementLigne) throw new Error("La ligne du règlement n'a pas pu être créée");
+
+    const montantRecu = vente.montantRecuFcfa + data.montantFcfa;
+    const solde = vente.montantTotalFcfa - montantRecu;
+    const statut: "en_attente" | "partiel" | "regle" | "en_retard" =
+      solde <= 0
+        ? "regle"
+        : vente.dateEcheanceReglement && new Date(vente.dateEcheanceReglement) < new Date()
+          ? "en_retard"
+          : "partiel";
+
+    const [updatedVente] = await tx
+      .update(ventesExportateursTable)
+      .set({
+        montantRecuFcfa: montantRecu,
+        soldeDuFcfa: Math.max(0, solde),
+        statut,
+      })
+      .where(eq(ventesExportateursTable.id, vente.id))
+      .returning({ id: ventesExportateursTable.id });
+    if (!updatedVente) throw new Error("La vente n'a pas pu être mise à jour");
+
+    const [created] = await tx.insert(chequesRecusTable).values({
+      cooperativeId,
+      numeroCheque: data.numeroCheque,
+      banque: data.banque,
+      montantFcfa: data.montantFcfa,
+      dateReception: data.dateReception,
+      dateEcheance: data.dateEcheance ?? null,
+      statut: "a_deposer",
+      venteExportateurId: vente.id,
+      exportateurId: exportateur.id,
+      paiementId: paiement.id,
+      paiementLigneId: paiementLigne.id,
+      createdBy: data.createdBy,
+    }).returning();
+    if (!created) throw new Error("Le chèque reçu n'a pas pu être créé");
+
+    await proposerEcrituresDansTransaction(tx, cooperativeId, [{
+      source: "encaissement",
+      sourceId: created.id,
+      libelle: `Chèque reçu — vente exportateur ${exportateur.nom}`,
+      compteDebit: "511",
+      compteCredit: "4111",
+      montantFcfa: data.montantFcfa,
+      date: data.dateReception,
+      numeroPiece: `ENC-CHQ-${created.id}`,
+      tiersId: exportateur.id,
+      tiersType: "exportateur",
+    }]);
+
+    return created;
+  });
 }
 
 export async function deposerChequeRecu(
