@@ -78,6 +78,7 @@ const TRANSITIONS: Record<string, { label: string; next: string }> = {
   charge:         { label: "Marquer en transit →",        next: "en_transit" },
   en_transit:     { label: "Confirmer arrivée au port →", next: "arrive_port" },
   arrive_port:    { label: "Saisir la réception port →",  next: "reception" },
+  litige:         { label: "Résoudre le litige →",         next: "reception" },
 };
 
 const MOTIFS_ECART = [
