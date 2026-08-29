@@ -1,6 +1,7 @@
 import { type Request, type Response } from "express";
 import {
   listExpeditions,
+  listFraisTransportARegler,
   getExpeditionsStats,
   getExpedition,
   createExpedition,
@@ -44,6 +45,18 @@ export async function handleListExpeditions(req: Request, res: Response): Promis
     res.json(rows);
   } catch (err) {
     req.log.error({ err }, "handleListExpeditions");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function handleListFraisTransportARegler(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(403).json({ erreur: "Coopérative non associée" }); return; }
+
+  try {
+    res.json(await listFraisTransportARegler(cooperativeId));
+  } catch (err) {
+    req.log.error({ err }, "handleListFraisTransportARegler");
     res.status(500).json({ erreur: "Erreur interne" });
   }
 }

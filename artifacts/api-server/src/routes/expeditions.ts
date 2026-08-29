@@ -2,6 +2,7 @@ import { Router } from "express";
 import { checkPermission } from "../middlewares/permissions";
 import {
   handleListExpeditions,
+  handleListFraisTransportARegler,
   handleGetStats,
   handleGetExpedition,
   handleCreateExpedition,
@@ -33,6 +34,12 @@ router.get(
   "/expeditions/stats",
   checkPermission("expeditions", "lire"),
   handleGetStats,
+);
+
+router.get(
+  "/expeditions/frais-transport-a-regler",
+  checkPermission("paiements", "lire"),
+  handleListFraisTransportARegler,
 );
 
 router.get(
@@ -97,7 +104,7 @@ router.put(
 
 router.post(
   "/expeditions/:id/reglement-frais-transport",
-  checkPermission("expeditions", "modifier"),
+  checkPermission("paiements", "valider"),
   handleReglerFraisTransport,
 );
 

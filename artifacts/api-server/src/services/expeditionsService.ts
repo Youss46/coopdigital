@@ -92,6 +92,32 @@ export async function listExpeditions(cooperativeId: number, filtres?: {
   return rows;
 }
 
+// ── Frais d'exportation à régler ─────────────────────────────────────────────
+
+export async function listFraisTransportARegler(cooperativeId: number) {
+  return db
+    .select({
+      id:                         expeditionsTable.id,
+      numeroExpedition:           expeditionsTable.numeroExpedition,
+      statut:                     expeditionsTable.statut,
+      port:                       expeditionsTable.port,
+      transporteur:               expeditionsTable.transporteur,
+      nomChauffeur:               expeditionsTable.nomChauffeur,
+      dateArriveePort:            expeditionsTable.dateArriveePort,
+      fraisTransportFcfa:         expeditionsTable.fraisTransportFcfa,
+      fraisTransportStatut:       expeditionsTable.fraisTransportStatut,
+      exportateurNom:             expeditionsTable.exportateurNom,
+    })
+    .from(expeditionsTable)
+    .where(and(
+      eq(expeditionsTable.cooperativeId, cooperativeId),
+      eq(expeditionsTable.statut, "receptionne"),
+      eq(expeditionsTable.fraisTransportStatut, "non_paye"),
+      sql`${expeditionsTable.fraisTransportFcfa} IS NOT NULL AND ${expeditionsTable.fraisTransportFcfa} > 0`,
+    ))
+    .orderBy(desc(expeditionsTable.dateArriveePort), desc(expeditionsTable.createdAt));
+}
+
 // ── Statistiques résumées ───────────────────────────────────────────────────
 
 export async function getExpeditionsStats(cooperativeId: number) {

@@ -64,21 +64,6 @@ interface LotDisponible {
   qrCodeLot: string;
 }
 
-interface CaisseDisponible {
-  id: number;
-  nom: string;
-  solde_actuel_fcfa: string;
-  session_id: number | null;
-  session_statut: string | null;
-}
-
-interface CompteBancaireDisponible {
-  id: number;
-  nom: string;
-  banque: string;
-  solde_actuel_fcfa: string;
-}
-
 const STATUT_CONFIG: Record<string, { label: string; color: string; step: number }> = {
   en_preparation: { label: "En préparation", color: "text-gray-600",   step: 0 },
   charge:         { label: "Chargé",          color: "text-blue-600",   step: 1 },
@@ -141,25 +126,6 @@ export default function ExpeditionDetailPage() {
     enabled: !!id && showLotsPanel,
   });
 
-  const { data: caisses = [] } = useQuery<CaisseDisponible[]>({
-    queryKey: ["caisses-reglement-expedition", id],
-    queryFn: () => apiFetch("/api/caisse", token),
-    enabled: !!id && Number(exp?.fraisTransportFcfa ?? 0) > 0 && String(exp?.fraisTransportStatut ?? "non_paye") !== "paye",
-    staleTime: 30_000,
-  });
-
-  const { data: comptesBancaires = [] } = useQuery<CompteBancaireDisponible[]>({
-    queryKey: ["comptes-bancaires-reglement-expedition", id],
-    queryFn: () => apiFetch("/api/banque", token),
-    enabled: !!id && Number(exp?.fraisTransportFcfa ?? 0) > 0 && String(exp?.fraisTransportStatut ?? "non_paye") !== "paye",
-    staleTime: 30_000,
-  });
-
-  const [modeReglement, setModeReglement] = useState<"especes" | "banque">("especes");
-  const [caisseReglementId, setCaisseReglementId] = useState("");
-  const [compteBancaireReglementId, setCompteBancaireReglementId] = useState("");
-  const [referenceReglement, setReferenceReglement] = useState("");
-
   const rattacherMutation = useMutation({
     mutationFn: (lotId: number) => apiPost(`/api/expeditions/${id}/lots`, token, { lotId }),
     onSuccess: () => {
@@ -207,28 +173,6 @@ export default function ExpeditionDetailPage() {
       void qc.invalidateQueries({ queryKey: ["expeditions"] });
     },
     onError: (err: Error) => toast({ title: "Erreur", description: err.message, variant: "destructive" }),
-  });
-
-  const reglementFraisMutation = useMutation({
-    mutationFn: () => apiPost(`/api/expeditions/${id}/reglement-frais-transport`, token, {
-      modePaiement: modeReglement,
-      ...(modeReglement === "especes"
-        ? { caisseId: Number(caisseReglementId) }
-        : { compteBancaireId: Number(compteBancaireReglementId) }),
-      reference: referenceReglement.trim() || undefined,
-    }),
-    onSuccess: () => {
-      toast({ title: "Frais de transport réglés", description: "La trésorerie et la comptabilité ont été mises à jour." });
-      setReferenceReglement("");
-      setCaisseReglementId("");
-      setCompteBancaireReglementId("");
-      void qc.invalidateQueries({ queryKey: ["expedition", id] });
-      void qc.invalidateQueries({ queryKey: ["expeditions"] });
-      void qc.invalidateQueries({ queryKey: ["expeditions-stats"] });
-      void qc.invalidateQueries({ queryKey: ["caisses-reglement-expedition", id] });
-      void qc.invalidateQueries({ queryKey: ["comptes-bancaires-reglement-expedition", id] });
-    },
-    onError: (err: Error) => toast({ title: "Règlement impossible", description: err.message, variant: "destructive" }),
   });
 
   if (isLoading) return <div className="p-8 text-center text-gray-500">Chargement…</div>;
@@ -418,82 +362,9 @@ export default function ExpeditionDetailPage() {
                 Le règlement est bloqué : la réception ou la dette de transport a été annulée.
               </div>
             ) : (
-              <>
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                  <div>
-                    <Label>Mode de paiement</Label>
-                    <Select
-                      value={modeReglement}
-                      onValueChange={value => {
-                        setModeReglement(value as "especes" | "banque");
-                        setCaisseReglementId("");
-                        setCompteBancaireReglementId("");
-                      }}
-                    >
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="especes">Espèces — caisse</SelectItem>
-                        <SelectItem value="banque">Banque</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {modeReglement === "especes" ? (
-                    <div>
-                      <Label>Caisse ouverte *</Label>
-                      <Select value={caisseReglementId || undefined} onValueChange={setCaisseReglementId}>
-                        <SelectTrigger><SelectValue placeholder="Sélectionner une caisse" /></SelectTrigger>
-                        <SelectContent>
-                          {caisses.filter(c => c.session_id !== null && c.session_statut === "ouverte").map(c => (
-                            <SelectItem key={c.id} value={String(c.id)}>
-                              {c.nom} — {Number(c.solde_actuel_fcfa).toLocaleString("fr-FR")} FCFA
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {caisses.every(c => c.session_id === null || c.session_statut !== "ouverte") && (
-                        <p className="mt-1 text-xs text-orange-600">Aucune caisse n'est ouverte aujourd'hui.</p>
-                      )}
-                    </div>
-                  ) : (
-                    <div>
-                      <Label>Compte bancaire actif *</Label>
-                      <Select value={compteBancaireReglementId || undefined} onValueChange={setCompteBancaireReglementId}>
-                        <SelectTrigger><SelectValue placeholder="Sélectionner un compte" /></SelectTrigger>
-                        <SelectContent>
-                          {comptesBancaires.map(c => (
-                            <SelectItem key={c.id} value={String(c.id)}>
-                              {c.nom} — {c.banque} ({Number(c.solde_actuel_fcfa).toLocaleString("fr-FR")} FCFA)
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {comptesBancaires.length === 0 && (
-                        <p className="mt-1 text-xs text-orange-600">Aucun compte bancaire actif n'est disponible.</p>
-                      )}
-                    </div>
-                  )}
-                  <div>
-                    <Label>Référence (facultatif)</Label>
-                    <Input
-                      value={referenceReglement}
-                      onChange={e => setReferenceReglement(e.target.value)}
-                      placeholder="N° reçu, virement…"
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-end">
-                  <Button
-                    className="bg-blue-700 hover:bg-blue-800"
-                    disabled={
-                      reglementFraisMutation.isPending ||
-                      (modeReglement === "especes" ? !caisseReglementId : !compteBancaireReglementId)
-                    }
-                    onClick={() => reglementFraisMutation.mutate()}
-                  >
-                    {reglementFraisMutation.isPending ? "Règlement en cours…" : "Régler les frais"}
-                  </Button>
-                </div>
-              </>
+              <div className="rounded-md bg-blue-50 p-3 text-sm text-blue-800">
+                Le règlement des frais d’exportation se fait désormais depuis la page <strong>Règlements</strong>.
+              </div>
             )}
           </CardContent>
         </Card>

@@ -3,7 +3,7 @@ import {
   CheckCircle2, Clock, XCircle, Loader2, CreditCard, Search,
   CheckCheck, AlertCircle, Banknote, Smartphone, ChevronDown,
   Receipt, Package, User, Calendar, TrendingUp, X, Wallet,
-  AlertTriangle, Lock, FileDown, Printer, Fuel,
+  AlertTriangle, Lock, FileDown, Printer, Fuel, Ship,
 } from "lucide-react";
 import {
   useListPaiements,
@@ -18,7 +18,7 @@ import {
   getListPaiementsQueryKey,
   getGetPaiementsStatsQueryKey,
 } from "@workspace/api-client-react";
-import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
 import { usePermission } from "@/hooks/usePermission";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -58,6 +58,66 @@ const tok = () => localStorage.getItem("coop_token") ?? "";
 const apiFetch = (url: string) =>
   fetch(`${BASE}${url}`, { headers: { Authorization: `Bearer ${tok()}` } }).then((r) => r.json());
 
+async function apiFetchChecked<T>(url: string): Promise<T> {
+  const response = await fetch(`${BASE}${url}`, {
+    headers: { Authorization: `Bearer ${tok()}` },
+  });
+  const payload = await response.json().catch(() => null) as { erreur?: string } | T | null;
+  if (!response.ok) {
+    const message = payload && typeof payload === "object" && "erreur" in payload
+      ? String(payload.erreur)
+      : `HTTP ${response.status}`;
+    throw new Error(message);
+  }
+  return payload as T;
+}
+
+async function apiPostChecked<T>(url: string, body: unknown): Promise<T> {
+  const response = await fetch(`${BASE}${url}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${tok()}`,
+    },
+    body: JSON.stringify(body),
+  });
+  const payload = await response.json().catch(() => null) as { erreur?: string } | T | null;
+  if (!response.ok) {
+    const message = payload && typeof payload === "object" && "erreur" in payload
+      ? String(payload.erreur)
+      : `HTTP ${response.status}`;
+    throw new Error(message);
+  }
+  return payload as T;
+}
+
+type FraisTransportARegler = {
+  id: number;
+  numeroExpedition: string;
+  statut: string;
+  port: string;
+  transporteur: string | null;
+  nomChauffeur: string | null;
+  dateArriveePort: string | null;
+  fraisTransportFcfa: string | number;
+  fraisTransportStatut: string;
+  exportateurNom: string | null;
+};
+
+type CaisseTransport = {
+  id: number;
+  nom: string;
+  solde_actuel_fcfa: string;
+  session_id: number | null;
+  session_statut: string | null;
+};
+
+type CompteBancaireTransport = {
+  id: number;
+  nom: string;
+  banque: string;
+  solde_actuel_fcfa: string;
+};
 // ─── Formatters ─────────────────────────────────────────────────────────────
 
 function fmt(n: number | null | undefined) {
@@ -120,6 +180,188 @@ function ModeBadge({ mode }: { mode: string | null | undefined }) {
     <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${cfg.cls}`}>
       {cfg.icon}{cfg.label}
     </span>
+  );
+}
+
+function ModalReglementTransport({
+  expedition,
+  caisses,
+  comptesBancaires,
+  isDelegue,
+  onClose,
+  onConfirm,
+  loading,
+}: {
+  expedition: FraisTransportARegler;
+  caisses: CaisseTransport[];
+  comptesBancaires: CompteBancaireTransport[];
+  isDelegue: boolean;
+  onClose: () => void;
+  onConfirm: (input: {
+    modePaiement: "especes" | "banque";
+    caisseId?: number;
+    compteBancaireId?: number;
+    reference?: string;
+  }) => void;
+  loading: boolean;
+}) {
+  const [mode, setMode] = useState<"especes" | "banque">("especes");
+  const [caisseId, setCaisseId] = useState("");
+  const [compteBancaireId, setCompteBancaireId] = useState("");
+  const [reference, setReference] = useState("");
+  const [touched, setTouched] = useState(false);
+
+  const caissesOuvertes = caisses.filter(
+    (caisse) => caisse.session_id !== null && caisse.session_statut === "ouverte",
+  );
+  const ressourceManquante = mode === "especes" ? !caisseId : !compteBancaireId;
+
+  function handleConfirm() {
+    if (ressourceManquante) {
+      setTouched(true);
+      return;
+    }
+    onConfirm({
+      modePaiement: mode,
+      ...(mode === "especes"
+        ? { caisseId: Number(caisseId) }
+        : { compteBancaireId: Number(compteBancaireId) }),
+      reference: reference.trim() || undefined,
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
+        <div className="p-6 space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+              <Ship size={18} className="text-blue-700" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-bold text-gray-900 text-sm">Régler les frais d’exportation</h3>
+              <p className="text-xs text-gray-500 font-mono mt-0.5">{expedition.numeroExpedition}</p>
+            </div>
+            <button onClick={onClose} className="ml-auto text-gray-400 hover:text-gray-600" aria-label="Fermer">
+              <X size={16} />
+            </button>
+          </div>
+
+          <div className="rounded-xl bg-blue-50 border border-blue-100 p-4 space-y-1 text-sm">
+            <div className="flex justify-between gap-3">
+              <span className="text-gray-500">Transporteur</span>
+              <span className="font-medium text-gray-800 text-right">
+                {expedition.transporteur || expedition.nomChauffeur || "—"}
+              </span>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span className="text-gray-500">Port</span>
+              <span className="font-medium text-gray-800">{expedition.port}</span>
+            </div>
+            <div className="border-t border-blue-100 pt-2 mt-2 flex justify-between items-center">
+              <span className="font-semibold text-gray-700">Montant à régler</span>
+              <span className="text-xl font-bold text-blue-800">{fmt(Number(expedition.fraisTransportFcfa))}</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Mode de règlement <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={mode}
+              onChange={(event) => {
+                const nextMode = event.target.value as "especes" | "banque";
+                setMode(nextMode);
+                setCaisseId("");
+                setCompteBancaireId("");
+                setTouched(false);
+              }}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white"
+            >
+              <option value="especes">Espèces — caisse</option>
+              {!isDelegue && <option value="banque">Banque</option>}
+            </select>
+          </div>
+
+          {mode === "especes" ? (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Caisse ouverte <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={caisseId}
+                onChange={(event) => { setCaisseId(event.target.value); setTouched(false); }}
+                className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white ${
+                  touched && !caisseId ? "border-red-400 bg-red-50" : "border-gray-200"
+                }`}
+              >
+                <option value="">— Sélectionner une caisse ouverte —</option>
+                {caissesOuvertes.map((caisse) => (
+                  <option key={caisse.id} value={String(caisse.id)}>
+                    {caisse.nom} — {Number(caisse.solde_actuel_fcfa).toLocaleString("fr-FR")} FCFA
+                  </option>
+                ))}
+              </select>
+              {caissesOuvertes.length === 0 && (
+                <p className="text-xs text-orange-600 mt-1">Aucune caisse n’est ouverte aujourd’hui.</p>
+              )}
+            </div>
+          ) : (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Compte bancaire actif <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={compteBancaireId}
+                onChange={(event) => { setCompteBancaireId(event.target.value); setTouched(false); }}
+                className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white ${
+                  touched && !compteBancaireId ? "border-red-400 bg-red-50" : "border-gray-200"
+                }`}
+              >
+                <option value="">— Sélectionner un compte bancaire —</option>
+                {comptesBancaires.map((compte) => (
+                  <option key={compte.id} value={String(compte.id)}>
+                    {compte.nom} — {compte.banque} ({Number(compte.solde_actuel_fcfa).toLocaleString("fr-FR")} FCFA)
+                  </option>
+                ))}
+              </select>
+              {comptesBancaires.length === 0 && (
+                <p className="text-xs text-orange-600 mt-1">Aucun compte bancaire actif n’est disponible.</p>
+              )}
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Référence <span className="text-gray-400">(facultatif)</span>
+            </label>
+            <input
+              value={reference}
+              onChange={(event) => setReference(event.target.value)}
+              placeholder="N° reçu, virement…"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+            />
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={onClose}
+              className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Annuler
+            </button>
+            <button
+              onClick={handleConfirm}
+              disabled={loading || ressourceManquante}
+              className="flex-1 py-2.5 rounded-xl text-white text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-1.5 bg-blue-700 hover:bg-blue-800"
+            >
+              {loading ? <Loader2 size={15} className="animate-spin" /> : <><CheckCircle2 size={15} /> Régler les frais</>}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -805,6 +1047,7 @@ type ModalState =
   | null;
 
 export default function ReglementsPage() {
+  const peutLire = usePermission("paiements", "lire");
   const peutValider = usePermission("paiements", "valider");
   const peutRejeter = usePermission("paiements", "rejeter");
   const { utilisateur } = useAuth();
@@ -816,6 +1059,7 @@ export default function ReglementsPage() {
   const [filtreProxy, setFiltreProxy] = useState(false);
   const [recherche, setRecherche] = useState("");
   const [modal, setModal] = useState<ModalState>(null);
+  const [transportModal, setTransportModal] = useState<FraisTransportARegler | null>(null);
 
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -871,8 +1115,65 @@ export default function ReglementsPage() {
     query: { queryKey: getListPaiementsQueryKey(params) },
   });
 
+  const {
+    data: fraisTransport = [],
+    isLoading: fraisTransportLoading,
+    isError: fraisTransportError,
+  } = useQuery<FraisTransportARegler[]>({
+    queryKey: ["frais-transport-a-regler"],
+    queryFn: () => apiFetchChecked<FraisTransportARegler[]>("/api/expeditions/frais-transport-a-regler"),
+    enabled: peutLire,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  });
+  const { data: caissesTransport = [] } = useQuery<CaisseTransport[]>({
+    queryKey: ["caisses-reglement-exportation"],
+    queryFn: () => apiFetchChecked<CaisseTransport[]>("/api/caisse"),
+    enabled: peutValider && !!transportModal,
+    staleTime: 30_000,
+  });
+  const { data: comptesBancairesTransport = [] } = useQuery<CompteBancaireTransport[]>({
+    queryKey: ["comptes-bancaires-reglement-exportation"],
+    queryFn: () => apiFetchChecked<CompteBancaireTransport[]>("/api/banque"),
+    enabled: peutValider && !isDelegue && !!transportModal,
+    staleTime: 30_000,
+  });
+
   const validerMut = useValiderPaiement();
   const rejeterMut = useRejeterPaiement();
+  const reglementTransportMut = useMutation({
+    mutationFn: (input: {
+      expeditionId: number;
+      modePaiement: "especes" | "banque";
+      caisseId?: number;
+      compteBancaireId?: number;
+      reference?: string;
+    }) => apiPostChecked(`/api/expeditions/${input.expeditionId}/reglement-frais-transport`, {
+      modePaiement: input.modePaiement,
+      caisseId: input.caisseId,
+      compteBancaireId: input.compteBancaireId,
+      reference: input.reference,
+    }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["frais-transport-a-regler"] });
+      void qc.invalidateQueries({ queryKey: ["expeditions"] });
+      void qc.invalidateQueries({ queryKey: ["expeditions-stats"] });
+      void qc.invalidateQueries({ queryKey: ["caisses-reglement-exportation"] });
+      void qc.invalidateQueries({ queryKey: ["comptes-bancaires-reglement-exportation"] });
+      void qc.invalidateQueries({ queryKey: ["caisse-centrale-session"] });
+      if (isDelegue) {
+        void qc.invalidateQueries({ queryKey: ["caisse-delegue-solde", utilisateur?.id] });
+      }
+      setTransportModal(null);
+      toast({
+        title: "Frais d’exportation réglés",
+        description: "La trésorerie et la comptabilité ont été mises à jour.",
+      });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Règlement impossible", description: err.message, variant: "destructive" });
+    },
+  });
 
   function invalidateAll() {
     qc.invalidateQueries({ queryKey: ["listPaiements"] });
@@ -1159,6 +1460,58 @@ export default function ReglementsPage() {
         />
       </div>
 
+      {/* ── Frais d'exportation ── */}
+      {peutLire && (
+        <section className="rounded-xl border border-blue-100 bg-blue-50/40 overflow-hidden">
+          <div className="px-5 py-4 flex flex-wrap items-center justify-between gap-3 border-b border-blue-100">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center">
+                <Ship size={17} className="text-blue-700" />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-gray-900">Frais d’exportation</h2>
+                <p className="text-xs text-gray-500">
+                  Expéditions réceptionnées à régler
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-sm font-bold text-blue-800">
+                {fraisTransport.reduce((total, expedition) => total + Number(expedition.fraisTransportFcfa), 0).toLocaleString("fr-FR")} FCFA
+              </p>
+              <p className="text-xs text-gray-500">
+                {fraisTransport.length} expédition{fraisTransport.length !== 1 ? "s" : ""}
+              </p>
+            </div>
+          </div>
+          {fraisTransportLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="animate-spin text-blue-300" size={24} />
+            </div>
+          ) : fraisTransportError ? (
+            <div className="flex items-center gap-2 px-5 py-6 text-sm text-red-700">
+              <AlertCircle size={16} />
+              Impossible de charger les frais d’exportation à régler.
+            </div>
+          ) : fraisTransport.length === 0 ? (
+            <div className="px-5 py-7 text-center text-sm text-gray-500">
+              Aucun frais d’exportation en attente de règlement.
+            </div>
+          ) : (
+            <div className="divide-y divide-blue-100">
+              {fraisTransport.map((expedition) => (
+                <FraisTransportRow
+                  key={expedition.id}
+                  expedition={expedition}
+                  peutValider={peutValider}
+                  onRegler={() => setTransportModal(expedition)}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
       {/* ── Filtres ── */}
       <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[180px]">
@@ -1275,6 +1628,22 @@ export default function ReglementsPage() {
         <ModalRecu
           paiement={modal.paiement}
           onClose={() => setModal(null)}
+        />
+      )}
+      {transportModal && (
+        <ModalReglementTransport
+          expedition={transportModal}
+          caisses={caissesTransport}
+          comptesBancaires={comptesBancairesTransport}
+          isDelegue={isDelegue}
+          onClose={() => {
+            if (!reglementTransportMut.isPending) setTransportModal(null);
+          }}
+          onConfirm={(input) => reglementTransportMut.mutate({
+            expeditionId: transportModal.id,
+            ...input,
+          })}
+          loading={reglementTransportMut.isPending}
         />
       )}
     </div>
@@ -1436,6 +1805,55 @@ function PaiementRow({
               </button>
             )}
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FraisTransportRow({
+  expedition,
+  peutValider,
+  onRegler,
+}: {
+  expedition: FraisTransportARegler;
+  peutValider: boolean;
+  onRegler: () => void;
+}) {
+  const dateReception = expedition.dateArriveePort
+    ? new Date(expedition.dateArriveePort).toLocaleDateString("fr-FR")
+    : "—";
+
+  return (
+    <div className="px-5 py-4 bg-white/70">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1 space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-semibold text-gray-900 text-sm font-mono">{expedition.numeroExpedition}</p>
+            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium bg-amber-100 text-amber-700">
+              <Clock size={11} /> Non payé
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-500">
+            <span>Port de {expedition.port}</span>
+            <span>Réception : {dateReception}</span>
+            {(expedition.transporteur || expedition.nomChauffeur) && (
+              <span>{expedition.transporteur || expedition.nomChauffeur}</span>
+            )}
+            {expedition.exportateurNom && <span>Exportateur : {expedition.exportateurNom}</span>}
+          </div>
+        </div>
+        <div className="text-right flex flex-col items-end gap-2 shrink-0">
+          <span className="font-bold text-gray-900">{fmt(Number(expedition.fraisTransportFcfa))}</span>
+          {peutValider && (
+            <button
+              onClick={onRegler}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white whitespace-nowrap bg-blue-700 hover:bg-blue-800"
+            >
+              <Banknote size={12} />
+              Régler les frais
+            </button>
+          )}
         </div>
       </div>
     </div>
