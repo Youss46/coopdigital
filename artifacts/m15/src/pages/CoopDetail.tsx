@@ -219,7 +219,7 @@ export default function CoopDetail() {
 
   return (
     <Layout>
-      <div className="p-8 max-w-4xl mx-auto">
+      <div className="w-full max-w-4xl mx-auto p-4 sm:p-8">
         <Link href="/cooperatives">
           <button className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors">
             <ArrowLeft size={15} /> Retour aux coopératives
@@ -247,11 +247,11 @@ export default function CoopDetail() {
         {data && (
           <>
             {/* Header */}
-            <div className="bg-card border rounded-xl p-6 mb-6">
-              <div className="flex items-start justify-between gap-4">
-                <div>
+            <div className="bg-card border rounded-xl p-4 sm:p-6 mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                <div className="min-w-0">
                   <div className="flex items-center gap-3 mb-1">
-                    <h1 className="text-2xl font-bold">{data.cooperative.nom}</h1>
+                    <h1 className="text-2xl font-bold break-words">{data.cooperative.nom}</h1>
                     {data.licenceCourante && (
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statutColor(data.licenceCourante.statut)}`}>
                         {statutLabel(data.licenceCourante.statut)}
@@ -262,8 +262,8 @@ export default function CoopDetail() {
                     {data.cooperative.ville}, {data.cooperative.region} · Créée le {formatDate(data.cooperative.createdAt)}
                   </div>
                 </div>
-                <div className="flex gap-2 flex-wrap">
-                  <button onClick={load} className="flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm hover:bg-muted">
+                <div className="flex gap-2 flex-wrap sm:justify-end">
+                  <button onClick={load} className="flex items-center justify-center gap-1.5 px-3 py-2 border rounded-lg text-sm hover:bg-muted">
                     <RefreshCw size={13} />
                   </button>
                   {(data.licenceCourante?.statut === "inactive" || data.licenceCourante?.statut === "trial" || data.licenceCourante?.statut === "expiree") && (
@@ -294,10 +294,10 @@ export default function CoopDetail() {
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-1 mb-6 bg-muted rounded-lg p-1 w-fit">
+            <div className="grid grid-cols-2 gap-1 mb-6 bg-muted rounded-lg p-1 w-full sm:flex sm:w-fit">
               {tabs.map((t) => (
                 <button key={t.id} onClick={() => setTab(t.id)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === t.id ? "bg-card shadow-sm" : "hover:bg-card/50 text-muted-foreground"}`}>
+                  className={`flex min-w-0 items-center justify-center gap-2 px-2 sm:px-4 py-2 rounded-md text-sm font-medium transition-colors ${t.id === "historique" ? "col-span-2 sm:col-span-1" : ""} ${tab === t.id ? "bg-card shadow-sm" : "hover:bg-card/50 text-muted-foreground"}`}>
                   <t.icon size={14} /> {t.label}
                 </button>
               ))}
@@ -307,7 +307,7 @@ export default function CoopDetail() {
             {tab === "licence" && (
               <div className="space-y-4">
                 {data.licenceCourante ? (
-                  <div className="bg-card border rounded-xl p-5 grid grid-cols-2 gap-4 text-sm">
+                  <div className="bg-card border rounded-xl p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                     <div><span className="text-muted-foreground">Plan</span><div className="font-semibold mt-0.5">{data.licenceCourante.planNom ?? "—"}</div></div>
                     <div><span className="text-muted-foreground">Clé de licence</span><div className="font-mono text-xs mt-0.5 bg-muted px-2 py-1 rounded">{data.licenceCourante.cleLicence}</div></div>
                     <div><span className="text-muted-foreground">Activation</span><div className="font-medium mt-0.5">{formatDate(data.licenceCourante.dateActivation)}</div></div>
@@ -347,7 +347,7 @@ export default function CoopDetail() {
                 {data.pca ? (
                   <>
                     <div className="bg-card border rounded-xl p-5">
-                      <div className="flex items-start justify-between mb-4">
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
                         <div className="flex items-center gap-3">
                           <div className="size-12 rounded-full bg-primary/10 flex items-center justify-center">
                             <User size={20} className="text-primary" />
@@ -357,13 +357,13 @@ export default function CoopDetail() {
                             <div className="text-xs text-muted-foreground">PCA / Directeur de coopérative</div>
                           </div>
                         </div>
-                        <button onClick={openEditPca}
-                          className="flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm hover:bg-muted">
+                         <button onClick={openEditPca}
+                           className="self-start flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm hover:bg-muted">
                           <Pencil size={13} /> Modifier
                         </button>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                         <div>
                           <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1"><Mail size={11} /> Email</div>
                           <div className="flex items-center gap-1.5">
@@ -396,14 +396,14 @@ export default function CoopDetail() {
 
                     {/* Reset password */}
                     <div className="bg-card border rounded-xl p-5">
-                      <div className="flex items-start justify-between">
-                        <div>
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                        <div className="min-w-0">
                           <div className="font-semibold text-sm mb-0.5 flex items-center gap-2"><KeyRound size={14} /> Réinitialisation du mot de passe</div>
                           <div className="text-xs text-muted-foreground">Génère un nouveau mot de passe temporaire et l'envoie par SMS au PCA.</div>
                         </div>
                         <button
                           onClick={() => { setShowResetPca(true); setResetResult(null); setActionError(""); }}
-                          className="flex items-center gap-1.5 px-3 py-2 border border-orange-200 text-orange-700 rounded-lg text-sm hover:bg-orange-50 shrink-0 ml-4">
+                          className="self-start flex items-center gap-1.5 px-3 py-2 border border-orange-200 text-orange-700 rounded-lg text-sm hover:bg-orange-50 shrink-0">
                           <KeyRound size={13} /> Réinitialiser
                         </button>
                       </div>
@@ -421,7 +421,7 @@ export default function CoopDetail() {
 
             {/* Stats Tab */}
             {tab === "stats" && (
-              <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {[
                   { label: "Membres enregistrés", value: data.stats.nbMembres },
                   { label: "Utilisateurs actifs", value: data.stats.nbUsers },
@@ -512,14 +512,14 @@ export default function CoopDetail() {
                   ) : (
                     <div className="divide-y max-h-72 overflow-y-auto">
                       {[...featureHistory].reverse().map((entry) => (
-                        <div key={entry.id} className="px-5 py-3 flex items-center gap-3 text-sm">
+                        <div key={entry.id} className="px-5 py-3 flex flex-wrap items-center gap-3 text-sm">
                           <History size={14} className="text-muted-foreground shrink-0" />
                           <div className="flex-1">
                             <span className="font-medium">{features.find((feature) => feature.key === entry.featureKey)?.label ?? entry.featureKey}</span>
                             <span className="text-muted-foreground"> · {entry.previousMode ?? "actif"} → {entry.newMode}</span>
                             {entry.reason && <div className="text-xs text-muted-foreground mt-0.5">{entry.reason}</div>}
                           </div>
-                          <span className="text-xs text-muted-foreground">{formatDate(entry.createdAt)}</span>
+                           <span className="text-xs text-muted-foreground sm:ml-auto">{formatDate(entry.createdAt)}</span>
                         </div>
                       ))}
                     </div>
@@ -539,7 +539,7 @@ export default function CoopDetail() {
                 ) : (
                   <div className="divide-y">
                     {data.historique.map((h) => (
-                      <div key={h.id} className="px-5 py-4 flex items-start gap-4">
+                       <div key={h.id} className="px-5 py-4 flex flex-wrap items-start gap-4">
                         <div className="size-8 rounded-full bg-muted flex items-center justify-center shrink-0 mt-0.5">
                           <History size={13} className="text-muted-foreground" />
                         </div>
@@ -554,7 +554,7 @@ export default function CoopDetail() {
                           )}
                           {h.effectuePar && <div className="text-xs text-muted-foreground/60 mt-0.5">Par {h.effectuePar}</div>}
                         </div>
-                        <div className="text-xs text-muted-foreground shrink-0">{formatDate(h.createdAt)}</div>
+                         <div className="text-xs text-muted-foreground sm:ml-auto shrink-0">{formatDate(h.createdAt)}</div>
                       </div>
                     ))}
                   </div>

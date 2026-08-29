@@ -110,7 +110,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       )}
 
       {/* ── Contenu principal ─────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
         {/* Top bar mobile */}
         <div className="md:hidden flex items-center gap-3 px-4 py-3 bg-sidebar text-white border-b border-white/10 shrink-0">
           <button
@@ -128,7 +128,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        <main className="flex-1 overflow-y-auto bg-background">
+        <main className="flex-1 min-w-0 overflow-y-auto bg-background">
           {children}
         </main>
       </div>
