@@ -2,6 +2,10 @@ import { pool } from "@workspace/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { validerPaiement } from "../controllers/paiementsController.js";
 import { getJournal } from "../services/caisseService.js";
+import {
+  annulerChequeRecu,
+  rejeterChequeRecu,
+} from "../services/chequesRecusService.js";
 
 const enabled =
   process.env.RUN_POSTGRES_INTEGRATION === "1" &&
@@ -845,6 +849,507 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
         session_statut: "fermee",
         date_session: sessionDate,
       }),
+    ]);
+  });
+});
+
+describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () => {
+  let client: any;
+  let cooperativeId: number;
+  let exportateurId: number;
+  const paymentIds: number[] = [];
+  const saleIds: number[] = [];
+  const chequeIds: number[] = [];
+
+  type SaleFixture = {
+    paymentId: number;
+    saleId: number;
+    chequeId: number;
+  };
+
+  beforeAll(async () => {
+    client = await pool.connect();
+
+    const cooperative = await client.query(
+      `INSERT INTO cooperatives (nom, ville, region)
+       VALUES ($1, $2, $3) RETURNING id`,
+      [`Rejet chèque reçu ${process.pid}`, "Test", "Test"],
+    );
+    cooperativeId = cooperative.rows[0].id;
+
+    await client.query(
+      `INSERT INTO config_comptable (cooperative_id, auto_encaissements)
+       VALUES ($1, true)`,
+      [cooperativeId],
+    );
+
+    const exportateur = await client.query(
+      `INSERT INTO exportateurs (cooperative_id, nom)
+       VALUES ($1, $2) RETURNING id`,
+      [cooperativeId, "Exportateur test rejet"],
+    );
+    exportateurId = exportateur.rows[0].id;
+  });
+
+  afterAll(async () => {
+    await client.query(
+      `DELETE FROM ecritures_comptables WHERE cooperative_id = $1`,
+      [cooperativeId],
+    );
+    await client.query(
+      `DELETE FROM ecritures_en_attente WHERE cooperative_id = $1`,
+      [cooperativeId],
+    );
+    await client.query(
+      `DELETE FROM cheques_recus WHERE cooperative_id = $1`,
+      [cooperativeId],
+    );
+    await client.query(`DELETE FROM paiements WHERE id = ANY($1::int[])`, [
+      paymentIds,
+    ]);
+    await client.query(`DELETE FROM ventes_exportateurs WHERE id = ANY($1::int[])`, [
+      saleIds,
+    ]);
+    await client.query(`DELETE FROM exportateurs WHERE id = $1`, [
+      exportateurId,
+    ]);
+    await client.query(
+      `DELETE FROM config_comptable WHERE cooperative_id = $1`,
+      [cooperativeId],
+    );
+    await client.query(`DELETE FROM cooperatives WHERE id = $1`, [
+      cooperativeId,
+    ]);
+    client.release();
+  });
+
+  async function createFixture(
+    lines: Array<{ mode: "especes" | "cheque"; amount: number }>,
+    suffix: string,
+  ): Promise<SaleFixture> {
+    const total = lines.reduce((sum, line) => sum + line.amount, 0);
+    const sale = await client.query(
+      `INSERT INTO ventes_exportateurs
+         (exportateur_id, poids_kg, prix_unitaire_fcfa, montant_total_fcfa,
+          date_vente, montant_recu_fcfa, solde_du_fcfa, statut)
+       VALUES ($1, 1::numeric, $2::integer, $2::integer,
+               '2026-08-29', $2::integer, 0, 'regle')
+       RETURNING id`,
+      [exportateurId, total],
+    );
+    const saleId = sale.rows[0].id as number;
+    saleIds.push(saleId);
+
+    const payment = await client.query(
+      `INSERT INTO paiements
+         (libelle, mode_reglement, montant_a_payer_fcfa, montant_verse_fcfa,
+          reste_a_payer_fcfa, montant_fcfa, mode_paiement, statut)
+       VALUES ($1, $2, $3::numeric, $3::numeric, 0, $5::integer, $4, 'confirme')
+       RETURNING id`,
+      [
+        `Encaissement vente exportateur #${saleId}`,
+        lines.length === 1 ? lines[0]!.mode : "mixte",
+        total,
+        lines.length === 1 ? lines[0]!.mode : null,
+        total,
+      ],
+    );
+    const paymentId = payment.rows[0].id as number;
+    paymentIds.push(paymentId);
+
+    const linePlaceholders = lines
+      .map((_, index) => `($1, $${index * 2 + 2}::mode_paiement, $${index * 2 + 3}::integer)`)
+      .join(", ");
+    const lineParams = [
+      paymentId,
+      ...lines.flatMap((line) => [line.mode, line.amount]),
+    ];
+    const paymentLines = await client.query(
+      `INSERT INTO paiement_lignes
+         (paiement_id, mode_paiement, montant_fcfa)
+       VALUES ${linePlaceholders}
+       RETURNING id`,
+      lineParams,
+    );
+    const insertedLines = paymentLines.rows as Array<{ id: number }>;
+
+    for (const line of lines) {
+      await client.query(
+        `INSERT INTO ecritures_comptables
+           (cooperative_id, date_ecriture, numero_piece, libelle,
+            compte_debit, compte_credit, montant_fcfa, source, source_id, exercice)
+         VALUES ($1, '2026-08-29', $2, $3, $4, '4111', $5,
+                 'encaissement', $6, 2026)`,
+        [
+          cooperativeId,
+          `ENC-${saleId}-${line.mode}`,
+          `Encaissement ${line.mode} — vente ${saleId}`,
+          line.mode === "cheque" ? "511" : "571",
+          line.amount,
+          saleId,
+        ],
+      );
+    }
+
+    const chequeLine = lines.find((line) => line.mode === "cheque");
+    if (!chequeLine) {
+      throw new Error("La fixture doit contenir un chèque");
+    }
+    const cheque = await client.query(
+      `INSERT INTO cheques_recus
+         (cooperative_id, numero_cheque, banque, montant_fcfa, date_reception,
+          vente_exportateur_id, exportateur_id, paiement_id, paiement_ligne_id,
+          created_by)
+       VALUES ($1, $2, 'Banque de test', $3, '2026-08-29', $4, $5, $6, $7, 0)
+       RETURNING id`,
+      [
+        cooperativeId,
+        `CHQ-${suffix}-${saleId}`,
+        chequeLine.amount,
+        saleId,
+        exportateurId,
+        paymentId,
+        insertedLines[lines.indexOf(chequeLine)]!.id,
+      ],
+    );
+    const chequeId = cheque.rows[0].id as number;
+    chequeIds.push(chequeId);
+
+    return { paymentId, saleId, chequeId };
+  }
+
+  async function saleState(saleId: number) {
+    const result = await client.query(
+      `SELECT montant_recu_fcfa, solde_du_fcfa, statut
+       FROM ventes_exportateurs WHERE id = $1`,
+      [saleId],
+    );
+    return result.rows[0];
+  }
+
+  async function paymentState(paymentId: number) {
+    const result = await client.query(
+      `SELECT statut, motif_rejet FROM paiements WHERE id = $1`,
+      [paymentId],
+    );
+    return result.rows[0];
+  }
+
+  async function chequeState(chequeId: number) {
+    const result = await client.query(
+      `SELECT statut, date_rejet::text, motif_rejet,
+              date_annulation::text, motif_annulation
+       FROM cheques_recus WHERE id = $1`,
+      [chequeId],
+    );
+    return result.rows[0];
+  }
+
+  async function accountingState(fixture: SaleFixture) {
+    const result = await client.query(
+      `SELECT compte_debit, compte_credit, montant_fcfa, source, source_id,
+              numero_piece
+       FROM ecritures_comptables
+       WHERE cooperative_id = $1
+         AND (
+           numero_piece LIKE $2
+           OR numero_piece LIKE $3
+           OR numero_piece = $4
+         )
+       ORDER BY id`,
+      [
+        cooperativeId,
+        `ENC-${fixture.saleId}-%`,
+        `REJ-CHQ-${fixture.chequeId}`,
+        `ANN-CHQ-${fixture.chequeId}`,
+      ],
+    );
+    return result.rows;
+  }
+
+  async function installFailureTrigger(
+    table: "ecritures_comptables" | "ventes_exportateurs",
+    operation: "INSERT" | "UPDATE",
+    name: string,
+    condition: string,
+  ): Promise<void> {
+    await client.query(`
+      CREATE FUNCTION "${name}_fn"()
+      RETURNS trigger
+      LANGUAGE plpgsql
+      AS $$
+      BEGIN
+        RAISE EXCEPTION 'Erreur simulée pendant ${operation.toLowerCase()}';
+      END;
+      $$;
+
+      CREATE TRIGGER "${name}"
+      BEFORE ${operation} ON ${table}
+      FOR EACH ROW
+      WHEN (${condition})
+      EXECUTE FUNCTION "${name}_fn"();
+    `);
+  }
+
+  async function removeFailureTrigger(
+    table: "ecritures_comptables" | "ventes_exportateurs",
+    name: string,
+  ): Promise<void> {
+    await client.query(`
+      DROP TRIGGER IF EXISTS "${name}" ON ${table};
+      DROP FUNCTION IF EXISTS "${name}_fn"();
+    `);
+  }
+
+  it("réouvre toute la créance après le rejet d'un chèque seul", async () => {
+    const fixture = await createFixture(
+      [{ mode: "cheque", amount: 100_000 }],
+      "seul",
+    );
+
+    await expect(
+      rejeterChequeRecu(fixture.chequeId, cooperativeId, {
+        motifRejet: "Provision insuffisante",
+        dateRejet: "2026-08-29",
+      }),
+    ).resolves.toMatchObject({
+      id: fixture.chequeId,
+      statut: "rejete",
+      dateRejet: "2026-08-29",
+      motifRejet: "Provision insuffisante",
+    });
+
+    await expect(saleState(fixture.saleId)).resolves.toEqual({
+      montant_recu_fcfa: 0,
+      solde_du_fcfa: 100_000,
+      statut: "en_attente",
+    });
+    await expect(paymentState(fixture.paymentId)).resolves.toEqual({
+      statut: "rejete",
+      motif_rejet: "Provision insuffisante",
+    });
+    await expect(chequeState(fixture.chequeId)).resolves.toMatchObject({
+      statut: "rejete",
+      date_rejet: "2026-08-29",
+      motif_rejet: "Provision insuffisante",
+    });
+    await expect(accountingState(fixture)).resolves.toEqual([
+      {
+        compte_debit: "511",
+        compte_credit: "4111",
+        montant_fcfa: 100_000,
+        source: "encaissement",
+        source_id: fixture.saleId,
+        numero_piece: `ENC-${fixture.saleId}-cheque`,
+      },
+      {
+        compte_debit: "4111",
+        compte_credit: "511",
+        montant_fcfa: 100_000,
+        source: "encaissement",
+        source_id: fixture.chequeId,
+        numero_piece: `REJ-CHQ-${fixture.chequeId}`,
+      },
+    ]);
+  });
+
+  it("conserve uniquement les espèces après le rejet du chèque ventilé", async () => {
+    const fixture = await createFixture(
+      [
+        { mode: "especes", amount: 40_000 },
+        { mode: "cheque", amount: 60_000 },
+      ],
+      "mixte",
+    );
+
+    await rejeterChequeRecu(fixture.chequeId, cooperativeId, {
+      motifRejet: "Signature non conforme",
+      dateRejet: "2026-08-29",
+    });
+
+    await expect(saleState(fixture.saleId)).resolves.toEqual({
+      montant_recu_fcfa: 40_000,
+      solde_du_fcfa: 60_000,
+      statut: "partiel",
+    });
+    await expect(paymentState(fixture.paymentId)).resolves.toEqual({
+      statut: "rejete",
+      motif_rejet: "Signature non conforme",
+    });
+    await expect(chequeState(fixture.chequeId)).resolves.toMatchObject({
+      statut: "rejete",
+      motif_rejet: "Signature non conforme",
+    });
+    await expect(accountingState(fixture)).resolves.toEqual([
+      {
+        compte_debit: "571",
+        compte_credit: "4111",
+        montant_fcfa: 40_000,
+        source: "encaissement",
+        source_id: fixture.saleId,
+        numero_piece: `ENC-${fixture.saleId}-especes`,
+      },
+      {
+        compte_debit: "511",
+        compte_credit: "4111",
+        montant_fcfa: 60_000,
+        source: "encaissement",
+        source_id: fixture.saleId,
+        numero_piece: `ENC-${fixture.saleId}-cheque`,
+      },
+      {
+        compte_debit: "4111",
+        compte_credit: "511",
+        montant_fcfa: 60_000,
+        source: "encaissement",
+        source_id: fixture.chequeId,
+        numero_piece: `REJ-CHQ-${fixture.chequeId}`,
+      },
+    ]);
+  });
+
+  it("annule le chèque et réouvre le solde avec une écriture inverse", async () => {
+    const fixture = await createFixture(
+      [{ mode: "cheque", amount: 75_000 }],
+      "annulation",
+    );
+
+    await annulerChequeRecu(
+      fixture.chequeId,
+      cooperativeId,
+      "Annulation demandée par l'exportateur",
+    );
+
+    await expect(saleState(fixture.saleId)).resolves.toEqual({
+      montant_recu_fcfa: 0,
+      solde_du_fcfa: 75_000,
+      statut: "en_attente",
+    });
+    await expect(paymentState(fixture.paymentId)).resolves.toEqual({
+      statut: "rejete",
+      motif_rejet: "Annulation demandée par l'exportateur",
+    });
+    await expect(chequeState(fixture.chequeId)).resolves.toMatchObject({
+      statut: "annule",
+      motif_annulation: "Annulation demandée par l'exportateur",
+    });
+    await expect(accountingState(fixture)).resolves.toEqual([
+      {
+        compte_debit: "511",
+        compte_credit: "4111",
+        montant_fcfa: 75_000,
+        source: "encaissement",
+        source_id: fixture.saleId,
+        numero_piece: `ENC-${fixture.saleId}-cheque`,
+      },
+      {
+        compte_debit: "4111",
+        compte_credit: "511",
+        montant_fcfa: 75_000,
+        source: "encaissement",
+        source_id: fixture.chequeId,
+        numero_piece: `ANN-CHQ-${fixture.chequeId}`,
+      },
+    ]);
+  });
+
+  it("annule toutes les étapes si l'écriture comptable échoue", async () => {
+    const fixture = await createFixture(
+      [{ mode: "cheque", amount: 90_000 }],
+      "ecriture",
+    );
+    const trigger = `rejet_chq_ecriture_${process.pid}_${fixture.chequeId}`;
+    await installFailureTrigger(
+      "ecritures_comptables",
+      "INSERT",
+      trigger,
+      `NEW.cooperative_id = ${cooperativeId}`,
+    );
+
+    try {
+      await expect(
+        rejeterChequeRecu(fixture.chequeId, cooperativeId, {
+          motifRejet: "Écriture indisponible",
+          dateRejet: "2026-08-29",
+        }),
+      ).rejects.toThrow();
+    } finally {
+      await removeFailureTrigger("ecritures_comptables", trigger);
+    }
+
+    await expect(saleState(fixture.saleId)).resolves.toEqual({
+      montant_recu_fcfa: 90_000,
+      solde_du_fcfa: 0,
+      statut: "regle",
+    });
+    await expect(paymentState(fixture.paymentId)).resolves.toEqual({
+      statut: "confirme",
+      motif_rejet: null,
+    });
+    await expect(chequeState(fixture.chequeId)).resolves.toMatchObject({
+      statut: "a_deposer",
+      date_rejet: null,
+      motif_rejet: null,
+    });
+    await expect(accountingState(fixture)).resolves.toEqual([
+      {
+        compte_debit: "511",
+        compte_credit: "4111",
+        montant_fcfa: 90_000,
+        source: "encaissement",
+        source_id: fixture.saleId,
+        numero_piece: `ENC-${fixture.saleId}-cheque`,
+      },
+    ]);
+  });
+
+  it("annule toutes les étapes si la vente refuse sa mise à jour", async () => {
+    const fixture = await createFixture(
+      [{ mode: "cheque", amount: 80_000 }],
+      "mise-a-jour",
+    );
+    const trigger = `rejet_chq_vente_${process.pid}_${fixture.chequeId}`;
+    await installFailureTrigger(
+      "ventes_exportateurs",
+      "UPDATE",
+      trigger,
+      `OLD.id = ${fixture.saleId}`,
+    );
+
+    try {
+      await expect(
+        rejeterChequeRecu(fixture.chequeId, cooperativeId, {
+          motifRejet: "Vente verrouillée",
+          dateRejet: "2026-08-29",
+        }),
+      ).rejects.toThrow();
+    } finally {
+      await removeFailureTrigger("ventes_exportateurs", trigger);
+    }
+
+    await expect(saleState(fixture.saleId)).resolves.toEqual({
+      montant_recu_fcfa: 80_000,
+      solde_du_fcfa: 0,
+      statut: "regle",
+    });
+    await expect(paymentState(fixture.paymentId)).resolves.toEqual({
+      statut: "confirme",
+      motif_rejet: null,
+    });
+    await expect(chequeState(fixture.chequeId)).resolves.toMatchObject({
+      statut: "a_deposer",
+      date_rejet: null,
+      motif_rejet: null,
+    });
+    await expect(accountingState(fixture)).resolves.toEqual([
+      {
+        compte_debit: "511",
+        compte_credit: "4111",
+        montant_fcfa: 80_000,
+        source: "encaissement",
+        source_id: fixture.saleId,
+        numero_piece: `ENC-${fixture.saleId}-cheque`,
+      },
     ]);
   });
 });
