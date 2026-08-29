@@ -1,4 +1,9 @@
-import { getToken, clearAuth } from "./auth";
+import {
+  getToken,
+  clearAuth,
+  markAccountDisabled,
+  COMPTE_DESACTIVE_MESSAGE,
+} from "./auth";
 import { queueOp, queueGpsOp, queueEnqueteOp, type PendingOpType, type GpsOp } from "./idb";
 import {
   GPS_CRS,
@@ -12,6 +17,36 @@ import type {
 
 const BASE = `${import.meta.env.VITE_API_URL ?? ""}/api/terrain`;
 
+type ApiErrorBody = {
+  code?: string;
+  erreur?: string;
+};
+
+async function readErrorBody(res: Response): Promise<ApiErrorBody> {
+  return await res.json().catch(() => ({})) as ApiErrorBody;
+}
+
+function throwApiError(
+  res: Response,
+  body: ApiErrorBody,
+  skipSessionExpiry = false,
+): never {
+  if (body.code === "COMPTE_DESACTIVE") {
+    const message = body.erreur || COMPTE_DESACTIVE_MESSAGE;
+    markAccountDisabled(message);
+    window.location.href = `${import.meta.env.BASE_URL ?? "/"}login`;
+    throw new Error(message);
+  }
+
+  if (res.status === 401 && !skipSessionExpiry) {
+    clearAuth();
+    window.location.href = `${import.meta.env.BASE_URL ?? "/"}login`;
+    throw new Error("Session expirée");
+  }
+
+  throw new Error(body.erreur || `Erreur ${res.status}`);
+}
+
 async function apiFetch<T>(path: string, options: RequestInit = {}, skipSessionExpiry = false): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
@@ -21,13 +56,7 @@ async function apiFetch<T>(path: string, options: RequestInit = {}, skipSessionE
   };
   const res = await fetch(`${BASE}${path}`, { ...options, headers });
   if (!res.ok) {
-    if (res.status === 401 && !skipSessionExpiry) {
-      clearAuth();
-      window.location.href = `${import.meta.env.BASE_URL ?? "/"}login`;
-      throw new Error("Session expirée");
-    }
-    const body = await res.json().catch(() => ({}));
-    throw new Error((body as { erreur?: string }).erreur || `Erreur ${res.status}`);
+    throwApiError(res, await readErrorBody(res), skipSessionExpiry);
   }
   return res.json() as Promise<T>;
 }
@@ -145,8 +174,7 @@ export async function telechargerReleveCommissions(campagneId?: number): Promise
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error((body as { erreur?: string }).erreur || `Erreur ${res.status}`);
+    throwApiError(res, await readErrorBody(res));
   }
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
@@ -275,8 +303,7 @@ export async function imprimerRecuLivraison(livraisonId: number): Promise<void> 
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error((body as { erreur?: string }).erreur || `Erreur ${res.status}`);
+    throwApiError(res, await readErrorBody(res));
   }
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
@@ -322,8 +349,7 @@ export async function telechargerBordereauSession(sessionId: number): Promise<vo
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error((body as { erreur?: string }).erreur || `Erreur ${res.status}`);
+    throwApiError(res, await readErrorBody(res));
   }
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
@@ -428,9 +454,7 @@ async function apiPeseeFetch<T>(path: string, options: RequestInit = {}): Promis
   };
   const res = await fetch(`${PESEE_BASE}${path}`, { ...options, headers, cache: "no-store" });
   if (!res.ok) {
-    if (res.status === 401) { clearAuth(); window.location.href = `${import.meta.env.BASE_URL ?? "/"}login`; throw new Error("Session expirée"); }
-    const body = await res.json().catch(() => ({}));
-    throw new Error((body as { erreur?: string }).erreur || `Erreur ${res.status}`);
+    throwApiError(res, await readErrorBody(res));
   }
   return res.json() as Promise<T>;
 }
@@ -495,13 +519,7 @@ export async function createSessionPesee(data: {
     throw new SessionEnCoursError(body.sessionId!, body.numeroSession ?? "");
   }
   if (!res.ok) {
-    if (res.status === 401) {
-      clearAuth();
-      window.location.href = `${import.meta.env.BASE_URL ?? "/"}login`;
-      throw new Error("Session expirée");
-    }
-    const body = await res.json().catch(() => ({}));
-    throw new Error((body as { erreur?: string }).erreur || `Erreur ${res.status}`);
+    throwApiError(res, await readErrorBody(res));
   }
   return res.json();
 }

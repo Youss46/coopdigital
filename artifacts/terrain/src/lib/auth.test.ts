@@ -2,10 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentUser } from "./types";
 import {
   clearAuth,
+  getAuthMessage,
   getLastAuthActivity,
   getStoredActiveAuth,
   getToken,
+  isAccountDisabled,
   isTerrainSessionIdle,
+  markAccountDisabled,
   recordAuthActivity,
   saveAuth,
   TERRAIN_IDLE_TIMEOUT_MS,
@@ -73,5 +76,24 @@ describe("session terrain persistée", () => {
     expect(isTerrainSessionIdle(lastActivityAt)).toBe(true);
     recordAuthActivity();
     expect(isTerrainSessionIdle(getLastAuthActivity())).toBe(false);
+  });
+
+  it("conserve la raison de désactivation sans supprimer les données hors ligne", () => {
+    saveAuth("token-valide", user);
+
+    markAccountDisabled();
+
+    expect(getToken()).toBeNull();
+    expect(isAccountDisabled()).toBe(true);
+    expect(getAuthMessage()).toContain("désactivé");
+  });
+
+  it("efface la raison de désactivation lors d'une nouvelle connexion", () => {
+    markAccountDisabled();
+
+    saveAuth("nouveau-token", user);
+
+    expect(isAccountDisabled()).toBe(false);
+    expect(getAuthMessage()).toBeNull();
   });
 });

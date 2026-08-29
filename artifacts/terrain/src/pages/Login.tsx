@@ -2,6 +2,11 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { loginTerrain } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
+import {
+  COMPTE_DESACTIVE_MESSAGE,
+  getAuthMessage,
+  isAccountDisabled,
+} from "../lib/auth";
 
 function EyeIcon({ open }: { open: boolean }) {
   return open ? (
@@ -25,7 +30,7 @@ export default function Login() {
   const [, setLocation] = useLocation();
   const [telephone, setTelephone] = useState("");
   const [motDePasse, setMotDePasse] = useState("");
-  const [erreur, setErreur] = useState("");
+  const [erreur, setErreur] = useState(() => getAuthMessage() ?? "");
   const [loading, setLoading] = useState(false);
   const [voirMdp, setVoirMdp] = useState(false);
 
@@ -42,6 +47,8 @@ export default function Login() {
       const msg = (err as Error).message || "";
       if (msg === "COMPTE_CENTRAL") {
         setErreur("Ce compte est géré par la base centrale. Vous ne pouvez pas vous connecter directement. Contactez votre coopérative.");
+      } else if (isAccountDisabled()) {
+        setErreur(getAuthMessage() ?? COMPTE_DESACTIVE_MESSAGE);
       } else {
         setErreur(msg || "Numéro ou mot de passe incorrect");
       }
@@ -59,6 +66,11 @@ export default function Login() {
       <div className="t-login__card">
         <form onSubmit={handleSubmit} className="t-gap">
           {erreur && <div className="t-login__error">⚠️ {erreur}</div>}
+          {isAccountDisabled() && (
+            <div style={{ marginTop: "-0.5rem", color: "#92400e", fontSize: "0.82rem", lineHeight: 1.45 }}>
+              Vos opérations hors connexion sont conservées sur cet appareil et ne seront pas synchronisées tant que le compte ne sera pas réactivé.
+            </div>
+          )}
 
           <div className="t-field">
             <label className="t-label" htmlFor="tel">Numéro de téléphone</label>

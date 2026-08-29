@@ -11,6 +11,7 @@ import {
   getPendingBrouillons, markBrouillonSynced, markBrouillonError,
 } from "../lib/idb";
 import { syncOps, syncGpsOps, syncEnqueteOps, batchSyncBrouillon } from "../lib/api";
+import { isAccountDisabled } from "../lib/auth";
 
 export interface SyncResult {
   succes: number;
@@ -53,7 +54,7 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const triggerSync = useCallback(async () => {
-    if (syncingRef.current || !navigator.onLine) return;
+    if (syncingRef.current || !navigator.onLine || isAccountDisabled()) return;
     const [ops, gpsOps, enqOps, pendingBrouillons] = await Promise.all([
       getPendingOps(), getPendingGpsOps(), getPendingEnqueteOps(), getPendingBrouillons(),
     ]);

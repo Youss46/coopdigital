@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { getToken } from "../lib/auth";
+import { apiPost } from "../lib/api";
 
 const BASE = `${import.meta.env.VITE_API_URL ?? ""}/api/terrain`;
 
@@ -38,20 +38,12 @@ async function registerPushSubscription(): Promise<void> {
       applicationServerKey: urlBase64ToUint8Array(vapidKey).buffer as ArrayBuffer,
     });
 
-    const token = getToken();
-    await fetch(`${BASE}/push/subscribe`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    await apiPost("/push/subscribe", {
+      endpoint: sub.endpoint,
+      keys: {
+        p256dh: btoa(String.fromCharCode(...new Uint8Array(sub.getKey("p256dh")!))),
+        auth:   btoa(String.fromCharCode(...new Uint8Array(sub.getKey("auth")!))),
       },
-      body: JSON.stringify({
-        endpoint: sub.endpoint,
-        keys: {
-          p256dh: btoa(String.fromCharCode(...new Uint8Array(sub.getKey("p256dh")!))),
-          auth:   btoa(String.fromCharCode(...new Uint8Array(sub.getKey("auth")!))),
-        },
-      }),
     });
   } catch {
     // Push non disponible sur cet appareil — on ignore silencieusement
