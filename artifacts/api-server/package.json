@@ -10,7 +10,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
-    "test:integration:payment-ventilation": "if [ \"$RUN_POSTGRES_INTEGRATION\" != \"1\" ]; then echo 'RUN_POSTGRES_INTEGRATION=1 est requis pour cette validation.' >&2; exit 1; fi; if [ -z \"$DATABASE_URL\" ]; then echo 'DATABASE_URL est requis pour cette validation.' >&2; exit 1; fi; vitest run --config vitest.integration.config.ts src/tests/paiementVentilation.integration.test.ts --reporter=verbose"
+    "test:integration:payment-ventilation": "if [ \"$RUN_POSTGRES_INTEGRATION\" != \"1\" ]; then echo 'RUN_POSTGRES_INTEGRATION=1 est requis pour cette validation.' >&2; exit 1; fi; if [ -z \"$DATABASE_URL\" ]; then echo 'DATABASE_URL est requis pour cette validation.' >&2; exit 1; fi; vitest run --config vitest.integration.config.ts src/tests/paiementVentilation.integration.test.ts --reporter=verbose",
+    "test:integration:treasury-transfer": "if [ \"$RUN_POSTGRES_INTEGRATION\" != \"1\" ]; then echo 'RUN_POSTGRES_INTEGRATION=1 est requis pour cette validation.' >&2; exit 1; fi; if [ -z \"$DATABASE_URL\" ]; then echo 'DATABASE_URL est requis pour cette validation.' >&2; exit 1; fi; vitest run --config vitest.integration.config.ts src/tests/treasuryTransferConcurrency.integration.test.ts --reporter=verbose"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.116.0",
