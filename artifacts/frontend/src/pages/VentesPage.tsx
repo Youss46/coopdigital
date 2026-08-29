@@ -195,7 +195,7 @@ export default function VentesPage() {
     queryKey: ["stock-dispo-auto", modeConstitution],
     queryFn: async () => {
       const tok = token ?? localStorage.getItem("coop_token") ?? "";
-      const res = await fetch(`${BASE}/api/ventes/preview-auto`, {
+      const res = await fetch(`${BASE}/api/lots/preview-auto`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
         body: JSON.stringify({ quantiteCibleKg: Number.MAX_SAFE_INTEGER, pourFournisseurs: false }),
@@ -338,7 +338,7 @@ export default function VentesPage() {
     setAutoPreview(null);
     try {
       const tok = token ?? localStorage.getItem("coop_token") ?? "";
-      const res = await fetch(`${BASE}/api/ventes/preview-auto`, {
+      const res = await fetch(`${BASE}/api/lots/preview-auto`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
         body: JSON.stringify({ quantiteCibleKg: cible, pourFournisseurs: false }),
