@@ -16,6 +16,7 @@ function comptesForMouvement(type: string, motif: string): { debit: string; cred
       virement_entrant:   "585",  // Virements internes de fonds (transit)
       depot_especes:      "571",  // Caisse
       remboursement_recu: "162",  // Emprunts établissements de crédit
+      encaissement_cheque_recu: "511", // Chèques à encaisser
       autre_credit:       "471",  // Créditeurs divers
     };
     return { debit: "521", credit: credits[motif] ?? "471" };

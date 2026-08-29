@@ -1,5 +1,6 @@
 import { type Request, type Response } from "express";
 import * as svc from "../services/chequesService.js";
+import * as recusSvc from "../services/chequesRecusService.js";
 
 function getCoop(req: Request) { return req.user?.cooperativeId ?? null; }
 function getUser(req: Request) { return req.user?.id ?? null; }
@@ -158,6 +159,103 @@ export async function postAnnuler(req: Request, res: Response): Promise<void> {
     if (msg === "Chèque introuvable") { res.status(404).json({ erreur: msg }); return; }
     if (msg.startsWith("Seul un chèque")) { res.status(409).json({ erreur: msg }); return; }
     req.log.error({ err }, "Erreur postAnnuler");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+// ─── Chèques reçus ─────────────────────────────────────────────────────────────
+
+export async function getChequesRecus(req: Request, res: Response): Promise<void> {
+  const cooperativeId = getCoop(req);
+  if (!cooperativeId) { res.status(403).json({ erreur: "Coopérative non associée à ce compte" }); return; }
+  const statut = req.query["statut"] ? String(req.query["statut"]) : undefined;
+  try {
+    res.json(await recusSvc.listChequesRecus(cooperativeId, statut));
+  } catch (err) {
+    req.log.error({ err }, "Erreur getChequesRecus");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function postDeposerRecu(req: Request, res: Response): Promise<void> {
+  const cooperativeId = getCoop(req);
+  if (!cooperativeId) { res.status(403).json({ erreur: "Coopérative non associée à ce compte" }); return; }
+  const id = parseInt(String(req.params["id"]));
+  if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+  try {
+    res.json(await recusSvc.deposerChequeRecu(id, cooperativeId, (req.body ?? {}).dateDepot));
+  } catch (err) {
+    const msg = (err as Error).message;
+    if (msg === "Chèque reçu introuvable") { res.status(404).json({ erreur: msg }); return; }
+    if (msg.startsWith("Seul un chèque")) { res.status(409).json({ erreur: msg }); return; }
+    req.log.error({ err }, "Erreur postDeposerRecu");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function postEncaisserRecu(req: Request, res: Response): Promise<void> {
+  const cooperativeId = getCoop(req);
+  const userId = getUser(req);
+  if (!cooperativeId || !userId) { res.status(403).json({ erreur: "Coopérative non associée à ce compte" }); return; }
+  const id = parseInt(String(req.params["id"]));
+  const body = (req.body ?? {}) as { compteBancaireId?: number; dateEncaissement?: string };
+  if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+  if (!body.compteBancaireId) {
+    res.status(400).json({ erreur: "Le compte bancaire est obligatoire pour encaisser un chèque reçu" });
+    return;
+  }
+  try {
+    res.json(await recusSvc.encaisserChequeRecu(id, cooperativeId, {
+      compteBancaireId: body.compteBancaireId,
+      dateEncaissement: body.dateEncaissement,
+    }, userId));
+  } catch (err) {
+    const msg = (err as Error).message;
+    if (msg === "Chèque reçu introuvable") { res.status(404).json({ erreur: msg }); return; }
+    if (msg.startsWith("Le chèque doit")) { res.status(409).json({ erreur: msg }); return; }
+    if (msg === "Compte bancaire introuvable" || msg === "Compte bancaire inactif") {
+      res.status(400).json({ erreur: msg }); return;
+    }
+    req.log.error({ err }, "Erreur postEncaisserRecu");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function postRejeterRecu(req: Request, res: Response): Promise<void> {
+  const cooperativeId = getCoop(req);
+  if (!cooperativeId) { res.status(403).json({ erreur: "Coopérative non associée à ce compte" }); return; }
+  const id = parseInt(String(req.params["id"]));
+  const body = (req.body ?? {}) as { motifRejet?: string; dateRejet?: string };
+  if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+  if (!body.motifRejet?.trim()) { res.status(400).json({ erreur: "Le motif de rejet est obligatoire" }); return; }
+  try {
+    res.json(await recusSvc.rejeterChequeRecu(id, cooperativeId, {
+      motifRejet: body.motifRejet,
+      dateRejet: body.dateRejet,
+    }));
+  } catch (err) {
+    const msg = (err as Error).message;
+    if (msg === "Chèque reçu introuvable") { res.status(404).json({ erreur: msg }); return; }
+    if (msg.startsWith("Seul un chèque")) { res.status(409).json({ erreur: msg }); return; }
+    req.log.error({ err }, "Erreur postRejeterRecu");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function postAnnulerRecu(req: Request, res: Response): Promise<void> {
+  const cooperativeId = getCoop(req);
+  if (!cooperativeId) { res.status(403).json({ erreur: "Coopérative non associée à ce compte" }); return; }
+  const id = parseInt(String(req.params["id"]));
+  const motifAnnulation = String((req.body ?? {}).motifAnnulation ?? "").trim();
+  if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+  if (!motifAnnulation) { res.status(400).json({ erreur: "Le motif d'annulation est obligatoire" }); return; }
+  try {
+    res.json(await recusSvc.annulerChequeRecu(id, cooperativeId, motifAnnulation));
+  } catch (err) {
+    const msg = (err as Error).message;
+    if (msg === "Chèque reçu introuvable") { res.status(404).json({ erreur: msg }); return; }
+    if (msg.startsWith("Seul un chèque")) { res.status(409).json({ erreur: msg }); return; }
+    req.log.error({ err }, "Erreur postAnnulerRecu");
     res.status(500).json({ erreur: "Erreur interne" });
   }
 }

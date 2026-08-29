@@ -962,6 +962,125 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /cheques-recus:
+    get:
+      operationId: getChequesRecus
+      tags: [cheques]
+      summary: Lister les chèques reçus des exportateurs
+      parameters:
+        - name: statut
+          in: query
+          schema:
+            type: string
+            enum: [a_deposer, depose, encaisse, rejete, annule]
+      responses:
+        "200":
+          description: Chèques reçus
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChequeRecu"
+
+  /cheques-recus/{id}/deposer:
+    post:
+      operationId: deposerChequeRecu
+      tags: [cheques]
+      summary: Enregistrer le dépôt d'un chèque reçu
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dateDepot: { type: string }
+      responses:
+        "200":
+          description: Chèque déposé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChequeRecu"
+
+  /cheques-recus/{id}/encaisser:
+    post:
+      operationId: encaisserChequeRecu
+      tags: [cheques]
+      summary: Enregistrer l'encaissement bancaire d'un chèque reçu
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EncaisserChequeRecuInput"
+      responses:
+        "200":
+          description: Chèque encaissé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChequeRecu"
+
+  /cheques-recus/{id}/rejeter:
+    post:
+      operationId: rejeterChequeRecu
+      tags: [cheques]
+      summary: Rejeter un chèque reçu
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RejeterChequeRecuInput"
+      responses:
+        "200":
+          description: Chèque rejeté
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChequeRecu"
+
+  /cheques-recus/{id}/annuler:
+    post:
+      operationId: annulerChequeRecu
+      tags: [cheques]
+      summary: Annuler un chèque reçu
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnnulerChequeRecuInput"
+      responses:
+        "200":
+          description: Chèque annulé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChequeRecu"
+
   # ── M07 Communication ─────────────────────────────────────────
   /communication/sms-groupe:
     post:
@@ -8327,6 +8446,127 @@ components:
       properties:
         montantFcfa:
           type: integer
+          minimum: 1
+        modePaiement:
+          type: string
+          nullable: true
+          enum: [especes, cheque]
+        numeroCheque:
+          type: string
+          nullable: true
+        banque:
+          type: string
+          nullable: true
+        dateEcheanceCheque:
+          type: string
+          nullable: true
+        dateEncaissement:
+          type: string
+          nullable: true
+        ventilations:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/EncaissementVenteLigneInput"
+
+    EncaissementVenteLigneInput:
+      type: object
+      required: [modePaiement, montantFcfa]
+      properties:
+        modePaiement:
+          type: string
+          enum: [especes, cheque]
+        montantFcfa:
+          type: integer
+          minimum: 1
+        numeroCheque:
+          type: string
+          nullable: true
+        banque:
+          type: string
+          nullable: true
+        dateEcheanceCheque:
+          type: string
+          nullable: true
+
+    EncaisserChequeRecuInput:
+      type: object
+      required: [compteBancaireId]
+      properties:
+        compteBancaireId:
+          type: integer
+        dateEncaissement:
+          type: string
+
+    RejeterChequeRecuInput:
+      type: object
+      required: [motifRejet]
+      properties:
+        motifRejet:
+          type: string
+          minLength: 1
+        dateRejet:
+          type: string
+
+    AnnulerChequeRecuInput:
+      type: object
+      required: [motifAnnulation]
+      properties:
+        motifAnnulation:
+          type: string
+          minLength: 1
+
+    ChequeRecu:
+      type: object
+      required: [id, cooperativeId, numeroCheque, banque, montantFcfa, dateReception, statut, venteExportateurId, exportateurId, paiementId, paiementLigneId, createdAt]
+      properties:
+        id:
+          type: integer
+        cooperativeId:
+          type: integer
+        numeroCheque:
+          type: string
+        banque:
+          type: string
+        montantFcfa:
+          type: integer
+        dateReception:
+          type: string
+        dateEcheance:
+          type: ["string", "null"]
+        statut:
+          type: string
+          enum: [a_deposer, depose, encaisse, rejete, annule]
+        dateDepot:
+          type: ["string", "null"]
+        dateEncaissement:
+          type: ["string", "null"]
+        dateRejet:
+          type: ["string", "null"]
+        motifRejet:
+          type: ["string", "null"]
+        dateAnnulation:
+          type: ["string", "null"]
+        motifAnnulation:
+          type: ["string", "null"]
+        compteBancaireId:
+          type: ["integer", "null"]
+        mouvementBanqueId:
+          type: ["integer", "null"]
+        venteExportateurId:
+          type: integer
+        exportateurId:
+          type: integer
+        paiementId:
+          type: integer
+        paiementLigneId:
+          type: integer
+        exportateurNom:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+  # Les actions des chèques reçus restent séparées de celles des chèques émis.
 
     CreancesSummary:
       type: object

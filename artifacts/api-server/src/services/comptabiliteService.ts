@@ -605,8 +605,9 @@ export async function generateEcrituresEncaissement(cooperativeId: number, param
   exportateurNom: string;
   montantFcfa: number;
   date: string;
+  compteDebit?: string;
 }) {
-  const c = await resolveComptes(cooperativeId, "ventes_export", "encaissement_exportateur", "521", "4111");
+  const c = await resolveComptes(cooperativeId, "ventes_export", "encaissement_exportateur", params.compteDebit ?? "521", "4111");
   await proposerEcriture(cooperativeId, {
     source: "encaissement", sourceId: params.venteId,
     libelle: `Encaissement exportateur – ${params.exportateurNom}`,
@@ -615,6 +616,34 @@ export async function generateEcrituresEncaissement(cooperativeId: number, param
     numeroPiece: `ENC-${params.venteId}`,
     tiersId: params.exportateurId, tiersType: params.exportateurId ? "exportateur" : undefined,
   });
+}
+
+export async function generateEcrituresEncaissementDansTransaction(
+  tx: ComptabiliteTransaction,
+  cooperativeId: number,
+  params: {
+    venteId: number;
+    exportateurId?: number;
+    exportateurNom: string;
+    montantFcfa: number;
+    date: string;
+    compteDebit: string;
+    compteCredit?: string;
+    libelle?: string;
+  },
+): Promise<void> {
+  await proposerEcrituresDansTransaction(tx, cooperativeId, [{
+    source: "encaissement",
+    sourceId: params.venteId,
+    libelle: params.libelle ?? `Encaissement exportateur – ${params.exportateurNom}`,
+    compteDebit: params.compteDebit,
+    compteCredit: params.compteCredit ?? "4111",
+    montantFcfa: params.montantFcfa,
+    date: params.date,
+    numeroPiece: `ENC-${params.venteId}-${params.compteDebit}`,
+    tiersId: params.exportateurId,
+    tiersType: params.exportateurId ? "exportateur" : undefined,
+  }]);
 }
 
 /**

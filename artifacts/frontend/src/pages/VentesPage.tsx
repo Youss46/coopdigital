@@ -135,6 +135,11 @@ export default function VentesPage() {
   const [modalVente, setModalVente]           = useState(false);
   const [modalEncaisse, setModalEncaisse]     = useState<number | null>(null);
   const [montantEncaisse, setMontantEncaisse] = useState("");
+  const [modeEncaissement, setModeEncaissement] = useState<"especes" | "cheque" | "mixte">("especes");
+  const [montantCheque, setMontantCheque] = useState("");
+  const [numeroCheque, setNumeroCheque] = useState("");
+  const [banqueCheque, setBanqueCheque] = useState("");
+  const [dateEcheanceCheque, setDateEcheanceCheque] = useState("");
   const [form, setForm]                       = useState(VENTE_INIT);
   const [sourceStock, setSourceStock]         = useState<"lots" | "reception" | "fournisseur">("lots");
   const [formFourn, setFormFourn]             = useState(VENTE_FOURN_INIT);
@@ -229,10 +234,15 @@ export default function VentesPage() {
         qc.invalidateQueries({ queryKey: getGetVentesQueryKey({}) });
         setModalEncaisse(null);
         setMontantEncaisse("");
+        setModeEncaissement("especes");
+        setMontantCheque("");
+        setNumeroCheque("");
+        setBanqueCheque("");
+        setDateEcheanceCheque("");
         toast({ title: "Encaissement enregistré" });
       },
-      onError: () => {
-        toast({ title: "Erreur encaissement", variant: "destructive" });
+      onError: (err: unknown) => {
+        toast({ title: "Erreur encaissement", description: err instanceof Error ? err.message : "Impossible d'enregistrer l'encaissement", variant: "destructive" });
       },
     },
   });
@@ -647,7 +657,15 @@ export default function VentesPage() {
                       <td className="px-4 py-3">
                         {peutEncaisser && v.statut !== "regle" && v.statut !== "refoule" && v.soldeDuFcfa > 0 && (
                           <button
-                            onClick={() => { setModalEncaisse(v.id); setMontantEncaisse(String(v.soldeDuFcfa)); }}
+                            onClick={() => {
+                              setModalEncaisse(v.id);
+                              setMontantEncaisse(String(v.soldeDuFcfa));
+                              setModeEncaissement("especes");
+                              setMontantCheque("");
+                              setNumeroCheque("");
+                              setBanqueCheque("");
+                              setDateEcheanceCheque("");
+                            }}
                             className="flex items-center gap-1 text-xs text-green-700 hover:text-green-900 font-medium whitespace-nowrap"
                           >
                             <Banknote size={12} /> Encaisser
@@ -1083,6 +1101,58 @@ export default function VentesPage() {
                   autoFocus
                 />
               </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Mode de règlement *</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    ["especes", "Espèces"],
+                    ["cheque", "Chèque"],
+                    ["mixte", "Espèces + chèque"],
+                  ] as const).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setModeEncaissement(value)}
+                      className={`px-2 py-2 rounded-lg border text-xs font-medium ${modeEncaissement === value ? "border-green-700 bg-green-50 text-green-800" : "border-gray-200 text-gray-600"}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {modeEncaissement !== "especes" && (
+                <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                  {modeEncaissement === "mixte" && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Montant du chèque (FCFA) *</label>
+                      <NumericInput
+                        decimal={false}
+                        value={montantCheque}
+                        onChange={setMontantCheque}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
+                        placeholder="Part réglée par chèque"
+                      />
+                      {!!montantCheque && !!montantEncaisse && (
+                        <p className="text-xs text-gray-600 mt-1">
+                          Espèces : {(parseInt(montantEncaisse) - parseInt(montantCheque)).toLocaleString("fr-FR")} FCFA
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">N° du chèque *</label>
+                    <input value={numeroCheque} onChange={e => setNumeroCheque(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white" placeholder="Numéro unique" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Banque tirée *</label>
+                    <input value={banqueCheque} onChange={e => setBanqueCheque(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white" placeholder="Nom de la banque" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Date d'échéance</label>
+                    <input type="date" value={dateEcheanceCheque} onChange={e => setDateEcheanceCheque(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white" />
+                  </div>
+                </div>
+              )}
             </div>
             <div className="px-6 pb-5 flex gap-3">
               <button
@@ -1092,8 +1162,26 @@ export default function VentesPage() {
                 Annuler
               </button>
               <button
-                onClick={() => mutEncaisse.mutate({ id: modalEncaisse!, data: { montantFcfa: parseInt(montantEncaisse) } })}
-                disabled={!montantEncaisse || parseInt(montantEncaisse) <= 0 || mutEncaisse.isPending}
+                onClick={() => {
+                  const total = parseInt(montantEncaisse);
+                  const cheque = modeEncaissement === "cheque" ? total : parseInt(montantCheque);
+                  const especes = total - cheque;
+                  const data = modeEncaissement === "especes"
+                    ? { montantFcfa: total, modePaiement: "especes" as const }
+                    : modeEncaissement === "cheque"
+                      ? { montantFcfa: total, modePaiement: "cheque" as const, numeroCheque, banque: banqueCheque, dateEcheanceCheque: dateEcheanceCheque || null }
+                      : { montantFcfa: total, ventilations: [
+                          { modePaiement: "especes" as const, montantFcfa: especes },
+                          { modePaiement: "cheque" as const, montantFcfa: cheque, numeroCheque, banque: banqueCheque, dateEcheanceCheque: dateEcheanceCheque || null },
+                        ] };
+                  mutEncaisse.mutate({ id: modalEncaisse!, data });
+                }}
+                disabled={
+                  !montantEncaisse ||
+                  parseInt(montantEncaisse) <= 0 ||
+                  (modeEncaissement !== "especes" && (!numeroCheque.trim() || !banqueCheque.trim() || (modeEncaissement === "mixte" && (!montantCheque || parseInt(montantCheque) <= 0 || parseInt(montantCheque) >= parseInt(montantEncaisse))))) ||
+                  mutEncaisse.isPending
+                }
                 className="flex-1 py-2.5 text-white rounded-lg text-sm font-medium bg-green-700 hover:bg-green-800 disabled:opacity-50"
               >
                 {mutEncaisse.isPending ? "Enregistrement…" : "Confirmer encaissement"}

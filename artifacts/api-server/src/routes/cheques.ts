@@ -11,4 +11,10 @@ router.post("/cheques/:id/encaisser", checkPermission("cheques", "encaisser"), c
 router.post("/cheques/:id/rejeter",   checkPermission("cheques", "rejeter"),   ctrl.postRejeter);
 router.post("/cheques/:id/annuler",   checkPermission("cheques", "annuler"),   ctrl.postAnnuler);
 
+router.get ("/cheques-recus",             checkPermission("cheques", "lire"),      ctrl.getChequesRecus);
+router.post("/cheques-recus/:id/deposer", checkPermission("cheques", "modifier"),  ctrl.postDeposerRecu);
+router.post("/cheques-recus/:id/encaisser", checkPermission("cheques", "encaisser"), ctrl.postEncaisserRecu);
+router.post("/cheques-recus/:id/rejeter", checkPermission("cheques", "rejeter"), ctrl.postRejeterRecu);
+router.post("/cheques-recus/:id/annuler", checkPermission("cheques", "annuler"), ctrl.postAnnulerRecu);
+
 export default router;

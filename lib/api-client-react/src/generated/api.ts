@@ -27,6 +27,7 @@ import type {
   AlertesEquipements,
   AlertesPrevisions,
   AnalyseMarge,
+  AnnulerChequeRecuInput,
   AnomalieItem,
   AnomaliesListResponse,
   AnomaliesStats,
@@ -74,6 +75,7 @@ import type {
   CertificationDetail,
   CertificationMembre,
   Chauffeur,
+  ChequeRecu,
   CloturerAgInput,
   ComparaisonBilanCampagne,
   ComparaisonCampagne,
@@ -122,6 +124,7 @@ import type {
   DeleteDepenseVehicule200,
   DeleteEquipement200,
   DepenseVehicule,
+  DeposerChequeRecuBody,
   DesactiverMembresSansCampagne200,
   Devise,
   DiffuserPrixSmsInput,
@@ -137,6 +140,7 @@ import type {
   EmpruntInput,
   EmpruntsDashboard,
   EncaissementInput,
+  EncaisserChequeRecuInput,
   EncoursMembre,
   EnregistrerLiberation201,
   EntreeClassement,
@@ -177,6 +181,7 @@ import type {
   GetBulletinsParams,
   GetCertificationsCriteres200,
   GetChauffeurs200,
+  GetChequesRecusParams,
   GetComparaisonCampagnesParams,
   GetCompteResultatParams,
   GetDashboardParams,
@@ -297,6 +302,7 @@ import type {
   RecalculerResult,
   Refus,
   RefusStats,
+  RejeterChequeRecuInput,
   RejeterEcritureInput,
   RejeterPaiementInput,
   RemboursementAvancePersonnelInput,
@@ -3495,6 +3501,378 @@ export const useSignalerRefusVente = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getSignalerRefusVenteMutationOptions(options));
+    }
+
+export const getGetChequesRecusUrl = (params?: GetChequesRecusParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/cheques-recus?${stringifiedParams}` : `/api/cheques-recus`
+}
+
+/**
+ * @summary Lister les chèques reçus des exportateurs
+ */
+export const getChequesRecus = async (params?: GetChequesRecusParams, options?: RequestInit): Promise<ChequeRecu[]> => {
+
+  return customFetch<ChequeRecu[]>(getGetChequesRecusUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetChequesRecusQueryKey = (params?: GetChequesRecusParams,) => {
+    return [
+    `/api/cheques-recus`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetChequesRecusQueryOptions = <TData = Awaited<ReturnType<typeof getChequesRecus>>, TError = ErrorType<unknown>>(params?: GetChequesRecusParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getChequesRecus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetChequesRecusQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getChequesRecus>>> = ({ signal }) => getChequesRecus(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getChequesRecus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetChequesRecusQueryResult = NonNullable<Awaited<ReturnType<typeof getChequesRecus>>>
+export type GetChequesRecusQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Lister les chèques reçus des exportateurs
+ */
+
+export function useGetChequesRecus<TData = Awaited<ReturnType<typeof getChequesRecus>>, TError = ErrorType<unknown>>(
+ params?: GetChequesRecusParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getChequesRecus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetChequesRecusQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getDeposerChequeRecuUrl = (id: number,) => {
+
+
+
+
+  return `/api/cheques-recus/${id}/deposer`
+}
+
+/**
+ * @summary Enregistrer le dépôt d'un chèque reçu
+ */
+export const deposerChequeRecu = async (id: number,
+    deposerChequeRecuBody?: DeposerChequeRecuBody, options?: RequestInit): Promise<ChequeRecu> => {
+
+  return customFetch<ChequeRecu>(getDeposerChequeRecuUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      deposerChequeRecuBody,)
+  }
+);}
+
+
+
+
+export const getDeposerChequeRecuMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deposerChequeRecu>>, TError,{id: number;data?: BodyType<DeposerChequeRecuBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deposerChequeRecu>>, TError,{id: number;data?: BodyType<DeposerChequeRecuBody>}, TContext> => {
+
+const mutationKey = ['deposerChequeRecu'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deposerChequeRecu>>, {id: number;data?: BodyType<DeposerChequeRecuBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  deposerChequeRecu(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeposerChequeRecuMutationResult = NonNullable<Awaited<ReturnType<typeof deposerChequeRecu>>>
+    export type DeposerChequeRecuMutationBody = BodyType<DeposerChequeRecuBody> | undefined
+    export type DeposerChequeRecuMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Enregistrer le dépôt d'un chèque reçu
+ */
+export const useDeposerChequeRecu = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deposerChequeRecu>>, TError,{id: number;data?: BodyType<DeposerChequeRecuBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deposerChequeRecu>>,
+        TError,
+        {id: number;data?: BodyType<DeposerChequeRecuBody>},
+        TContext
+      > => {
+      return useMutation(getDeposerChequeRecuMutationOptions(options));
+    }
+
+export const getEncaisserChequeRecuUrl = (id: number,) => {
+
+
+
+
+  return `/api/cheques-recus/${id}/encaisser`
+}
+
+/**
+ * @summary Enregistrer l'encaissement bancaire d'un chèque reçu
+ */
+export const encaisserChequeRecu = async (id: number,
+    encaisserChequeRecuInput: EncaisserChequeRecuInput, options?: RequestInit): Promise<ChequeRecu> => {
+
+  return customFetch<ChequeRecu>(getEncaisserChequeRecuUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      encaisserChequeRecuInput,)
+  }
+);}
+
+
+
+
+export const getEncaisserChequeRecuMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof encaisserChequeRecu>>, TError,{id: number;data: BodyType<EncaisserChequeRecuInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof encaisserChequeRecu>>, TError,{id: number;data: BodyType<EncaisserChequeRecuInput>}, TContext> => {
+
+const mutationKey = ['encaisserChequeRecu'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof encaisserChequeRecu>>, {id: number;data: BodyType<EncaisserChequeRecuInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  encaisserChequeRecu(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EncaisserChequeRecuMutationResult = NonNullable<Awaited<ReturnType<typeof encaisserChequeRecu>>>
+    export type EncaisserChequeRecuMutationBody = BodyType<EncaisserChequeRecuInput>
+    export type EncaisserChequeRecuMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Enregistrer l'encaissement bancaire d'un chèque reçu
+ */
+export const useEncaisserChequeRecu = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof encaisserChequeRecu>>, TError,{id: number;data: BodyType<EncaisserChequeRecuInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof encaisserChequeRecu>>,
+        TError,
+        {id: number;data: BodyType<EncaisserChequeRecuInput>},
+        TContext
+      > => {
+      return useMutation(getEncaisserChequeRecuMutationOptions(options));
+    }
+
+export const getRejeterChequeRecuUrl = (id: number,) => {
+
+
+
+
+  return `/api/cheques-recus/${id}/rejeter`
+}
+
+/**
+ * @summary Rejeter un chèque reçu
+ */
+export const rejeterChequeRecu = async (id: number,
+    rejeterChequeRecuInput: RejeterChequeRecuInput, options?: RequestInit): Promise<ChequeRecu> => {
+
+  return customFetch<ChequeRecu>(getRejeterChequeRecuUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      rejeterChequeRecuInput,)
+  }
+);}
+
+
+
+
+export const getRejeterChequeRecuMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rejeterChequeRecu>>, TError,{id: number;data: BodyType<RejeterChequeRecuInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof rejeterChequeRecu>>, TError,{id: number;data: BodyType<RejeterChequeRecuInput>}, TContext> => {
+
+const mutationKey = ['rejeterChequeRecu'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof rejeterChequeRecu>>, {id: number;data: BodyType<RejeterChequeRecuInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  rejeterChequeRecu(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RejeterChequeRecuMutationResult = NonNullable<Awaited<ReturnType<typeof rejeterChequeRecu>>>
+    export type RejeterChequeRecuMutationBody = BodyType<RejeterChequeRecuInput>
+    export type RejeterChequeRecuMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Rejeter un chèque reçu
+ */
+export const useRejeterChequeRecu = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rejeterChequeRecu>>, TError,{id: number;data: BodyType<RejeterChequeRecuInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof rejeterChequeRecu>>,
+        TError,
+        {id: number;data: BodyType<RejeterChequeRecuInput>},
+        TContext
+      > => {
+      return useMutation(getRejeterChequeRecuMutationOptions(options));
+    }
+
+export const getAnnulerChequeRecuUrl = (id: number,) => {
+
+
+
+
+  return `/api/cheques-recus/${id}/annuler`
+}
+
+/**
+ * @summary Annuler un chèque reçu
+ */
+export const annulerChequeRecu = async (id: number,
+    annulerChequeRecuInput: AnnulerChequeRecuInput, options?: RequestInit): Promise<ChequeRecu> => {
+
+  return customFetch<ChequeRecu>(getAnnulerChequeRecuUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      annulerChequeRecuInput,)
+  }
+);}
+
+
+
+
+export const getAnnulerChequeRecuMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof annulerChequeRecu>>, TError,{id: number;data: BodyType<AnnulerChequeRecuInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof annulerChequeRecu>>, TError,{id: number;data: BodyType<AnnulerChequeRecuInput>}, TContext> => {
+
+const mutationKey = ['annulerChequeRecu'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof annulerChequeRecu>>, {id: number;data: BodyType<AnnulerChequeRecuInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  annulerChequeRecu(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AnnulerChequeRecuMutationResult = NonNullable<Awaited<ReturnType<typeof annulerChequeRecu>>>
+    export type AnnulerChequeRecuMutationBody = BodyType<AnnulerChequeRecuInput>
+    export type AnnulerChequeRecuMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Annuler un chèque reçu
+ */
+export const useAnnulerChequeRecu = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof annulerChequeRecu>>, TError,{id: number;data: BodyType<AnnulerChequeRecuInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof annulerChequeRecu>>,
+        TError,
+        {id: number;data: BodyType<AnnulerChequeRecuInput>},
+        TContext
+      > => {
+      return useMutation(getAnnulerChequeRecuMutationOptions(options));
     }
 
 export const getSendSmsGroupeUrl = () => {

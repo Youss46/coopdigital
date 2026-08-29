@@ -1466,8 +1466,103 @@ export interface StockReceptionne {
   lots: StockReceptionneLotsItem[];
 }
 
-export interface EncaissementInput {
+export type EncaissementInputModePaiement = typeof EncaissementInputModePaiement[keyof typeof EncaissementInputModePaiement] | null;
+
+
+export const EncaissementInputModePaiement = {
+  especes: 'especes',
+  cheque: 'cheque',
+} as const;
+
+export type EncaissementVenteLigneInputModePaiement = typeof EncaissementVenteLigneInputModePaiement[keyof typeof EncaissementVenteLigneInputModePaiement];
+
+
+export const EncaissementVenteLigneInputModePaiement = {
+  especes: 'especes',
+  cheque: 'cheque',
+} as const;
+
+export interface EncaissementVenteLigneInput {
+  modePaiement: EncaissementVenteLigneInputModePaiement;
+  /** @minimum 1 */
   montantFcfa: number;
+  numeroCheque?: string | null;
+  banque?: string | null;
+  dateEcheanceCheque?: string | null;
+}
+
+export interface EncaissementInput {
+  /** @minimum 1 */
+  montantFcfa: number;
+  modePaiement?: EncaissementInputModePaiement;
+  numeroCheque?: string | null;
+  banque?: string | null;
+  dateEcheanceCheque?: string | null;
+  dateEncaissement?: string | null;
+  /** @minItems 1 */
+  ventilations?: EncaissementVenteLigneInput[];
+}
+
+export interface EncaisserChequeRecuInput {
+  compteBancaireId: number;
+  dateEncaissement?: string;
+}
+
+export interface RejeterChequeRecuInput {
+  /** @minLength 1 */
+  motifRejet: string;
+  dateRejet?: string;
+}
+
+export interface AnnulerChequeRecuInput {
+  /** @minLength 1 */
+  motifAnnulation: string;
+}
+
+export type ChequeRecuStatut = typeof ChequeRecuStatut[keyof typeof ChequeRecuStatut];
+
+
+export const ChequeRecuStatut = {
+  a_deposer: 'a_deposer',
+  depose: 'depose',
+  encaisse: 'encaisse',
+  rejete: 'rejete',
+  annule: 'annule',
+} as const;
+
+export interface ChequeRecu {
+  id: number;
+  cooperativeId: number;
+  numeroCheque: string;
+  banque: string;
+  montantFcfa: number;
+  dateReception: string;
+  /** @nullable */
+  dateEcheance?: string | null;
+  statut: ChequeRecuStatut;
+  /** @nullable */
+  dateDepot?: string | null;
+  /** @nullable */
+  dateEncaissement?: string | null;
+  /** @nullable */
+  dateRejet?: string | null;
+  /** @nullable */
+  motifRejet?: string | null;
+  /** @nullable */
+  dateAnnulation?: string | null;
+  /** @nullable */
+  motifAnnulation?: string | null;
+  /** @nullable */
+  compteBancaireId?: number | null;
+  /** @nullable */
+  mouvementBanqueId?: number | null;
+  venteExportateurId: number;
+  exportateurId: number;
+  paiementId: number;
+  paiementLigneId: number;
+  /** @nullable */
+  exportateurNom?: string | null;
+  createdAt: string;
 }
 
 export interface CreancesSummary {
@@ -5090,6 +5185,25 @@ export const GetVentesStatut = {
   regle: 'regle',
   en_retard: 'en_retard',
 } as const;
+
+export type GetChequesRecusParams = {
+statut?: GetChequesRecusStatut;
+};
+
+export type GetChequesRecusStatut = typeof GetChequesRecusStatut[keyof typeof GetChequesRecusStatut];
+
+
+export const GetChequesRecusStatut = {
+  a_deposer: 'a_deposer',
+  depose: 'depose',
+  encaisse: 'encaisse',
+  rejete: 'rejete',
+  annule: 'annule',
+} as const;
+
+export type DeposerChequeRecuBody = {
+  dateDepot?: string;
+};
 
 export type GetGrandLivreParams = {
 compte?: string;

@@ -1,9 +1,10 @@
 import { type Request, type Response } from "express";
-import { db, exportateursTable, ventesExportateursTable, traitementsRefusTable, lotsTable, campagnesTable, expeditionsTable, expeditionLotsTable } from "@workspace/db";
+import { db, exportateursTable, ventesExportateursTable, traitementsRefusTable, lotsTable, campagnesTable, expeditionsTable, expeditionLotsTable, paiementsTable, paiementLignesTable } from "@workspace/db";
 import { eq, sql, desc, and, lte, inArray } from "drizzle-orm";
 import { CreateExportateurBody, CreateVenteBody, EncaisserVenteBody } from "@workspace/api-zod";
-import { generateEcrituresVente, generateEcrituresEncaissement } from "../services/comptabiliteService";
+import { generateEcrituresVente, generateEcrituresEncaissement, generateEcrituresEncaissementDansTransaction } from "../services/comptabiliteService";
 import { calculerPoidsDisponibleVente } from "../services/venteReceptionService";
+import { creerChequeRecuDansTransaction } from "../services/chequesRecusService.js";
 
 const venteSelect = {
   id: ventesExportateursTable.id,
@@ -463,46 +464,149 @@ export async function encaisserVente(req: Request, res: Response): Promise<void>
     }
 
     const vente = current.ventes_exportateurs;
-
-    const montantEncaisse = vente.montantRecuFcfa + parse.data.montantFcfa;
-    const solde = vente.montantTotalFcfa - montantEncaisse;
-
-    let statut: "en_attente" | "partiel" | "regle" | "en_retard" = "partiel";
-    if (solde <= 0) {
-      statut = "regle";
-    } else if (
-      vente.dateEcheanceReglement &&
-      new Date(vente.dateEcheanceReglement) < new Date()
-    ) {
-      statut = "en_retard";
+    const body = parse.data;
+    const lignes = body.ventilations ?? [{
+      modePaiement: body.modePaiement ?? null,
+      montantFcfa: body.montantFcfa,
+      numeroCheque: body.numeroCheque ?? null,
+      banque: body.banque ?? null,
+      dateEcheanceCheque: body.dateEcheanceCheque ?? null,
+    }];
+    if (body.ventilations && body.modePaiement) {
+      res.status(400).json({ erreur: "Utilisez soit modePaiement, soit ventilations, pas les deux." });
+      return;
     }
+    const modeLegacy = !body.modePaiement && !body.ventilations;
+    const modes = lignes.map((ligne) => ligne.modePaiement);
+    if (!modeLegacy && lignes.some((ligne) => ligne.modePaiement !== "especes" && ligne.modePaiement !== "cheque")) {
+      res.status(400).json({ erreur: "Le mode de règlement doit être espèces ou chèque." });
+      return;
+    }
+    const montantVentile = lignes.reduce((sum, ligne) => sum + Number(ligne.montantFcfa), 0);
+    if (montantVentile !== body.montantFcfa) {
+      res.status(400).json({ erreur: "Le total des moyens de paiement doit être égal au montant encaissé." });
+      return;
+    }
+    const chequeLignes = lignes.filter((ligne) => ligne.modePaiement === "cheque");
+    for (const ligne of chequeLignes) {
+      if (!ligne.numeroCheque?.trim() || !ligne.banque?.trim()) {
+        res.status(400).json({ erreur: "Le numéro et la banque sont obligatoires pour chaque chèque reçu." });
+        return;
+      }
+    }
+    const userId = req.user?.id ?? null;
+    const dateOperation = body.dateEncaissement ?? new Date().toISOString().split("T")[0]!;
 
-    const [updated] = await db
-      .update(ventesExportateursTable)
-      .set({
+    const transactionResult = await db.transaction(async (tx) => {
+      const [locked] = await tx
+        .select()
+        .from(ventesExportateursTable)
+        .where(eq(ventesExportateursTable.id, id))
+        .for("update")
+        .limit(1);
+      if (!locked) throw new Error("Vente non trouvée");
+      const resteAvant = locked.soldeDuFcfa;
+      if (body.montantFcfa > resteAvant) {
+        throw new Error(`Le montant dépasse le solde de la vente (${resteAvant.toLocaleString("fr-FR")} FCFA).`);
+      }
+
+      let paiementId: number | null = null;
+      let paiementLigneIds: number[] = [];
+      if (!modeLegacy) {
+        const modeUnique = lignes.length === 1 ? lignes[0]?.modePaiement : null;
+        const [paiement] = await tx.insert(paiementsTable).values({
+          libelle: `Encaissement vente exportateur #${id}`,
+          modeReglement: modeUnique ?? "mixte",
+          montantAPayerFcfa: String(body.montantFcfa),
+          montantVerseFcfa: String(body.montantFcfa),
+          resteAPayerFcfa: "0",
+          montantFcfa: body.montantFcfa,
+          modePaiement: modeUnique === "especes" || modeUnique === "cheque" ? modeUnique : null,
+          statut: chequeLignes.length > 0 ? "confirme" : "effectue",
+          validePar: userId,
+          dateValidation: new Date(),
+          agentSaisiseurId: userId,
+        }).returning({ id: paiementsTable.id });
+        paiementId = paiement?.id ?? null;
+        if (!paiementId) throw new Error("Le règlement de la vente n'a pas pu être créé");
+        const insertedLines = await tx.insert(paiementLignesTable).values(lignes.map((ligne) => ({
+          paiementId: paiementId!,
+          modePaiement: ligne.modePaiement as "especes" | "cheque",
+          montantFcfa: Number(ligne.montantFcfa),
+          numeroCheque: ligne.numeroCheque ?? null,
+          banque: ligne.banque ?? null,
+          dateEcheance: ligne.dateEcheanceCheque ?? null,
+        }))).returning({ id: paiementLignesTable.id });
+        paiementLigneIds = insertedLines.map((ligne) => ligne.id);
+      }
+
+      const montantEncaisse = locked.montantRecuFcfa + body.montantFcfa;
+      const solde = locked.montantTotalFcfa - montantEncaisse;
+      let statut: "en_attente" | "partiel" | "regle" | "en_retard" = "partiel";
+      if (solde <= 0) statut = "regle";
+      else if (locked.dateEcheanceReglement && new Date(locked.dateEcheanceReglement) < new Date()) statut = "en_retard";
+
+      const [updated] = await tx.update(ventesExportateursTable).set({
         montantRecuFcfa: montantEncaisse,
         soldeDuFcfa: Math.max(0, solde),
         statut,
-      })
-      .where(eq(ventesExportateursTable.id, id))
-      .returning();
+      }).where(eq(ventesExportateursTable.id, id)).returning();
+      if (!updated) throw new Error("La vente n'a pas pu être mise à jour");
+
+      if (modeLegacy) {
+        await generateEcrituresEncaissementDansTransaction(tx, cooperativeId, {
+          venteId: id,
+          exportateurId: vente.exportateurId,
+          exportateurNom: current.exportateurs?.nom ?? `exp-${vente.exportateurId}`,
+          montantFcfa: body.montantFcfa,
+          date: dateOperation,
+          compteDebit: "521",
+        });
+      } else {
+        for (const [index, ligne] of lignes.entries()) {
+          await generateEcrituresEncaissementDansTransaction(tx, cooperativeId, {
+            venteId: id,
+            exportateurId: vente.exportateurId,
+            exportateurNom: current.exportateurs?.nom ?? `exp-${vente.exportateurId}`,
+            montantFcfa: Number(ligne.montantFcfa),
+            date: dateOperation,
+            compteDebit: ligne.modePaiement === "cheque" ? "511" : "571",
+            libelle: `${ligne.modePaiement === "cheque" ? "Chèque reçu" : "Espèces"} — vente exportateur ${current.exportateurs?.nom ?? vente.exportateurId}`,
+          });
+          if (ligne.modePaiement === "cheque") {
+            await creerChequeRecuDansTransaction(tx, {
+              cooperativeId,
+              numeroCheque: ligne.numeroCheque!.trim(),
+              banque: ligne.banque!.trim(),
+              montantFcfa: Number(ligne.montantFcfa),
+              dateReception: dateOperation,
+              dateEcheance: ligne.dateEcheanceCheque ?? null,
+              venteExportateurId: id,
+              exportateurId: vente.exportateurId,
+              paiementId: paiementId!,
+              paiementLigneId: paiementLigneIds[index]!,
+              createdBy: userId ?? 0,
+            });
+          }
+        }
+      }
+      return updated;
+    });
 
     const [detail] = await db
       .select(venteSelect)
       .from(ventesExportateursTable)
       .leftJoin(exportateursTable, eq(exportateursTable.id, ventesExportateursTable.exportateurId))
-      .where(eq(ventesExportateursTable.id, updated!.id));
-
-    void generateEcrituresEncaissement(cooperativeId, {
-      venteId: id,
-      exportateurId: current.ventes_exportateurs.exportateurId ?? undefined,
-      exportateurNom: detail?.exportateurNom ?? `exp-${id}`,
-      montantFcfa: parse.data.montantFcfa,
-      date: new Date().toISOString().split("T")[0]!,
-    });
+      .where(eq(ventesExportateursTable.id, transactionResult.id));
 
     res.json(detail);
   } catch (err) {
+    const msg = (err as Error).message;
+    if (msg === "Vente non trouvée") { res.status(404).json({ erreur: msg }); return; }
+    if (msg.startsWith("Le montant dépasse") || msg.includes("numéro") || msg.includes("duplicate key")) {
+      res.status(409).json({ erreur: msg.includes("duplicate key") ? "Ce numéro de chèque existe déjà pour cette coopérative." : msg });
+      return;
+    }
     req.log.error({ err }, "Erreur encaisserVente");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }

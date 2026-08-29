@@ -1045,8 +1045,25 @@ export const EncaisserVenteParams = zod.object({
   "id": zod.coerce.number()
 })
 
+
+
+
+
+
 export const EncaisserVenteBody = zod.object({
-  "montantFcfa": zod.number()
+  "montantFcfa": zod.number().min(1),
+  "modePaiement": zod.enum(['especes', 'cheque']).nullish(),
+  "numeroCheque": zod.string().nullish(),
+  "banque": zod.string().nullish(),
+  "dateEcheanceCheque": zod.string().nullish(),
+  "dateEncaissement": zod.string().nullish(),
+  "ventilations": zod.array(zod.object({
+  "modePaiement": zod.enum(['especes', 'cheque']),
+  "montantFcfa": zod.number().min(1),
+  "numeroCheque": zod.string().nullish(),
+  "banque": zod.string().nullish(),
+  "dateEcheanceCheque": zod.string().nullish()
+})).min(1).optional()
 })
 
 export const EncaisserVenteResponse = zod.object({
@@ -1080,6 +1097,196 @@ export const SignalerRefusVenteBody = zod.object({
   "dateRefus": zod.coerce.date(),
   "motifRefus": zod.string().optional(),
   "entrepotRetourId": zod.number()
+})
+
+
+/**
+ * @summary Lister les chèques reçus des exportateurs
+ */
+export const GetChequesRecusQueryParams = zod.object({
+  "statut": zod.enum(['a_deposer', 'depose', 'encaisse', 'rejete', 'annule']).optional()
+})
+
+export const GetChequesRecusResponseItem = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "numeroCheque": zod.string(),
+  "banque": zod.string(),
+  "montantFcfa": zod.number(),
+  "dateReception": zod.string(),
+  "dateEcheance": zod.string().nullish(),
+  "statut": zod.enum(['a_deposer', 'depose', 'encaisse', 'rejete', 'annule']),
+  "dateDepot": zod.string().nullish(),
+  "dateEncaissement": zod.string().nullish(),
+  "dateRejet": zod.string().nullish(),
+  "motifRejet": zod.string().nullish(),
+  "dateAnnulation": zod.string().nullish(),
+  "motifAnnulation": zod.string().nullish(),
+  "compteBancaireId": zod.number().nullish(),
+  "mouvementBanqueId": zod.number().nullish(),
+  "venteExportateurId": zod.number(),
+  "exportateurId": zod.number(),
+  "paiementId": zod.number(),
+  "paiementLigneId": zod.number(),
+  "exportateurNom": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+export const GetChequesRecusResponse = zod.array(GetChequesRecusResponseItem)
+
+
+/**
+ * @summary Enregistrer le dépôt d'un chèque reçu
+ */
+export const DeposerChequeRecuParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeposerChequeRecuBody = zod.object({
+  "dateDepot": zod.string().optional()
+})
+
+export const DeposerChequeRecuResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "numeroCheque": zod.string(),
+  "banque": zod.string(),
+  "montantFcfa": zod.number(),
+  "dateReception": zod.string(),
+  "dateEcheance": zod.string().nullish(),
+  "statut": zod.enum(['a_deposer', 'depose', 'encaisse', 'rejete', 'annule']),
+  "dateDepot": zod.string().nullish(),
+  "dateEncaissement": zod.string().nullish(),
+  "dateRejet": zod.string().nullish(),
+  "motifRejet": zod.string().nullish(),
+  "dateAnnulation": zod.string().nullish(),
+  "motifAnnulation": zod.string().nullish(),
+  "compteBancaireId": zod.number().nullish(),
+  "mouvementBanqueId": zod.number().nullish(),
+  "venteExportateurId": zod.number(),
+  "exportateurId": zod.number(),
+  "paiementId": zod.number(),
+  "paiementLigneId": zod.number(),
+  "exportateurNom": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Enregistrer l'encaissement bancaire d'un chèque reçu
+ */
+export const EncaisserChequeRecuParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const EncaisserChequeRecuBody = zod.object({
+  "compteBancaireId": zod.number(),
+  "dateEncaissement": zod.string().optional()
+})
+
+export const EncaisserChequeRecuResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "numeroCheque": zod.string(),
+  "banque": zod.string(),
+  "montantFcfa": zod.number(),
+  "dateReception": zod.string(),
+  "dateEcheance": zod.string().nullish(),
+  "statut": zod.enum(['a_deposer', 'depose', 'encaisse', 'rejete', 'annule']),
+  "dateDepot": zod.string().nullish(),
+  "dateEncaissement": zod.string().nullish(),
+  "dateRejet": zod.string().nullish(),
+  "motifRejet": zod.string().nullish(),
+  "dateAnnulation": zod.string().nullish(),
+  "motifAnnulation": zod.string().nullish(),
+  "compteBancaireId": zod.number().nullish(),
+  "mouvementBanqueId": zod.number().nullish(),
+  "venteExportateurId": zod.number(),
+  "exportateurId": zod.number(),
+  "paiementId": zod.number(),
+  "paiementLigneId": zod.number(),
+  "exportateurNom": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Rejeter un chèque reçu
+ */
+export const RejeterChequeRecuParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const RejeterChequeRecuBody = zod.object({
+  "motifRejet": zod.string().min(1),
+  "dateRejet": zod.string().optional()
+})
+
+export const RejeterChequeRecuResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "numeroCheque": zod.string(),
+  "banque": zod.string(),
+  "montantFcfa": zod.number(),
+  "dateReception": zod.string(),
+  "dateEcheance": zod.string().nullish(),
+  "statut": zod.enum(['a_deposer', 'depose', 'encaisse', 'rejete', 'annule']),
+  "dateDepot": zod.string().nullish(),
+  "dateEncaissement": zod.string().nullish(),
+  "dateRejet": zod.string().nullish(),
+  "motifRejet": zod.string().nullish(),
+  "dateAnnulation": zod.string().nullish(),
+  "motifAnnulation": zod.string().nullish(),
+  "compteBancaireId": zod.number().nullish(),
+  "mouvementBanqueId": zod.number().nullish(),
+  "venteExportateurId": zod.number(),
+  "exportateurId": zod.number(),
+  "paiementId": zod.number(),
+  "paiementLigneId": zod.number(),
+  "exportateurNom": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Annuler un chèque reçu
+ */
+export const AnnulerChequeRecuParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const AnnulerChequeRecuBody = zod.object({
+  "motifAnnulation": zod.string().min(1)
+})
+
+export const AnnulerChequeRecuResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "numeroCheque": zod.string(),
+  "banque": zod.string(),
+  "montantFcfa": zod.number(),
+  "dateReception": zod.string(),
+  "dateEcheance": zod.string().nullish(),
+  "statut": zod.enum(['a_deposer', 'depose', 'encaisse', 'rejete', 'annule']),
+  "dateDepot": zod.string().nullish(),
+  "dateEncaissement": zod.string().nullish(),
+  "dateRejet": zod.string().nullish(),
+  "motifRejet": zod.string().nullish(),
+  "dateAnnulation": zod.string().nullish(),
+  "motifAnnulation": zod.string().nullish(),
+  "compteBancaireId": zod.number().nullish(),
+  "mouvementBanqueId": zod.number().nullish(),
+  "venteExportateurId": zod.number(),
+  "exportateurId": zod.number(),
+  "paiementId": zod.number(),
+  "paiementLigneId": zod.number(),
+  "exportateurNom": zod.string().nullish(),
+  "createdAt": zod.string()
 })
 
 

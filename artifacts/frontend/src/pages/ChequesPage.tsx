@@ -99,6 +99,7 @@ export default function ChequesPage() {
   const peutAnnuler   = perms["annuler"]?.includes(role);
 
   const qc = useQueryClient();
+  const [espace, setEspace] = useState<"recus" | "emis">("recus");
   const [filtreStatut, setFiltreStatut] = useState<StatutFiltreType>("tous");
   const [chequeSelectionne, setChequeSelectionne] = useState<Cheque | null>(null);
 
@@ -172,8 +173,13 @@ export default function ChequesPage() {
     { key: "annule",    label: "Annulés",   count: cheques.filter(c => c.statut === "annule").length },
   ];
 
+  if (espace === "recus") {
+    return <ChequesRecusView onBackToEmis={() => setEspace("emis")} />;
+  }
+
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-6">
+      <EspaceTabs active="emis" onChange={setEspace} />
       {/* En-tête */}
       <div className="flex items-center justify-between">
         <div>
@@ -426,6 +432,193 @@ export default function ChequesPage() {
           isPending={mutAnnuler.isPending}
           error={mutAnnuler.error?.message}
         />
+      )}
+    </div>
+  );
+}
+
+function EspaceTabs({
+  active,
+  onChange,
+}: {
+  active: "recus" | "emis";
+  onChange: (value: "recus" | "emis") => void;
+}) {
+  return (
+    <div className="flex rounded-xl border border-gray-200 bg-white p-1 w-fit shadow-sm">
+      <button
+        onClick={() => onChange("recus")}
+        className={`px-4 py-2 rounded-lg text-sm font-medium ${active === "recus" ? "bg-emerald-600 text-white" : "text-gray-600 hover:bg-gray-50"}`}
+      >
+        Chèques reçus
+      </button>
+      <button
+        onClick={() => onChange("emis")}
+        className={`px-4 py-2 rounded-lg text-sm font-medium ${active === "emis" ? "bg-emerald-600 text-white" : "text-gray-600 hover:bg-gray-50"}`}
+      >
+        Chèques émis
+      </button>
+    </div>
+  );
+}
+
+type ChequeRecu = {
+  id: number;
+  numeroCheque: string;
+  banque: string;
+  montantFcfa: number;
+  dateReception: string;
+  dateEcheance: string | null;
+  statut: "a_deposer" | "depose" | "encaisse" | "rejete" | "annule";
+  dateDepot: string | null;
+  dateEncaissement: string | null;
+  dateRejet: string | null;
+  motifRejet: string | null;
+  dateAnnulation: string | null;
+  motifAnnulation: string | null;
+  compteBancaireId: number | null;
+  venteExportateurId: number;
+  exportateurId: number;
+  paiementId: number;
+  paiementLigneId: number;
+  exportateurNom: string | null;
+};
+
+const STATUTS_RECUS = {
+  a_deposer: { label: "À déposer", color: "bg-amber-100 text-amber-800", icon: Clock },
+  depose: { label: "Déposé", color: "bg-blue-100 text-blue-800", icon: Building2 },
+  encaisse: { label: "Encaissé", color: "bg-green-100 text-green-800", icon: CheckCircle2 },
+  rejete: { label: "Rejeté", color: "bg-red-100 text-red-800", icon: XCircle },
+  annule: { label: "Annulé", color: "bg-gray-100 text-gray-600", icon: Ban },
+} as const;
+
+function ChequesRecusView({ onBackToEmis }: { onBackToEmis: () => void }) {
+  const qc = useQueryClient();
+  const { utilisateur } = useAuth();
+  const perms = PERMISSIONS["cheques"] ?? {};
+  const role = utilisateur?.role ?? "";
+  const peutEncaisser = perms["encaisser"]?.includes(role);
+  const peutRejeter = perms["rejeter"]?.includes(role);
+  const peutModifier = perms["modifier"]?.includes(role);
+  const peutAnnuler = perms["annuler"]?.includes(role);
+  const [filtre, setFiltre] = useState<"tous" | ChequeRecu["statut"]>("tous");
+  const [action, setAction] = useState<{ type: "deposer" | "encaisser" | "rejeter" | "annuler"; cheque: ChequeRecu } | null>(null);
+  const [dateAction, setDateAction] = useState(new Date().toISOString().slice(0, 10));
+  const [compteId, setCompteId] = useState("");
+  const [motif, setMotif] = useState("");
+
+  const url = filtre === "tous" ? "/api/cheques-recus" : `/api/cheques-recus?statut=${filtre}`;
+  const { data: cheques = [], isLoading, isError } = useQuery<ChequeRecu[]>({
+    queryKey: ["cheques-recus", filtre],
+    queryFn: () => apiFetch<ChequeRecu[]>(url),
+  });
+  const { data: comptes = [] } = useQuery<CompteBancaire[]>({
+    queryKey: ["banque-comptes"],
+    queryFn: () => apiFetch<CompteBancaire[]>("/api/banque"),
+  });
+
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: ["cheques-recus"] });
+    void qc.invalidateQueries({ queryKey: ["banque-comptes"] });
+    setAction(null);
+    setMotif("");
+    setCompteId("");
+  };
+  const mutAction = useMutation({
+    mutationFn: async () => {
+      if (!action) throw new Error("Action invalide");
+      if (action.type === "deposer") {
+        return apiPost<ChequeRecu>(`/api/cheques-recus/${action.cheque.id}/deposer`, { dateDepot: dateAction });
+      }
+      if (action.type === "encaisser") {
+        return apiPost<ChequeRecu>(`/api/cheques-recus/${action.cheque.id}/encaisser`, { compteBancaireId: Number(compteId), dateEncaissement: dateAction });
+      }
+      if (!motif.trim()) throw new Error(action.type === "rejeter" ? "Le motif de rejet est obligatoire" : "Le motif d'annulation est obligatoire");
+      return apiPost<ChequeRecu>(`/api/cheques-recus/${action.cheque.id}/${action.type}`, action.type === "rejeter" ? { motifRejet: motif, dateRejet: dateAction } : { motifAnnulation: motif });
+    },
+    onSuccess: refresh,
+  });
+
+  const totals = {
+    a_deposer: cheques.filter(c => c.statut === "a_deposer"),
+    depose: cheques.filter(c => c.statut === "depose"),
+    encaisse: cheques.filter(c => c.statut === "encaisse"),
+  };
+  const filtres: Array<{ key: "tous" | ChequeRecu["statut"]; label: string }> = [
+    { key: "tous", label: "Tous" }, { key: "a_deposer", label: "À déposer" },
+    { key: "depose", label: "Déposés" }, { key: "encaisse", label: "Encaissés" },
+    { key: "rejete", label: "Rejetés" }, { key: "annule", label: "Annulés" },
+  ];
+
+  return (
+    <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-6">
+      <EspaceTabs active="recus" onChange={value => value === "emis" && onBackToEmis()} />
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><CheckSquare className="text-emerald-600" size={24} />Chèques reçus</h1>
+          <p className="text-sm text-gray-500 mt-1">Suivi des chèques remis par les exportateurs, de la réception à l'encaissement bancaire.</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <KpiCard label="À déposer" value={totals.a_deposer.length} unit="chèque(s)" color="amber" icon={Clock} />
+        <KpiCard label="Montant à déposer" value={totals.a_deposer.reduce((s, c) => s + c.montantFcfa, 0)} unit="FCFA" color="amber" isMontant />
+        <KpiCard label="Déposés" value={totals.depose.length} unit="chèque(s)" color="green" icon={Building2} />
+        <KpiCard label="Encaissés" value={totals.encaisse.reduce((s, c) => s + c.montantFcfa, 0)} unit="FCFA" color="green" isMontant />
+      </div>
+      <div className="flex gap-2 flex-wrap">
+        {filtres.map(f => (
+          <button key={f.key} onClick={() => setFiltre(f.key)} className={`px-3 py-1.5 rounded-full text-sm font-medium ${filtre === f.key ? "bg-emerald-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>{f.label}</button>
+        ))}
+      </div>
+      {isError ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">Impossible de charger les chèques reçus.</div>
+      ) : isLoading ? (
+        <div className="flex justify-center py-12"><Loader2 className="animate-spin text-emerald-600" size={32} /></div>
+      ) : cheques.length === 0 ? (
+        <div className="text-center py-16 text-gray-400"><CheckSquare size={40} className="mx-auto mb-3 opacity-30" /><p className="font-medium">Aucun chèque reçu trouvé</p></div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+          <div className="overflow-x-auto"><table className="w-full text-sm">
+            <thead><tr className="bg-gray-50 border-b border-gray-200 text-gray-600 text-xs uppercase tracking-wide">
+              <th className="px-4 py-3 text-left">N° Chèque</th><th className="px-4 py-3 text-left">Exportateur</th>
+              <th className="px-4 py-3 text-right">Montant</th><th className="px-4 py-3 text-left">Banque</th>
+              <th className="px-4 py-3 text-center">Reçu le</th><th className="px-4 py-3 text-center">Statut</th><th className="px-4 py-3 text-center">Actions</th>
+            </tr></thead>
+            <tbody className="divide-y divide-gray-100">{cheques.map(c => {
+              const info = STATUTS_RECUS[c.statut]; const Icon = info.icon;
+              return <tr key={c.id} className="hover:bg-gray-50">
+                <td className="px-4 py-3 font-mono text-xs"><span className="flex items-center gap-1"><Hash size={11} />{c.numeroCheque}</span></td>
+                <td className="px-4 py-3"><div className="font-medium">{c.exportateurNom ?? "—"}</div><div className="text-xs text-gray-400">Vente #{c.venteExportateurId} · Paiement #{c.paiementId}</div></td>
+                <td className="px-4 py-3 text-right font-semibold">{fmt(c.montantFcfa)}</td>
+                <td className="px-4 py-3 text-gray-600">{c.banque}</td><td className="px-4 py-3 text-center text-gray-600">{fmtDate(c.dateReception)}</td>
+                <td className="px-4 py-3 text-center"><span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${info.color}`}><Icon size={11} />{info.label}</span></td>
+                <td className="px-4 py-3"><div className="flex justify-center gap-1 flex-wrap">
+                  {c.statut === "a_deposer" && peutModifier && <button onClick={() => { setAction({ type: "deposer", cheque: c }); setDateAction(new Date().toISOString().slice(0, 10)); }} className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded">Déposer</button>}
+                  {c.statut === "depose" && peutEncaisser && <button onClick={() => { setAction({ type: "encaisser", cheque: c }); setDateAction(new Date().toISOString().slice(0, 10)); }} className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded">Encaisser</button>}
+                  {(c.statut === "a_deposer" || c.statut === "depose") && peutRejeter && <button onClick={() => { setAction({ type: "rejeter", cheque: c }); setMotif(""); }} className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded">Rejeter</button>}
+                  {(c.statut === "a_deposer" || c.statut === "depose") && peutAnnuler && <button onClick={() => { setAction({ type: "annuler", cheque: c }); setMotif(""); }} className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">Annuler</button>}
+                </div></td>
+              </tr>;
+            })}</tbody>
+          </table></div>
+        </div>
+      )}
+      {action && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between px-5 py-4 border-b"><h2 className="font-semibold">{
+              action.type === "deposer" ? "Enregistrer le dépôt" : action.type === "encaisser" ? "Encaisser à la banque" : action.type === "rejeter" ? "Rejeter le chèque" : "Annuler le chèque"
+            }</h2><button onClick={() => setAction(null)}><X size={18} className="text-gray-400" /></button></div>
+            <div className="p-5 space-y-4">
+              <p className="text-sm text-gray-600">Chèque n° <strong>{action.cheque.numeroCheque}</strong> · {fmt(action.cheque.montantFcfa)}</p>
+              {action.type !== "annuler" && <div><label className="block text-xs font-medium mb-1">Date</label><input type="date" value={dateAction} onChange={e => setDateAction(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" /></div>}
+              {action.type === "encaisser" && <div><label className="block text-xs font-medium mb-1">Compte bancaire crédité *</label><select value={compteId} onChange={e => setCompteId(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm"><option value="">— Sélectionner —</option>{comptes.map(c => <option key={c.id} value={String(c.id)}>{c.nom} · {c.banque}</option>)}</select></div>}
+              {(action.type === "rejeter" || action.type === "annuler") && <div><label className="block text-xs font-medium mb-1">Motif *</label><textarea value={motif} onChange={e => setMotif(e.target.value)} rows={3} className="w-full border rounded-lg px-3 py-2 text-sm" /></div>}
+            </div>
+            <div className="px-5 pb-5 flex gap-3"><button onClick={() => setAction(null)} className="flex-1 py-2.5 border rounded-lg text-sm">Annuler</button><button onClick={() => mutAction.mutate()} disabled={mutAction.isPending || (action.type === "encaisser" && !compteId) || ((action.type === "rejeter" || action.type === "annuler") && !motif.trim())} className="flex-1 py-2.5 bg-emerald-600 text-white rounded-lg text-sm disabled:opacity-50">{mutAction.isPending ? "Enregistrement…" : "Confirmer"}</button></div>
+            {mutAction.error && <p className="px-5 pb-4 text-xs text-red-600">{mutAction.error.message}</p>}
+          </div>
+        </div>
       )}
     </div>
   );
