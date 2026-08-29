@@ -4,6 +4,7 @@ import { validerPaiement } from "../controllers/paiementsController.js";
 import { getJournal } from "../services/caisseService.js";
 import {
   annulerChequeRecu,
+  deposerChequeRecu,
   rejeterChequeRecu,
 } from "../services/chequesRecusService.js";
 
@@ -1037,7 +1038,7 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
 
   async function chequeState(chequeId: number) {
     const result = await client.query(
-      `SELECT statut, date_rejet::text, motif_rejet,
+      `SELECT statut, date_depot::text, date_rejet::text, motif_rejet,
               date_annulation::text, motif_annulation
        FROM cheques_recus WHERE id = $1`,
       [chequeId],
@@ -1201,6 +1202,119 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
         compte_debit: "4111",
         compte_credit: "511",
         montant_fcfa: 60_000,
+        source: "encaissement",
+        source_id: fixture.chequeId,
+        numero_piece: `REJ-CHQ-${fixture.chequeId}`,
+      },
+    ]);
+  });
+
+  it("réouvre correctement la créance après le dépôt puis le rejet du chèque", async () => {
+    const fixture = await createFixture(
+      [{ mode: "cheque", amount: 85_000 }],
+      "depose-puis-rejete",
+    );
+
+    await deposerChequeRecu(fixture.chequeId, cooperativeId, "2026-08-28");
+    await rejeterChequeRecu(fixture.chequeId, cooperativeId, {
+      motifRejet: "Chèque retourné par la banque",
+      dateRejet: "2026-08-29",
+    });
+
+    await expect(saleState(fixture.saleId)).resolves.toEqual({
+      montant_recu_fcfa: 0,
+      solde_du_fcfa: 85_000,
+      statut: "en_attente",
+    });
+    await expect(paymentState(fixture.paymentId)).resolves.toEqual({
+      statut: "rejete",
+      motif_rejet: "Chèque retourné par la banque",
+    });
+    await expect(chequeState(fixture.chequeId)).resolves.toMatchObject({
+      statut: "rejete",
+      date_depot: "2026-08-28",
+      date_rejet: "2026-08-29",
+      motif_rejet: "Chèque retourné par la banque",
+    });
+    await expect(accountingState(fixture)).resolves.toEqual([
+      {
+        compte_debit: "511",
+        compte_credit: "4111",
+        montant_fcfa: 85_000,
+        source: "encaissement",
+        source_id: fixture.saleId,
+        numero_piece: `ENC-${fixture.saleId}-cheque`,
+      },
+      {
+        compte_debit: "4111",
+        compte_credit: "511",
+        montant_fcfa: 85_000,
+        source: "encaissement",
+        source_id: fixture.chequeId,
+        numero_piece: `REJ-CHQ-${fixture.chequeId}`,
+      },
+    ]);
+  });
+
+  it("ne rejette qu'une seule fois lors de deux requêtes concurrentes", async () => {
+    const fixture = await createFixture(
+      [{ mode: "cheque", amount: 95_000 }],
+      "concurrent",
+    );
+
+    const results = await Promise.allSettled([
+      rejeterChequeRecu(fixture.chequeId, cooperativeId, {
+        motifRejet: "Premier motif",
+        dateRejet: "2026-08-29",
+      }),
+      rejeterChequeRecu(fixture.chequeId, cooperativeId, {
+        motifRejet: "Second motif",
+        dateRejet: "2026-08-29",
+      }),
+    ]);
+
+    const fulfilled = results.filter(
+      (result): result is PromiseFulfilledResult<Awaited<ReturnType<typeof rejeterChequeRecu>>> =>
+        result.status === "fulfilled",
+    );
+    const rejected = results.filter(
+      (result): result is PromiseRejectedResult => result.status === "rejected",
+    );
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0]!.reason).toMatchObject({
+      message: "Seul un chèque à déposer ou déposé peut être rejeté",
+    });
+
+    const persistedMotif = fulfilled[0]!.value.motifRejet;
+    expect(["Premier motif", "Second motif"]).toContain(persistedMotif);
+    await expect(saleState(fixture.saleId)).resolves.toEqual({
+      montant_recu_fcfa: 0,
+      solde_du_fcfa: 95_000,
+      statut: "en_attente",
+    });
+    await expect(paymentState(fixture.paymentId)).resolves.toEqual({
+      statut: "rejete",
+      motif_rejet: persistedMotif,
+    });
+    await expect(chequeState(fixture.chequeId)).resolves.toMatchObject({
+      statut: "rejete",
+      date_rejet: "2026-08-29",
+      motif_rejet: persistedMotif,
+    });
+    await expect(accountingState(fixture)).resolves.toEqual([
+      {
+        compte_debit: "511",
+        compte_credit: "4111",
+        montant_fcfa: 95_000,
+        source: "encaissement",
+        source_id: fixture.saleId,
+        numero_piece: `ENC-${fixture.saleId}-cheque`,
+      },
+      {
+        compte_debit: "4111",
+        compte_credit: "511",
+        montant_fcfa: 95_000,
         source: "encaissement",
         source_id: fixture.chequeId,
         numero_piece: `REJ-CHQ-${fixture.chequeId}`,

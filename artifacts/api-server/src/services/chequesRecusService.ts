@@ -5,7 +5,7 @@ import {
   ventesExportateursTable,
   paiementsTable,
 } from "@workspace/db";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { enregistrerMouvement } from "./banqueService.js";
 import {
   proposerEcrituresDansTransaction,
@@ -162,11 +162,17 @@ export async function rejeterChequeRecu(
       throw new Error("Seul un chèque à déposer ou déposé peut être rejeté");
     }
     const dateRejet = data.dateRejet ?? today();
-    await tx.update(chequesRecusTable).set({
+    const [updated] = await tx.update(chequesRecusTable).set({
       statut: "rejete",
       dateRejet,
       motifRejet: data.motifRejet,
-    }).where(eq(chequesRecusTable.id, id));
+    }).where(and(
+      eq(chequesRecusTable.id, id),
+      inArray(chequesRecusTable.statut, ["a_deposer", "depose"]),
+    )).returning();
+    if (!updated) {
+      throw new Error("Seul un chèque à déposer ou déposé peut être rejeté");
+    }
 
     const [vente] = await tx.select()
       .from(ventesExportateursTable)
