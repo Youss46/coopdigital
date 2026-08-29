@@ -7,6 +7,7 @@ import {
   handleCreateExpedition,
   handleChangerStatut,
   handleConfirmerReception,
+  handleReglerFraisTransport,
   handleRapportEudr,
   handleGetFlotteVehicules,
   handleGetFlotteChauffeurs,
@@ -92,6 +93,12 @@ router.put(
   "/expeditions/:id/reception",
   checkPermission("expeditions", "modifier"),
   handleConfirmerReception,
+);
+
+router.post(
+  "/expeditions/:id/reglement-frais-transport",
+  checkPermission("expeditions", "modifier"),
+  handleReglerFraisTransport,
 );
 
 router.get(

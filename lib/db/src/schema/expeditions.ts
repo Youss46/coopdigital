@@ -50,6 +50,15 @@ export const expeditionsTable = pgTable("expeditions", {
   telephoneChauffeur:   varchar("telephone_chauffeur", { length: 30 }),
   transporteur:         varchar("transporteur", { length: 200 }),
   numeroBonTransport:   varchar("numero_bon_transport", { length: 100 }),
+  // Dette de transport constatée à la réception, puis réglée séparément.
+  fraisTransportFcfa:              numeric("frais_transport_fcfa"),
+  fraisTransportStatut:             varchar("frais_transport_statut", { length: 20 }).notNull().default("non_paye"),
+  fraisTransportModePaiement:       varchar("frais_transport_mode_paiement", { length: 20 }),
+  fraisTransportCaisseId:           integer("frais_transport_caisse_id"),
+  fraisTransportCompteBancaireId:   integer("frais_transport_compte_bancaire_id"),
+  fraisTransportDateReglement:      date("frais_transport_date_reglement", { mode: "string" }),
+  fraisTransportReferenceReglement: varchar("frais_transport_reference_reglement", { length: 100 }),
+  fraisTransportReglePar:           integer("frais_transport_regle_par"),
 
   dateDepart:           timestamp("date_depart", { withTimezone: true }),
   lieuDepart:           varchar("lieu_depart", { length: 255 }).default("Magasin central"),

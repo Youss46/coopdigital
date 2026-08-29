@@ -13,6 +13,7 @@ import {
   rattacherLot,
   detacherLot,
   genererNumeroExpedition,
+  reglerFraisTransport,
 } from "../services/expeditionsService";
 import { generateBonLivraison, generateBordereauTransport, generateRapportEudrPdf, generateConstatReception } from "../services/pdfService";
 
@@ -139,6 +140,49 @@ export async function handleConfirmerReception(req: Request, res: Response): Pro
     res.json(result);
   } catch (err: unknown) {
     req.log.error({ err }, "handleConfirmerReception");
+    const msg = err instanceof Error ? err.message : "Erreur interne";
+    res.status(400).json({ erreur: msg });
+  }
+}
+
+export async function handleReglerFraisTransport(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  const userId = req.user?.id;
+  if (!cooperativeId || !userId) {
+    res.status(403).json({ erreur: "Coopérative non associée" });
+    return;
+  }
+
+  try {
+    const id = parseInt(String(req.params["id"]), 10);
+    if (!Number.isInteger(id) || id <= 0) {
+      res.status(400).json({ erreur: "ID invalide" });
+      return;
+    }
+    const {
+      modePaiement,
+      caisseId,
+      compteBancaireId,
+      dateReglement,
+      reference,
+    } = req.body as {
+      modePaiement?: "especes" | "banque";
+      caisseId?: number;
+      compteBancaireId?: number;
+      dateReglement?: string;
+      reference?: string;
+    };
+
+    const result = await reglerFraisTransport(cooperativeId, id, userId, {
+      modePaiement: modePaiement!,
+      caisseId: caisseId === undefined ? undefined : Number(caisseId),
+      compteBancaireId: compteBancaireId === undefined ? undefined : Number(compteBancaireId),
+      dateReglement,
+      reference,
+    });
+    res.status(201).json(result);
+  } catch (err: unknown) {
+    req.log.error({ err }, "handleReglerFraisTransport");
     const msg = err instanceof Error ? err.message : "Erreur interne";
     res.status(400).json({ erreur: msg });
   }

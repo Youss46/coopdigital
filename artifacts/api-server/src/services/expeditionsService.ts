@@ -1,7 +1,10 @@
 import { db, expeditionsTable, expeditionLotsTable, expeditionHistoriqueTable, campagnesTable, membresTable, livraisonsTable, exportateursTable, vehiculesTable, chauffeursTable, lotsTable, lotLivraisonsTable, parcellesTable, ventesExportateursTable, entrepotsTable, mouvementsStockTable, traitementsRefusTable } from "@workspace/db";
 import { calculerPoidsAcceptePort } from "./venteReceptionService";
 import { eq, and, desc, sql, count, notInArray, inArray } from "drizzle-orm";
-import { proposerEcriture } from "./comptabiliteService";
+import { proposerEcriture, proposerEcrituresDansTransaction } from "./comptabiliteService";
+import { enregistrerMouvement as enregistrerMouvementCaisse } from "./caisseService.js";
+import { enregistrerMouvement as enregistrerMouvementBanque } from "./banqueService.js";
+import type { ComptabiliteTransaction } from "./comptabiliteService.js";
 import { notifExpeditionArriveePort, notifExpeditionLitige } from "./notificationService.js";
 import { logger } from "../lib/logger";
 
@@ -726,6 +729,31 @@ export async function changerStatut(
     }
   }
 
+  // Une réception passée en litige peut être résolue ultérieurement. Si des
+  // frais de transport avaient été saisis à la réception, leur dette est
+  // constatée au moment où la réception devient définitivement acceptée.
+  if (
+    nouveauStatut === "receptionne" &&
+    exp.statut === "litige" &&
+    exp.fraisTransportFcfa &&
+    Number(exp.fraisTransportFcfa) > 0
+  ) {
+    try {
+      await proposerEcriture(cooperativeId, {
+        source:      "transport",
+        sourceId:    expeditionId,
+        libelle:     `Frais transport ${exp.numeroExpedition}`,
+        compteDebit:  "612",
+        compteCredit: "401",
+        montantFcfa:  Math.round(Number(exp.fraisTransportFcfa)),
+        date:         new Date().toISOString().slice(0, 10),
+        numeroPiece:  exp.numeroExpedition,
+      });
+    } catch (err) {
+      logger.error({ err }, "Erreur écriture frais transport après résolution du litige");
+    }
+  }
+
   return { ok: true, statut: nouveauStatut };
 }
 
@@ -785,6 +813,12 @@ export async function confirmerReception(
   const littigeSacs  = tauxEcartSacs !== null && tauxEcartSacs > SEUIL_LITIGE;
   const nouveauStatut: "receptionne" | "litige" = littigePoids || littigeSacs ? "litige" : "receptionne";
   const provisionLitige = nouveauStatut === "litige";
+  const fraisTransport = input.fraisTransportFcfa === undefined
+    ? null
+    : Math.round(Number(input.fraisTransportFcfa));
+  if (fraisTransport !== null && (!Number.isFinite(fraisTransport) || fraisTransport < 0)) {
+    throw new Error("Les frais de transport doivent être un montant positif");
+  }
 
   // Notes enrichies avec infos sacs
   const notesSacs = ecartSacs !== null
@@ -803,6 +837,9 @@ export async function confirmerReception(
     dateArriveePort:    input.dateArriveePort ? new Date(input.dateArriveePort) : new Date(),
     statutReception:    nouveauStatut === "receptionne" ? "accepte" : "litige",
     provisionLitige,
+    ...(fraisTransport !== null && exp.fraisTransportFcfa == null
+      ? { fraisTransportFcfa: fraisTransport > 0 ? String(fraisTransport) : null, fraisTransportStatut: "non_paye" }
+      : {}),
     updatedAt:          new Date(),
   }).where(eq(expeditionsTable.id, expeditionId));
 
@@ -852,7 +889,11 @@ export async function confirmerReception(
       logger.error({ err }, "Erreur écriture comptable réception");
     }
 
-    if (input.fraisTransportFcfa && input.fraisTransportFcfa > 0) {
+    if (
+      input.fraisTransportFcfa &&
+      input.fraisTransportFcfa > 0 &&
+      exp.fraisTransportFcfa == null
+    ) {
       try {
         await proposerEcriture(cooperativeId, {
           source:      "transport",
@@ -914,6 +955,136 @@ export async function confirmerReception(
       tauxEcart <= SEUIL_ACCEPTABLE  ? "acceptable" :
       tauxEcart <= SEUIL_LITIGE      ? "a_justifier" : "litige",
   };
+}
+
+// ── Règlement des frais de transport ─────────────────────────────────────────
+
+export interface ReglerFraisTransportInput {
+  modePaiement: "especes" | "banque";
+  caisseId?: number;
+  compteBancaireId?: number;
+  dateReglement?: string;
+  reference?: string;
+}
+
+export async function reglerFraisTransport(
+  cooperativeId: number,
+  expeditionId: number,
+  userId: number,
+  input: ReglerFraisTransportInput,
+) {
+  if (input.modePaiement !== "especes" && input.modePaiement !== "banque") {
+    throw new Error("Le mode de paiement doit être espèces ou banque");
+  }
+  if (input.modePaiement === "especes" && !input.caisseId) {
+    throw new Error("Une caisse est requise pour un règlement en espèces");
+  }
+  if (input.modePaiement === "banque" && !input.compteBancaireId) {
+    throw new Error("Un compte bancaire est requis pour un règlement par banque");
+  }
+
+  return db.transaction(async (tx: ComptabiliteTransaction) => {
+    // Ce verrou fait de la transition non_paye → paye une opération
+    // idempotente, même si deux règlements sont soumis simultanément.
+    const [exp] = await tx
+      .select()
+      .from(expeditionsTable)
+      .where(and(
+        eq(expeditionsTable.id, expeditionId),
+        eq(expeditionsTable.cooperativeId, cooperativeId),
+      ))
+      .for("update")
+      .limit(1);
+
+    if (!exp) throw new Error("Expédition introuvable");
+    if (exp.statut === "litige" || String(exp.statut) === "annule" || exp.statutReception === "annule") {
+      throw new Error("Le règlement est impossible pour une réception en litige ou annulée");
+    }
+    if (exp.statut !== "receptionne") {
+      throw new Error("Les frais ne peuvent être réglés que pour une réception acceptée");
+    }
+
+    const montant = Math.round(Number(exp.fraisTransportFcfa ?? 0));
+    if (!Number.isFinite(montant) || montant <= 0) {
+      throw new Error("Aucun frais de transport à régler pour cette expédition");
+    }
+    if (exp.fraisTransportStatut === "paye") {
+      throw new Error("Les frais de transport de cette expédition sont déjà réglés");
+    }
+
+    const dateReglement = input.dateReglement ?? new Date().toISOString().slice(0, 10);
+    const reference = input.reference ?? `EXP-${exp.numeroExpedition}-TRANSPORT`;
+    const libelle = `Règlement frais transport ${exp.numeroExpedition}`;
+
+    let mouvementId: number;
+    if (input.modePaiement === "especes") {
+      const result = await enregistrerMouvementCaisse(input.caisseId!, {
+        type: "sortie",
+        motif: "reglement_frais_exportation",
+        montantFcfa: montant,
+        libelle,
+        referenceOperation: reference,
+        userId,
+        cooperativeId,
+        skipAccounting: true,
+      }, tx);
+      mouvementId = result.mouvement.id;
+    } else {
+      const result = await enregistrerMouvementBanque(input.compteBancaireId!, cooperativeId, {
+        type: "debit",
+        motif: "reglement_frais_exportation",
+        montantFcfa: montant,
+        libelle,
+        reference,
+        dateOperation: dateReglement,
+        userId,
+        skipAccounting: true,
+      }, tx);
+      mouvementId = result.mouvement.id;
+    }
+
+    // Le compte de dette est soldé vers l'actif réellement débité. La source
+    // transport conserve le paramétrage autoTransport et les exports
+    // comptables identifient l'expédition comme pièce d'origine.
+    await proposerEcrituresDansTransaction(tx, cooperativeId, [{
+      source:       "transport",
+      sourceId:     expeditionId,
+      libelle,
+      compteDebit:  "401",
+      compteCredit: input.modePaiement === "especes" ? "571" : "521",
+      montantFcfa:  montant,
+      date:         dateReglement,
+      numeroPiece:  `${exp.numeroExpedition}-REG`,
+    }]);
+
+    const [updated] = await tx
+      .update(expeditionsTable)
+      .set({
+        fraisTransportStatut:             "paye",
+        fraisTransportModePaiement:       input.modePaiement,
+        fraisTransportCaisseId:           input.modePaiement === "especes" ? input.caisseId! : null,
+        fraisTransportCompteBancaireId:   input.modePaiement === "banque" ? input.compteBancaireId! : null,
+        fraisTransportDateReglement:      dateReglement,
+        fraisTransportReferenceReglement: reference,
+        fraisTransportReglePar:           userId,
+        updatedAt:                        new Date(),
+      })
+      .where(and(
+        eq(expeditionsTable.id, expeditionId),
+        eq(expeditionsTable.cooperativeId, cooperativeId),
+        eq(expeditionsTable.fraisTransportStatut, "non_paye"),
+      ))
+      .returning();
+
+    if (!updated) throw new Error("Le règlement des frais de transport a déjà été enregistré");
+    return {
+      expeditionId,
+      statut: updated.fraisTransportStatut,
+      modePaiement: input.modePaiement,
+      montantFcfa: montant,
+      mouvementId,
+    };
+  });
 }
 
 // ── Rapport EUDR ─────────────────────────────────────────────────────────────

@@ -64,6 +64,21 @@ interface LotDisponible {
   qrCodeLot: string;
 }
 
+interface CaisseDisponible {
+  id: number;
+  nom: string;
+  solde_actuel_fcfa: string;
+  session_id: number | null;
+  session_statut: string | null;
+}
+
+interface CompteBancaireDisponible {
+  id: number;
+  nom: string;
+  banque: string;
+  solde_actuel_fcfa: string;
+}
+
 const STATUT_CONFIG: Record<string, { label: string; color: string; step: number }> = {
   en_preparation: { label: "En préparation", color: "text-gray-600",   step: 0 },
   charge:         { label: "Chargé",          color: "text-blue-600",   step: 1 },
@@ -126,6 +141,25 @@ export default function ExpeditionDetailPage() {
     enabled: !!id && showLotsPanel,
   });
 
+  const { data: caisses = [] } = useQuery<CaisseDisponible[]>({
+    queryKey: ["caisses-reglement-expedition", id],
+    queryFn: () => apiFetch("/api/caisse", token),
+    enabled: !!id && Number(exp?.fraisTransportFcfa ?? 0) > 0 && String(exp?.fraisTransportStatut ?? "non_paye") !== "paye",
+    staleTime: 30_000,
+  });
+
+  const { data: comptesBancaires = [] } = useQuery<CompteBancaireDisponible[]>({
+    queryKey: ["comptes-bancaires-reglement-expedition", id],
+    queryFn: () => apiFetch("/api/banque", token),
+    enabled: !!id && Number(exp?.fraisTransportFcfa ?? 0) > 0 && String(exp?.fraisTransportStatut ?? "non_paye") !== "paye",
+    staleTime: 30_000,
+  });
+
+  const [modeReglement, setModeReglement] = useState<"especes" | "banque">("especes");
+  const [caisseReglementId, setCaisseReglementId] = useState("");
+  const [compteBancaireReglementId, setCompteBancaireReglementId] = useState("");
+  const [referenceReglement, setReferenceReglement] = useState("");
+
   const rattacherMutation = useMutation({
     mutationFn: (lotId: number) => apiPost(`/api/expeditions/${id}/lots`, token, { lotId }),
     onSuccess: () => {
@@ -175,12 +209,37 @@ export default function ExpeditionDetailPage() {
     onError: (err: Error) => toast({ title: "Erreur", description: err.message, variant: "destructive" }),
   });
 
+  const reglementFraisMutation = useMutation({
+    mutationFn: () => apiPost(`/api/expeditions/${id}/reglement-frais-transport`, token, {
+      modePaiement: modeReglement,
+      ...(modeReglement === "especes"
+        ? { caisseId: Number(caisseReglementId) }
+        : { compteBancaireId: Number(compteBancaireReglementId) }),
+      reference: referenceReglement.trim() || undefined,
+    }),
+    onSuccess: () => {
+      toast({ title: "Frais de transport réglés", description: "La trésorerie et la comptabilité ont été mises à jour." });
+      setReferenceReglement("");
+      setCaisseReglementId("");
+      setCompteBancaireReglementId("");
+      void qc.invalidateQueries({ queryKey: ["expedition", id] });
+      void qc.invalidateQueries({ queryKey: ["expeditions"] });
+      void qc.invalidateQueries({ queryKey: ["expeditions-stats"] });
+      void qc.invalidateQueries({ queryKey: ["caisses-reglement-expedition", id] });
+      void qc.invalidateQueries({ queryKey: ["comptes-bancaires-reglement-expedition", id] });
+    },
+    onError: (err: Error) => toast({ title: "Règlement impossible", description: err.message, variant: "destructive" }),
+  });
+
   if (isLoading) return <div className="p-8 text-center text-gray-500">Chargement…</div>;
   if (!exp) return <div className="p-8 text-center text-gray-500">Expédition introuvable</div>;
 
   const statut = String(exp.statut ?? "");
   const cfg = STATUT_CONFIG[statut] ?? { label: statut, color: "text-gray-600", step: 0 };
   const transition = TRANSITIONS[statut];
+  const fraisTransportMontant = Number(exp.fraisTransportFcfa ?? 0);
+  const fraisTransportPaye = String(exp.fraisTransportStatut ?? "non_paye") === "paye";
+  const fraisTransportAnnule = statut === "annule" || String(exp.statutReception ?? "") === "annule";
 
   const poidsCharge = parseFloat(String(exp.poidsChargeKg ?? "0"));
   const ecartKg = poidsRecu && poidsCharge
@@ -326,6 +385,119 @@ export default function ExpeditionDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Dette transporteur et règlement de trésorerie */}
+      {fraisTransportMontant > 0 && (
+        <Card className={fraisTransportPaye ? "border-green-200" : statut === "litige" ? "border-orange-200" : fraisTransportAnnule ? "border-gray-300" : "border-blue-200"}>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center justify-between gap-2">
+              <span>Frais de transport</span>
+              <Badge className={fraisTransportPaye ? "bg-green-100 text-green-700 hover:bg-green-100" : statut === "litige" ? "bg-orange-100 text-orange-700 hover:bg-orange-100" : fraisTransportAnnule ? "bg-gray-100 text-gray-600 hover:bg-gray-100" : "bg-blue-100 text-blue-700 hover:bg-blue-100"}>
+                {fraisTransportPaye ? "Payé" : statut === "litige" ? "En attente — litige" : fraisTransportAnnule ? "Annulé" : "Non payé"}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-baseline justify-between">
+              <span className="text-sm text-gray-500">Dette constatée</span>
+              <strong className="text-xl">{fraisTransportMontant.toLocaleString("fr-FR")} FCFA</strong>
+            </div>
+
+            {fraisTransportPaye ? (
+              <div className="rounded-md bg-green-50 p-3 text-sm text-green-800">
+                Règlement effectué par {String(exp.fraisTransportModePaiement ?? "—") === "especes" ? "espèces" : "banque"}
+                {exp.fraisTransportDateReglement ? ` le ${new Date(String(exp.fraisTransportDateReglement)).toLocaleDateString("fr-FR")}` : ""}.
+                {exp.fraisTransportReferenceReglement ? ` Référence : ${String(exp.fraisTransportReferenceReglement)}.` : ""}
+              </div>
+            ) : statut === "litige" ? (
+              <div className="rounded-md bg-orange-50 p-3 text-sm text-orange-800">
+                Le règlement est bloqué jusqu'à la résolution du litige. La dette pourra être réglée lorsque la réception sera acceptée.
+              </div>
+            ) : fraisTransportAnnule ? (
+              <div className="rounded-md bg-gray-50 p-3 text-sm text-gray-700">
+                Le règlement est bloqué : la réception ou la dette de transport a été annulée.
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <div>
+                    <Label>Mode de paiement</Label>
+                    <Select
+                      value={modeReglement}
+                      onValueChange={value => {
+                        setModeReglement(value as "especes" | "banque");
+                        setCaisseReglementId("");
+                        setCompteBancaireReglementId("");
+                      }}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="especes">Espèces — caisse</SelectItem>
+                        <SelectItem value="banque">Banque</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {modeReglement === "especes" ? (
+                    <div>
+                      <Label>Caisse ouverte *</Label>
+                      <Select value={caisseReglementId || undefined} onValueChange={setCaisseReglementId}>
+                        <SelectTrigger><SelectValue placeholder="Sélectionner une caisse" /></SelectTrigger>
+                        <SelectContent>
+                          {caisses.filter(c => c.session_id !== null && c.session_statut === "ouverte").map(c => (
+                            <SelectItem key={c.id} value={String(c.id)}>
+                              {c.nom} — {Number(c.solde_actuel_fcfa).toLocaleString("fr-FR")} FCFA
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {caisses.every(c => c.session_id === null || c.session_statut !== "ouverte") && (
+                        <p className="mt-1 text-xs text-orange-600">Aucune caisse n'est ouverte aujourd'hui.</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div>
+                      <Label>Compte bancaire actif *</Label>
+                      <Select value={compteBancaireReglementId || undefined} onValueChange={setCompteBancaireReglementId}>
+                        <SelectTrigger><SelectValue placeholder="Sélectionner un compte" /></SelectTrigger>
+                        <SelectContent>
+                          {comptesBancaires.map(c => (
+                            <SelectItem key={c.id} value={String(c.id)}>
+                              {c.nom} — {c.banque} ({Number(c.solde_actuel_fcfa).toLocaleString("fr-FR")} FCFA)
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {comptesBancaires.length === 0 && (
+                        <p className="mt-1 text-xs text-orange-600">Aucun compte bancaire actif n'est disponible.</p>
+                      )}
+                    </div>
+                  )}
+                  <div>
+                    <Label>Référence (facultatif)</Label>
+                    <Input
+                      value={referenceReglement}
+                      onChange={e => setReferenceReglement(e.target.value)}
+                      placeholder="N° reçu, virement…"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    className="bg-blue-700 hover:bg-blue-800"
+                    disabled={
+                      reglementFraisMutation.isPending ||
+                      (modeReglement === "especes" ? !caisseReglementId : !compteBancaireReglementId)
+                    }
+                    onClick={() => reglementFraisMutation.mutate()}
+                  >
+                    {reglementFraisMutation.isPending ? "Règlement en cours…" : "Régler les frais"}
+                  </Button>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Certificat phytosanitaire */}
       {(() => {

@@ -28,6 +28,7 @@ function comptesForMouvement(type: string, motif: string): { debit: string; cred
     frais_bancaires:      "638",  // Autres charges externes
     remboursement_emprunt:"162",  // Emprunts
     paiement_cheque:      "401",  // Fournisseurs (producteurs payés par chèque)
+    reglement_frais_exportation: "401",  // Dette transporteur
     autre_debit:          "628",  // Frais divers
   };
   return { debit: debits[motif] ?? "628", credit: "521" };
@@ -120,6 +121,8 @@ export async function enregistrerMouvement(
     dateOperation?: string;
     dateValeur?: string;
     userId?: number;
+    /** Le parent fournit l'écriture dans sa propre transaction. */
+    skipAccounting?: boolean;
   },
   tx?: ComptabiliteTransaction,
 ) {
@@ -139,6 +142,9 @@ export async function enregistrerMouvement(
 
     const montant    = Math.abs(data.montantFcfa);
     const soldeActuel = parseFloat(compte.soldeActuelFcfa as string);
+    if (data.type === "debit" && soldeActuel < montant) {
+      throw new Error(`Solde bancaire insuffisant (${soldeActuel.toLocaleString("fr-FR")} FCFA disponible)`);
+    }
     const nouveauSolde = data.type === "credit"
       ? soldeActuel + montant
       : soldeActuel - montant;
@@ -169,18 +175,21 @@ export async function enregistrerMouvement(
       .set({ soldeActuelFcfa: nouveauSolde.toString() })
       .where(eq(comptesBancairesTable.id, compteId));
 
-    // Écriture comptable OHADA 521. Elle doit rester dans la même transaction
-    // que le mouvement et la mise à jour du solde.
-    const comptes = comptesForMouvement(data.type, data.motif);
-    await proposerEcrituresDansTransaction(executor, cooperativeId, [{
-      source:       "banque",
-      sourceId:     mouvement.id,
-      libelle:      data.libelle ?? `Banque — ${data.motif}`,
-      compteDebit:  comptes.debit,
-      compteCredit: comptes.credit,
-      montantFcfa:  montant,
-      date:         dateOp,
-    }]);
+    // L'écriture comptable OHADA reste dans la même transaction que le
+    // mouvement et la mise à jour du solde. Un parent peut la fournir lui-même
+    // lorsque le mouvement fait partie d'une opération métier composée.
+    if (!data.skipAccounting) {
+      const comptes = comptesForMouvement(data.type, data.motif);
+      await proposerEcrituresDansTransaction(executor, cooperativeId, [{
+        source:       "banque",
+        sourceId:     mouvement.id,
+        libelle:      data.libelle ?? `Banque — ${data.motif}`,
+        compteDebit:  comptes.debit,
+        compteCredit: comptes.credit,
+        montantFcfa:  montant,
+        date:         dateOp,
+      }]);
+    }
 
     const soldeMini = parseFloat(compte.soldeMiniAlerteFcfa as string);
     let alerte: string | undefined;

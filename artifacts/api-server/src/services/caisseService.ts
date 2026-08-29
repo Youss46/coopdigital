@@ -30,6 +30,7 @@ function comptesForMouvement(type: string, motif: string): CompteMapping {
     avance:               "4091",  // Fournisseurs, avances et acomptes versés
     achat_intrants:       "604",   // Achats stockés de matières et fournitures
     frais_fonctionnement: "638",   // Autres charges externes
+    reglement_frais_exportation: "401", // Dette transporteur
     depot_banque:         "521",   // Banque
     remboursement:        "162",   // Emprunts établissements de crédit
     autre:                "628",   // Frais de télécommunications / divers
@@ -174,6 +175,7 @@ export interface MouvementInput {
   libelle?: string;
   referenceOperation?: string;
   userId?: number;
+  cooperativeId?: number;
   /** Remplace le compte débit calculé depuis le motif (ex: dette producteur configurée ou 6042) */
   compteDebitOverride?: string;
   /** Le parent fournit l'écriture dans sa propre transaction. */
@@ -182,19 +184,23 @@ export interface MouvementInput {
 
 export async function enregistrerMouvement(
   caisseId: number,
-  data: MouvementInput
+  data: MouvementInput,
+  parentTx?: ComptabiliteTransaction,
 ): Promise<{
   mouvement: typeof mouvementsCaisseTable.$inferSelect;
   alerte?: string;
   soldeActuel: number;
 }> {
-  return db.transaction(async (tx) => {
+  const enregistrerDansTransaction = async (tx: ComptabiliteTransaction) => {
     // Le verrou doit être pris avant le calcul du nouveau solde : deux débits
     // simultanés ne doivent jamais écraser la valeur calculée par l'autre.
     const [caisse] = await tx
       .select()
       .from(caissesTable)
-      .where(eq(caissesTable.id, caisseId))
+      .where(and(
+        eq(caissesTable.id, caisseId),
+        ...(data.cooperativeId !== undefined ? [eq(caissesTable.cooperativeId, data.cooperativeId)] : []),
+      ))
       .for("update")
       .limit(1);
     if (!caisse) throw new Error("Caisse introuvable");
@@ -259,7 +265,11 @@ export async function enregistrerMouvement(
     }
 
     return { mouvement, alerte, soldeActuel: nouveauSolde };
-  });
+  };
+
+  return parentTx
+    ? enregistrerDansTransaction(parentTx)
+    : db.transaction(enregistrerDansTransaction);
 }
 
 // ─── Transfert inter-caisses ──────────────────────────────────────────────────
