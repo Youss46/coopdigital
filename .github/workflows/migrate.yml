@@ -8,8 +8,13 @@ on:
   workflow_dispatch:
 
 jobs:
+  postgres-integration:
+    name: PostgreSQL integration gate
+    uses: ./.github/workflows/postgres-integration.yml
+
   migrate:
     name: Apply schema to Railway
+    needs: postgres-integration
     runs-on: ubuntu-latest
 
     steps:

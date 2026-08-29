@@ -71,6 +71,48 @@ pnpm --filter @workspace/api-server run dev
 pnpm --filter @workspace/frontend run dev
 ```
 
+## Déploiement de l'API
+
+Le déploiement de l'API suit une chaîne de contrôles obligatoire :
+
+1. Le workflow **PostgreSQL Integration Tests** initialise une base PostgreSQL
+   éphémère et exécute les scénarios de ventilation des paiements et de
+   concurrence des chèques reçus.
+2. Le workflow **DB Migration (Railway)** ne peut appliquer les migrations
+   Railway qu'après la réussite de ce contrôle. Il est déclenché sur les
+   commits de `main`/`master` et peut aussi être lancé manuellement.
+3. Railway exécute également `ci-migrate` dans `preDeployCommand`. Une migration
+   en erreur fait donc échouer le déploiement avant le démarrage de l'API.
+
+### Règle de statut GitHub à activer
+
+Dans les règles de protection de `main` (ou dans une ruleset GitHub), rendre
+obligatoire le contrôle exact :
+
+`PostgreSQL Integration Tests / Payment and received-cheque concurrency protection`
+
+Activer aussi l'obligation de mise à jour de la branche avant fusion et
+interdire les contournements pour les administrateurs. Cette règle empêche une
+pull request de livrer du code sans la validation PostgreSQL ; la dépendance
+`needs: postgres-integration` protège en plus les pushes directs et les
+exécutions du workflow de migration.
+
+### Secours pour un déploiement manuel
+
+Si l'intégration GitHub → Railway est indisponible, ne pas utiliser **Deploy
+Latest** directement. Depuis GitHub Actions :
+
+1. sélectionner **DB Migration (Railway)** puis **Run workflow** sur la branche
+   et le commit exacts à livrer ;
+2. attendre la réussite de **PostgreSQL integration gate** puis de
+   **Apply schema to Railway** ;
+3. dans Railway, déployer ce même commit et vérifier que le `preDeployCommand`
+   se termine avec succès avant de considérer l'API disponible.
+
+Une migration ou un scénario PostgreSQL en échec doit entraîner l'arrêt de la
+procédure : corriger le commit puis relancer le workflow, sans passer outre le
+contrôle.
+
 ## Commandes utiles
 
 ```bash

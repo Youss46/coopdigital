@@ -2,16 +2,14 @@ name: PostgreSQL Integration Tests
 
 on:
   pull_request:
-  push:
-    branches:
-      - main
-      - master
   workflow_dispatch:
+  workflow_call:
 
 jobs:
   postgres-integration:
     name: Payment and received-cheque concurrency protection
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     services:
       postgres:

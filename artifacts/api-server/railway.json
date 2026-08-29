@@ -5,6 +5,7 @@
     "buildCommand": "pnpm run typecheck:libs && pnpm --filter @workspace/api-server run build"
   },
   "deploy": {
+    "preDeployCommand": "pnpm --filter @workspace/db run ci-migrate",
     "startCommand": "pnpm --filter @workspace/api-server run start",
     "healthcheckPath": "/api/healthz",
     "restartPolicyType": "ON_FAILURE",
