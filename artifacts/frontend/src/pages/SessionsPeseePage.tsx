@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useFeatureAccess } from "@/hooks/useFeatureAccess";
 import {
   Scale, Search, Loader2, ChevronRight,
   Package, CheckCircle2, AlertCircle, Clock, X,
@@ -119,7 +120,7 @@ function fmtDate(iso: string) {
 
 // ─── Modal détail ─────────────────────────────────────────────────────────────
 
-function SessionDetailModal({ sessionId, onClose }: { sessionId: number; onClose: () => void }) {
+function SessionDetailModal({ sessionId, onClose, canWrite }: { sessionId: number; onClose: () => void; canWrite: boolean }) {
   const qc = useQueryClient();
   const { data: detail, isLoading } = useQuery<SessionDetail>({
     queryKey: ["session-pesee-detail", sessionId],
@@ -260,7 +261,7 @@ function SessionDetailModal({ sessionId, onClose }: { sessionId: number; onClose
                 <div style={{ fontSize: ".8rem", color: "#64748b", marginBottom: 8 }}>
                   Cette session est terminée et peut être convertie en livraison officielle.
                 </div>
-                <button
+                {canWrite && <button
                   disabled
                   title="Disponible prochainement"
                   style={{
@@ -273,7 +274,7 @@ function SessionDetailModal({ sessionId, onClose }: { sessionId: number; onClose
                   <Package size={14} />
                   Convertir en livraison
                   <span style={{ fontSize: ".7rem", fontWeight: 400 }}>(prochainement)</span>
-                </button>
+                </button>}
               </div>
             )}
 
@@ -347,6 +348,7 @@ function getPeriodeDates(periode: PeriodeFilter): { date_debut?: string; date_fi
 }
 
 export default function SessionsPeseePage() {
+  const { isFeatureReadOnly } = useFeatureAccess("pesee");
   const [search, setSearch] = useState("");
   const [statut, setStatut] = useState<StatutFilter>("all");
   const [periode, setPeriode] = useState<PeriodeFilter>("all");
@@ -399,7 +401,7 @@ export default function SessionsPeseePage() {
         </div>
 
         {/* Bouton expiration manuelle */}
-        {nbStale > 0 && (
+        {nbStale > 0 && !isFeatureReadOnly && (
           <button
             onClick={() => {
               if (confirm(`Expirer les ${nbStale} session(s) abandonnée(s) depuis plus de 8h ?`)) {
@@ -624,7 +626,7 @@ export default function SessionsPeseePage() {
 
       {/* Modal détail */}
       {selectedId !== null && (
-        <SessionDetailModal sessionId={selectedId} onClose={() => setSelectedId(null)} />
+        <SessionDetailModal sessionId={selectedId} onClose={() => setSelectedId(null)} canWrite={!isFeatureReadOnly} />
       )}
     </div>
   );

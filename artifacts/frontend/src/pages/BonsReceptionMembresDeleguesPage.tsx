@@ -18,6 +18,7 @@ import {
 } from "@workspace/api-client-react";
 import { MoneyInput } from "@/components/ui/money-input";
 import { NumericInput } from "@/components/ui/numeric-input";
+import { useFeatureAccess } from "@/hooks/useFeatureAccess";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok  = () => localStorage.getItem("coop_token") ?? "";
@@ -110,6 +111,7 @@ export default function BonsReceptionMembresDeleguesPage() {
   const qc = useQueryClient();
   const [, navigate] = useLocation();
   const search = useSearch();
+  const { isFeatureReadOnly } = useFeatureAccess("bons_reception");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(FORM_INIT);
   const [filtreStatut, setFiltreStatut] = useState<string>("actifs");
@@ -228,7 +230,7 @@ export default function BonsReceptionMembresDeleguesPage() {
             Enregistrez l'arrivée du cacao d'un membre délégué de localités avant la pesée.
           </p>
         </div>
-        <button
+        {!isFeatureReadOnly && <button
           onClick={() => { setShowForm(true); setForm(FORM_INIT); }}
           style={{
             display: "flex", alignItems: "center", gap: 8,
@@ -239,7 +241,7 @@ export default function BonsReceptionMembresDeleguesPage() {
         >
           <Plus size={16} />
           Nouveau bon de réception
-        </button>
+        </button>}
       </div>
 
       {/* ── Synthèse rapide ──────────────────────────────────────────────── */}
@@ -405,7 +407,7 @@ export default function BonsReceptionMembresDeleguesPage() {
                   </div>
                 )}
 
-                {bon.statut === "en_attente_pesee" && (
+                {bon.statut === "en_attente_pesee" && !isFeatureReadOnly && (
                   <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
                     <button
                       onClick={() => {
@@ -437,7 +439,7 @@ export default function BonsReceptionMembresDeleguesPage() {
       </div>
 
       {/* ── Modal : Nouveau bon ──────────────────────────────────────────── */}
-      {showForm && (
+      {showForm && !isFeatureReadOnly && (
         <div style={{
           position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 1000,
           display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "24px 16px",

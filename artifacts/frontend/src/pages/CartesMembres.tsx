@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { openPdfViewer } from "@/lib/pdfViewer";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useFeatureAccess } from "@/hooks/useFeatureAccess";
 import {
   CreditCard, Download, Ban, CheckCircle2, Search,
   Loader2, Users, AlertCircle, RefreshCw,
@@ -53,6 +54,7 @@ const STATUT_BADGE: Record<string, { label: string; cls: string }> = {
 
 export default function CartesMembres() {
   const qc = useQueryClient();
+  const { isFeatureReadOnly } = useFeatureAccess("membres");
   const [search, setSearch] = useState("");
   const [filtre, setFiltre] = useState<"tous" | "non_emise" | "active" | "suspendue">("tous");
   const [motifModal, setMotifModal] = useState<{ id: number; action: "suspendre" | "activer" } | null>(null);
@@ -249,7 +251,7 @@ export default function CartesMembres() {
 
                           {/* Suspendre / Activer */}
                           {c.carteStatut !== "suspendue" ? (
-                            <button
+                            isFeatureReadOnly ? null : <button
                               onClick={() => setMotifModal({ id: c.id, action: "suspendre" })}
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-medium transition-colors"
                             >
@@ -257,7 +259,7 @@ export default function CartesMembres() {
                               <span className="hidden sm:inline">Suspendre</span>
                             </button>
                           ) : (
-                            <button
+                            isFeatureReadOnly ? null : <button
                               onClick={() => mutation.mutate({ id: c.id, action: "activer" })}
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-xs font-medium transition-colors"
                             >
@@ -277,7 +279,7 @@ export default function CartesMembres() {
       </div>
 
       {/* Modal suspension */}
-      {motifModal && (
+      {motifModal && !isFeatureReadOnly && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
             <h2 className="text-lg font-bold text-gray-900">Suspendre la carte</h2>

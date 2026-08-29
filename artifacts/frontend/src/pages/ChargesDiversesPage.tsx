@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { useFeatureAccess } from "@/hooks/useFeatureAccess";
 import {
   Plus, Pencil, Trash2, CheckCircle2, Filter, BarChart3,
   TrendingDown, FileText, Loader2,
@@ -140,6 +141,7 @@ const STATUT_BADGE: Record<string, string> = {
 // ── Composant principal ───────────────────────────────────────────────────────
 export default function ChargesDiversesPage() {
   const { toast } = useToast();
+  const { isFeatureReadOnly } = useFeatureAccess("charges_diverses");
   const qc = useQueryClient();
 
   // Filtres
@@ -275,6 +277,7 @@ export default function ChargesDiversesPage() {
   }, []);
 
   const handleSubmit = useCallback(() => {
+    if (isFeatureReadOnly) return;
     if (!form.libelle || !form.montant_fcfa || !form.date_charge) {
       toast({ title: "Champs requis", description: "Libellé, montant et date sont obligatoires.", variant: "destructive" });
       return;
@@ -292,7 +295,7 @@ export default function ChargesDiversesPage() {
     } else {
       createMut.mutate(form);
     }
-  }, [form, editTarget, createMut, updateMut, toast]);
+  }, [form, editTarget, createMut, updateMut, toast, isFeatureReadOnly]);
 
   const handleCompteCreditChange = useCallback((value: string) => {
     if (value === "401") {
@@ -342,9 +345,9 @@ export default function ChargesDiversesPage() {
             <BarChart3 className="h-4 w-4 mr-2" />
             {showStats ? "Masquer stats" : "Statistiques"}
           </Button>
-          <Button onClick={openCreate} className="bg-red-600 hover:bg-red-700">
+          {!isFeatureReadOnly && <Button onClick={openCreate} className="bg-red-600 hover:bg-red-700">
             <Plus className="h-4 w-4 mr-2" /> Nouvelle charge
-          </Button>
+          </Button>}
         </div>
       </div>
 
@@ -427,9 +430,9 @@ export default function ChargesDiversesPage() {
             <div className="text-center py-12 text-gray-500">
               <TrendingDown className="h-10 w-10 mx-auto mb-3 text-gray-300" />
               <p>Aucune charge enregistrée</p>
-              <Button variant="outline" size="sm" className="mt-3" onClick={openCreate}>
+              {!isFeatureReadOnly && <Button variant="outline" size="sm" className="mt-3" onClick={openCreate}>
                 <Plus className="h-4 w-4 mr-1" /> Ajouter une charge
-              </Button>
+              </Button>}
             </div>
           ) : (
             <Table>
@@ -477,24 +480,24 @@ export default function ChargesDiversesPage() {
                       <div className="flex items-center justify-end gap-1">
                         {c.statut === "brouillon" && (
                           <>
-                            <Button
+                            {!isFeatureReadOnly && <Button
                               variant="ghost" size="icon"
                               title="Valider et générer l'écriture comptable"
                               onClick={() => validerMut.mutate(c.id)}
                               disabled={validerMut.isPending}
                             >
                               <CheckCircle2 className="h-4 w-4 text-green-600" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => openEdit(c)}>
+                            </Button>}
+                            {!isFeatureReadOnly && <Button variant="ghost" size="icon" onClick={() => openEdit(c)}>
                               <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
+                            </Button>}
+                            {!isFeatureReadOnly && <Button
                               variant="ghost" size="icon"
                               onClick={() => { if (confirm("Supprimer cette charge ?")) deleteMut.mutate(c.id); }}
                               disabled={deleteMut.isPending}
                             >
                               <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>
+                            </Button>}
                           </>
                         )}
                       </div>

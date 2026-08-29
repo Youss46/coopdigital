@@ -9,6 +9,7 @@ import {
   useUpdateUser,
 } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
+import { useFeatureAccess } from "@/hooks/useFeatureAccess";
 import { UserPlus, Trash2, ToggleLeft, ToggleRight, ShieldCheck, Copy, RefreshCw, CheckCheck, Share2, KeyRound, Pencil } from "lucide-react";
 
 // ——— Génération de mot de passe sécurisé ———
@@ -1040,6 +1041,7 @@ function ResetPasswordModal({ nom, prenoms, email, userId, role, telephone, onCl
 export default function ComptesPage() {
   const { utilisateur } = useAuth();
   const { toast } = useToast();
+  const { isFeatureReadOnly } = useFeatureAccess("administration");
 
   const requesterRole = utilisateur?.role ?? "";
   const requesterId = utilisateur?.id ?? 0;
@@ -1133,14 +1135,14 @@ export default function ComptesPage() {
             {(comptes?.length ?? 0) > 1 ? "s" : ""}
           </p>
         </div>
-        <button
+        {!isFeatureReadOnly && <button
           onClick={() => setShowCreate(true)}
           className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-white text-sm font-medium"
           style={{ backgroundColor: "#1a4731" }}
         >
           <UserPlus size={16} />
           Créer un compte
-        </button>
+        </button>}
       </div>
 
       {/* Table */}
@@ -1215,7 +1217,7 @@ export default function ComptesPage() {
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
                           {/* Modifier le nom et le prénom */}
-                          <button
+                          {!isFeatureReadOnly && <button
                             onClick={() =>
                               setEditIdentityTarget({
                                 id: compte.id,
@@ -1228,10 +1230,10 @@ export default function ComptesPage() {
                             className="p-1.5 rounded-lg text-gray-400 hover:text-green-700 hover:bg-green-50 transition-colors"
                           >
                             <Pencil size={15} />
-                          </button>
+                          </button>}
 
                           {/* Modifier le mode de gestion — délégués uniquement */}
-                          {(compte.role as string) === "delegue" && !isOwn && (
+                          {!isFeatureReadOnly && (compte.role as string) === "delegue" && !isOwn && (
                             <button
                               onClick={() =>
                                 setEditModeGestionTarget({
@@ -1249,7 +1251,7 @@ export default function ComptesPage() {
                           )}
 
                           {/* Réinitialiser le mot de passe */}
-                          {canResetPwd && (
+                          {!isFeatureReadOnly && canResetPwd && (
                             <button
                               onClick={() =>
                                 setResetTarget({
@@ -1269,7 +1271,7 @@ export default function ComptesPage() {
                           )}
 
                           {/* Activer / Désactiver — pas sur soi-même et pas PCA désactivé */}
-                          {!isOwn && !isPca && (
+                          {!isFeatureReadOnly && !isOwn && !isPca && (
                             <button
                               onClick={() => handleToggle(compte.id, compte.actif)}
                               disabled={toggleMutation.isPending}
@@ -1285,7 +1287,7 @@ export default function ComptesPage() {
                           )}
 
                           {/* Supprimer — visible uniquement si autorisé */}
-                          {canDelete && (
+                          {!isFeatureReadOnly && canDelete && (
                             <button
                               onClick={() =>
                                 setDeleteTarget({
@@ -1312,7 +1314,7 @@ export default function ComptesPage() {
       </div>
 
       {/* Modal création */}
-      {showCreate && (
+      {showCreate && !isFeatureReadOnly && (
         <CreateModal
           requesterRole={requesterRole}
           onClose={() => setShowCreate(false)}
@@ -1321,7 +1323,7 @@ export default function ComptesPage() {
       )}
 
       {/* Modal confirmation suppression */}
-      {deleteTarget && (
+      {deleteTarget && !isFeatureReadOnly && (
         <DeleteModal
           nom={deleteTarget.nom}
           prenoms={deleteTarget.prenoms}
@@ -1332,7 +1334,7 @@ export default function ComptesPage() {
       )}
 
       {/* Modal réinitialisation mot de passe */}
-      {resetTarget && (
+      {resetTarget && !isFeatureReadOnly && (
         <ResetPasswordModal
           userId={resetTarget.id}
           nom={resetTarget.nom}
@@ -1345,7 +1347,7 @@ export default function ComptesPage() {
       )}
 
       {/* Modal édition mode de gestion */}
-      {editModeGestionTarget && (
+      {editModeGestionTarget && !isFeatureReadOnly && (
         <EditModeGestionModal
           userId={editModeGestionTarget.id}
           nom={editModeGestionTarget.nom}
@@ -1357,7 +1359,7 @@ export default function ComptesPage() {
       )}
 
       {/* Modal édition identité */}
-      {editIdentityTarget && (
+      {editIdentityTarget && !isFeatureReadOnly && (
         <EditIdentityModal
           userId={editIdentityTarget.id}
           nom={editIdentityTarget.nom}

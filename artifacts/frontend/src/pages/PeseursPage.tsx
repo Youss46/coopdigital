@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useFeatureAccess } from "@/hooks/useFeatureAccess";
 import { Scale, Plus, Loader2, X, Eye, EyeOff, KeyRound, Building2, Users, Trash2 } from "lucide-react";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
@@ -304,6 +305,7 @@ function ResetMdpModal({ peseur, onClose }: { peseur: Peseur; onClose: () => voi
 // ─── Page principale ────────────────────────────────────────────────────────
 export default function PeseursPage() {
   const qc = useQueryClient();
+  const { isFeatureReadOnly } = useFeatureAccess("delegues");
   const [showCreate, setShowCreate] = useState(false);
   const [resetPeseur, setResetPeseur] = useState<Peseur | null>(null);
   const [suppressionCible, setSuppressionCible] = useState<Peseur | null>(null);
@@ -372,10 +374,10 @@ export default function PeseursPage() {
             <p style={{ margin: 0, fontSize: ".82rem", color: "#6b7280" }}>Gestion des agents peseurs et de leur rattachement</p>
           </div>
         </div>
-        <button onClick={() => setShowCreate(true)}
+        {!isFeatureReadOnly && <button onClick={() => setShowCreate(true)}
           style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8, background: "#0369a1", color: "#fff", border: "none", fontWeight: 700, fontSize: ".88rem", cursor: "pointer" }}>
           <Plus size={16} /> Nouveau peseur
-        </button>
+        </button>}
       </div>
 
       {/* Statistiques */}
@@ -458,33 +460,33 @@ export default function PeseursPage() {
               </div>
               <Badge color={p.actif ? "green" : "red"}>{p.actif ? "Actif" : "Inactif"}</Badge>
               <div style={{ display: "flex", gap: 6 }}>
-                <button
+                {!isFeatureReadOnly && <button
                   onClick={() => toggleActif.mutate({ id: p.id, actif: !p.actif })}
                   disabled={toggleActif.isPending}
                   style={{ padding: "5px 10px", borderRadius: 7, border: "1px solid #e5e7eb", background: "#f9fafb", color: "#374151", fontSize: ".75rem", fontWeight: 600, cursor: "pointer" }}>
                   {p.actif ? "Désactiver" : "Activer"}
-                </button>
-                <button onClick={() => setResetPeseur(p)}
+                </button>}
+                {!isFeatureReadOnly && <button onClick={() => setResetPeseur(p)}
                   style={{ padding: "5px 8px", borderRadius: 7, border: "1px solid #e5e7eb", background: "#f9fafb", color: "#6b7280", cursor: "pointer", display: "flex", alignItems: "center" }}>
                   <KeyRound size={14} />
-                </button>
-                <button
+                </button>}
+                {!isFeatureReadOnly && <button
                   onClick={() => ouvrirSuppression(p)}
                   disabled={supprimerPeseur.isPending}
                   title="Supprimer ce compte peseur"
                   aria-label={`Supprimer le compte de ${p.prenoms} ${p.nom}`}
                   style={{ padding: "5px 8px", borderRadius: 7, border: "1px solid #fecaca", background: "#fffafa", color: "#dc2626", cursor: supprimerPeseur.isPending ? "wait" : "pointer", display: "flex", alignItems: "center" }}>
                   {supprimerPeseur.isPending ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                </button>
+                </button>}
               </div>
             </div>
           ))
         )}
       </div>
 
-      {showCreate && <CreerPeseurModal onClose={() => setShowCreate(false)} delegues={delegues} />}
-      {resetPeseur && <ResetMdpModal peseur={resetPeseur} onClose={() => setResetPeseur(null)} />}
-      {suppressionCible && (
+      {showCreate && !isFeatureReadOnly && <CreerPeseurModal onClose={() => setShowCreate(false)} delegues={delegues} />}
+      {resetPeseur && !isFeatureReadOnly && <ResetMdpModal peseur={resetPeseur} onClose={() => setResetPeseur(null)} />}
+      {suppressionCible && !isFeatureReadOnly && (
         <SupprimerPeseurModal
           peseur={suppressionCible}
           onConfirm={confirmerSuppression}

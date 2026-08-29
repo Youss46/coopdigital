@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { PERMISSIONS } from "@/config/permissions";
+import { useFeatureAccess } from "@/hooks/useFeatureAccess";
 
 // ── Auth helpers ─────────────────────────────────────────────────────────────
 const BASE = import.meta.env.VITE_API_URL ?? "";
@@ -90,13 +91,14 @@ function StatutBadge({ statut }: { statut: Cheque["statut"] }) {
 // ── Page principale ───────────────────────────────────────────────────────────
 export default function ChequesPage() {
   const { utilisateur } = useAuth();
+  const { isFeatureReadOnly } = useFeatureAccess("cheques");
   const role = utilisateur?.role ?? "";
   const perms = PERMISSIONS["cheques"] ?? {};
-  const peutCreer     = perms["creer"]?.includes(role);
-  const peutModifier  = perms["modifier"]?.includes(role);
-  const peutEncaisser = perms["encaisser"]?.includes(role);
-  const peutRejeter   = perms["rejeter"]?.includes(role);
-  const peutAnnuler   = perms["annuler"]?.includes(role);
+  const peutCreer     = !isFeatureReadOnly && perms["creer"]?.includes(role);
+  const peutModifier  = !isFeatureReadOnly && perms["modifier"]?.includes(role);
+  const peutEncaisser = !isFeatureReadOnly && perms["encaisser"]?.includes(role);
+  const peutRejeter   = !isFeatureReadOnly && perms["rejeter"]?.includes(role);
+  const peutAnnuler   = !isFeatureReadOnly && perms["annuler"]?.includes(role);
 
   const qc = useQueryClient();
   const [espace, setEspace] = useState<"recus" | "emis">("recus");
@@ -384,7 +386,7 @@ export default function ChequesPage() {
       )}
 
       {/* ── Modales ── */}
-      {modalCreer && (
+      {modalCreer && !isFeatureReadOnly && (
         <ModalCreer
           onClose={() => setModalCreer(false)}
           onSubmit={d => mutCreer.mutate(d)}
@@ -525,13 +527,14 @@ function ChequesRecusView({
   peutCreer: boolean;
 }) {
   const qc = useQueryClient();
+  const { isFeatureReadOnly } = useFeatureAccess("cheques");
   const { utilisateur } = useAuth();
   const perms = PERMISSIONS["cheques"] ?? {};
   const role = utilisateur?.role ?? "";
-  const peutEncaisser = perms["encaisser"]?.includes(role);
-  const peutRejeter = perms["rejeter"]?.includes(role);
-  const peutModifier = perms["modifier"]?.includes(role);
-  const peutAnnuler = perms["annuler"]?.includes(role);
+  const peutEncaisser = !isFeatureReadOnly && perms["encaisser"]?.includes(role);
+  const peutRejeter = !isFeatureReadOnly && perms["rejeter"]?.includes(role);
+  const peutModifier = !isFeatureReadOnly && perms["modifier"]?.includes(role);
+  const peutAnnuler = !isFeatureReadOnly && perms["annuler"]?.includes(role);
   const [filtre, setFiltre] = useState<"tous" | ChequeRecu["statut"]>("tous");
   const [action, setAction] = useState<{ type: "deposer" | "encaisser" | "rejeter" | "annuler"; cheque: ChequeRecu } | null>(null);
   const [dateAction, setDateAction] = useState(new Date().toISOString().slice(0, 10));
@@ -653,7 +656,7 @@ function ChequesRecusView({
           </table></div>
         </div>
       )}
-      {modalCreer && (
+      {modalCreer && !isFeatureReadOnly && (
         <ModalCreerRecu
           onClose={() => setModalCreer(false)}
           onSubmit={data => mutCreer.mutate(data)}
@@ -661,7 +664,7 @@ function ChequesRecusView({
           error={mutCreer.error?.message}
         />
       )}
-      {action && (
+      {action && !isFeatureReadOnly && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
             <div className="flex items-center justify-between px-5 py-4 border-b"><h2 className="font-semibold">{

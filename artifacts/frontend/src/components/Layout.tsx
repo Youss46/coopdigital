@@ -54,6 +54,7 @@ import {
   AlertTriangle,
   Scale,
   PackageCheck,
+  LockKeyhole,
 } from "lucide-react";
 import { NAV_ITEMS, type NavItemConfig } from "@/config/navigation";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -326,10 +327,13 @@ function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout:
   );
 }
 
-export default function Layout({ children }: { children: React.ReactNode }) {
+export default function Layout({ children, featureKey }: { children: React.ReactNode; featureKey?: string }) {
   const { logout } = useAuth();
   const [menuOuvert, setMenuOuvert] = useState(false);
   const [confirmDeconnexion, setConfirmDeconnexion] = useState(false);
+  const [location] = useLocation();
+  const currentFeatureKey = featureKey ?? featureKeyForPath(location) ?? undefined;
+  const { feature, isFeatureReadOnly } = useFeatureAccess(currentFeatureKey);
 
   const demanderDeconnexion = () => {
     setMenuOuvert(false);
@@ -398,6 +402,24 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Bannière système (maintenance) */}
         <SystemBanner />
+
+        {isFeatureReadOnly && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="flex-shrink-0 flex items-start gap-3 border-b border-amber-200 bg-amber-50 px-4 py-3 text-amber-900 sm:px-6"
+          >
+            <LockKeyhole size={18} className="mt-0.5 flex-shrink-0 text-amber-700" />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">
+                Mode lecture seule{feature?.label ? ` — ${feature.label}` : ""}
+              </p>
+              <p className="mt-0.5 text-xs text-amber-800">
+                Les données restent consultables, mais les créations, modifications et suppressions sont désactivées.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Contenu */}
         <main className="flex-1 overflow-hidden">

@@ -94,11 +94,15 @@ const queryClient = new QueryClient({
   },
 });
 
-function ProtectedRoute({ component: Component, roles }: { component: React.ComponentType; roles?: string[] }) {
+function ProtectedRoute({ component: Component, roles, writeOnly }: {
+  component: React.ComponentType;
+  roles?: string[];
+  writeOnly?: boolean;
+}) {
   const { estConnecte, utilisateur } = useAuth();
   const [location] = useLocation();
   const featureKey = featureKeyForPath(location);
-  const { isFeatureEnabled, isFeatureLoading } = useFeatureAccess(featureKey ?? undefined);
+  const { isFeatureEnabled, isFeatureLoading, isFeatureReadOnly } = useFeatureAccess(featureKey ?? undefined);
   if (!estConnecte) return <Redirect to="/login" />;
   if (roles && !roles.includes(utilisateur?.role ?? "")) return <Redirect to="/dashboard" />;
   if (!isFeatureLoading && !isFeatureEnabled) {
@@ -114,8 +118,20 @@ function ProtectedRoute({ component: Component, roles }: { component: React.Comp
       </Layout>
     );
   }
+  if (writeOnly && !isFeatureLoading && isFeatureReadOnly) {
+    return (
+      <Layout featureKey={featureKey ?? undefined}>
+        <div className="mx-auto mt-12 max-w-lg rounded-xl border border-amber-200 bg-amber-50 p-6 text-center">
+          <h1 className="text-lg font-semibold text-amber-900">Action indisponible en lecture seule</h1>
+          <p className="mt-2 text-sm text-amber-800">
+            Cette page sert à créer une donnée. Consultez l’historique du module pour accéder aux informations existantes.
+          </p>
+        </div>
+      </Layout>
+    );
+  }
   return (
-    <Layout>
+    <Layout featureKey={featureKey ?? undefined}>
       <Component />
     </Layout>
   );
@@ -319,7 +335,7 @@ function AppRoutes() {
         <ProtectedRoute component={FinancesTableauBordPage} />
       </Route>
       <Route path="/expeditions/nouvelle">
-        <ProtectedRoute component={NouvelleExpeditionPage} roles={["pca", "directeur", "responsable_tracabilite"]} />
+        <ProtectedRoute component={NouvelleExpeditionPage} roles={["pca", "directeur", "responsable_tracabilite"]} writeOnly />
       </Route>
       <Route path="/expeditions/:id">
         <ProtectedRoute component={ExpeditionDetailPage} roles={["pca", "directeur", "responsable_tracabilite", "auditeur"]} />

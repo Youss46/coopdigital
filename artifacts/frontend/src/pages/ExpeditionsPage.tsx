@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
+import { useFeatureAccess } from "@/hooks/useFeatureAccess";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -68,6 +69,7 @@ const STATUT_CONFIG: Record<string, { label: string; color: string; icon: React.
 
 export default function ExpeditionsPage() {
   const { token, utilisateur } = useAuth();
+  const { isFeatureReadOnly } = useFeatureAccess("expeditions");
   const [filtreStatut, setFiltreStatut] = useState("tous");
   const [filtrePort, setFiltrePort] = useState("tous");
   const [filtreType, setFiltreType] = useState("tous");
@@ -80,7 +82,7 @@ export default function ExpeditionsPage() {
   const queryString = params.toString();
 
   const voitDelegues = ["pca", "directeur", "magasinier", "comptable", "auditeur"].includes(utilisateur?.role ?? "");
-  const peutCreer = ["pca", "directeur", "responsable_tracabilite"].includes(utilisateur?.role ?? "");
+  const peutCreer = !isFeatureReadOnly && ["pca", "directeur", "responsable_tracabilite"].includes(utilisateur?.role ?? "");
 
   const { data: expeditions = [], isLoading, refetch } = useQuery<ExpeditionRow[]>({
     queryKey: ["expeditions", filtreStatut, filtrePort, filtreType],
