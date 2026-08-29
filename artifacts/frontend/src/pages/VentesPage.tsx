@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { usePermission } from "@/hooks/usePermission";
-import { trackEvent } from "@/lib/analytics";
+import { trackVenteEnregistree } from "@/lib/analytics";
 import {
   useGetVentes,
   useGetExportateurs,
@@ -205,10 +205,10 @@ export default function VentesPage() {
   const mutVente = useCreateVente({
     mutation: {
       onSuccess: (data, variables) => {
-        trackEvent("vente_enregistree", {
-          source: variables.data.expeditionId != null ? "reception_port" : "lot",
-          statut: data.statut,
-        });
+        trackVenteEnregistree(
+          variables.data.expeditionId != null ? "reception_port" : "lot",
+          { ok: true, statut: data.statut },
+        );
         qc.invalidateQueries({ queryKey: getGetVentesQueryKey({}) });
         qc.invalidateQueries({ queryKey: getGetExportateursQueryKey() });
         qc.invalidateQueries({ queryKey: ["ventes-lots-stock"] });
@@ -306,10 +306,7 @@ export default function VentesPage() {
         const errBody = await res.json().catch(() => ({})) as { erreur?: string };
         throw new Error(errBody.erreur ?? `HTTP ${res.status}`);
       }
-      trackEvent("vente_enregistree", {
-        source: "fournisseur",
-        statut: "en_attente",
-      });
+      trackVenteEnregistree("fournisseur", { ok: res.ok });
       qc.invalidateQueries({ queryKey: getGetVentesQueryKey({}) });
       qc.invalidateQueries({ queryKey: ["ventes-stock-fournisseurs"] });
       qc.invalidateQueries({ queryKey: ["livraisons-dispos-fourn", formFourn.fournisseurId] });
@@ -384,10 +381,7 @@ export default function VentesPage() {
       });
       const venteData = await venteRes.json() as { erreur?: string; statut?: string };
       if (!venteRes.ok) throw new Error(venteData.erreur ?? `HTTP ${venteRes.status}`);
-      trackEvent("vente_enregistree", {
-        source: "lot",
-        statut: venteData.statut ?? "en_attente",
-      });
+      trackVenteEnregistree("lot", { ok: venteRes.ok, statut: venteData.statut });
       // Succès
       qc.invalidateQueries({ queryKey: getGetVentesQueryKey({}) });
       qc.invalidateQueries({ queryKey: getGetExportateursQueryKey() });

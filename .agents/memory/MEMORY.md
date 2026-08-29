@@ -89,3 +89,4 @@
 - [Date de session du journal de caisse](cash-journal-session-date.md) — les débits automatiques doivent cibler la session ouverte du jour, sinon le journal quotidien masque le mouvement.
 - [Analyse Claude des balances Sage](balance-sage-claude-analysis.md) — une ligne Sage mouvementée peut être analysée malgré un compte absent du plan; la préparation comptable garde le contrôle bloquant.
 - [Bons carburant saisis en montant](bons-carburant-montant.md) — montant autorisé et montant consommé pilotent le flux; litres/prix restent facultatifs pour les historiques et le détail.
+- [Frontend Vitest shared binary](frontend-vitest-shared-binary.md) — les tests frontend réutilisent Vitest depuis l’artifact API; la config doit éviter `vitest/config` local.
