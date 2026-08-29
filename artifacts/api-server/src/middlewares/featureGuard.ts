@@ -1,5 +1,6 @@
 import { type Request, type Response, type NextFunction } from "express";
 import { featureKeyForPath, featureModeAllowsMethod, getCooperativeFeatureConfig } from "../services/cooperativeFeaturesService.js";
+import { recordFeatureAccessDenied } from "../services/featureAccessMetrics.js";
 
 export async function featureGuard(req: Request, res: Response, next: NextFunction): Promise<void> {
   const terrainAgent = (req as Request & { agent?: { cooperativeId: number | null } }).agent;
@@ -19,6 +20,12 @@ export async function featureGuard(req: Request, res: Response, next: NextFuncti
     const feature = config?.find((candidate) => candidate.key === featureKey);
     if (!feature || feature.mode === "active") { next(); return; }
     if (featureModeAllowsMethod(feature.mode, req.method)) { next(); return; }
+    recordFeatureAccessDenied({
+      cooperativeId,
+      featureKey,
+      mode: feature.mode,
+      method: req.method,
+    }, req.log);
     res.status(403).json({
       erreur: feature.mode === "lecture_seule"
         ? "Cette fonctionnalité est disponible en lecture seule"
