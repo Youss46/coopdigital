@@ -5,6 +5,7 @@ import { getJournal } from "../services/caisseService.js";
 import {
   annulerChequeRecu,
   deposerChequeRecu,
+  encaisserChequeRecu,
   rejeterChequeRecu,
 } from "../services/chequesRecusService.js";
 
@@ -858,6 +859,7 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
   let client: any;
   let cooperativeId: number;
   let exportateurId: number;
+  let compteBancaireId: number;
   const paymentIds: number[] = [];
   const saleIds: number[] = [];
   const chequeIds: number[] = [];
@@ -884,6 +886,15 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
       [cooperativeId],
     );
 
+    const compteBancaire = await client.query(
+      `INSERT INTO comptes_bancaires
+        (cooperative_id, nom, banque, solde_actuel_fcfa, solde_mini_alerte_fcfa, actif)
+       VALUES ($1, $2, 'Banque de test', 0, 0, true)
+       RETURNING id`,
+      [cooperativeId, "Compte bancaire test rejet/encaissement"],
+    );
+    compteBancaireId = compteBancaire.rows[0].id;
+
     const exportateur = await client.query(
       `INSERT INTO exportateurs (cooperative_id, nom)
        VALUES ($1, $2) RETURNING id`,
@@ -899,6 +910,10 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
     );
     await client.query(
       `DELETE FROM ecritures_en_attente WHERE cooperative_id = $1`,
+      [cooperativeId],
+    );
+    await client.query(
+      `DELETE FROM mouvements_banque WHERE cooperative_id = $1`,
       [cooperativeId],
     );
     await client.query(
@@ -918,6 +933,9 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
       `DELETE FROM config_comptable WHERE cooperative_id = $1`,
       [cooperativeId],
     );
+    await client.query(`DELETE FROM comptes_bancaires WHERE id = $1`, [
+      compteBancaireId,
+    ]);
     await client.query(`DELETE FROM cooperatives WHERE id = $1`, [
       cooperativeId,
     ]);
@@ -1038,10 +1056,28 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
 
   async function chequeState(chequeId: number) {
     const result = await client.query(
-      `SELECT statut, date_depot::text, date_rejet::text, motif_rejet,
+      `SELECT statut, date_depot::text, date_encaissement::text,
+              date_rejet::text, motif_rejet,
+              compte_bancaire_id, mouvement_banque_id,
               date_annulation::text, motif_annulation
        FROM cheques_recus WHERE id = $1`,
       [chequeId],
+    );
+    return result.rows[0];
+  }
+
+  async function bankState() {
+    const result = await client.query(
+      `SELECT
+         (SELECT count(*)::int
+            FROM mouvements_banque
+           WHERE cooperative_id = $1
+             AND compte_id = $2
+             AND motif = 'encaissement_cheque_recu') AS mouvement_count,
+         (SELECT solde_actuel_fcfa
+            FROM comptes_bancaires
+           WHERE id = $2) AS solde_actuel_fcfa`,
+      [cooperativeId, compteBancaireId],
     );
     return result.rows[0];
   }
@@ -1408,6 +1444,131 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
           : `ANN-CHQ-${fixture.chequeId}`,
       },
     ]);
+  });
+
+  it("ne peut pas encaisser et rejeter le même chèque en concurrence", async () => {
+    const fixture = await createFixture(
+      [{ mode: "cheque", amount: 120_000 }],
+      "encaisse-rejet-concurrent",
+    );
+
+    await deposerChequeRecu(fixture.chequeId, cooperativeId, "2026-08-28");
+
+    const results = await Promise.allSettled([
+      encaisserChequeRecu(
+        fixture.chequeId,
+        cooperativeId,
+        {
+          compteBancaireId,
+          dateEncaissement: "2026-08-29",
+        },
+        0,
+      ),
+      rejeterChequeRecu(fixture.chequeId, cooperativeId, {
+        motifRejet: "Rejet concurrent",
+        dateRejet: "2026-08-29",
+      }),
+    ]);
+
+    const fulfilled = results.filter(
+      (result): result is PromiseFulfilledResult<
+        Awaited<ReturnType<typeof encaisserChequeRecu>>
+        | Awaited<ReturnType<typeof rejeterChequeRecu>>
+      > => result.status === "fulfilled",
+    );
+    const rejected = results.filter(
+      (result): result is PromiseRejectedResult => result.status === "rejected",
+    );
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+
+    const successfulStatus = fulfilled[0]!.value.statut;
+    expect(["encaisse", "rejete"]).toContain(successfulStatus);
+    expect(rejected[0]!.reason).toMatchObject({
+      message: successfulStatus === "encaisse"
+        ? "Seul un chèque à déposer ou déposé peut être rejeté"
+        : "Le chèque doit être déposé avant son encaissement",
+    });
+
+    if (successfulStatus === "encaisse") {
+      await expect(saleState(fixture.saleId)).resolves.toEqual({
+        montant_recu_fcfa: 120_000,
+        solde_du_fcfa: 0,
+        statut: "regle",
+      });
+      await expect(paymentState(fixture.paymentId)).resolves.toEqual({
+        statut: "effectue",
+        motif_rejet: null,
+      });
+      await expect(chequeState(fixture.chequeId)).resolves.toMatchObject({
+        statut: "encaisse",
+        date_depot: "2026-08-28",
+        date_encaissement: "2026-08-29",
+        date_rejet: null,
+        motif_rejet: null,
+        compte_bancaire_id: compteBancaireId,
+        mouvement_banque_id: expect.any(Number),
+        date_annulation: null,
+        motif_annulation: null,
+      });
+      await expect(bankState()).resolves.toEqual({
+        mouvement_count: 1,
+        solde_actuel_fcfa: "120000",
+      });
+      await expect(accountingState(fixture)).resolves.toEqual([
+        {
+          compte_debit: "511",
+          compte_credit: "4111",
+          montant_fcfa: 120_000,
+          source: "encaissement",
+          source_id: fixture.saleId,
+          numero_piece: `ENC-${fixture.saleId}-cheque`,
+        },
+      ]);
+    } else {
+      await expect(saleState(fixture.saleId)).resolves.toEqual({
+        montant_recu_fcfa: 0,
+        solde_du_fcfa: 120_000,
+        statut: "en_attente",
+      });
+      await expect(paymentState(fixture.paymentId)).resolves.toEqual({
+        statut: "rejete",
+        motif_rejet: "Rejet concurrent",
+      });
+      await expect(chequeState(fixture.chequeId)).resolves.toMatchObject({
+        statut: "rejete",
+        date_depot: "2026-08-28",
+        date_encaissement: null,
+        date_rejet: "2026-08-29",
+        motif_rejet: "Rejet concurrent",
+        compte_bancaire_id: null,
+        mouvement_banque_id: null,
+        date_annulation: null,
+        motif_annulation: null,
+      });
+      await expect(bankState()).resolves.toEqual({
+        mouvement_count: 0,
+        solde_actuel_fcfa: "0",
+      });
+      await expect(accountingState(fixture)).resolves.toEqual([
+        {
+          compte_debit: "511",
+          compte_credit: "4111",
+          montant_fcfa: 120_000,
+          source: "encaissement",
+          source_id: fixture.saleId,
+          numero_piece: `ENC-${fixture.saleId}-cheque`,
+        },
+        {
+          compte_debit: "4111",
+          compte_credit: "511",
+          montant_fcfa: 120_000,
+          source: "encaissement",
+          source_id: fixture.chequeId,
+          numero_piece: `REJ-CHQ-${fixture.chequeId}`,
+        },
+      ]);
+    }
   });
 
   it("annule le chèque et réouvre le solde avec une écriture inverse", async () => {

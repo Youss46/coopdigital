@@ -134,8 +134,14 @@ export async function encaisserChequeRecu(
         compteBancaireId: data.compteBancaireId,
         mouvementBanqueId: mouvement.id,
       })
-      .where(eq(chequesRecusTable.id, id))
+      .where(and(
+        eq(chequesRecusTable.id, id),
+        eq(chequesRecusTable.statut, "depose"),
+      ))
       .returning();
+    if (!updated) {
+      throw new Error("Le chèque doit être déposé avant son encaissement");
+    }
     if (cheque.paiementId) {
       await tx.update(paiementsTable)
         .set({ statut: "effectue", dateValidation: new Date() })
