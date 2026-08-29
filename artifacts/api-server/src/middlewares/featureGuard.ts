@@ -2,8 +2,9 @@ import { type Request, type Response, type NextFunction } from "express";
 import { featureKeyForPath, featureModeAllowsMethod, getCooperativeFeatureConfig } from "../services/cooperativeFeaturesService.js";
 
 export async function featureGuard(req: Request, res: Response, next: NextFunction): Promise<void> {
-  const cooperativeId = req.user?.cooperativeId;
-  if (!cooperativeId) { next(); return; }
+  const terrainAgent = (req as Request & { agent?: { cooperativeId: number | null } }).agent;
+  const cooperativeId = req.user?.cooperativeId ?? terrainAgent?.cooperativeId;
+  if (cooperativeId == null) { next(); return; }
 
   const pathname = req.originalUrl.replace(/^\/api/, "").split("?")[0] ?? "";
   // Ce endpoint doit rester consultable pour construire l'interface, même

@@ -9,6 +9,30 @@ const { okHandler } = vi.hoisted(() => ({
   },
 }));
 
+vi.mock("../services/cooperativeFeaturesService.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../services/cooperativeFeaturesService.js")>();
+  return {
+    ...actual,
+    getCooperativeFeatureConfig: vi.fn().mockResolvedValue([]),
+  };
+});
+
+vi.mock("@workspace/db", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@workspace/db")>();
+  return {
+    ...actual,
+    db: {
+      select: () => ({
+        from: () => ({
+          where: () => ({
+            limit: async () => [{ actif: true }],
+          }),
+        }),
+      }),
+    },
+  };
+});
+
 vi.mock("../controllers/entrepotDelegueController.js", () => ({
   getMonEntrepotHandler: okHandler,
   getMesMouvementsHandler: okHandler,
@@ -37,6 +61,8 @@ vi.mock("../controllers/m15Controller.js", () => ({
   getCooperativesHandler: okHandler,
   createCooperativeHandler: okHandler,
   getCooperativeHandler: okHandler,
+  getCooperativeFeaturesHandler: okHandler,
+  updateCooperativeFeaturesHandler: okHandler,
   updateCooperativeHandler: okHandler,
   getPlansHandler: okHandler,
   updatePlanHandler: okHandler,

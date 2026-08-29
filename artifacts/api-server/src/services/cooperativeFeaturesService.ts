@@ -167,6 +167,19 @@ export async function updateCooperativeFeatures(
 export function featureKeyForPath(pathname: string): string | null {
   const path = pathname.split("?")[0] ?? pathname;
   const prefixes: Array<[string, string]> = [
+    ["/terrain/chauffeur", "transport"],
+    ["/terrain/enquetes", "enquetes"], ["/terrain/bons-reception", "bons_reception"],
+    ["/terrain/fournisseurs", "fournisseurs"], ["/terrain/fournisseur", "fournisseurs"],
+    ["/terrain/entrepot", "entrepots"], ["/terrain/transferts", "entrepots"],
+    ["/terrain/collecte", "livraisons"], ["/terrain/paiement", "reglements"],
+    ["/terrain/avances", "avances"], ["/terrain/avance", "avances"],
+    ["/terrain/missions", "missions"], ["/terrain/messages", "missions"],
+    ["/terrain/peseur/collectes", "livraisons"], ["/terrain/bilan-jour", "livraisons"],
+    ["/terrain/recu", "livraisons"], ["/terrain/prix", "prix"],
+    ["/terrain/mes-commissions", "delegues"], ["/terrain/commissions", "delegues"],
+    ["/terrain/delegues-centraux", "delegues"], ["/terrain/rapport-journalier", "reporting"],
+    ["/terrain/sync", "hors_ligne"],
+    ["/pesee", "pesee"], ["/transferts", "entrepots"],
     ["/finances", "finances"], ["/sessions-pesee", "pesee"], ["/bons-reception-membres", "bons_reception"],
     ["/delegues-localites", "delegues_localites"], ["/administration", "administration"], ["/ops-en-attente", "hors_ligne"],
     ["/formations-rse", "formations_rse"], ["/charges-diverses", "charges_diverses"], ["/mobile-marchand", "mobile_marchand"],

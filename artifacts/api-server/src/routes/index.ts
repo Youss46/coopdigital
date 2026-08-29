@@ -80,6 +80,40 @@ router.use(setupRouter);
 router.use(authRouter);
 router.use(stationRouter);
 router.use(portailRouter);
+
+// Ces routeurs contiennent aussi des routes terrain ou des routes publiques et
+// sont donc montés avant le guard global. Leurs branches coopératives doivent
+// néanmoins conserver l'ordre licence → RBAC → fonctionnalité.
+router.use("/delegues", authMiddleware, tenantGuard, denyComptableRestrictedModules, featureGuard);
+router.use(["/entrepots", "/transferts"], authMiddleware, tenantGuard, denyComptableRestrictedModules, featureGuard);
+router.use("/pesee", authMiddleware, tenantGuard, denyComptableRestrictedModules, featureGuard);
+for (const prefix of [
+  "/terrain/chauffeur",
+  "/terrain/enquetes",
+  "/terrain/bons-reception",
+  "/terrain/fournisseurs",
+  "/terrain/fournisseur",
+  "/terrain/entrepot",
+  "/terrain/transferts",
+  "/terrain/collecte",
+  "/terrain/paiement",
+  "/terrain/avances",
+  "/terrain/avance",
+  "/terrain/missions",
+  "/terrain/messages",
+  "/terrain/peseur/collectes",
+  "/terrain/bilan-jour",
+  "/terrain/recu",
+  "/terrain/prix",
+  "/terrain/mes-commissions",
+  "/terrain/commissions",
+  "/terrain/delegues-centraux",
+  "/terrain/rapport-journalier",
+  "/terrain/sync",
+]) {
+  router.use(prefix, authMiddleware, tenantGuard, denyComptableRestrictedModules, featureGuard);
+}
+
 router.use(terrainRouter);
 router.use(deleguesRouter);
 router.use(entrepotsDeleguesRouter);
@@ -91,8 +125,8 @@ router.use(peseeRouter);
 // Guard global : auth + vérification licence pour toutes les routes coopérative
 router.use(authMiddleware);
 router.use(tenantGuard);
-router.use(featureGuard);
 router.use(denyComptableRestrictedModules);
+router.use(featureGuard);
 
 router.use(membresRouter);
 router.use(avancesRouter);

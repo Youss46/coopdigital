@@ -1,13 +1,22 @@
 import express, { type Request, type Response as ExpressResponse } from "express";
 import type { Server } from "node:http";
 import jwt from "jsonwebtoken";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { okHandler } = vi.hoisted(() => ({
+const { okHandler, featureConfigs } = vi.hoisted(() => ({
   okHandler: (_req: Request, res: ExpressResponse) => {
     res.status(200).json({ ok: true });
   },
+  featureConfigs: new Map<number, Array<{ key: string; mode: string }>>(),
 }));
+
+vi.mock("../services/cooperativeFeaturesService.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../services/cooperativeFeaturesService.js")>();
+  return {
+    ...actual,
+    getCooperativeFeatureConfig: vi.fn(async (cooperativeId: number) => featureConfigs.get(cooperativeId) ?? []),
+  };
+});
 
 vi.mock("../controllers/peseeController.js", () => ({
   handleGetBalancesAlertes: okHandler,
@@ -171,13 +180,23 @@ describe("montage des routes et périmètre du comptable", () => {
     await closeTestServer(server);
   });
 
-  function tokenFor(role: string): string {
-    return jwt.sign({ id: 1, role, cooperativeId: 1 }, process.env.JWT_SECRET!);
+  beforeEach(() => {
+    featureConfigs.clear();
+  });
+
+  function tokenFor(role: string, cooperativeId = 1): string {
+    return jwt.sign({ id: 1, role, cooperativeId }, process.env.JWT_SECRET!);
   }
 
-  async function request(path: string, role: string): Promise<globalThis.Response> {
+  async function request(
+    path: string,
+    role: string,
+    cooperativeId = 1,
+    method = "GET",
+  ): Promise<globalThis.Response> {
     return fetch(`${baseUrl}${path}`, {
-      headers: { Authorization: `Bearer ${tokenFor(role)}` },
+      method,
+      headers: { Authorization: `Bearer ${tokenFor(role, cooperativeId)}` },
     });
   }
 
@@ -199,5 +218,46 @@ describe("montage des routes et périmètre du comptable", () => {
 
   it("conserve l'accès du comptable aux routes comptables", async () => {
     expect((await request("/api/comptabilite/grand-livre", "comptable")).status).toBe(200);
+  });
+
+  it("isole une fonctionnalité désactivée entre deux coopératives", async () => {
+    featureConfigs.set(1, [{ key: "pesee", mode: "disabled" }]);
+
+    const disabled = await request("/api/pesee/balances", "pca", 1);
+    const active = await request("/api/pesee/balances", "pca", 2);
+
+    expect(disabled.status).toBe(403);
+    expect(await disabled.json()).toMatchObject({
+      code: "FEATURE_DISABLED",
+      featureKey: "pesee",
+      mode: "disabled",
+    });
+    expect(active.status).toBe(200);
+  });
+
+  it("autorise GET et HEAD mais refuse toutes les écritures en lecture seule", async () => {
+    featureConfigs.set(1, [{ key: "pesee", mode: "lecture_seule" }]);
+
+    expect((await request("/api/pesee/balances", "pca", 1, "GET")).status).toBe(200);
+    expect((await request("/api/pesee/balances", "pca", 1, "HEAD")).status).toBe(200);
+
+    for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
+      const response = await request("/api/pesee/balances", "pca", 1, method);
+      expect(response.status, method).toBe(403);
+      expect(await response.json()).toMatchObject({
+        code: "FEATURE_DISABLED",
+        featureKey: "pesee",
+        mode: "lecture_seule",
+      });
+    }
+  });
+
+  it("évalue le RBAC avant le module désactivé", async () => {
+    featureConfigs.set(1, [{ key: "stocks", mode: "disabled" }]);
+
+    const response = await request("/api/stocks/entrepots", "comptable");
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).not.toHaveProperty("code", "FEATURE_DISABLED");
   });
 });

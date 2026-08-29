@@ -10,6 +10,11 @@ describe("cooperative features", () => {
     expect(featureKeyForPath("/membres/42")).toBe("membres");
     expect(featureKeyForPath("/finances/tableau-bord")).toBe("finances");
     expect(featureKeyForPath("/sessions-pesee/12")).toBe("pesee");
+    expect(featureKeyForPath("/pesee/balances")).toBe("pesee");
+    expect(featureKeyForPath("/transferts/42/arrivee")).toBe("entrepots");
+    expect(featureKeyForPath("/terrain/collecte")).toBe("livraisons");
+    expect(featureKeyForPath("/terrain/enquetes/12")).toBe("enquetes");
+    expect(featureKeyForPath("/terrain/entrepot")).toBe("entrepots");
     expect(featureKeyForPath("/config/features")).toBe("parametres");
     expect(featureKeyForPath("/unknown")).toBeNull();
   });
