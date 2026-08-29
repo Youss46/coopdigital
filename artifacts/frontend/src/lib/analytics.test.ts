@@ -8,6 +8,7 @@ const sources: VenteSource[] = ["lot", "reception_port", "fournisseur"];
 
 const mocks = vi.hoisted(() => ({
   createVente: vi.fn(),
+  toast: vi.fn(),
   useQuery: vi.fn(),
 }));
 
@@ -20,7 +21,7 @@ vi.mock("@/hooks/usePermission", () => ({
 }));
 
 vi.mock("@/hooks/use-toast", () => ({
-  useToast: () => ({ toast: vi.fn() }),
+  useToast: () => ({ toast: mocks.toast }),
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -83,6 +84,7 @@ describe("branchement UI du suivi des ventes", () => {
 
   beforeEach(() => {
     track.mockReset();
+    mocks.toast.mockReset();
     window.umami = { track };
     createVenteShouldSucceed = true;
 
@@ -128,6 +130,8 @@ describe("branchement UI du suivi des ventes", () => {
           return { data: [{ id: 41, dateLivraison: "2026-08-12", poidsKg: "9000" }] };
         case "prix-actuel":
           return { data: { prixVenteExportFcfa: "1200" } };
+        case "stock-dispo-auto":
+          return { data: { poidsTotalKg: 18500, nbLivraisons: 2 } };
         default:
           return { data: [] };
       }
@@ -200,7 +204,8 @@ describe("branchement UI du suivi des ventes", () => {
   function inputLabeled(labelText: string, value: string) {
     const label = Array.from(container.querySelectorAll("label"))
       .find((candidate) => candidate.textContent?.includes(labelText));
-    const input = label?.parentElement?.querySelector("input");
+    const input = label?.parentElement?.querySelector("input")
+      ?? label?.parentElement?.parentElement?.querySelector("input");
     if (!(input instanceof HTMLInputElement)) {
       throw new Error(`Champ introuvable: ${labelText}`);
     }
@@ -231,6 +236,39 @@ describe("branchement UI du suivi des ventes", () => {
 
   function expectNotTracked() {
     expect(track).not.toHaveBeenCalled();
+  }
+
+  function jsonResponse(ok: boolean, body: unknown, status = ok ? 200 : 500) {
+    return {
+      ok,
+      status,
+      json: async () => body,
+    };
+  }
+
+  async function fillAutomaticSale(
+    lotResponse = jsonResponse(true, { id: 42 }),
+    saleResponse = jsonResponse(true, { statut: "en_attente" }),
+  ) {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(true, {
+        livraisonIds: [101, 102],
+        poidsTotalKg: 18500,
+        nbLivraisons: 2,
+        surplusKg: 0,
+      }))
+      .mockResolvedValueOnce(lotResponse)
+      .mockResolvedValueOnce(saleResponse);
+    openSaleModal();
+    act(() => {
+      buttonContaining("Constituer automatiquement").click();
+    });
+    inputLabeled("Quantité cible (kg)", "18500");
+    await act(async () => {
+      buttonContaining("Prévisualiser").click();
+    });
+    selectLabeled("Exportateur", "7");
+    inputLabeled("Prix unitaire", "1200");
   }
 
   function fillMemberSale(source: "lot" | "reception") {
@@ -329,5 +367,80 @@ describe("branchement UI du suivi des ventes", () => {
     });
 
     expectNotTracked();
+  });
+
+  it("constitue automatiquement un lot, enregistre la vente et confirme le succès", async () => {
+    renderPage();
+    await fillAutomaticSale();
+
+    await act(async () => {
+      buttonContaining("Constituer le lot et vendre").click();
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "/api/lots/preview-auto",
+      "/api/lots",
+      "/api/ventes",
+    ]);
+    expect((fetchMock.mock.calls[1]![1] as RequestInit).method).toBe("POST");
+    expect(JSON.parse(String((fetchMock.mock.calls[1]![1] as RequestInit).body))).toEqual({
+      livraisonIds: [101, 102],
+    });
+    expect((fetchMock.mock.calls[2]![1] as RequestInit).method).toBe("POST");
+    expect(JSON.parse(String((fetchMock.mock.calls[2]![1] as RequestInit).body))).toEqual(expect.objectContaining({
+      exportateurId: 7,
+      lotId: 42,
+      poidsKg: 18500,
+      prixUnitaireFcfa: 1200,
+    }));
+    expectTracked("lot");
+    expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Lot constitué et vente enregistrée",
+    }));
+    expect(container.textContent).not.toContain("Nouvelle vente cacao");
+  });
+
+  it("ne déclenche aucun événement si la constitution automatique du lot échoue", async () => {
+    renderPage();
+    await fillAutomaticSale(jsonResponse(false, { erreur: "Lot impossible" }));
+
+    await act(async () => {
+      buttonContaining("Constituer le lot et vendre").click();
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1]![0]).toBe("/api/lots");
+    expectNotTracked();
+    expect(mocks.toast).toHaveBeenCalledWith({
+      title: "Erreur",
+      description: "Lot impossible",
+      variant: "destructive",
+    });
+    expect(buttonContaining("Constituer le lot et vendre").disabled).toBe(false);
+    expect(container.textContent).toContain("Nouvelle vente cacao");
+  });
+
+  it("ne déclenche aucun événement si la vente automatique échoue", async () => {
+    renderPage();
+    await fillAutomaticSale(
+      jsonResponse(true, { id: 42 }),
+      jsonResponse(false, { erreur: "Vente impossible" }),
+    );
+
+    await act(async () => {
+      buttonContaining("Constituer le lot et vendre").click();
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock.mock.calls[2]![0]).toBe("/api/ventes");
+    expectNotTracked();
+    expect(mocks.toast).toHaveBeenCalledWith({
+      title: "Erreur",
+      description: "Vente impossible",
+      variant: "destructive",
+    });
+    expect(buttonContaining("Constituer le lot et vendre").disabled).toBe(false);
+    expect(container.textContent).toContain("Nouvelle vente cacao");
   });
 });

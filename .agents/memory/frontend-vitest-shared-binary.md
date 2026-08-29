@@ -7,4 +7,4 @@ Le frontend ne porte pas actuellement sa propre installation de Vitest; ses test
 
 **Why:** Le chargeur de configuration Vitest résout `vitest/config` avant d’appliquer les alias, ce qui fait échouer une configuration frontend basée sur `defineConfig` sans dépendance locale; sans alias/plugin, un test de composant ne peut pas résoudre les imports de l’application ni transformer son TSX.
 
-**How to apply:** Pour ajouter ou modifier des tests frontend, conserver le script de test et l’alias de résolution existants, puis vérifier avec le script de l’artifact frontend.
+**How to apply:** Pour ajouter ou modifier des tests frontend, conserver le script de test et l’alias de résolution existants, puis vérifier avec le script de l’artifact frontend. Les assertions doivent utiliser les propriétés DOM natives tant qu’aucun matcher jest-dom n’est enregistré.
