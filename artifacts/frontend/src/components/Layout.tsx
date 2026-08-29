@@ -58,6 +58,7 @@ import {
 import { NAV_ITEMS, type NavItemConfig } from "@/config/navigation";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useOffline } from "@/contexts/OfflineContext";
+import { useFeatureAccess, featureKeyForPath } from "@/hooks/useFeatureAccess";
 import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey, useGetAnomaliesStats, getGetAnomaliesStatsQueryKey, useGetPaiementsStats, getGetPaiementsStatsQueryKey } from "@workspace/api-client-react";
 import { OfflineBanner } from "./OfflineIndicator";
 import NotificationPanel from "./NotificationPanel";
@@ -165,6 +166,7 @@ function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout:
   const [location] = useLocation();
   const { utilisateur } = useAuth();
   const { pendingCount } = useOffline();
+  const { features, isFeatureLoading } = useFeatureAccess();
 
   const showBadge = BADGE_ROLES.includes(utilisateur?.role ?? "");
   const showAnomaliesBadge = ANOMALIE_BADGE_ROLES.includes(utilisateur?.role ?? "");
@@ -247,7 +249,8 @@ function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout:
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {(navItems as NavItem[])
-          .filter(({ roles }) => !roles || roles.includes(utilisateur?.role ?? ""))
+          .filter(({ roles, href }) => !roles || roles.includes(utilisateur?.role ?? ""))
+          .filter(({ href }) => isFeatureLoading || features.find((feature) => feature.key === featureKeyForPath(href))?.mode !== "disabled")
           .map(({ href, label, icon: Icon, showBadge: hasBadge, showAnomaliesBadge: hasAnomaliesBadge, showEudrAlerteBadge: hasEudrAlerteBadge, showMessagesBadge: hasMessagesBadge, showPendingOpsBadge: hasPendingOpsBadge, showReglementsBadge: hasReglementsBadge }) => {
             const isActive = location === href || location.startsWith(href + "/");
             const badgeCount = hasAnomaliesBadge && showAnomaliesBadge ? nbCritiques

@@ -92,3 +92,4 @@
 - [Analyse Claude des balances Sage](balance-sage-claude-analysis.md) — une ligne Sage mouvementée peut être analysée malgré un compte absent du plan; la préparation comptable garde le contrôle bloquant.
 - [Bons carburant saisis en montant](bons-carburant-montant.md) — montant autorisé et montant consommé pilotent le flux; litres/prix restent facultatifs pour les historiques et le détail.
 - [Frontend Vitest shared binary](frontend-vitest-shared-binary.md) — les tests frontend réutilisent Vitest depuis l’artifact API; la config doit éviter `vitest/config` local.
+- [Configuration des fonctionnalités coopérative](cooperative-features.md) — absence de configuration = actif; les dépendances sont désactivées en cascade et le contrôle suit licence → fonctionnalité → permission.

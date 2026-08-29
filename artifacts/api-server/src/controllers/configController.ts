@@ -11,6 +11,7 @@ import {
 } from "../services/configService";
 import { invalidateLogoCache, drawHeader, drawFooter } from "../services/pdfHeaderService";
 import type { ConfigCooperative } from "@workspace/db";
+import { getCooperativeFeatureConfig } from "../services/cooperativeFeaturesService";
 
 function toDateStr(d: Date | null | undefined): string | null | undefined {
   if (d == null) return d;
@@ -72,6 +73,21 @@ export async function handleGetConfig(req: Request, res: Response): Promise<void
     res.json(config ? toApiConfig(config) : {});
   } catch (err) {
     req.log.error({ err }, "Erreur getConfig");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function handleGetFeatures(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) {
+      res.status(400).json({ erreur: "Coopérative introuvable" });
+      return;
+    }
+    const features = await getCooperativeFeatureConfig(cooperativeId);
+    res.json({ features: features ?? [] });
+  } catch (err) {
+    req.log.error({ err }, "Erreur get fonctionnalités coopérative");
     res.status(500).json({ erreur: "Erreur interne" });
   }
 }

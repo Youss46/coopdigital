@@ -2,6 +2,7 @@ import { Router } from "express";
 import { authMiddleware } from "../middlewares/auth";
 import {
   handleGetConfig,
+  handleGetFeatures,
   handleUpdateConfig,
   handleUploadLogo,
   handleGetDocuments,
@@ -13,6 +14,7 @@ import {
 const router = Router();
 
 router.get("/config",                  authMiddleware, handleGetConfig);
+router.get("/config/features",         authMiddleware, handleGetFeatures);
 router.put("/config",                  authMiddleware, handleUpdateConfig);
 router.post("/config/logo",            authMiddleware, handleUploadLogo);
 router.get("/config/export-pdf",       authMiddleware, handleExportConfigPdf);

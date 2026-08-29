@@ -1,7 +1,8 @@
 import { type Request, type Response } from "express";
 import * as licenceService from "../services/licenceService.js";
+import * as cooperativeFeaturesService from "../services/cooperativeFeaturesService.js";
 import { db } from "@workspace/db";
-import { plansAbonnementTable, licencesTable } from "@workspace/db";
+import { plansAbonnementTable, licencesTable, cooperativeFeatureModes } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 export async function resetPasswordPcaHandler(req: Request, res: Response): Promise<void> {
@@ -133,6 +134,48 @@ export async function getCooperativeHandler(req: Request, res: Response): Promis
   } catch (err) {
     req.log.error({ err }, "Erreur détail coop M15");
     res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function getCooperativeFeaturesHandler(req: Request, res: Response): Promise<void> {
+  const id = parseInt(String(req.params["id"]), 10);
+  if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+  try {
+    const features = await cooperativeFeaturesService.getCooperativeFeatureConfig(id);
+    if (!features) { res.status(404).json({ erreur: "Coopérative introuvable" }); return; }
+    const history = await cooperativeFeaturesService.getCooperativeFeatureHistory(id);
+    res.json({ features, history });
+  } catch (err) {
+    req.log.error({ err }, "Erreur fonctionnalités coop M15");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function updateCooperativeFeaturesHandler(req: Request, res: Response): Promise<void> {
+  const id = parseInt(String(req.params["id"]), 10);
+  const body = req.body as {
+    updates?: Array<{ featureKey?: string; mode?: string; reason?: string }>;
+  };
+  if (isNaN(id) || !Array.isArray(body.updates)) {
+    res.status(400).json({ erreur: "ID et liste de modifications requis" });
+    return;
+  }
+  const updates = body.updates.map((update) => ({
+    featureKey: String(update.featureKey ?? ""),
+    mode: String(update.mode ?? "") as (typeof cooperativeFeatureModes)[number],
+    reason: update.reason,
+  }));
+  if (updates.some((update) => !update.featureKey || !cooperativeFeatureModes.includes(update.mode))) {
+    res.status(400).json({ erreur: "Une fonctionnalité ou un mode est invalide" });
+    return;
+  }
+  try {
+    const features = await cooperativeFeaturesService.updateCooperativeFeatures(id, updates, m15UserId(req));
+    const history = await cooperativeFeaturesService.getCooperativeFeatureHistory(id);
+    res.json({ features, history });
+  } catch (err) {
+    req.log.error({ err }, "Erreur mise à jour fonctionnalités coop M15");
+    res.status(400).json({ erreur: (err as Error).message });
   }
 }
 

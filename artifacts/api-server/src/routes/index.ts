@@ -70,6 +70,7 @@ import chargesDiversesRouter from "./charges_diverses";
 import commissionsMembresDelaguesRouter from "./commissions_membres_delegues";
 import bonsReceptionRouter from "./bons_reception";
 import { denyComptableRestrictedModules } from "../middlewares/permissions";
+import { featureGuard } from "../middlewares/featureGuard";
 
 const router: IRouter = Router();
 
@@ -90,6 +91,7 @@ router.use(peseeRouter);
 // Guard global : auth + vérification licence pour toutes les routes coopérative
 router.use(authMiddleware);
 router.use(tenantGuard);
+router.use(featureGuard);
 router.use(denyComptableRestrictedModules);
 
 router.use(membresRouter);

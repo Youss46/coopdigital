@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
+import { Switch, Route, Router as WouterRouter, Redirect, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -86,6 +86,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { OnlineToast } from "@/components/OfflineIndicator";
 import { OfflineProvider } from "@/contexts/OfflineContext";
 import PdfViewerModal from "@/components/PdfViewerModal";
+import { useFeatureAccess, featureKeyForPath } from "@/hooks/useFeatureAccess";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -95,8 +96,24 @@ const queryClient = new QueryClient({
 
 function ProtectedRoute({ component: Component, roles }: { component: React.ComponentType; roles?: string[] }) {
   const { estConnecte, utilisateur } = useAuth();
+  const [location] = useLocation();
+  const featureKey = featureKeyForPath(location);
+  const { isFeatureEnabled, isFeatureLoading } = useFeatureAccess(featureKey ?? undefined);
   if (!estConnecte) return <Redirect to="/login" />;
   if (roles && !roles.includes(utilisateur?.role ?? "")) return <Redirect to="/dashboard" />;
+  if (!isFeatureLoading && !isFeatureEnabled) {
+    return (
+      <Layout>
+        <div className="max-w-lg mx-auto mt-16 rounded-xl border border-amber-200 bg-amber-50 p-6 text-center">
+          <h1 className="text-lg font-semibold text-amber-900">Fonctionnalité indisponible</h1>
+          <p className="mt-2 text-sm text-amber-800">Ce module n’est pas activé pour votre coopérative.</p>
+          <a href={`${import.meta.env.BASE_URL.replace(/\/$/, "")}/dashboard`} className="mt-4 inline-block text-sm font-medium text-amber-900 underline">
+            Retour au tableau de bord
+          </a>
+        </div>
+      </Layout>
+    );
+  }
   return (
     <Layout>
       <Component />

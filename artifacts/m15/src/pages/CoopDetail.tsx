@@ -1,20 +1,23 @@
 import { useEffect, useState } from "react";
 import { useParams, useLocation, Link } from "wouter";
 import Layout from "@/components/Layout";
+import { useAuth } from "@/lib/auth";
 import {
   fetchCooperative, fetchPlans, renouvelerLicence, suspendreCooperative,
   reactiverCooperative, supprimerCooperative, toggleRenouvellementAuto,
   resetPasswordPca, updatePca, activerCooperative,
+  fetchCooperativeFeatures, updateCooperativeFeatures,
   formatDate, formatFcfa, statutColor, statutLabel, joursColor,
-  type CoopDetail as CoopDetailType, type Plan,
+  type CoopDetail as CoopDetailType, type Plan, type CooperativeFeature, type CooperativeFeatureHistory, type FeatureMode,
 } from "@/lib/api";
 import {
   Loader2, AlertCircle, ArrowLeft, CheckCircle2, PauseCircle, XCircle,
   RefreshCw, Trash2, RotateCcw, Clock, History, BarChart3, FileKey,
   User, KeyRound, Copy, Check, ShieldAlert, Pencil, Phone, Mail, Play,
+  Settings2, LockKeyhole, Eye, Power,
 } from "lucide-react";
 
-type Tab = "licence" | "pca" | "stats" | "historique";
+type Tab = "licence" | "pca" | "stats" | "fonctionnalites" | "historique";
 
 const DUREES = [1, 2, 3, 5] as const;
 type Duree = 1 | 2 | 3 | 5;
@@ -46,6 +49,8 @@ export default function CoopDetail() {
   const params = useParams<{ id: string }>();
   const id = parseInt(params.id ?? "0");
   const [, navigate] = useLocation();
+  const { user } = useAuth();
+  const canManageFeatures = user?.role === "superadmin";
   const [data, setData] = useState<CoopDetailType | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,6 +73,12 @@ export default function CoopDetail() {
   const [confirSupp, setConfirSupp] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [features, setFeatures] = useState<CooperativeFeature[]>([]);
+  const [featureHistory, setFeatureHistory] = useState<CooperativeFeatureHistory[]>([]);
+  const [featuresLoading, setFeaturesLoading] = useState(false);
+  const [featureSaving, setFeatureSaving] = useState(false);
+  const [featureError, setFeatureError] = useState("");
+  const [featureReason, setFeatureReason] = useState("");
 
   // Reset PCA result
   const [resetResult, setResetResult] = useState<{ motdepasse_clair: string; email: string; sms_envoye: boolean; telephone: string | null } | null>(null);
@@ -81,10 +92,20 @@ export default function CoopDetail() {
   async function load() {
     setLoading(true); setError("");
     try {
-      const [d, ps] = await Promise.all([fetchCooperative(id), fetchPlans()]);
+      const [d, ps, fs] = await Promise.all([fetchCooperative(id), fetchPlans(), fetchCooperativeFeatures(id)]);
       setData(d); setPlans(ps);
+      setFeatures(fs.features); setFeatureHistory(fs.history);
     } catch (e) { setError(e instanceof Error ? e.message : "Erreur"); }
     finally { setLoading(false); }
+  }
+
+  async function loadFeatures() {
+    setFeaturesLoading(true); setFeatureError("");
+    try {
+      const fs = await fetchCooperativeFeatures(id);
+      setFeatures(fs.features); setFeatureHistory(fs.history);
+    } catch (e) { setFeatureError(e instanceof Error ? e.message : "Erreur"); }
+    finally { setFeaturesLoading(false); }
   }
 
   useEffect(() => { void load(); }, [id]);
@@ -171,10 +192,28 @@ export default function CoopDetail() {
     finally { setActionLoading(false); }
   }
 
+  async function saveFeatures() {
+    setFeatureSaving(true); setFeatureError("");
+    try {
+      const fs = await updateCooperativeFeatures(id, features.map((feature) => ({
+        featureKey: feature.key,
+        mode: feature.mode,
+        reason: featureReason || undefined,
+      })));
+      setFeatures(fs.features); setFeatureHistory(fs.history); setFeatureReason("");
+    } catch (e) { setFeatureError(e instanceof Error ? e.message : "Erreur"); }
+    finally { setFeatureSaving(false); }
+  }
+
+  function setFeatureMode(key: string, mode: FeatureMode) {
+    setFeatures((current) => current.map((feature) => feature.key === key ? { ...feature, mode, source: "custom" } : feature));
+  }
+
   const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
     { id: "licence", label: "Licence", icon: FileKey },
     { id: "pca", label: "PCA", icon: User },
     { id: "stats", label: "Statistiques", icon: BarChart3 },
+    { id: "fonctionnalites", label: "Fonctionnalités", icon: Settings2 },
     { id: "historique", label: "Historique", icon: History },
   ];
 
@@ -392,6 +431,100 @@ export default function CoopDetail() {
                     <div className="text-sm text-muted-foreground">{s.label}</div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* Fonctionnalités Tab */}
+            {tab === "fonctionnalites" && (
+              <div className="space-y-4">
+                <div className="bg-card border rounded-xl p-5">
+                  <div className="flex items-start justify-between gap-4 mb-2">
+                    <div>
+                      <h2 className="font-semibold">Modules de la coopérative</h2>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {canManageFeatures
+                          ? "Désactivez les modules inutiles ou rendez-les disponibles en lecture seule. Les permissions RBAC et la licence restent prioritaires."
+                          : "Consultation de la configuration. Seul le super administrateur peut modifier les modules."}
+                      </p>
+                    </div>
+                    <button onClick={() => void loadFeatures()} className="p-2 border rounded-lg hover:bg-muted" title="Actualiser">
+                      <RefreshCw size={14} className={featuresLoading ? "animate-spin" : ""} />
+                    </button>
+                  </div>
+                  {featureError && <div className="text-destructive text-sm flex items-center gap-1 mt-3"><AlertCircle size={14} /> {featureError}</div>}
+                  <div className="mt-5 space-y-5">
+                    {Array.from(new Set(features.map((feature) => feature.category))).map((category) => (
+                      <section key={category}>
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">{category}</h3>
+                        <div className="divide-y border rounded-lg">
+                          {features.filter((feature) => feature.category === category).map((feature) => (
+                            <div key={feature.key} className="p-3 flex items-center gap-3">
+                              <div className={`size-8 rounded-lg flex items-center justify-center ${
+                                feature.mode === "active" ? "bg-green-100 text-green-700" :
+                                feature.mode === "lecture_seule" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"
+                              }`}>
+                                {feature.mode === "active" ? <Power size={15} /> : feature.mode === "lecture_seule" ? <Eye size={15} /> : <LockKeyhole size={15} />}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-medium">{feature.label}</div>
+                                <div className="text-xs text-muted-foreground truncate">{feature.description}</div>
+                                {feature.dependsOn.length > 0 && (
+                                  <div className="text-[11px] text-muted-foreground/70 mt-0.5">
+                                    Dépend de : {feature.dependsOn.map((key) => features.find((candidate) => candidate.key === key)?.label ?? key).join(", ")}
+                                  </div>
+                                )}
+                              </div>
+                              <select
+                                value={feature.mode}
+                                onChange={(event) => setFeatureMode(feature.key, event.target.value as FeatureMode)}
+                                disabled={!canManageFeatures}
+                                className="border rounded-md bg-background px-2 py-1.5 text-xs font-medium"
+                              >
+                                <option value="active">Actif</option>
+                                <option value="lecture_seule">Lecture seule</option>
+                                <option value="disabled">Désactivé</option>
+                              </select>
+                            </div>
+                          ))}
+                        </div>
+                      </section>
+                    ))}
+                  </div>
+                  {canManageFeatures && <div className="mt-5 flex flex-col sm:flex-row gap-3 sm:items-end">
+                    <div className="flex-1">
+                      <label className="text-xs font-medium text-muted-foreground">Motif du changement (facultatif)</label>
+                      <input value={featureReason} onChange={(event) => setFeatureReason(event.target.value)}
+                        className={inputCls + " mt-1"} placeholder="Ex. Périmètre de l'abonnement" />
+                    </div>
+                    <button onClick={() => void saveFeatures()} disabled={featureSaving || featuresLoading}
+                      className="px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium disabled:opacity-60 flex items-center justify-center gap-2">
+                      {featureSaving && <Loader2 size={14} className="animate-spin" />} Enregistrer les modules
+                    </button>
+                  </div>}
+                </div>
+
+                <div className="bg-card border rounded-xl overflow-hidden">
+                  <div className="px-5 py-4 border-b">
+                    <h2 className="font-semibold text-sm">Historique des changements</h2>
+                  </div>
+                  {featureHistory.length === 0 ? (
+                    <div className="py-8 text-center text-sm text-muted-foreground">Aucun changement enregistré</div>
+                  ) : (
+                    <div className="divide-y max-h-72 overflow-y-auto">
+                      {[...featureHistory].reverse().map((entry) => (
+                        <div key={entry.id} className="px-5 py-3 flex items-center gap-3 text-sm">
+                          <History size={14} className="text-muted-foreground shrink-0" />
+                          <div className="flex-1">
+                            <span className="font-medium">{features.find((feature) => feature.key === entry.featureKey)?.label ?? entry.featureKey}</span>
+                            <span className="text-muted-foreground"> · {entry.previousMode ?? "actif"} → {entry.newMode}</span>
+                            {entry.reason && <div className="text-xs text-muted-foreground mt-0.5">{entry.reason}</div>}
+                          </div>
+                          <span className="text-xs text-muted-foreground">{formatDate(entry.createdAt)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 

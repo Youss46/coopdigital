@@ -4,6 +4,7 @@ import { Search, Users, Package, TrendingDown, X, MapPin, Phone, QrCode, Wheat, 
 import { customFetch } from "@workspace/api-client-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { NAV_ITEMS } from "@/config/navigation";
+import { useFeatureAccess, featureKeyForPath } from "@/hooks/useFeatureAccess";
 
 type SearchResults = {
   membres: { id: number; nom: string; prenoms: string; telephone: string; village: string | null; statut: string }[];
@@ -64,6 +65,7 @@ function saveToHistory(q: string) {
 export default function GlobalSearch() {
   const [, navigate] = useLocation();
   const { utilisateur } = useAuth();
+  const { features, isFeatureLoading } = useFeatureAccess();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResults | null>(null);
@@ -91,9 +93,11 @@ export default function GlobalSearch() {
     const q = normalize(query);
     const role = utilisateur?.role ?? "";
     return NAV_ITEMS.filter(
-      (m) => normalize(m.label).includes(q) && (m.roles.length === 0 || m.roles.includes(role))
+      (m) => normalize(m.label).includes(q)
+        && (m.roles.length === 0 || m.roles.includes(role))
+        && (isFeatureLoading || features.find((feature) => feature.key === featureKeyForPath(m.href))?.mode !== "disabled")
     ).slice(0, 6);
-  }, [query, utilisateur?.role]);
+  }, [query, utilisateur?.role, features, isFeatureLoading]);
 
   // Flat list of all navigable items in render order, used for ↑↓ keyboard nav
   const flatItems = useMemo<Array<() => void>>(() => {

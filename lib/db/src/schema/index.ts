@@ -69,3 +69,4 @@ export * from "./charges_diverses";
 export * from "./avances_delegues";
 export * from "./bons_reception_membres_delegues";
 export * from "./balancesSage";
+export * from "./cooperative_features";

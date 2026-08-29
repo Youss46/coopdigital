@@ -117,6 +117,45 @@ export async function fetchCooperative(id: number): Promise<CoopDetail> {
   return request<CoopDetail>(`/m15/cooperatives/${id}`);
 }
 
+export type FeatureMode = "active" | "lecture_seule" | "disabled";
+export interface CooperativeFeature {
+  key: string;
+  label: string;
+  category: string;
+  description: string;
+  dependsOn: string[];
+  mode: FeatureMode;
+  source: "custom" | "default";
+}
+export interface CooperativeFeatureHistory {
+  id: number;
+  cooperativeId: number;
+  featureKey: string;
+  previousMode: string | null;
+  newMode: FeatureMode;
+  reason: string | null;
+  changedBy: number | null;
+  createdAt: string;
+}
+export interface CooperativeFeaturesResponse {
+  features: CooperativeFeature[];
+  history: CooperativeFeatureHistory[];
+}
+
+export async function fetchCooperativeFeatures(id: number): Promise<CooperativeFeaturesResponse> {
+  return request<CooperativeFeaturesResponse>(`/m15/cooperatives/${id}/features`);
+}
+
+export async function updateCooperativeFeatures(
+  id: number,
+  updates: Array<{ featureKey: string; mode: FeatureMode; reason?: string }>,
+): Promise<CooperativeFeaturesResponse> {
+  return request<CooperativeFeaturesResponse>(`/m15/cooperatives/${id}/features`, {
+    method: "PUT",
+    body: JSON.stringify({ updates }),
+  });
+}
+
 export interface CreationCoopResult {
   cooperative: CoopDetail["cooperative"];
   cleLicence: string;

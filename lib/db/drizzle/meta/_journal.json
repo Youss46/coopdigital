@@ -967,6 +967,13 @@
       "when": 1788483400000,
       "tag": "0137_reglement_frais_transport",
       "breakpoints": true
+    },
+    {
+      "idx": 138,
+      "version": "7",
+      "when": 1788483500000,
+      "tag": "0138_cooperative_features",
+      "breakpoints": true
     }
   ]
 }
