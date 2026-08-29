@@ -1,7 +1,43 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, createElement } from "react";
+import { createRoot } from "react-dom/client";
+import VentesPage from "@/pages/VentesPage";
 import { trackVenteEnregistree, type VenteSource } from "./analytics";
 
 const sources: VenteSource[] = ["lot", "reception_port", "fournisseur"];
+
+const mocks = vi.hoisted(() => ({
+  createVente: vi.fn(),
+  useQuery: vi.fn(),
+}));
+
+vi.mock("@/contexts/AuthContext", () => ({
+  useAuth: () => ({ token: "test-token" }),
+}));
+
+vi.mock("@/hooks/usePermission", () => ({
+  usePermission: () => true,
+}));
+
+vi.mock("@/hooks/use-toast", () => ({
+  useToast: () => ({ toast: vi.fn() }),
+}));
+
+vi.mock("@tanstack/react-query", () => ({
+  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  useQuery: mocks.useQuery,
+}));
+
+vi.mock("@workspace/api-client-react", () => ({
+  useGetVentes: () => ({ data: [], isLoading: false }),
+  useGetExportateurs: () => ({
+    data: [{ id: 7, nom: "Exportateur test", ville: "Abidjan" }],
+  }),
+  useCreateVente: mocks.createVente,
+  useEncaisserVente: () => ({ mutate: vi.fn(), isPending: false }),
+  getGetVentesQueryKey: () => ["ventes"],
+  getGetExportateursQueryKey: () => ["exportateurs"],
+}));
 
 describe("suivi analytique des ventes", () => {
   const track = vi.fn();
@@ -36,4 +72,262 @@ describe("suivi analytique des ventes", () => {
       expect(track).not.toHaveBeenCalled();
     },
   );
+});
+
+describe("branchement UI du suivi des ventes", () => {
+  const track = vi.fn();
+  let createVenteShouldSucceed = true;
+  let fetchMock: ReturnType<typeof vi.fn>;
+  let container: HTMLDivElement;
+  let root: ReturnType<typeof createRoot>;
+
+  beforeEach(() => {
+    track.mockReset();
+    window.umami = { track };
+    createVenteShouldSucceed = true;
+
+    mocks.useQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
+      switch (queryKey[0]) {
+        case "ventes-lots-stock":
+          return {
+            data: [{
+              id: 12,
+              qrCodeLot: "LOT-0012",
+              statut: "en_stock",
+              poidsTotalKg: "18500",
+              entrepot: "Entrepôt membre",
+              dateCreation: "2026-08-01",
+            }],
+          };
+        case "ventes-stocks-receptionnes":
+          return {
+            data: [{
+              expeditionId: 21,
+              numeroExpedition: "EXP-0021",
+              port: "San Pedro",
+              dateReception: "2026-08-10",
+              poidsRecuPortKg: 19000,
+              poidsAcceptePortKg: 18500,
+              poidsVenduKg: 0,
+              poidsDisponibleKg: 18500,
+              lots: [{ lotId: 12, poidsKg: 18500 }],
+            }],
+          };
+        case "ventes-stock-fournisseurs":
+          return {
+            data: [{
+              id: 34,
+              nom: "Kouassi",
+              prenoms: "Awa",
+              type_fournisseur: "pisteur",
+              poids_disponible_kg: "9000",
+              nb_livraisons: 1,
+            }],
+          };
+        case "livraisons-dispos-fourn":
+          return { data: [{ id: 41, dateLivraison: "2026-08-12", poidsKg: "9000" }] };
+        case "prix-actuel":
+          return { data: { prixVenteExportFcfa: "1200" } };
+        default:
+          return { data: [] };
+      }
+    });
+
+    mocks.createVente.mockImplementation((options: {
+      mutation: {
+        onSuccess?: (data: { statut: string }, variables: { data: { expeditionId?: number } }) => void;
+        onError?: (error: Error) => void;
+      };
+    }) => ({
+      isPending: false,
+      mutate: (variables: { data: { expeditionId?: number } }) => {
+        if (createVenteShouldSucceed) {
+          options.mutation.onSuccess?.({ statut: "en_attente" }, variables);
+        } else {
+          options.mutation.onError?.(new Error("HTTP 500"));
+        }
+      },
+    }));
+
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    container = document.createElement("div");
+    document.body.appendChild(container);
+  });
+
+  afterEach(() => {
+    act(() => root?.unmount());
+    container.remove();
+    delete window.umami;
+    vi.unstubAllGlobals();
+    mocks.createVente.mockReset();
+    mocks.useQuery.mockReset();
+  });
+
+  function renderPage() {
+    act(() => {
+      root = createRoot(container);
+      root.render(createElement(VentesPage));
+    });
+  }
+
+  function buttonContaining(text: string): HTMLButtonElement {
+    const button = Array.from(container.querySelectorAll("button"))
+      .find((candidate) => candidate.textContent?.includes(text));
+    if (!(button instanceof HTMLButtonElement)) {
+      throw new Error(`Bouton introuvable: ${text}`);
+    }
+    return button;
+  }
+
+  function selectLabeled(labelText: string, value: string) {
+    const label = Array.from(container.querySelectorAll("label"))
+      .find((candidate) => candidate.textContent?.includes(labelText));
+    const select = label?.parentElement?.querySelector("select");
+    if (!(select instanceof HTMLSelectElement)) {
+      throw new Error(`Sélecteur introuvable: ${labelText}`);
+    }
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLSelectElement.prototype,
+        "value",
+      )?.set;
+      setter?.call(select, value);
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  }
+
+  function inputLabeled(labelText: string, value: string) {
+    const label = Array.from(container.querySelectorAll("label"))
+      .find((candidate) => candidate.textContent?.includes(labelText));
+    const input = label?.parentElement?.querySelector("input");
+    if (!(input instanceof HTMLInputElement)) {
+      throw new Error(`Champ introuvable: ${labelText}`);
+    }
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set;
+      setter?.call(input, value);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  }
+
+  function openSaleModal() {
+    act(() => {
+      buttonContaining("Nouvelle vente").click();
+    });
+  }
+
+  function expectTracked(source: VenteSource) {
+    expect(track).toHaveBeenCalledOnce();
+    expect(track).toHaveBeenCalledWith("vente_enregistree", {
+      source,
+      statut: "en_attente",
+    });
+  }
+
+  function expectNotTracked() {
+    expect(track).not.toHaveBeenCalled();
+  }
+
+  function fillMemberSale(source: "lot" | "reception") {
+    openSaleModal();
+    if (source === "lot") {
+      selectLabeled("Lot à vendre", "12");
+    } else {
+      act(() => {
+        buttonContaining("Réceptions port").click();
+      });
+      selectLabeled("Réception au port", "21");
+    }
+    selectLabeled("Exportateur", "7");
+  }
+
+  function fillSupplierSale() {
+    openSaleModal();
+    act(() => {
+      buttonContaining("Stock fournisseur").click();
+    });
+    selectLabeled("Pisteur / fournisseur", "34");
+    act(() => {
+      const checkbox = container.querySelector('input[type="checkbox"]');
+      if (!(checkbox instanceof HTMLInputElement)) {
+        throw new Error("Livraison fournisseur introuvable");
+      }
+      checkbox.click();
+    });
+    selectLabeled("Exportateur", "7");
+    inputLabeled("Prix unitaire", "1200");
+  }
+
+  it.each([
+    ["lot", () => fillMemberSale("lot")],
+    ["réception au port", () => fillMemberSale("reception")],
+  ] as const)(
+    "déclenche une seule fois l'événement après succès depuis %s",
+    async (_source, fill) => {
+      renderPage();
+      fill();
+
+      act(() => {
+        buttonContaining("Enregistrer la vente").click();
+      });
+
+      await act(async () => {});
+      expectTracked(_source === "lot" ? "lot" : "reception_port");
+    },
+  );
+
+  it("déclenche une seule fois l'événement après succès depuis un fournisseur", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ statut: "en_attente" }),
+    });
+    renderPage();
+    fillSupplierSale();
+
+    await act(async () => {
+      buttonContaining("Enregistrer la vente").click();
+    });
+
+    expectTracked("fournisseur");
+  });
+
+  it.each([
+    ["lot", () => fillMemberSale("lot")],
+    ["réception au port", () => fillMemberSale("reception")],
+  ] as const)(
+    "ne déclenche aucun événement après échec HTTP depuis %s",
+    async (_source, fill) => {
+      createVenteShouldSucceed = false;
+      renderPage();
+      fill();
+
+      act(() => {
+        buttonContaining("Enregistrer la vente").click();
+      });
+
+      await act(async () => {});
+      expectNotTracked();
+    },
+  );
+
+  it("ne déclenche aucun événement après échec HTTP depuis un fournisseur", async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: async () => ({ erreur: "Erreur serveur" }),
+    });
+    renderPage();
+    fillSupplierSale();
+
+    await act(async () => {
+      buttonContaining("Enregistrer la vente").click();
+    });
+
+    expectNotTracked();
+  });
 });
