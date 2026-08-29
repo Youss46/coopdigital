@@ -156,6 +156,45 @@ export async function updateCooperativeFeatures(
   });
 }
 
+export type CooperativeRoleMode = "active" | "disabled";
+export interface CooperativeRole {
+  key: string;
+  label: string;
+  description: string;
+  mode: CooperativeRoleMode;
+  source: "custom" | "default";
+  userCount: number;
+  updatedAt: string | null;
+}
+export interface CooperativeRoleHistory {
+  id: number;
+  cooperativeId: number;
+  roleKey: string;
+  previousMode: string | null;
+  newMode: CooperativeRoleMode;
+  reason: string | null;
+  changedBy: number | null;
+  createdAt: string;
+}
+export interface CooperativeRolesResponse {
+  roles: CooperativeRole[];
+  history: CooperativeRoleHistory[];
+}
+
+export async function fetchCooperativeRoles(id: number): Promise<CooperativeRolesResponse> {
+  return request<CooperativeRolesResponse>(`/m15/cooperatives/${id}/roles`);
+}
+
+export async function updateCooperativeRoles(
+  id: number,
+  updates: Array<{ roleKey: string; mode: CooperativeRoleMode; reason?: string }>,
+): Promise<CooperativeRolesResponse> {
+  return request<CooperativeRolesResponse>(`/m15/cooperatives/${id}/roles`, {
+    method: "PUT",
+    body: JSON.stringify({ updates }),
+  });
+}
+
 export interface CreationCoopResult {
   cooperative: CoopDetail["cooperative"];
   cleLicence: string;

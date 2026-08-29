@@ -9,6 +9,7 @@ import {
   ToggleUserActifBody,
 } from "@workspace/api-zod";
 import { canCreateUser, canDeleteUser, canResetUserPassword } from "../middlewares/roleGuard";
+import { assertRoleActive, CooperativeRoleDisabledError } from "../services/cooperativeRolesService.js";
 
 const ROLES_ALLOWED_TO_MANAGE = ["pca", "directeur"];
 const ROLES_ALLOWED_CREATE_PESEUR = ["pca", "directeur", "delegue"];
@@ -87,6 +88,16 @@ export async function createUser(req: Request, res: Response): Promise<void> {
   if (!canCreateUser(requesterRole, role)) {
     res.status(403).json({ erreur: "Vous ne pouvez pas créer un compte avec ce rôle" });
     return;
+  }
+
+  try {
+    await assertRoleActive(cooperativeId, role);
+  } catch (error) {
+    if (error instanceof CooperativeRoleDisabledError) {
+      res.status(403).json({ code: error.code, erreur: error.message });
+      return;
+    }
+    throw error;
   }
 
   // Les peseurs n'ont pas d'email réel — on génère un email interne à partir du téléphone
@@ -532,6 +543,15 @@ export async function createPeseurParDelegue(req: Request, res: Response): Promi
     res.status(401).json({ erreur: "Coopérative non associée" });
     return;
   }
+  try {
+    await assertRoleActive(cooperativeId, "peseur");
+  } catch (error) {
+    if (error instanceof CooperativeRoleDisabledError) {
+      res.status(403).json({ code: error.code, erreur: error.message });
+      return;
+    }
+    throw error;
+  }
 
   const body = req.body as { nom?: string; prenoms?: string; telephone?: string; motDePasse?: string };
   const { nom, prenoms, telephone, motDePasse } = body;
@@ -599,6 +619,15 @@ export async function createChauffeurUser(req: Request, res: Response): Promise<
   const role = req.user?.role;
   if (!ROLES_ALLOWED_TO_MANAGE.includes(role ?? "")) {
     res.status(403).json({ erreur: "Réservé au directeur / PCA" }); return;
+  }
+  try {
+    await assertRoleActive(cooperativeId, "chauffeur");
+  } catch (error) {
+    if (error instanceof CooperativeRoleDisabledError) {
+      res.status(403).json({ code: error.code, erreur: error.message });
+      return;
+    }
+    throw error;
   }
 
   const body = req.body as { nom?: string; prenoms?: string; telephone?: string; motDePasse?: string; chauffeur_id?: number };
@@ -762,6 +791,15 @@ export async function createPeseurAdmin(req: Request, res: Response): Promise<vo
   }
   const cooperativeId = req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
+  try {
+    await assertRoleActive(cooperativeId, "peseur");
+  } catch (error) {
+    if (error instanceof CooperativeRoleDisabledError) {
+      res.status(403).json({ code: error.code, erreur: error.message });
+      return;
+    }
+    throw error;
+  }
 
   const body = req.body as {
     nom?: string; prenoms?: string; telephone?: string; motDePasse?: string;

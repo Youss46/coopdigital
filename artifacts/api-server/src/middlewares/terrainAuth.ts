@@ -2,6 +2,7 @@ import { type Request, type Response, type NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { isRoleActive } from "../services/cooperativeRolesService.js";
 
 export const COMPTE_DESACTIVE_CODE = "COMPTE_DESACTIVE";
 export const COMPTE_DESACTIVE_MESSAGE =
@@ -24,17 +25,24 @@ const ROLES_TERRAIN = ["delegue", "agent_terrain", "peseur", "chauffeur"] as con
 
 async function compteTerrainActif(payload: TerrainJwtPayload): Promise<boolean> {
   const [user] = await db
-    .select({ actif: usersTable.actif })
+    .select({ actif: usersTable.actif, cooperativeId: usersTable.cooperativeId, role: usersTable.role })
     .from(usersTable)
     .where(eq(usersTable.id, payload.id))
     .limit(1);
-  return user?.actif === true;
+  return user?.actif === true && (!user.cooperativeId || await isRoleActive(user.cooperativeId, user.role));
 }
 
 function refuserCompteDesactive(res: Response): void {
   res.status(403).json({
     code: COMPTE_DESACTIVE_CODE,
     erreur: COMPTE_DESACTIVE_MESSAGE,
+  });
+}
+
+function refuserRoleDesactive(res: Response): void {
+  res.status(403).json({
+    code: "ROLE_DISABLED",
+    erreur: "Votre rôle est désactivé pour cette coopérative. Contactez l’administration.",
   });
 }
 
@@ -69,6 +77,12 @@ export async function terrainAuthMiddleware(req: Request, res: Response, next: N
     }
 
     if (!await compteTerrainActif(payload)) {
+      const [current] = await db.select({ actif: usersTable.actif, cooperativeId: usersTable.cooperativeId, role: usersTable.role })
+        .from(usersTable).where(eq(usersTable.id, payload.id)).limit(1);
+      if (current?.actif && current.cooperativeId && !await isRoleActive(current.cooperativeId, current.role)) {
+        refuserRoleDesactive(res);
+        return;
+      }
       refuserCompteDesactive(res);
       return;
     }
@@ -102,6 +116,12 @@ export async function flexAuthMiddleware(req: Request, res: Response, next: Next
     const payload = jwt.verify(token, secret) as TerrainJwtPayload & { role: string };
     if (ROLES_TERRAIN.includes(payload.role as (typeof ROLES_TERRAIN)[number])) {
       if (!await compteTerrainActif(payload)) {
+        const [current] = await db.select({ actif: usersTable.actif, cooperativeId: usersTable.cooperativeId, role: usersTable.role })
+          .from(usersTable).where(eq(usersTable.id, payload.id)).limit(1);
+        if (current?.actif && current.cooperativeId && !await isRoleActive(current.cooperativeId, current.role)) {
+          refuserRoleDesactive(res);
+          return;
+        }
         refuserCompteDesactive(res);
         return;
       }

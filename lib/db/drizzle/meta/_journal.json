@@ -974,6 +974,13 @@
       "when": 1788483500000,
       "tag": "0138_cooperative_features",
       "breakpoints": true
+    },
+    {
+      "idx": 139,
+      "version": "7",
+      "when": 1788483600000,
+      "tag": "0139_cooperative_roles",
+      "breakpoints": true
     }
   ]
 }

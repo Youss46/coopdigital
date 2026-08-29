@@ -8,6 +8,8 @@ import {
   getCooperativeHandler,
   getCooperativeFeaturesHandler,
   updateCooperativeFeaturesHandler,
+  getCooperativeRolesHandler,
+  updateCooperativeRolesHandler,
   updateCooperativeHandler,
   getPlansHandler,
   updatePlanHandler,
@@ -53,6 +55,8 @@ router.post("/m15/cooperatives", requireM15Role("superadmin", "admin"), createCo
 router.get("/m15/cooperatives/:id", getCooperativeHandler);
 router.get("/m15/cooperatives/:id/features", getCooperativeFeaturesHandler);
 router.put("/m15/cooperatives/:id/features", requireM15Role("superadmin"), updateCooperativeFeaturesHandler);
+router.get("/m15/cooperatives/:id/roles", getCooperativeRolesHandler);
+router.put("/m15/cooperatives/:id/roles", requireM15Role("superadmin"), updateCooperativeRolesHandler);
 router.put("/m15/cooperatives/:id", requireM15Role("superadmin", "admin"), updateCooperativeHandler);
 
 router.post("/m15/licences/generer", requireM15Role("superadmin", "admin"), genererLicenceHandler);

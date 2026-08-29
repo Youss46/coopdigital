@@ -1,5 +1,6 @@
 import { type Request, type Response } from "express";
 import bcrypt from "bcryptjs";
+import { assertRoleActive, CooperativeRoleDisabledError } from "../services/cooperativeRolesService.js";
 import { db } from "@workspace/db";
 import { eq, and, desc, sql, asc } from "drizzle-orm";
 import { missionsTerrainTable, missionsMembresTable, messagesMissionTable, usersTable, membresTable, parcellesTable } from "@workspace/db";
@@ -1225,6 +1226,16 @@ export async function createAgentTerrain(req: Request, res: Response): Promise<v
     if (!nom || !prenoms || !email || !telephone || !motDePasse) {
       res.status(400).json({ erreur: "Nom, prénoms, email, téléphone et mot de passe sont requis" });
       return;
+    }
+
+    try {
+      await assertRoleActive(cooperativeId, "agent_terrain");
+    } catch (error) {
+      if (error instanceof CooperativeRoleDisabledError) {
+        res.status(403).json({ code: error.code, erreur: error.message });
+        return;
+      }
+      throw error;
     }
 
     const passwordHash = await bcrypt.hash(motDePasse, 10);

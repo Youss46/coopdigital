@@ -20,6 +20,13 @@ export async function loginTerrainHandler(req: Request, res: Response): Promise<
       res.status(401).json({ erreur: "Numéro ou mot de passe incorrect" });
       return;
     }
+    if ("blockedRole" in result && result.blockedRole === "disabled") {
+      res.status(403).json({
+        code: "ROLE_DISABLED",
+        erreur: "Votre rôle est désactivé pour cette coopérative. Contactez l’administration.",
+      });
+      return;
+    }
     if ("blockedMode" in result && result.blockedMode === "central") {
       res.status(403).json({ erreur: "COMPTE_CENTRAL", message: "Ce compte est géré par la base centrale. Contactez votre coopérative." });
       return;

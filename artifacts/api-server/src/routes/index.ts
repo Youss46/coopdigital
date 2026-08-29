@@ -71,6 +71,7 @@ import commissionsMembresDelaguesRouter from "./commissions_membres_delegues";
 import bonsReceptionRouter from "./bons_reception";
 import { denyComptableRestrictedModules } from "../middlewares/permissions";
 import { featureGuard } from "../middlewares/featureGuard";
+import { cooperativeRoleGuard } from "../middlewares/cooperativeRoleGuard.js";
 
 const router: IRouter = Router();
 
@@ -84,9 +85,9 @@ router.use(portailRouter);
 // Ces routeurs contiennent aussi des routes terrain ou des routes publiques et
 // sont donc montés avant le guard global. Leurs branches coopératives doivent
 // néanmoins conserver l'ordre licence → RBAC → fonctionnalité.
-router.use("/delegues", authMiddleware, tenantGuard, denyComptableRestrictedModules, featureGuard);
-router.use(["/entrepots", "/transferts"], authMiddleware, tenantGuard, denyComptableRestrictedModules, featureGuard);
-router.use("/pesee", authMiddleware, tenantGuard, denyComptableRestrictedModules, featureGuard);
+router.use("/delegues", authMiddleware, tenantGuard, denyComptableRestrictedModules, featureGuard, cooperativeRoleGuard);
+router.use(["/entrepots", "/transferts"], authMiddleware, tenantGuard, denyComptableRestrictedModules, featureGuard, cooperativeRoleGuard);
+router.use("/pesee", authMiddleware, tenantGuard, denyComptableRestrictedModules, featureGuard, cooperativeRoleGuard);
 for (const prefix of [
   "/terrain/chauffeur",
   "/terrain/enquetes",
@@ -111,7 +112,7 @@ for (const prefix of [
   "/terrain/rapport-journalier",
   "/terrain/sync",
 ]) {
-  router.use(prefix, authMiddleware, tenantGuard, denyComptableRestrictedModules, featureGuard);
+  router.use(prefix, authMiddleware, tenantGuard, denyComptableRestrictedModules, featureGuard, cooperativeRoleGuard);
 }
 
 router.use(terrainRouter);
@@ -127,6 +128,7 @@ router.use(authMiddleware);
 router.use(tenantGuard);
 router.use(denyComptableRestrictedModules);
 router.use(featureGuard);
+router.use(cooperativeRoleGuard);
 
 router.use(membresRouter);
 router.use(avancesRouter);

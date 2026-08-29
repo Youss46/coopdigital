@@ -17,6 +17,7 @@ import { entrerStockSiDelegue, getEntrepotDuDelegue } from "./entrepotDelegueSer
 import { computeCodeMembre } from "./portailService.js";
 import { isCertificationCacao } from "../lib/certificationCacao.js";
 import { generateEcrituresLivraison } from "./comptabiliteService.js";
+import { isRoleActive } from "./cooperativeRolesService.js";
 
 function toNum(v: unknown): number {
   return Number(v ?? 0);
@@ -44,6 +45,10 @@ export async function loginTerrain(telephone: string, motDePasse: string) {
 
   const ok = await bcrypt.compare(motDePasse, user.passwordHash);
   if (!ok) return null;
+
+  if (user.cooperativeId && !await isRoleActive(user.cooperativeId, user.role)) {
+    return { blockedRole: "disabled" as const };
+  }
 
   // Délégué géré centralement : connexion terrain bloquée
   if (user.role === "delegue" && (user as typeof user & { modeGestion?: string | null }).modeGestion === "central") {

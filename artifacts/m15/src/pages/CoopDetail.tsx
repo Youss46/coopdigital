@@ -7,8 +7,10 @@ import {
   reactiverCooperative, supprimerCooperative, toggleRenouvellementAuto,
   resetPasswordPca, updatePca, activerCooperative,
   fetchCooperativeFeatures, updateCooperativeFeatures,
+  fetchCooperativeRoles, updateCooperativeRoles,
   formatDate, formatFcfa, statutColor, statutLabel, joursColor,
   type CoopDetail as CoopDetailType, type Plan, type CooperativeFeature, type CooperativeFeatureHistory, type FeatureMode,
+  type CooperativeRole, type CooperativeRoleHistory, type CooperativeRoleMode,
 } from "@/lib/api";
 import {
   Loader2, AlertCircle, ArrowLeft, CheckCircle2, PauseCircle, XCircle,
@@ -17,7 +19,7 @@ import {
   Settings2, LockKeyhole, Eye, Power,
 } from "lucide-react";
 
-type Tab = "licence" | "pca" | "stats" | "fonctionnalites" | "historique";
+type Tab = "licence" | "pca" | "stats" | "fonctionnalites" | "roles" | "historique";
 
 const DUREES = [1, 2, 3, 5] as const;
 type Duree = 1 | 2 | 3 | 5;
@@ -79,6 +81,12 @@ export default function CoopDetail() {
   const [featureSaving, setFeatureSaving] = useState(false);
   const [featureError, setFeatureError] = useState("");
   const [featureReason, setFeatureReason] = useState("");
+  const [roles, setRoles] = useState<CooperativeRole[]>([]);
+  const [roleHistory, setRoleHistory] = useState<CooperativeRoleHistory[]>([]);
+  const [rolesLoading, setRolesLoading] = useState(false);
+  const [rolesSaving, setRolesSaving] = useState(false);
+  const [roleError, setRoleError] = useState("");
+  const [roleReason, setRoleReason] = useState("");
 
   // Reset PCA result
   const [resetResult, setResetResult] = useState<{ motdepasse_clair: string; email: string; sms_envoye: boolean; telephone: string | null } | null>(null);
@@ -92,9 +100,10 @@ export default function CoopDetail() {
   async function load() {
     setLoading(true); setError("");
     try {
-      const [d, ps, fs] = await Promise.all([fetchCooperative(id), fetchPlans(), fetchCooperativeFeatures(id)]);
+      const [d, ps, fs, rs] = await Promise.all([fetchCooperative(id), fetchPlans(), fetchCooperativeFeatures(id), fetchCooperativeRoles(id)]);
       setData(d); setPlans(ps);
       setFeatures(fs.features); setFeatureHistory(fs.history);
+      setRoles(rs.roles); setRoleHistory(rs.history);
     } catch (e) { setError(e instanceof Error ? e.message : "Erreur"); }
     finally { setLoading(false); }
   }
@@ -106,6 +115,15 @@ export default function CoopDetail() {
       setFeatures(fs.features); setFeatureHistory(fs.history);
     } catch (e) { setFeatureError(e instanceof Error ? e.message : "Erreur"); }
     finally { setFeaturesLoading(false); }
+  }
+
+  async function loadRoles() {
+    setRolesLoading(true); setRoleError("");
+    try {
+      const rs = await fetchCooperativeRoles(id);
+      setRoles(rs.roles); setRoleHistory(rs.history);
+    } catch (e) { setRoleError(e instanceof Error ? e.message : "Erreur"); }
+    finally { setRolesLoading(false); }
   }
 
   useEffect(() => { void load(); }, [id]);
@@ -209,11 +227,29 @@ export default function CoopDetail() {
     setFeatures((current) => current.map((feature) => feature.key === key ? { ...feature, mode, source: "custom" } : feature));
   }
 
+  function setRoleMode(key: string, mode: CooperativeRoleMode) {
+    setRoles((current) => current.map((role) => role.key === key ? { ...role, mode, source: "custom" } : role));
+  }
+
+  async function saveRoles() {
+    setRolesSaving(true); setRoleError("");
+    try {
+      const rs = await updateCooperativeRoles(id, roles.map((role) => ({
+        roleKey: role.key,
+        mode: role.mode,
+        reason: roleReason || undefined,
+      })));
+      setRoles(rs.roles); setRoleHistory(rs.history); setRoleReason("");
+    } catch (e) { setRoleError(e instanceof Error ? e.message : "Erreur"); }
+    finally { setRolesSaving(false); }
+  }
+
   const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
     { id: "licence", label: "Licence", icon: FileKey },
     { id: "pca", label: "PCA", icon: User },
     { id: "stats", label: "Statistiques", icon: BarChart3 },
     { id: "fonctionnalites", label: "Fonctionnalités", icon: Settings2 },
+    { id: "roles", label: "Rôles", icon: ShieldAlert },
     { id: "historique", label: "Historique", icon: History },
   ];
 
@@ -520,6 +556,89 @@ export default function CoopDetail() {
                             {entry.reason && <div className="text-xs text-muted-foreground mt-0.5">{entry.reason}</div>}
                           </div>
                            <span className="text-xs text-muted-foreground sm:ml-auto">{formatDate(entry.createdAt)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Rôles Tab */}
+            {tab === "roles" && (
+              <div className="space-y-4">
+                <div className="bg-card border rounded-xl p-5">
+                  <div className="flex items-start justify-between gap-4 mb-2">
+                    <div>
+                      <h2 className="font-semibold">Rôles de la coopérative</h2>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {canManageFeatures
+                          ? "Désactivez un rôle pour empêcher sa connexion et toute nouvelle attribution. Les comptes et leur historique sont conservés."
+                          : "Consultation de la configuration. Seul le super administrateur peut modifier les rôles."}
+                      </p>
+                    </div>
+                    <button onClick={() => void loadRoles()} className="p-2 border rounded-lg hover:bg-muted" title="Actualiser">
+                      <RefreshCw size={14} className={rolesLoading ? "animate-spin" : ""} />
+                    </button>
+                  </div>
+                  {roleError && <div className="text-destructive text-sm flex items-center gap-1 mt-3"><AlertCircle size={14} /> {roleError}</div>}
+                  <div className="mt-5 divide-y border rounded-lg">
+                    {roles.map((role) => (
+                      <div key={role.key} className="p-3 flex flex-col sm:flex-row sm:items-center gap-3">
+                        <div className={`size-8 rounded-lg flex items-center justify-center shrink-0 ${
+                          role.mode === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
+                        }`}>
+                          {role.mode === "active" ? <Power size={15} /> : <LockKeyhole size={15} />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium">{role.label}</div>
+                          <div className="text-xs text-muted-foreground">{role.description}</div>
+                          <div className="text-[11px] text-muted-foreground mt-0.5">
+                            {role.userCount} compte{role.userCount > 1 ? "s" : ""} actif{role.userCount > 1 ? "s" : ""} concerné{role.userCount > 1 ? "s" : ""}
+                          </div>
+                        </div>
+                        <select
+                          value={role.mode}
+                          onChange={(event) => setRoleMode(role.key, event.target.value as CooperativeRoleMode)}
+                          disabled={!canManageFeatures}
+                          className="border rounded-md bg-background px-2 py-1.5 text-xs font-medium self-start sm:self-auto"
+                        >
+                          <option value="active">Actif</option>
+                          <option value="disabled">Désactivé</option>
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                  {canManageFeatures && <div className="mt-5 flex flex-col sm:flex-row gap-3 sm:items-end">
+                    <div className="flex-1">
+                      <label className="text-xs font-medium text-muted-foreground">Motif du changement (facultatif)</label>
+                      <input value={roleReason} onChange={(event) => setRoleReason(event.target.value)}
+                        className={inputCls + " mt-1"} placeholder="Ex. Réorganisation de l'équipe" />
+                    </div>
+                    <button onClick={() => void saveRoles()} disabled={rolesSaving || rolesLoading}
+                      className="px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium disabled:opacity-60 flex items-center justify-center gap-2">
+                      {rolesSaving && <Loader2 size={14} className="animate-spin" />} Enregistrer les rôles
+                    </button>
+                  </div>}
+                </div>
+
+                <div className="bg-card border rounded-xl overflow-hidden">
+                  <div className="px-5 py-4 border-b">
+                    <h2 className="font-semibold text-sm">Historique des changements</h2>
+                  </div>
+                  {roleHistory.length === 0 ? (
+                    <div className="py-8 text-center text-sm text-muted-foreground">Aucun changement enregistré</div>
+                  ) : (
+                    <div className="divide-y max-h-72 overflow-y-auto">
+                      {[...roleHistory].reverse().map((entry) => (
+                        <div key={entry.id} className="px-5 py-3 flex flex-wrap items-center gap-3 text-sm">
+                          <History size={14} className="text-muted-foreground shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <span className="font-medium">{roles.find((role) => role.key === entry.roleKey)?.label ?? entry.roleKey}</span>
+                            <span className="text-muted-foreground"> · {entry.previousMode ?? "actif"} → {entry.newMode === "active" ? "actif" : "désactivé"}</span>
+                            {entry.reason && <div className="text-xs text-muted-foreground mt-0.5">{entry.reason}</div>}
+                          </div>
+                          <span className="text-xs text-muted-foreground sm:ml-auto">{formatDate(entry.createdAt)}</span>
                         </div>
                       ))}
                     </div>

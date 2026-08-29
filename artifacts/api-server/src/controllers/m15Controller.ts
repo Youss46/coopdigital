@@ -1,8 +1,9 @@
 import { type Request, type Response } from "express";
 import * as licenceService from "../services/licenceService.js";
 import * as cooperativeFeaturesService from "../services/cooperativeFeaturesService.js";
+import * as cooperativeRolesService from "../services/cooperativeRolesService.js";
 import { db } from "@workspace/db";
-import { plansAbonnementTable, licencesTable, cooperativeFeatureModes } from "@workspace/db";
+import { plansAbonnementTable, licencesTable, cooperativeFeatureModes, cooperativeRoleModes } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 export async function resetPasswordPcaHandler(req: Request, res: Response): Promise<void> {
@@ -176,6 +177,47 @@ export async function updateCooperativeFeaturesHandler(req: Request, res: Respon
   } catch (err) {
     req.log.error({ err }, "Erreur mise à jour fonctionnalités coop M15");
     res.status(400).json({ erreur: (err as Error).message });
+  }
+}
+
+export async function getCooperativeRolesHandler(req: Request, res: Response): Promise<void> {
+  const id = parseInt(String(req.params["id"]), 10);
+  if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+  try {
+    const roles = await cooperativeRolesService.getCooperativeRoleConfig(id);
+    if (!roles) { res.status(404).json({ erreur: "Coopérative introuvable" }); return; }
+    const history = await cooperativeRolesService.getCooperativeRoleHistory(id);
+    res.json({ roles, history });
+  } catch (err) {
+    req.log.error({ err }, "Erreur rôles coop M15");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function updateCooperativeRolesHandler(req: Request, res: Response): Promise<void> {
+  const id = parseInt(String(req.params["id"]), 10);
+  const body = req.body as { updates?: Array<{ roleKey?: string; mode?: string; reason?: string }> };
+  if (isNaN(id) || !Array.isArray(body.updates)) {
+    res.status(400).json({ erreur: "ID et liste de modifications requis" });
+    return;
+  }
+  const updates = body.updates.map((update) => ({
+    roleKey: String(update.roleKey ?? ""),
+    mode: String(update.mode ?? "") as (typeof cooperativeRoleModes)[number],
+    reason: update.reason,
+  }));
+  if (updates.some((update) => !update.roleKey || !cooperativeRoleModes.includes(update.mode))) {
+    res.status(400).json({ erreur: "Un rôle ou un mode est invalide" });
+    return;
+  }
+  try {
+    const roles = await cooperativeRolesService.updateCooperativeRoles(id, updates, m15UserId(req));
+    const history = await cooperativeRolesService.getCooperativeRoleHistory(id);
+    res.json({ roles, history });
+  } catch (err) {
+    req.log.error({ err }, "Erreur mise à jour rôles coop M15");
+    const error = err as Error & { code?: string };
+    res.status(400).json({ code: error.code, erreur: error.message });
   }
 }
 
