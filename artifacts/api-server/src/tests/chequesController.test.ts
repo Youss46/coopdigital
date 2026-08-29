@@ -2,13 +2,20 @@ import express from "express";
 import type { Server } from "node:http";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { encaisserChequeRecu, rejeterChequeRecu, annulerChequeRecu } = vi.hoisted(() => ({
+const {
+  deposerChequeRecu,
+  encaisserChequeRecu,
+  rejeterChequeRecu,
+  annulerChequeRecu,
+} = vi.hoisted(() => ({
+  deposerChequeRecu: vi.fn(),
   encaisserChequeRecu: vi.fn(),
   rejeterChequeRecu: vi.fn(),
   annulerChequeRecu: vi.fn(),
 }));
 
 vi.mock("../services/chequesRecusService.js", () => ({
+  deposerChequeRecu,
   encaisserChequeRecu,
   rejeterChequeRecu,
   annulerChequeRecu,
@@ -57,6 +64,55 @@ afterAll(async () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+describe("POST /cheques-recus/:id/deposer", () => {
+  it("retourne 409 au perdant d'une double demande de dépôt", async () => {
+    let calls = 0;
+    let releaseConcurrentRequests!: () => void;
+    const concurrentRequests = new Promise<void>((resolve) => {
+      releaseConcurrentRequests = resolve;
+    });
+
+    deposerChequeRecu.mockImplementation(async () => {
+      const requestNumber = ++calls;
+      if (requestNumber === 2) releaseConcurrentRequests();
+      await concurrentRequests;
+
+      if (requestNumber === 1) {
+        return {
+          id: 40,
+          statut: "depose",
+          dateDepot: "2026-08-29",
+        };
+      }
+      throw new Error("Seul un chèque à déposer peut être déposé");
+    });
+
+    const request = () => fetch(`${baseUrl}/cheques-recus/40/deposer`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dateDepot: "2026-08-29" }),
+    });
+
+    const [firstResponse, secondResponse] = await Promise.all([request(), request()]);
+    const responses = await Promise.all([
+      firstResponse.json() as Promise<Record<string, unknown>>,
+      secondResponse.json() as Promise<Record<string, unknown>>,
+    ]);
+
+    expect([firstResponse.status, secondResponse.status].sort()).toEqual([200, 409]);
+    expect(responses).toContainEqual({
+      id: 40,
+      statut: "depose",
+      dateDepot: "2026-08-29",
+    });
+    expect(responses).toContainEqual({
+      erreur: "Seul un chèque à déposer peut être déposé",
+    });
+    expect(deposerChequeRecu).toHaveBeenCalledTimes(2);
+    expect(deposerChequeRecu).toHaveBeenCalledWith(40, 7, "2026-08-29");
+  });
 });
 
 describe("POST /cheques-recus/:id/encaisser", () => {
