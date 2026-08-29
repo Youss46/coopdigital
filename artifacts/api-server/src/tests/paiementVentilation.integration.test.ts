@@ -1322,6 +1322,94 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
     ]);
   });
 
+  it("ne conserve qu'une seule issue lors d'un rejet et d'une annulation concurrents", async () => {
+    const fixture = await createFixture(
+      [{ mode: "cheque", amount: 110_000 }],
+      "rejet-annulation-concurrent",
+    );
+
+    const results = await Promise.allSettled([
+      rejeterChequeRecu(fixture.chequeId, cooperativeId, {
+        motifRejet: "Rejet concurrent",
+        dateRejet: "2026-08-29",
+      }),
+      annulerChequeRecu(
+        fixture.chequeId,
+        cooperativeId,
+        "Annulation concurrente",
+      ),
+    ]);
+
+    const fulfilled = results.filter(
+      (result): result is PromiseFulfilledResult<
+        Awaited<ReturnType<typeof rejeterChequeRecu>>
+        | Awaited<ReturnType<typeof annulerChequeRecu>>
+      > => result.status === "fulfilled",
+    );
+    const rejected = results.filter(
+      (result): result is PromiseRejectedResult => result.status === "rejected",
+    );
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+
+    const successfulStatus = fulfilled[0]!.value.statut;
+    expect(["rejete", "annule"]).toContain(successfulStatus);
+    expect(rejected[0]!.reason).toMatchObject({
+      message: successfulStatus === "rejete"
+        ? "Seul un chèque à déposer ou déposé peut être annulé"
+        : "Seul un chèque à déposer ou déposé peut être rejeté",
+    });
+
+    await expect(saleState(fixture.saleId)).resolves.toEqual({
+      montant_recu_fcfa: 0,
+      solde_du_fcfa: 110_000,
+      statut: "en_attente",
+    });
+    await expect(paymentState(fixture.paymentId)).resolves.toEqual({
+      statut: "rejete",
+      motif_rejet: successfulStatus === "rejete"
+        ? "Rejet concurrent"
+        : "Annulation concurrente",
+    });
+    await expect(chequeState(fixture.chequeId)).resolves.toMatchObject(
+      successfulStatus === "rejete"
+        ? {
+            statut: "rejete",
+            date_rejet: "2026-08-29",
+            motif_rejet: "Rejet concurrent",
+            date_annulation: null,
+            motif_annulation: null,
+          }
+        : {
+            statut: "annule",
+            date_rejet: null,
+            motif_rejet: null,
+            date_annulation: "2026-08-29",
+            motif_annulation: "Annulation concurrente",
+          },
+    );
+    await expect(accountingState(fixture)).resolves.toEqual([
+      {
+        compte_debit: "511",
+        compte_credit: "4111",
+        montant_fcfa: 110_000,
+        source: "encaissement",
+        source_id: fixture.saleId,
+        numero_piece: `ENC-${fixture.saleId}-cheque`,
+      },
+      {
+        compte_debit: "4111",
+        compte_credit: "511",
+        montant_fcfa: 110_000,
+        source: "encaissement",
+        source_id: fixture.chequeId,
+        numero_piece: successfulStatus === "rejete"
+          ? `REJ-CHQ-${fixture.chequeId}`
+          : `ANN-CHQ-${fixture.chequeId}`,
+      },
+    ]);
+  });
+
   it("annule le chèque et réouvre le solde avec une écriture inverse", async () => {
     const fixture = await createFixture(
       [{ mode: "cheque", amount: 75_000 }],

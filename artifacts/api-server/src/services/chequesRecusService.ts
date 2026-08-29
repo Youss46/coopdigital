@@ -246,7 +246,13 @@ export async function annulerChequeRecu(
       statut: "annule",
       dateAnnulation: today(),
       motifAnnulation,
-    }).where(eq(chequesRecusTable.id, id)).returning();
+    }).where(and(
+      eq(chequesRecusTable.id, id),
+      inArray(chequesRecusTable.statut, ["a_deposer", "depose"]),
+    )).returning();
+    if (!updated) {
+      throw new Error("Seul un chèque à déposer ou déposé peut être annulé");
+    }
     const [vente] = await tx.select()
       .from(ventesExportateursTable)
       .where(eq(ventesExportateursTable.id, cheque.venteExportateurId))
