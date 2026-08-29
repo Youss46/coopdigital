@@ -10,7 +10,7 @@ on:
 
 jobs:
   postgres-integration:
-    name: Concurrent payment protection
+    name: Payment and received-cheque concurrency protection
     runs-on: ubuntu-latest
 
     services:
@@ -52,5 +52,15 @@ jobs:
       - name: Initialize disposable PostgreSQL schema
         run: pnpm --filter @workspace/db fresh-migrate
 
-      - name: Run PostgreSQL integration tests
-        run: pnpm --filter @workspace/api-server test:integration
+      - name: Run payment and received-cheque PostgreSQL integration tests
+        run: pnpm --filter @workspace/api-server run test:integration:payment-ventilation
+
+      # The service container is disposable, but also clear it explicitly so a
+      # failed test cannot leave fixtures behind if this job is ever reused.
+      - name: Clean disposable PostgreSQL database
+        if: always()
+        run: |
+          psql "$DATABASE_URL" \
+            --command "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;"
+          psql "$DATABASE_URL" \
+            --command "DROP SCHEMA IF EXISTS drizzle CASCADE;"
