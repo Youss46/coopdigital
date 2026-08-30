@@ -130,8 +130,8 @@ describe("feature access denial metrics", () => {
     }
 
     expect([...deliveredGroups.keys()].sort()).toEqual([
-      "17:stocks:lecture_seule",
       "17:stocks:disabled",
+      "17:stocks:lecture_seule",
       "18:stocks:disabled",
     ]);
     expect([...deliveredGroups.values()].every((group) => group.length === 1)).toBe(true);

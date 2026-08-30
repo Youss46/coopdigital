@@ -29,7 +29,9 @@ async function compteTerrainActif(payload: TerrainJwtPayload): Promise<boolean> 
     .from(usersTable)
     .where(eq(usersTable.id, payload.id))
     .limit(1);
-  return user?.actif === true && (!user.cooperativeId || await isRoleActive(user.cooperativeId, user.role));
+  return user?.actif === true
+    && user.cooperativeId != null
+    && await isRoleActive(user.cooperativeId, user.role);
 }
 
 function refuserCompteDesactive(res: Response): void {
@@ -79,6 +81,13 @@ export async function terrainAuthMiddleware(req: Request, res: Response, next: N
     if (!await compteTerrainActif(payload)) {
       const [current] = await db.select({ actif: usersTable.actif, cooperativeId: usersTable.cooperativeId, role: usersTable.role })
         .from(usersTable).where(eq(usersTable.id, payload.id)).limit(1);
+      if (current?.actif && current.cooperativeId == null) {
+        res.status(403).json({
+          code: "COOPERATIVE_MISSING",
+          erreur: "Ce compte terrain n’est rattaché à aucune coopérative. Contactez l’administration.",
+        });
+        return;
+      }
       if (current?.actif && current.cooperativeId && !await isRoleActive(current.cooperativeId, current.role)) {
         refuserRoleDesactive(res);
         return;

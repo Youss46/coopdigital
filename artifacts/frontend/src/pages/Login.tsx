@@ -132,7 +132,7 @@ export default function Login() {
     utilisateur: { id: number; nom: string; prenoms: string; role: string; cooperativeId?: number | null; motDePasseTemporaire?: boolean };
     token: string;
   }, emailConnecte: string) => {
-    if (data.utilisateur.role === "agent_terrain") {
+    if (data.utilisateur.role === "agent_terrain" || data.utilisateur.role === "peseur") {
       setErreur("__AGENT_TERRAIN__");
       return;
     }

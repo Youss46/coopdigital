@@ -20,6 +20,13 @@ export async function loginTerrainHandler(req: Request, res: Response): Promise<
       res.status(401).json({ erreur: "Numéro ou mot de passe incorrect" });
       return;
     }
+    if ("blockedCooperative" in result && result.blockedCooperative === "missing") {
+      res.status(403).json({
+        code: "COOPERATIVE_MISSING",
+        erreur: "Ce compte terrain n’est rattaché à aucune coopérative. Contactez l’administration.",
+      });
+      return;
+    }
     if ("blockedRole" in result && result.blockedRole === "disabled") {
       res.status(403).json({
         code: "ROLE_DISABLED",

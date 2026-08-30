@@ -1,15 +1,20 @@
 import jwt from "jsonwebtoken";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { dbMock } = vi.hoisted(() => ({
+const { dbMock, roleActiveMock } = vi.hoisted(() => ({
   dbMock: {
     select: vi.fn(),
   },
+  roleActiveMock: vi.fn(),
 }));
 
 vi.mock("@workspace/db", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@workspace/db")>()),
   db: dbMock,
+}));
+
+vi.mock("../services/cooperativeRolesService.js", () => ({
+  isRoleActive: roleActiveMock,
 }));
 
 const {
@@ -28,12 +33,12 @@ function makeResponse() {
   };
 }
 
-function makeRequest(role: "peseur" | "pca" = "peseur") {
+function makeRequest(role: "peseur" | "pca" = "peseur", cooperativeId: number | null = 9) {
   const payload = role === "peseur"
     ? {
         id: 42,
         role,
-        cooperativeId: 9,
+        cooperativeId,
         section: null,
         zoneType: null,
         zoneNom: null,
@@ -52,11 +57,11 @@ function makeRequest(role: "peseur" | "pca" = "peseur") {
   };
 }
 
-function mockAccount(actif: boolean) {
+function mockAccount(actif: boolean, cooperativeId: number | null = 9, role = "peseur") {
   dbMock.select.mockReturnValue({
     from: () => ({
       where: () => ({
-        limit: vi.fn().mockResolvedValue([{ actif }]),
+        limit: vi.fn().mockResolvedValue([{ actif, cooperativeId, role, mode: "active" }]),
       }),
     }),
   });
@@ -67,6 +72,7 @@ describe("révocation des sessions terrain", () => {
     vi.stubEnv("JWT_SECRET", SECRET);
     vi.stubEnv("SESSION_SECRET", "");
     dbMock.select.mockReset();
+    roleActiveMock.mockResolvedValue(true);
   });
 
   it("refuse immédiatement un JWT encore valide après désactivation", async () => {
@@ -95,6 +101,21 @@ describe("révocation des sessions terrain", () => {
     expect(next).toHaveBeenCalledOnce();
     expect((request as { agent?: { id: number } }).agent?.id).toBe(42);
     expect(response.status).not.toHaveBeenCalled();
+  });
+
+  it("refuse un compte actif sans coopérative avec une erreur de rattachement", async () => {
+    mockAccount(true, null);
+    const response = makeResponse();
+    const next = vi.fn();
+
+    await terrainAuthMiddleware(makeRequest("peseur", null) as never, response as never, next);
+
+    expect(response.status).toHaveBeenCalledWith(403);
+    expect(response.json).toHaveBeenCalledWith({
+      code: "COOPERATIVE_MISSING",
+      erreur: "Ce compte terrain n’est rattaché à aucune coopérative. Contactez l’administration.",
+    });
+    expect(next).not.toHaveBeenCalled();
   });
 
   it("applique aussi la révocation au middleware flexible des lectures de pesée", async () => {

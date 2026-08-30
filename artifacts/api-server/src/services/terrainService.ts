@@ -46,6 +46,13 @@ export async function loginTerrain(telephone: string, motDePasse: string) {
   const ok = await bcrypt.compare(motDePasse, user.passwordHash);
   if (!ok) return null;
 
+  // Un compte terrain sans coopérative ne peut pas utiliser le moindre
+  // endpoint métier. Ne pas lui remettre un JWT qui provoquerait ensuite un
+  // faux "401 session expirée" au premier appel.
+  if (!user.cooperativeId) {
+    return { blockedCooperative: "missing" as const };
+  }
+
   if (user.cooperativeId && !await isRoleActive(user.cooperativeId, user.role)) {
     return { blockedRole: "disabled" as const };
   }
