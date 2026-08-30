@@ -90,16 +90,10 @@ export default defineConfig({
             handler: "NetworkOnly",
           },
           {
+            // Les réponses API peuvent dépendre du compte, de la coopérative
+            // et du token Authorization. Ne jamais les partager via le SW.
             urlPattern: /^\/api\//,
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "api-cache-v1",
-              expiration: {
-                maxEntries: 200,
-                maxAgeSeconds: 60 * 60 * 24,
-              },
-              networkTimeoutSeconds: 10,
-            },
+            handler: "NetworkOnly",
           },
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\//,

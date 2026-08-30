@@ -1,4 +1,4 @@
-const CACHE_VERSION = "coopdigital-terrain-v4";
+const CACHE_VERSION = "coopdigital-terrain-v5";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DATA_CACHE   = `${CACHE_VERSION}-data`;
 
@@ -40,6 +40,13 @@ self.addEventListener("fetch", (e) => {
   // assets : les données (sessions en cours, bons, bilans) deviendraient
   // figées au premier chargement.
   if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/terrain/api")) {
+    // Une réponse authentifiée ne doit jamais passer par le cache, même en
+    // cas de réseau instable : un 401 ancien ne doit pas déconnecter un autre
+    // compte sur le même appareil.
+    if (e.request.headers.has("Authorization")) {
+      e.respondWith(fetch(e.request));
+      return;
+    }
     if (e.request.method === "GET") {
       e.respondWith(networkFirstStrategy(e.request));
     } else {
