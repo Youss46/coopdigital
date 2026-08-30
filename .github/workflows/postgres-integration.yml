@@ -7,7 +7,7 @@ on:
 
 jobs:
   postgres-integration:
-    name: Payment and received-cheque concurrency protection
+    name: Payment, received-cheque, and sacherie concurrency protection
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -50,8 +50,10 @@ jobs:
       - name: Initialize disposable PostgreSQL schema
         run: pnpm --filter @workspace/db fresh-migrate
 
-      - name: Run payment and received-cheque PostgreSQL integration tests
-        run: pnpm --filter @workspace/api-server run test:integration:payment-ventilation
+      - name: Run payment, received-cheque, and sacherie PostgreSQL integration tests
+        run: |
+          pnpm --filter @workspace/api-server run test:integration:payment-ventilation
+          pnpm --filter @workspace/api-server run test:integration:sacherie
 
       # The service container is disposable, but also clear it explicitly so a
       # failed test cannot leave fixtures behind if this job is ever reused.
