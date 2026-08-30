@@ -139,25 +139,75 @@ describe.skipIf(!enabled)("paiements de primes concurrents sur PostgreSQL", () =
   });
 
   afterAll(async () => {
-    await first.query(`
-      DELETE FROM ecritures_comptables
-        WHERE cooperative_id = ${cooperativeId} AND source_id IN (${allocationId}, ${mobileAllocationId});
-      DELETE FROM mouvements_caisse WHERE caisse_id = ${caisseId};
-      DELETE FROM mouvements_mobile_marchand WHERE compte_id = ${mobileAccountId};
-      DELETE FROM comptes_mobiles_marchands WHERE id = ${mobileAccountId};
-      DELETE FROM sessions_caisse WHERE id = ${sessionId};
-      DELETE FROM caisses WHERE id = ${caisseId};
-      DELETE FROM primes_membres WHERE id = ${allocationId};
-      DELETE FROM primes_membres WHERE id = ${mobileAllocationId};
-      DELETE FROM primes_distributions WHERE id = ${distributionId};
-      DELETE FROM primes_distributions WHERE id = ${mobileDistributionId};
-      DELETE FROM primes_receptions WHERE cooperative_id = ${cooperativeId};
-      DELETE FROM config_comptable WHERE cooperative_id = ${cooperativeId};
-      DELETE FROM membres WHERE id = ${memberId};
-      DELETE FROM cooperatives WHERE id = ${cooperativeId};
-    `);
-    first.release();
-    second.release();
+    try {
+      if (!first || !cooperativeId) return;
+
+      await first.query("BEGIN");
+      try {
+        // Scope every delete to the dedicated fixture cooperative so partial
+        // setup failures are cleaned up just like failed assertions.
+        await first.query(
+          `DELETE FROM ecritures_comptables WHERE cooperative_id = $1`,
+          [cooperativeId],
+        );
+        await first.query(
+          `DELETE FROM ecritures_en_attente WHERE cooperative_id = $1`,
+          [cooperativeId],
+        );
+        await first.query(
+          `DELETE FROM mouvements_caisse
+           WHERE caisse_id IN (
+             SELECT id FROM caisses WHERE cooperative_id = $1
+           )`,
+          [cooperativeId],
+        );
+        await first.query(
+          `DELETE FROM mouvements_mobile_marchand
+           WHERE compte_id IN (
+             SELECT id FROM comptes_mobiles_marchands WHERE cooperative_id = $1
+           )`,
+          [cooperativeId],
+        );
+        await first.query(
+          `DELETE FROM comptes_mobiles_marchands WHERE cooperative_id = $1`,
+          [cooperativeId],
+        );
+        await first.query(
+          `DELETE FROM sessions_caisse WHERE cooperative_id = $1`,
+          [cooperativeId],
+        );
+        await first.query(`DELETE FROM caisses WHERE cooperative_id = $1`, [
+          cooperativeId,
+        ]);
+        await first.query(`DELETE FROM primes_membres WHERE cooperative_id = $1`, [
+          cooperativeId,
+        ]);
+        await first.query(
+          `DELETE FROM primes_distributions WHERE cooperative_id = $1`,
+          [cooperativeId],
+        );
+        await first.query(
+          `DELETE FROM primes_receptions WHERE cooperative_id = $1`,
+          [cooperativeId],
+        );
+        await first.query(`DELETE FROM config_comptable WHERE cooperative_id = $1`, [
+          cooperativeId,
+        ]);
+        await first.query(`DELETE FROM membres WHERE cooperative_id = $1`, [
+          cooperativeId,
+        ]);
+        await first.query(`DELETE FROM cooperatives WHERE id = $1`, [
+          cooperativeId,
+        ]);
+        await first.query("COMMIT");
+      } catch (error) {
+        await first.query("ROLLBACK").catch(() => undefined);
+        throw error;
+      }
+    } finally {
+      first?.release();
+      second?.release();
+    }
   });
 
   it("fait attendre le second paiement puis le refuse sans double effet financier", async () => {
