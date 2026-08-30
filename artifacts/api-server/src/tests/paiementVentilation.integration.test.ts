@@ -1,5 +1,5 @@
 import { pool } from "@workspace/db";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { validerPaiement } from "../controllers/paiementsController.js";
 import { getJournal } from "../services/caisseService.js";
 import {
@@ -12,6 +12,30 @@ import {
 const enabled =
   process.env.RUN_POSTGRES_INTEGRATION === "1" &&
   Boolean(process.env.DATABASE_URL);
+
+const postgresReferenceDate =
+  process.env.POSTGRES_INTEGRATION_REFERENCE_DATE ?? "2026-08-29";
+
+function shiftIsoDate(date: string, days: number): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw new Error(
+      "POSTGRES_INTEGRATION_REFERENCE_DATE doit être une date ISO (AAAA-MM-JJ)",
+    );
+  }
+
+  const parsed = new Date(`${date}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) {
+    throw new Error(
+      "POSTGRES_INTEGRATION_REFERENCE_DATE doit être une date civile valide",
+    );
+  }
+
+  parsed.setUTCDate(parsed.getUTCDate() + days);
+  return parsed.toISOString().slice(0, 10);
+}
+
+const postgresPreviousDate = shiftIsoDate(postgresReferenceDate, -1);
+const postgresReferenceYear = Number(postgresReferenceDate.slice(0, 4));
 
 type TestResponse = {
   statusCode: number;
@@ -871,6 +895,9 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
   };
 
   beforeAll(async () => {
+    vi.useFakeTimers({
+      now: new Date(`${postgresReferenceDate}T12:00:00.000Z`),
+    });
     client = await pool.connect();
 
     const cooperative = await client.query(
@@ -940,6 +967,7 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
       cooperativeId,
     ]);
     client.release();
+    vi.useRealTimers();
   });
 
   async function createFixture(
@@ -952,9 +980,9 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
          (exportateur_id, poids_kg, prix_unitaire_fcfa, montant_total_fcfa,
           date_vente, montant_recu_fcfa, solde_du_fcfa, statut)
        VALUES ($1, 1::numeric, $2::integer, $2::integer,
-               '2026-08-29', $2::integer, 0, 'regle')
+               $3::date, $2::integer, 0, 'regle')
        RETURNING id`,
-      [exportateurId, total],
+      [exportateurId, total, postgresReferenceDate],
     );
     const saleId = sale.rows[0].id as number;
     saleIds.push(saleId);
@@ -997,8 +1025,8 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
         `INSERT INTO ecritures_comptables
            (cooperative_id, date_ecriture, numero_piece, libelle,
             compte_debit, compte_credit, montant_fcfa, source, source_id, exercice)
-         VALUES ($1, '2026-08-29', $2, $3, $4, '4111', $5,
-                 'encaissement', $6, 2026)`,
+         VALUES ($1, $7::date, $2, $3, $4, '4111', $5,
+                 'encaissement', $6, $8)`,
         [
           cooperativeId,
           `ENC-${saleId}-${line.mode}`,
@@ -1006,6 +1034,8 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
           line.mode === "cheque" ? "511" : "571",
           line.amount,
           saleId,
+          postgresReferenceDate,
+          postgresReferenceYear,
         ],
       );
     }
@@ -1019,12 +1049,13 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
          (cooperative_id, numero_cheque, banque, montant_fcfa, date_reception,
           vente_exportateur_id, exportateur_id, paiement_id, paiement_ligne_id,
           created_by)
-       VALUES ($1, $2, 'Banque de test', $3, '2026-08-29', $4, $5, $6, $7, 0)
+       VALUES ($1, $2, 'Banque de test', $3, $4::date, $5, $6, $7, $8, 0)
        RETURNING id`,
       [
         cooperativeId,
         `CHQ-${suffix}-${saleId}`,
         chequeLine.amount,
+          postgresReferenceDate,
         saleId,
         exportateurId,
         paymentId,
@@ -1153,8 +1184,8 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
     );
 
     const results = await Promise.allSettled([
-      deposerChequeRecu(fixture.chequeId, cooperativeId, "2026-08-29"),
-      deposerChequeRecu(fixture.chequeId, cooperativeId, "2026-08-29"),
+      deposerChequeRecu(fixture.chequeId, cooperativeId, postgresReferenceDate),
+      deposerChequeRecu(fixture.chequeId, cooperativeId, postgresReferenceDate),
     ]);
 
     const fulfilled = results.filter(
@@ -1172,12 +1203,12 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
     expect(fulfilled[0]!.value).toMatchObject({
       id: fixture.chequeId,
       statut: "depose",
-      dateDepot: "2026-08-29",
+      dateDepot: postgresReferenceDate,
     });
 
     await expect(chequeState(fixture.chequeId)).resolves.toMatchObject({
       statut: "depose",
-      date_depot: "2026-08-29",
+      date_depot: postgresReferenceDate,
       date_encaissement: null,
       date_rejet: null,
       date_annulation: null,
@@ -1203,20 +1234,20 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
       [{ mode: "cheque", amount: 72_000 }],
       "encaissement-concurrent",
     );
-    await deposerChequeRecu(fixture.chequeId, cooperativeId, "2026-08-29");
+    await deposerChequeRecu(fixture.chequeId, cooperativeId, postgresReferenceDate);
     const bankBefore = Number(await bankBalance());
 
     const results = await Promise.allSettled([
       encaisserChequeRecu(
         fixture.chequeId,
         cooperativeId,
-        { compteBancaireId, dateEncaissement: "2026-08-29" },
+        { compteBancaireId, dateEncaissement: postgresReferenceDate },
         0,
       ),
       encaisserChequeRecu(
         fixture.chequeId,
         cooperativeId,
-        { compteBancaireId, dateEncaissement: "2026-08-29" },
+        { compteBancaireId, dateEncaissement: postgresReferenceDate },
         0,
       ),
     ]);
@@ -1237,13 +1268,13 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
       id: fixture.chequeId,
       statut: "encaisse",
       compteBancaireId,
-      dateEncaissement: "2026-08-29",
+      dateEncaissement: postgresReferenceDate,
     });
 
     await expect(chequeState(fixture.chequeId)).resolves.toMatchObject({
       statut: "encaisse",
-      date_depot: "2026-08-29",
-      date_encaissement: "2026-08-29",
+      date_depot: postgresReferenceDate,
+      date_encaissement: postgresReferenceDate,
       date_rejet: null,
       date_annulation: null,
       compte_bancaire_id: compteBancaireId,
@@ -1269,12 +1300,12 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
     await expect(
       rejeterChequeRecu(fixture.chequeId, cooperativeId, {
         motifRejet: "Provision insuffisante",
-        dateRejet: "2026-08-29",
+        dateRejet: postgresReferenceDate,
       }),
     ).resolves.toMatchObject({
       id: fixture.chequeId,
       statut: "rejete",
-      dateRejet: "2026-08-29",
+      dateRejet: postgresReferenceDate,
       motifRejet: "Provision insuffisante",
     });
 
@@ -1289,7 +1320,7 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
     });
     await expect(chequeState(fixture.chequeId)).resolves.toMatchObject({
       statut: "rejete",
-      date_rejet: "2026-08-29",
+      date_rejet: postgresReferenceDate,
       motif_rejet: "Provision insuffisante",
     });
     await expect(accountingState(fixture)).resolves.toEqual([
@@ -1323,7 +1354,7 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
 
     await rejeterChequeRecu(fixture.chequeId, cooperativeId, {
       motifRejet: "Signature non conforme",
-      dateRejet: "2026-08-29",
+      dateRejet: postgresReferenceDate,
     });
 
     await expect(saleState(fixture.saleId)).resolves.toEqual({
@@ -1373,10 +1404,10 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
       "depose-puis-rejete",
     );
 
-    await deposerChequeRecu(fixture.chequeId, cooperativeId, "2026-08-28");
+    await deposerChequeRecu(fixture.chequeId, cooperativeId, postgresPreviousDate);
     await rejeterChequeRecu(fixture.chequeId, cooperativeId, {
       motifRejet: "Chèque retourné par la banque",
-      dateRejet: "2026-08-29",
+      dateRejet: postgresReferenceDate,
     });
 
     await expect(saleState(fixture.saleId)).resolves.toEqual({
@@ -1390,8 +1421,8 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
     });
     await expect(chequeState(fixture.chequeId)).resolves.toMatchObject({
       statut: "rejete",
-      date_depot: "2026-08-28",
-      date_rejet: "2026-08-29",
+      date_depot: postgresPreviousDate,
+      date_rejet: postgresReferenceDate,
       motif_rejet: "Chèque retourné par la banque",
     });
     await expect(accountingState(fixture)).resolves.toEqual([
@@ -1423,11 +1454,11 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
     const results = await Promise.allSettled([
       rejeterChequeRecu(fixture.chequeId, cooperativeId, {
         motifRejet: "Premier motif",
-        dateRejet: "2026-08-29",
+        dateRejet: postgresReferenceDate,
       }),
       rejeterChequeRecu(fixture.chequeId, cooperativeId, {
         motifRejet: "Second motif",
-        dateRejet: "2026-08-29",
+        dateRejet: postgresReferenceDate,
       }),
     ]);
 
@@ -1457,7 +1488,7 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
     });
     await expect(chequeState(fixture.chequeId)).resolves.toMatchObject({
       statut: "rejete",
-      date_rejet: "2026-08-29",
+      date_rejet: postgresReferenceDate,
       motif_rejet: persistedMotif,
     });
     await expect(accountingState(fixture)).resolves.toEqual([
@@ -1489,7 +1520,7 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
     const results = await Promise.allSettled([
       rejeterChequeRecu(fixture.chequeId, cooperativeId, {
         motifRejet: "Rejet concurrent",
-        dateRejet: "2026-08-29",
+        dateRejet: postgresReferenceDate,
       }),
       annulerChequeRecu(
         fixture.chequeId,
@@ -1533,7 +1564,7 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
       successfulStatus === "rejete"
         ? {
             statut: "rejete",
-            date_rejet: "2026-08-29",
+            date_rejet: postgresReferenceDate,
             motif_rejet: "Rejet concurrent",
             date_annulation: null,
             motif_annulation: null,
@@ -1542,7 +1573,7 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
             statut: "annule",
             date_rejet: null,
             motif_rejet: null,
-            date_annulation: "2026-08-29",
+            date_annulation: postgresReferenceDate,
             motif_annulation: "Annulation concurrente",
           },
     );
@@ -1574,7 +1605,7 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
       "encaisse-rejet-concurrent",
     );
 
-    await deposerChequeRecu(fixture.chequeId, cooperativeId, "2026-08-28");
+    await deposerChequeRecu(fixture.chequeId, cooperativeId, postgresPreviousDate);
     const bankBefore = Number(await bankBalance());
 
     const results = await Promise.allSettled([
@@ -1583,13 +1614,13 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
         cooperativeId,
         {
           compteBancaireId,
-          dateEncaissement: "2026-08-29",
+          dateEncaissement: postgresReferenceDate,
         },
         0,
       ),
       rejeterChequeRecu(fixture.chequeId, cooperativeId, {
         motifRejet: "Rejet concurrent",
-        dateRejet: "2026-08-29",
+        dateRejet: postgresReferenceDate,
       }),
     ]);
 
@@ -1625,8 +1656,8 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
       });
       await expect(chequeState(fixture.chequeId)).resolves.toMatchObject({
         statut: "encaisse",
-        date_depot: "2026-08-28",
-        date_encaissement: "2026-08-29",
+        date_depot: postgresPreviousDate,
+        date_encaissement: postgresReferenceDate,
         date_rejet: null,
         motif_rejet: null,
         compte_bancaire_id: compteBancaireId,
@@ -1660,9 +1691,9 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
       });
       await expect(chequeState(fixture.chequeId)).resolves.toMatchObject({
         statut: "rejete",
-        date_depot: "2026-08-28",
+        date_depot: postgresPreviousDate,
         date_encaissement: null,
-        date_rejet: "2026-08-29",
+        date_rejet: postgresReferenceDate,
         motif_rejet: "Rejet concurrent",
         compte_bancaire_id: null,
         mouvement_banque_id: null,
@@ -1739,7 +1770,7 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
     });
     await expect(chequeState(fixture.chequeId)).resolves.toMatchObject({
       statut: "annule",
-      date_annulation: "2026-08-29",
+      date_annulation: postgresReferenceDate,
       motif_annulation: persistedMotif,
       date_rejet: null,
       date_encaissement: null,
@@ -1773,14 +1804,14 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
       [{ mode: "cheque", amount: 125_000 }],
       "encaissement-annulation-concurrent",
     );
-    await deposerChequeRecu(fixture.chequeId, cooperativeId, "2026-08-29");
+    await deposerChequeRecu(fixture.chequeId, cooperativeId, postgresReferenceDate);
     const bankBefore = Number(await bankBalance());
 
     const results = await Promise.allSettled([
       encaisserChequeRecu(
         fixture.chequeId,
         cooperativeId,
-        { compteBancaireId, dateEncaissement: "2026-08-29" },
+        { compteBancaireId, dateEncaissement: postgresReferenceDate },
         0,
       ),
       annulerChequeRecu(
@@ -1822,8 +1853,8 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
       });
       await expect(chequeState(fixture.chequeId)).resolves.toMatchObject({
         statut: "encaisse",
-        date_depot: "2026-08-29",
-        date_encaissement: "2026-08-29",
+        date_depot: postgresReferenceDate,
+        date_encaissement: postgresReferenceDate,
         date_rejet: null,
         date_annulation: null,
         compte_bancaire_id: compteBancaireId,
@@ -1846,10 +1877,10 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
       });
       await expect(chequeState(fixture.chequeId)).resolves.toMatchObject({
         statut: "annule",
-        date_depot: "2026-08-29",
+        date_depot: postgresReferenceDate,
         date_encaissement: null,
         date_rejet: null,
-        date_annulation: "2026-08-29",
+        date_annulation: postgresReferenceDate,
         motif_annulation: "Annulation concurrente",
         compte_bancaire_id: null,
         mouvement_banque_id: null,
@@ -1941,7 +1972,7 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
       await expect(
         rejeterChequeRecu(fixture.chequeId, cooperativeId, {
           motifRejet: "Écriture indisponible",
-          dateRejet: "2026-08-29",
+          dateRejet: postgresReferenceDate,
         }),
       ).rejects.toThrow();
     } finally {
@@ -1991,7 +2022,7 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
       await expect(
         rejeterChequeRecu(fixture.chequeId, cooperativeId, {
           motifRejet: "Vente verrouillée",
-          dateRejet: "2026-08-29",
+          dateRejet: postgresReferenceDate,
         }),
       ).rejects.toThrow();
     } finally {
