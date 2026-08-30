@@ -5,6 +5,7 @@ import {
   recordFeatureAccessDenied,
   resetFeatureAccessDenialMetrics,
 } from "../services/featureAccessMetrics.js";
+import { OPERATIONS_ALERT_CHANNEL } from "../lib/logger.js";
 
 describe("feature access denial metrics", () => {
   const logger = { warn: vi.fn() };
@@ -46,10 +47,32 @@ describe("feature access denial metrics", () => {
     const spikeCalls = logger.warn.mock.calls.filter(([fields]) => fields.event === "feature_access_denied_spike");
     expect(spikeCalls).toHaveLength(1);
     expect(spikeCalls[0][0]).toMatchObject({
+      channel: OPERATIONS_ALERT_CHANNEL,
       cooperativeId: 17,
       featureKey: "stocks",
       mode: "disabled",
       denialCount: FEATURE_ACCESS_DENIAL_SPIKE_THRESHOLD,
+      threshold: FEATURE_ACCESS_DENIAL_SPIKE_THRESHOLD,
+    });
+  });
+
+  it("keeps the operations alert limited to approved operational fields", () => {
+    for (let i = 0; i < FEATURE_ACCESS_DENIAL_SPIKE_THRESHOLD; i += 1) {
+      recordFeatureAccessDenied(context, logger);
+    }
+
+    const spikeFields = logger.warn.mock.calls
+      .map(([fields]) => fields)
+      .find((fields) => fields.event === "feature_access_denied_spike");
+
+    expect(spikeFields).toEqual({
+      channel: OPERATIONS_ALERT_CHANNEL,
+      event: "feature_access_denied_spike",
+      cooperativeId: 17,
+      featureKey: "stocks",
+      mode: "disabled",
+      denialCount: FEATURE_ACCESS_DENIAL_SPIKE_THRESHOLD,
+      windowSeconds: FEATURE_ACCESS_DENIAL_WINDOW_MS / 1000,
       threshold: FEATURE_ACCESS_DENIAL_SPIKE_THRESHOLD,
     });
   });

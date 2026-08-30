@@ -21,6 +21,19 @@ export const logger = pino({
       }),
 });
 
+/**
+ * Logger indépendant du contexte HTTP pour les alertes destinées à
+ * l'exploitation. Les alertes ne doivent jamais hériter de req.log, qui peut
+ * contenir des bindings de requête (notamment l'URL).
+ *
+ * En production, la sortie JSON est routée par le collecteur de logs. Le
+ * champ `channel` constitue le contrat de routage stable du canal.
+ */
+export const OPERATIONS_ALERT_CHANNEL = "operations-alerts";
+export const operationsAlertLogger = logger.child({
+  channel: OPERATIONS_ALERT_CHANNEL,
+});
+
 export const RH_STORAGE_FAILURE_ALERT_THRESHOLD_DEFAULT = 3;
 export const RH_STORAGE_FAILURE_ALERT_WINDOW_SECONDS_DEFAULT = 300;
 

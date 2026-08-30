@@ -1,3 +1,8 @@
+import {
+  OPERATIONS_ALERT_CHANNEL,
+  operationsAlertLogger,
+} from "../lib/logger.js";
+
 export const FEATURE_ACCESS_DENIAL_WINDOW_MS = 5 * 60 * 1000;
 export const FEATURE_ACCESS_DENIAL_SPIKE_THRESHOLD = 20;
 
@@ -37,7 +42,7 @@ function removeExpiredCounters(now: number): void {
  */
 export function recordFeatureAccessDenied(
   context: FeatureAccessDenialContext,
-  logger: FeatureAccessDenialLogger,
+  logger: FeatureAccessDenialLogger = operationsAlertLogger,
 ): number {
   const now = Date.now();
   removeExpiredCounters(now);
@@ -63,6 +68,7 @@ export function recordFeatureAccessDenied(
 
   if (counter.count === FEATURE_ACCESS_DENIAL_SPIKE_THRESHOLD) {
     logger.warn({
+      channel: OPERATIONS_ALERT_CHANNEL,
       event: "feature_access_denied_spike",
       cooperativeId: context.cooperativeId,
       featureKey: context.featureKey,
