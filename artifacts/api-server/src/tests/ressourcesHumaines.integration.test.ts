@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { pool } from "@workspace/db";
 import { ObjectNotFoundError, ObjectStorageService } from "../lib/objectStorage.js";
+import { logger, resetRhStorageReadFailureCounters } from "../lib/logger.js";
 import ressourcesHumainesRouter from "../routes/ressourcesHumaines.js";
 
 const enabled = process.env.RUN_POSTGRES_INTEGRATION === "1" && Boolean(process.env.DATABASE_URL);
@@ -369,7 +370,7 @@ describe.skipIf(!enabled)("décisions de congés RH sur PostgreSQL", () => {
     }
   });
 
-  it("ne journalise pas un téléchargement lorsque le stockage échoue ou ne retrouve plus le fichier", async () => {
+  it("distingue une absence de fichier d'une panne répétée du stockage sans journaliser de consultation", async () => {
     const missingDocument = await insertDocument(
       cooperativeA,
       personnelA,
@@ -394,6 +395,11 @@ describe.skipIf(!enabled)("décisions de congés RH sur PostgreSQL", () => {
     const downloadObject = vi
       .spyOn(ObjectStorageService.prototype, "downloadObject")
       .mockRejectedValue(new Error("Stockage RH indisponible"));
+    const loggerError = vi.spyOn(logger, "error");
+    const previousThreshold = process.env["RH_STORAGE_FAILURE_ALERT_THRESHOLD"];
+    const previousWindow = process.env["RH_STORAGE_FAILURE_ALERT_WINDOW_SECONDS"];
+    process.env["RH_STORAGE_FAILURE_ALERT_THRESHOLD"] = "2";
+    process.env["RH_STORAGE_FAILURE_ALERT_WINDOW_SECONDS"] = "60";
 
     try {
       const missingDownload = await fetch(`${baseUrl}/rh/documents/${missingDocument}/fichier`, {
@@ -407,6 +413,27 @@ describe.skipIf(!enabled)("décisions de congés RH sur PostgreSQL", () => {
       });
       expect(unavailableDownload.status).toBe(500);
       expect(await unavailableDownload.json()).toMatchObject({ erreur: "Erreur interne du serveur" });
+
+      const repeatedUnavailableDownload = await fetch(`${baseUrl}/rh/documents/${unavailableDocument}/fichier`, {
+        headers: { Authorization: `Bearer ${token(userA, cooperativeA)}` },
+      });
+      expect(repeatedUnavailableDownload.status).toBe(500);
+      expect(await repeatedUnavailableDownload.json()).toMatchObject({ erreur: "Erreur interne du serveur" });
+
+      const alertCall = loggerError.mock.calls.find(([, message]) =>
+        message === "Alerte opérationnelle : stockage RH indisponible",
+      );
+      expect(alertCall).toBeDefined();
+      expect(alertCall?.[0]).toMatchObject({
+        event: "rh_storage_read_failure",
+        alert: "rh_storage_unavailable",
+        cooperativeId: cooperativeA,
+        failureCount: 2,
+        failureThreshold: 2,
+        classification: "storage_unavailable",
+      });
+      expect(JSON.stringify(alertCall?.[0])).not.toContain("document-unavailable.pdf");
+      expect(JSON.stringify(alertCall?.[0])).not.toContain("Stockage RH indisponible");
 
       const auditRows = await pool.query(
         `SELECT id
@@ -434,6 +461,18 @@ describe.skipIf(!enabled)("décisions de congés RH sur PostgreSQL", () => {
     } finally {
       getObjectEntityFile.mockRestore();
       downloadObject.mockRestore();
+      loggerError.mockRestore();
+      resetRhStorageReadFailureCounters();
+      if (previousThreshold === undefined) {
+        delete process.env["RH_STORAGE_FAILURE_ALERT_THRESHOLD"];
+      } else {
+        process.env["RH_STORAGE_FAILURE_ALERT_THRESHOLD"] = previousThreshold;
+      }
+      if (previousWindow === undefined) {
+        delete process.env["RH_STORAGE_FAILURE_ALERT_WINDOW_SECONDS"];
+      } else {
+        process.env["RH_STORAGE_FAILURE_ALERT_WINDOW_SECONDS"] = previousWindow;
+      }
     }
   });
 });

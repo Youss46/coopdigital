@@ -14,7 +14,7 @@ import {
   rhHistoriqueTable,
 } from "@workspace/db";
 import { ObjectNotFoundError, ObjectStorageService } from "../lib/objectStorage.js";
-import { logger } from "../lib/logger.js";
+import { logger, recordRhStorageReadFailure } from "../lib/logger.js";
 
 const CONGE_SOLDE_ANNUEL = 26;
 const ECHEANCE_JOURS = 60;
@@ -772,8 +772,10 @@ export async function deleteRhDocumentFile(req: Request, res: Response): Promise
 }
 
 export async function downloadRhDocumentFile(req: Request, res: Response): Promise<void> {
+  let coopId: number | null = null;
+  let storageReadInProgress = false;
   try {
-    const coopId = cooperativeId(req);
+    coopId = cooperativeId(req);
     const id = idOf(req.params["id"]);
     const [document] = await db.select().from(rhDocumentsTable).where(
       and(eq(rhDocumentsTable.id, id), eq(rhDocumentsTable.cooperativeId, coopId)),
@@ -782,8 +784,10 @@ export async function downloadRhDocumentFile(req: Request, res: Response): Promi
       res.status(404).json({ erreur: "Fichier RH introuvable" });
       return;
     }
+    storageReadInProgress = true;
     const objectFile = await objectStorageService.getObjectEntityFile(document.fichierPath);
     const response = await objectStorageService.downloadObject(objectFile, 0);
+    storageReadInProgress = false;
     await logHistory(coopId, document.personnelId, "document", id, "consultation_fichier", {
       nom: document.fichierNom ?? "document",
       typeMime: document.fichierMimeType ?? "application/octet-stream",
@@ -801,6 +805,25 @@ export async function downloadRhDocumentFile(req: Request, res: Response): Promi
     if (err instanceof ObjectNotFoundError) {
       res.status(404).json({ erreur: "Fichier RH introuvable" });
       return;
+    }
+    if (storageReadInProgress && coopId !== null) {
+      const failure = recordRhStorageReadFailure(coopId);
+      const context = {
+        event: "rh_storage_read_failure",
+        cooperativeId: coopId,
+        documentId: idOf(req.params["id"]),
+        failureCount: failure.count,
+        failureThreshold: failure.threshold,
+        windowSeconds: failure.windowSeconds,
+        classification: "storage_unavailable",
+      };
+      logger.warn(context, "Échec de lecture d'une pièce RH dans le stockage");
+      if (failure.shouldAlert) {
+        logger.error(
+          { ...context, alert: "rh_storage_unavailable" },
+          "Alerte opérationnelle : stockage RH indisponible",
+        );
+      }
     }
     handleError(req, res, err, "downloadRhDocumentFile");
   }
