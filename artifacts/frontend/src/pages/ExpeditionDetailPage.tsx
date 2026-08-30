@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { NumericInput } from "@/components/ui/numeric-input";
+import { getPrechargementSummary } from "@/lib/prechargement";
 import {
   ArrowLeft, Ship, MapPin, CheckCircle2,
   ChevronRight, FileText, Users, Leaf, AlertCircle,
@@ -197,13 +198,15 @@ export default function ExpeditionDetailPage() {
   const fraisTransportPaye = String(exp.fraisTransportStatut ?? "non_paye") === "paye";
   const fraisTransportAnnule = statut === "annule" || String(exp.statutReception ?? "") === "annule";
 
-  const poidsCharge = parseFloat(String(exp.poidsChargeEffectifKg ?? exp.poidsPrevuKg ?? exp.poidsChargeKg ?? "0"));
-  const poidsPrevu = parseFloat(String(exp.poidsPrevuKg ?? exp.poidsChargeKg ?? "0"));
-  const prechargement = exp.prechargement && typeof exp.prechargement === "object"
-    ? exp.prechargement as Record<string, unknown>
-    : null;
-  const prechargementStatut = String(prechargement?.prechargementStatut ?? "");
-  const prechargementTerminee = prechargement?.statut === "terminee";
+  const prechargementSummary = getPrechargementSummary(exp);
+  const {
+    poidsChargeKg: poidsCharge,
+    poidsPrevuKg: poidsPrevu,
+    nombreSacsCharge: sacsCharges,
+    prechargement,
+    statut: prechargementStatut,
+    terminee: prechargementTerminee,
+  } = prechargementSummary;
   const canValidatePrechargement = ["pca", "directeur", "responsable_tracabilite"].includes(String(utilisateur?.role ?? ""));
   const ecartKg = poidsRecu && poidsCharge
     ? poidsCharge - parseFloat(poidsRecu)
@@ -213,9 +216,6 @@ export default function ExpeditionDetailPage() {
     : null;
 
   // Écart sacs — calculé uniquement si les deux valeurs sont connues
-  const sacsCharges = exp.nombreSacsEffectif
-    ? parseInt(String(exp.nombreSacsEffectif))
-    : exp.nombreSacs ? parseInt(String(exp.nombreSacs)) : null;
   const ecartSacs = nombreSacsRecu && sacsCharges !== null
     ? sacsCharges - parseInt(nombreSacsRecu, 10)
     : null;
