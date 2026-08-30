@@ -305,7 +305,7 @@ function ResetMdpModal({ peseur, onClose }: { peseur: Peseur; onClose: () => voi
 // ─── Page principale ────────────────────────────────────────────────────────
 export default function PeseursPage() {
   const qc = useQueryClient();
-  const { isFeatureReadOnly } = useFeatureAccess("delegues");
+  const { isFeatureReadOnly } = useFeatureAccess("peseurs");
   const [showCreate, setShowCreate] = useState(false);
   const [resetPeseur, setResetPeseur] = useState<Peseur | null>(null);
   const [suppressionCible, setSuppressionCible] = useState<Peseur | null>(null);

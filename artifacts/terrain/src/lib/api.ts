@@ -1,6 +1,7 @@
 import {
   getToken,
   clearAuth,
+  setAuthMessage,
   markAccountDisabled,
   COMPTE_DESACTIVE_MESSAGE,
 } from "./auth";
@@ -39,7 +40,9 @@ function throwApiError(
   }
 
   if (res.status === 401 && !skipSessionExpiry) {
+    const detail = body.erreur || "Le serveur a refusé la session terrain.";
     clearAuth();
+    setAuthMessage(`Session refusée par le serveur : ${detail}`);
     window.location.href = `${import.meta.env.BASE_URL ?? "/"}login`;
     throw new Error("Session expirée");
   }
