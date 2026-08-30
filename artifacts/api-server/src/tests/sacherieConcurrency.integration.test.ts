@@ -39,8 +39,8 @@ describe.skipIf(!enabled)("idempotence de la sacherie sur PostgreSQL", () => {
   let typeSacId: number;
 
   const suffix = `${process.pid}_${Date.now()}`;
-  const delayFunction = `task135_sacherie_delay_${suffix}`;
-  const delayTrigger = `task135_sacherie_delay_trigger_${suffix}`;
+  const delayFunction = `task136_sacherie_delay_${suffix}`;
+  const delayTrigger = `task136_sacherie_delay_trigger_${suffix}`;
 
   function identifier(value: string): string {
     return `"${value.replaceAll(`"`, `""`)}"`;
@@ -99,7 +99,14 @@ describe.skipIf(!enabled)("idempotence de la sacherie sur PostgreSQL", () => {
       `INSERT INTO sacherie_mouvements
          (cooperative_id, type_sac_id, type, quantite, reference, cree_par)
        VALUES ($1, $2, 'entree', 10, $3, $4)`,
-      [cooperativeId, typeSacId, `TASK135-SEED-${suffix}`, userId],
+      [cooperativeId, typeSacId, `TASK136-SEED-${suffix}`, userId],
+    );
+    await client.query(
+      `INSERT INTO sacherie_mouvements
+         (cooperative_id, type_sac_id, type, quantite, membre_id,
+          campagne_id, reference, cree_par)
+       VALUES ($1, $2, 'attribution', 4, $3, $4, $5, $6)`,
+      [cooperativeId, typeSacId, memberId, campaignId, `TASK136-ATTRIBUTION-${suffix}`, userId],
     );
 
     await client.query(`
@@ -181,17 +188,16 @@ describe.skipIf(!enabled)("idempotence de la sacherie sur PostgreSQL", () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        type: "attribution",
+        type: "retour",
         typeSacId,
         quantite: quantity,
         membreId: memberId,
-        campagneId: campaignId,
-        reference: `TASK135-DOUBLE-${suffix}`,
+        reference: `TASK136-RETURN-${suffix}`,
       }),
     });
   }
 
-  it("retourne le même mouvement et ne débite qu'une fois malgré deux appels concurrents", async () => {
+  it("retourne le même mouvement et ne débite qu'une fois malgré deux retours concurrents", async () => {
     const responses = await Promise.all([request(4), request(4)]);
     const bodies = await Promise.all(
       responses.map((response) => response.json() as Promise<MovementResponse>),
@@ -208,9 +214,10 @@ describe.skipIf(!enabled)("idempotence de la sacherie sur PostgreSQL", () => {
        ORDER BY id`,
       [cooperativeId, typeSacId],
     );
-    expect(movements.rows).toHaveLength(2);
-    expect(calculateSacherieCentralStock(movements.rows)).toBe(6);
-    expect(calculateSacherieMemberBalance(movements.rows, memberId)).toBe(4);
+    expect(movements.rows).toHaveLength(3);
+    expect(movements.rows.filter((movement: { type: string }) => movement.type === "retour")).toHaveLength(1);
+    expect(calculateSacherieCentralStock(movements.rows)).toBe(10);
+    expect(calculateSacherieMemberBalance(movements.rows, memberId)).toBe(0);
 
     const conflicting = await request(5);
     expect(conflicting.status).toBe(409);
@@ -222,7 +229,7 @@ describe.skipIf(!enabled)("idempotence de la sacherie sur PostgreSQL", () => {
       `SELECT count(*)::int AS count
        FROM sacherie_mouvements
        WHERE cooperative_id = $1 AND reference = $2`,
-      [cooperativeId, `TASK135-DOUBLE-${suffix}`],
+      [cooperativeId, `TASK136-RETURN-${suffix}`],
     );
     expect(afterConflict.rows[0].count).toBe(1);
   });
