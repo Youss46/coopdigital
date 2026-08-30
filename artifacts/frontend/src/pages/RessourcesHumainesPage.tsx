@@ -67,6 +67,20 @@ type Personnel = {
   statut: "actif" | "suspendu" | "sorti";
 };
 type UserOption = { id: number; nom: string; prenoms: string; email: string; role: string; actif: boolean };
+type RhHistoryEntry = {
+  id: number;
+  personnelId: number | null;
+  entite: string;
+  entiteId: number | null;
+  action: string;
+  details: Record<string, unknown> | null;
+  faitPar: number | null;
+  faitParNom: string | null;
+  faitParPrenoms: string | null;
+  faitParEmail: string | null;
+  createdAt: string;
+};
+type PersonnelDetails = { historique: RhHistoryEntry[] };
 type Dashboard = {
   effectif: { total: number; actifs: number; suspendus: number; sortis: number };
   mouvements: { embauches30J: number; finsContrat60J: number };
@@ -133,6 +147,11 @@ export default function RessourcesHumainesPage() {
   const documents = useQuery({ queryKey: ["rh-documents"], queryFn: () => apiFetch<Document[]>("/api/rh/documents") });
   const leaves = useQuery({ queryKey: ["rh-leaves"], queryFn: () => apiFetch<Leave[]>("/api/rh/conges") });
   const absences = useQuery({ queryKey: ["rh-absences"], queryFn: () => apiFetch<Absence[]>("/api/rh/absences") });
+  const personnelDetails = useQuery({
+    queryKey: ["rh-personnel-detail", selectedId],
+    queryFn: () => apiFetch<PersonnelDetails>(`/api/rh/personnel/${selectedId}`),
+    enabled: selectedId !== null,
+  });
   const selected = personnel.data?.find((person) => person.id === selectedId) ?? null;
 
   function refresh() {
@@ -160,8 +179,8 @@ export default function RessourcesHumainesPage() {
     </div>
 
     {tab === "dashboard" && <DashboardTab data={dashboard.data} isLoading={dashboard.isLoading} personnel={personnel.data ?? []} onGo={(next) => setTab(next)} />}
-    {tab === "dossiers" && <DossiersTab personnel={personnel.data ?? []} users={users.data ?? []} selected={selected} selectedId={selectedId} onSelect={setSelectedId} canEdit={canEdit} onSaved={invalidate} />}
-    {tab === "contrats" && <ContractsTab personnel={personnel.data ?? []} contracts={contracts.data ?? []} documents={documents.data ?? []} canContracts={canContracts} canDocuments={canDocuments} onSaved={invalidate} />}
+    {tab === "dossiers" && <DossiersTab personnel={personnel.data ?? []} users={users.data ?? []} selected={selected} selectedId={selectedId} onSelect={setSelectedId} canEdit={canEdit} onSaved={invalidate} history={personnelDetails.data?.historique ?? []} historyLoading={personnelDetails.isLoading} />}
+    {tab === "contrats" && <ContractsTab personnel={personnel.data ?? []} contracts={contracts.data ?? []} documents={documents.data ?? []} canContracts={canContracts} canDocuments={canDocuments} onSaved={invalidate} onDownloaded={() => void qc.invalidateQueries({ queryKey: ["rh-personnel-detail"] })} />}
     {tab === "conges" && <LeaveTab personnel={personnel.data ?? []} leaves={leaves.data ?? []} absences={absences.data ?? []} canRequestLeave={canRequestLeave} canApproveLeave={canApproveLeave} canAbsences={canAbsences} onSaved={invalidate} />}
   </div>;
 }
@@ -185,7 +204,17 @@ function DashboardTab({ data, isLoading, personnel, onGo }: { data?: Dashboard; 
   </div>;
 }
 
-function DossiersTab({ personnel, users, selected, selectedId, onSelect, canEdit, onSaved }: { personnel: Personnel[]; users: UserOption[]; selected: Personnel | null; selectedId: number | null; onSelect: (id: number | null) => void; canEdit: boolean; onSaved: () => void }) {
+function DossiersTab({ personnel, users, selected, selectedId, onSelect, canEdit, onSaved, history, historyLoading }: {
+  personnel: Personnel[];
+  users: UserOption[];
+  selected: Personnel | null;
+  selectedId: number | null;
+  onSelect: (id: number | null) => void;
+  canEdit: boolean;
+  onSaved: () => void;
+  history: RhHistoryEntry[];
+  historyLoading: boolean;
+}) {
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState<Partial<Personnel>>({});
   const update = useRhMutation(`/api/rh/personnel/${selectedId ?? 0}`, "PUT", onSaved);
@@ -193,11 +222,57 @@ function DossiersTab({ personnel, users, selected, selectedId, onSelect, canEdit
   function select(person: Personnel) { onSelect(person.id); setDraft({ ...person }); }
   return <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.8fr)]">
     <section className="rounded-xl border border-slate-200 bg-white shadow-sm"><div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-semibold text-slate-900">Dossiers existants</h2><p className="text-xs text-slate-500">La création du personnel reste dans le module Salaires.</p></div><input className={`${inputClass} sm:max-w-xs`} placeholder="Rechercher…" value={search} onChange={(event) => setSearch(event.target.value)} /></div><div className="divide-y divide-slate-100">{filtered.map((person) => <button key={person.id} onClick={() => select(person)} className={`flex w-full items-center justify-between gap-3 p-4 text-left hover:bg-slate-50 ${selectedId === person.id ? "bg-emerald-50" : ""}`}><div className="flex min-w-0 items-center gap-3"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-semibold text-emerald-700">{person.nom[0]}{person.prenoms[0]}</div><div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-800">{person.nom} {person.prenoms}</p><p className="truncate text-xs text-slate-500">{person.poste} · depuis {dateLabel(person.dateEmbauche)}</p></div></div><StatusBadge value={person.statut} /></button>)}{filtered.length === 0 && <p className="p-8 text-center text-sm text-slate-500">Aucun dossier trouvé.</p>}</div></section>
-    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">{!selected ? <div className="flex h-full min-h-64 flex-col items-center justify-center text-center text-slate-400"><UserRound size={32} /><p className="mt-2 text-sm">Sélectionnez un dossier pour consulter ses informations administratives.</p></div> : <><div className="mb-4 flex items-center justify-between"><div><h2 className="font-semibold text-slate-900">{selected.nom} {selected.prenoms}</h2><p className="text-xs text-slate-500">Informations administratives, sans données de paie</p></div><Pencil size={16} className="text-slate-400" /></div><div className="grid gap-3 sm:grid-cols-2"><Field label="Nom"><input className={inputClass} disabled={!canEdit} value={String(draft.nom ?? "")} onChange={(e) => setDraft({ ...draft, nom: e.target.value })} /></Field><Field label="Prénoms"><input className={inputClass} disabled={!canEdit} value={String(draft.prenoms ?? "")} onChange={(e) => setDraft({ ...draft, prenoms: e.target.value })} /></Field><Field label="Poste"><input className={inputClass} disabled={!canEdit} value={String(draft.poste ?? "")} onChange={(e) => setDraft({ ...draft, poste: e.target.value })} /></Field><Field label="Rôle / fonction"><input className={inputClass} disabled={!canEdit} value={String(draft.roleSysteme ?? "")} onChange={(e) => setDraft({ ...draft, roleSysteme: e.target.value })} /></Field><Field label="Compte utilisateur associé"><select className={inputClass} disabled={!canEdit} value={draft.userId ? String(draft.userId) : ""} onChange={(e) => setDraft({ ...draft, userId: e.target.value ? Number(e.target.value) : null })}><option value="">Aucun compte associé</option>{users.filter((user) => user.actif || user.id === selected.userId).map((user) => <option key={user.id} value={user.id}>{user.nom} {user.prenoms} · {user.email}</option>)}</select></Field><Field label="Date de naissance"><input type="date" className={inputClass} disabled={!canEdit} value={String(draft.dateNaissance ?? "")} onChange={(e) => setDraft({ ...draft, dateNaissance: e.target.value })} /></Field><Field label="N° CNPS"><input className={inputClass} disabled={!canEdit} value={String(draft.numeroCnps ?? "")} onChange={(e) => setDraft({ ...draft, numeroCnps: e.target.value })} /></Field><Field label="N° CNI"><input className={inputClass} disabled={!canEdit} value={String(draft.numeroCni ?? "")} onChange={(e) => setDraft({ ...draft, numeroCni: e.target.value })} /></Field><Field label="Statut"><select className={inputClass} disabled={!canEdit} value={String(draft.statut ?? "actif")} onChange={(e) => setDraft({ ...draft, statut: e.target.value as Personnel["statut"] })}><option value="actif">Actif</option><option value="suspendu">Suspendu</option><option value="sorti">Sorti</option></select></Field><Field label="Adresse"><input className={inputClass} disabled={!canEdit} value={String(draft.adresse ?? "")} onChange={(e) => setDraft({ ...draft, adresse: e.target.value })} /></Field><Field label="Contact d'urgence"><input className={inputClass} disabled={!canEdit} value={String(draft.contactUrgenceNom ?? "")} onChange={(e) => setDraft({ ...draft, contactUrgenceNom: e.target.value })} /></Field><Field label="Téléphone urgence"><input className={inputClass} disabled={!canEdit} value={String(draft.contactUrgenceTelephone ?? "")} onChange={(e) => setDraft({ ...draft, contactUrgenceTelephone: e.target.value })} /></Field></div>{canEdit && <button className={`${buttonClass} mt-5 w-full bg-emerald-700 text-white hover:bg-emerald-800`} disabled={update.isPending} onClick={() => update.mutate(draft)}><Check size={16} />Enregistrer le dossier</button>}</>}</section>
+    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">{!selected ? <div className="flex h-full min-h-64 flex-col items-center justify-center text-center text-slate-400"><UserRound size={32} /><p className="mt-2 text-sm">Sélectionnez un dossier pour consulter ses informations administratives.</p></div> : <><div className="mb-4 flex items-center justify-between"><div><h2 className="font-semibold text-slate-900">{selected.nom} {selected.prenoms}</h2><p className="text-xs text-slate-500">Informations administratives, sans données de paie</p></div><Pencil size={16} className="text-slate-400" /></div><div className="grid gap-3 sm:grid-cols-2"><Field label="Nom"><input className={inputClass} disabled={!canEdit} value={String(draft.nom ?? "")} onChange={(e) => setDraft({ ...draft, nom: e.target.value })} /></Field><Field label="Prénoms"><input className={inputClass} disabled={!canEdit} value={String(draft.prenoms ?? "")} onChange={(e) => setDraft({ ...draft, prenoms: e.target.value })} /></Field><Field label="Poste"><input className={inputClass} disabled={!canEdit} value={String(draft.poste ?? "")} onChange={(e) => setDraft({ ...draft, poste: e.target.value })} /></Field><Field label="Rôle / fonction"><input className={inputClass} disabled={!canEdit} value={String(draft.roleSysteme ?? "")} onChange={(e) => setDraft({ ...draft, roleSysteme: e.target.value })} /></Field><Field label="Compte utilisateur associé"><select className={inputClass} disabled={!canEdit} value={draft.userId ? String(draft.userId) : ""} onChange={(e) => setDraft({ ...draft, userId: e.target.value ? Number(e.target.value) : null })}><option value="">Aucun compte associé</option>{users.filter((user) => user.actif || user.id === selected.userId).map((user) => <option key={user.id} value={user.id}>{user.nom} {user.prenoms} · {user.email}</option>)}</select></Field><Field label="Date de naissance"><input type="date" className={inputClass} disabled={!canEdit} value={String(draft.dateNaissance ?? "")} onChange={(e) => setDraft({ ...draft, dateNaissance: e.target.value })} /></Field><Field label="N° CNPS"><input className={inputClass} disabled={!canEdit} value={String(draft.numeroCnps ?? "")} onChange={(e) => setDraft({ ...draft, numeroCnps: e.target.value })} /></Field><Field label="N° CNI"><input className={inputClass} disabled={!canEdit} value={String(draft.numeroCni ?? "")} onChange={(e) => setDraft({ ...draft, numeroCni: e.target.value })} /></Field><Field label="Statut"><select className={inputClass} disabled={!canEdit} value={String(draft.statut ?? "actif")} onChange={(e) => setDraft({ ...draft, statut: e.target.value as Personnel["statut"] })}><option value="actif">Actif</option><option value="suspendu">Suspendu</option><option value="sorti">Sorti</option></select></Field><Field label="Adresse"><input className={inputClass} disabled={!canEdit} value={String(draft.adresse ?? "")} onChange={(e) => setDraft({ ...draft, adresse: e.target.value })} /></Field><Field label="Contact d'urgence"><input className={inputClass} disabled={!canEdit} value={String(draft.contactUrgenceNom ?? "")} onChange={(e) => setDraft({ ...draft, contactUrgenceNom: e.target.value })} /></Field><Field label="Téléphone urgence"><input className={inputClass} disabled={!canEdit} value={String(draft.contactUrgenceTelephone ?? "")} onChange={(e) => setDraft({ ...draft, contactUrgenceTelephone: e.target.value })} /></Field></div>{canEdit && <button className={`${buttonClass} mt-5 w-full bg-emerald-700 text-white hover:bg-emerald-800`} disabled={update.isPending} onClick={() => update.mutate(draft)}><Check size={16} />Enregistrer le dossier</button>}<RhHistoryPanel entries={history} isLoading={historyLoading} /></>}</section>
   </div>;
 }
 
-function ContractsTab({ personnel, contracts, documents, canContracts, canDocuments, onSaved }: { personnel: Personnel[]; contracts: Contract[]; documents: Document[]; canContracts: boolean; canDocuments: boolean; onSaved: () => void }) {
+function historyActionLabel(action: string) {
+  return ({
+    creation: "Création",
+    modification: "Modification",
+    remplacement_fichier: "Remplacement d’une pièce jointe",
+    ajout_fichier: "Ajout d’une pièce jointe",
+    suppression_fichier: "Suppression d’une pièce jointe",
+    consultation_fichier: "Téléchargement d’une pièce jointe",
+  } as Record<string, string>)[action] ?? action;
+}
+
+function RhHistoryPanel({ entries, isLoading }: { entries: RhHistoryEntry[]; isLoading: boolean }) {
+  const [filter, setFilter] = useState<"tous" | "consultations">("tous");
+  const visibleEntries = filter === "consultations"
+    ? entries.filter((entry) => entry.action === "consultation_fichier")
+    : entries;
+
+  return <div className="mt-6 border-t border-slate-100 pt-5">
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900"><History size={16} />Historique du dossier</h3>
+        <p className="text-xs text-slate-500">Les téléchargements de justificatifs sont tracés avec leur utilisateur et leur date.</p>
+      </div>
+      <select className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs" value={filter} onChange={(event) => setFilter(event.target.value as "tous" | "consultations")}>
+        <option value="tous">Toutes les actions</option>
+        <option value="consultations">Téléchargements uniquement</option>
+      </select>
+    </div>
+    {isLoading ? <p className="py-4 text-center text-sm text-slate-500">Chargement de l’historique…</p>
+      : visibleEntries.length === 0 ? <p className="rounded-lg bg-slate-50 p-4 text-center text-sm text-slate-500">{filter === "consultations" ? "Aucun téléchargement enregistré." : "Aucune action enregistrée."}</p>
+        : <div className="max-h-72 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-100">
+          {visibleEntries.map((entry) => {
+            const actor = [entry.faitParNom, entry.faitParPrenoms].filter(Boolean).join(" ") || (entry.faitPar ? `Compte #${entry.faitPar}` : "Système");
+            const documentName = typeof entry.details?.nom === "string" ? entry.details.nom : null;
+            return <div key={entry.id} className="p-3 text-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-semibold text-slate-800">{historyActionLabel(entry.action)}</span>
+                <time className="text-slate-500" dateTime={entry.createdAt}>{new Date(entry.createdAt).toLocaleString("fr-FR")}</time>
+              </div>
+              <div className="mt-1 text-slate-500">{actor}{documentName ? ` · ${documentName}` : ""}{entry.faitParEmail ? ` · ${entry.faitParEmail}` : ""}</div>
+            </div>;
+          })}
+        </div>}
+  </div>;
+}
+
+function ContractsTab({ personnel, contracts, documents, canContracts, canDocuments, onSaved, onDownloaded }: { personnel: Personnel[]; contracts: Contract[]; documents: Document[]; canContracts: boolean; canDocuments: boolean; onSaved: () => void; onDownloaded: () => void }) {
   const { toast } = useToast();
   const [section, setSection] = useState<"contrats" | "documents">("contrats");
   const [showForm, setShowForm] = useState(false);
@@ -236,7 +311,7 @@ function ContractsTab({ personnel, contracts, documents, canContracts, canDocume
       {section === "documents" && <p className="mt-3 text-xs text-slate-600">Vous pourrez joindre le fichier juste après la création du document. Formats acceptés : PDF, JPG, PNG, WEBP, DOC ou DOCX, 10 Mo maximum.</p>}
       <div className="mt-3 flex justify-end gap-2"><button className={`${buttonClass} border border-slate-200 bg-white text-slate-600`} onClick={() => setShowForm(false)}>Annuler</button><button className={`${buttonClass} bg-emerald-700 text-white`} disabled={!form.personnelId || (section === "contrats" ? !form.dateDebut : !form.titre) || contractMut.isPending || documentMut.isPending} onClick={() => section === "contrats" ? contractMut.mutate({ personnelId: Number(form.personnelId), type: form.type, dateDebut: form.dateDebut, dateFin: form.dateFin || null, reference: form.reference || null, notes: form.notes || null }) : documentMut.mutate({ personnelId: Number(form.personnelId), type: form.type, titre: form.titre, dateExpiration: form.dateExpiration || null, reference: form.reference || null, url: form.url || null, notes: form.notes || null })}><Check size={16} />Enregistrer</button></div>
     </div>}
-    {section === "contrats" ? <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm"><table className="w-full min-w-[700px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Personnel</th><th className="p-3">Type</th><th className="p-3">Période</th><th className="p-3">Statut</th><th className="p-3">Référence</th></tr></thead><tbody className="divide-y divide-slate-100">{contracts.map((row) => <tr key={row.id}><td className="p-3 font-medium text-slate-800">{row.personnelNom}<div className="text-xs font-normal text-slate-500">{row.poste}</div></td><td className="p-3">{row.type.toUpperCase()}</td><td className="p-3">{dateLabel(row.dateDebut)} → {dateLabel(row.dateFin)}</td><td className="p-3"><StatusBadge value={row.statut} /></td><td className="p-3 text-slate-500">{row.reference ?? "—"}</td></tr>)}</tbody></table>{contracts.length === 0 && <p className="p-8 text-center text-sm text-slate-500">Aucun contrat suivi.</p>}</div> : <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm"><table className="w-full min-w-[900px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Personnel</th><th className="p-3">Document</th><th className="p-3">Date</th><th className="p-3">Expiration</th><th className="p-3">Pièce jointe</th><th className="p-3">Action</th></tr></thead><tbody className="divide-y divide-slate-100">{documents.map((row) => <tr key={row.id}><td className="p-3 font-medium text-slate-800">{row.personnelNom}</td><td className="p-3">{row.titre}<div className="text-xs text-slate-500">{row.type}</div></td><td className="p-3">{dateLabel(row.dateDocument)}</td><td className={`p-3 ${row.dateExpiration && row.dateExpiration < new Date().toISOString().slice(0, 10) ? "font-semibold text-red-600" : "text-slate-600"}`}>{dateLabel(row.dateExpiration)}</td><td className="p-3">{row.pieceJointe ? <button className="text-left text-emerald-700 hover:underline" onClick={() => void downloadRhFile(row.pieceJointe!.url, row.pieceJointe!.nom).catch((error: Error) => toast({ title: "Téléchargement impossible", description: error.message, variant: "destructive" }))}><span className="block max-w-[190px] truncate font-medium">{row.pieceJointe.nom}</span><span className="text-xs text-slate-500">{fileSize(row.pieceJointe.taille)}</span></button> : <span className="text-slate-400">Aucune pièce</span>}</td><td className="p-3"><div className="flex items-center gap-2">{canDocuments && <><input id={`rh-file-${row.id}`} className="sr-only" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,application/pdf,image/jpeg,image/png,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" disabled={uploadFile.isPending} onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ""; if (file) uploadFile.mutate({ id: row.id, file }); }} /><label htmlFor={`rh-file-${row.id}`} className={`${buttonClass} cursor-pointer border border-slate-200 bg-white text-slate-600 hover:bg-slate-50`}><Upload size={15} />{row.pieceJointe ? "Remplacer" : "Joindre"}</label>{row.pieceJointe && <button className={`${buttonClass} border border-red-100 bg-red-50 px-2 text-red-700`} disabled={deleteFile.isPending} title="Retirer la pièce jointe" onClick={() => { if (window.confirm("Retirer cette pièce jointe ?")) deleteFile.mutate(row.id); }}><Trash2 size={15} /></button>}</>}</div></td></tr>)}</tbody></table>{documents.length === 0 && <p className="p-8 text-center text-sm text-slate-500">Aucun document suivi.</p>}</div>}
+    {section === "contrats" ? <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm"><table className="w-full min-w-[700px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Personnel</th><th className="p-3">Type</th><th className="p-3">Période</th><th className="p-3">Statut</th><th className="p-3">Référence</th></tr></thead><tbody className="divide-y divide-slate-100">{contracts.map((row) => <tr key={row.id}><td className="p-3 font-medium text-slate-800">{row.personnelNom}<div className="text-xs font-normal text-slate-500">{row.poste}</div></td><td className="p-3">{row.type.toUpperCase()}</td><td className="p-3">{dateLabel(row.dateDebut)} → {dateLabel(row.dateFin)}</td><td className="p-3"><StatusBadge value={row.statut} /></td><td className="p-3 text-slate-500">{row.reference ?? "—"}</td></tr>)}</tbody></table>{contracts.length === 0 && <p className="p-8 text-center text-sm text-slate-500">Aucun contrat suivi.</p>}</div> : <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm"><table className="w-full min-w-[900px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Personnel</th><th className="p-3">Document</th><th className="p-3">Date</th><th className="p-3">Expiration</th><th className="p-3">Pièce jointe</th><th className="p-3">Action</th></tr></thead><tbody className="divide-y divide-slate-100">{documents.map((row) => <tr key={row.id}><td className="p-3 font-medium text-slate-800">{row.personnelNom}</td><td className="p-3">{row.titre}<div className="text-xs text-slate-500">{row.type}</div></td><td className="p-3">{dateLabel(row.dateDocument)}</td><td className={`p-3 ${row.dateExpiration && row.dateExpiration < new Date().toISOString().slice(0, 10) ? "font-semibold text-red-600" : "text-slate-600"}`}>{dateLabel(row.dateExpiration)}</td><td className="p-3">{row.pieceJointe ? <button className="text-left text-emerald-700 hover:underline" onClick={() => void downloadRhFile(row.pieceJointe!.url, row.pieceJointe!.nom).then(onDownloaded).catch((error: Error) => toast({ title: "Téléchargement impossible", description: error.message, variant: "destructive" }))}><span className="block max-w-[190px] truncate font-medium">{row.pieceJointe.nom}</span><span className="text-xs text-slate-500">{fileSize(row.pieceJointe.taille)}</span></button> : <span className="text-slate-400">Aucune pièce</span>}</td><td className="p-3"><div className="flex items-center gap-2">{canDocuments && <><input id={`rh-file-${row.id}`} className="sr-only" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,application/pdf,image/jpeg,image/png,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" disabled={uploadFile.isPending} onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ""; if (file) uploadFile.mutate({ id: row.id, file }); }} /><label htmlFor={`rh-file-${row.id}`} className={`${buttonClass} cursor-pointer border border-slate-200 bg-white text-slate-600 hover:bg-slate-50`}><Upload size={15} />{row.pieceJointe ? "Remplacer" : "Joindre"}</label>{row.pieceJointe && <button className={`${buttonClass} border border-red-100 bg-red-50 px-2 text-red-700`} disabled={deleteFile.isPending} title="Retirer la pièce jointe" onClick={() => { if (window.confirm("Retirer cette pièce jointe ?")) deleteFile.mutate(row.id); }}><Trash2 size={15} /></button>}</>}</div></td></tr>)}</tbody></table>{documents.length === 0 && <p className="p-8 text-center text-sm text-slate-500">Aucun document suivi.</p>}</div>}
   </div>;
 }
 

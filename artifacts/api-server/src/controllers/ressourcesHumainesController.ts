@@ -271,7 +271,23 @@ export async function getRhPersonnel(req: Request, res: Response): Promise<void>
       db.select().from(rhDocumentsTable).where(and(eq(rhDocumentsTable.cooperativeId, coopId), eq(rhDocumentsTable.personnelId, id))).orderBy(desc(rhDocumentsTable.dateExpiration)),
       db.select().from(rhCongesTable).where(and(eq(rhCongesTable.cooperativeId, coopId), eq(rhCongesTable.personnelId, id))).orderBy(desc(rhCongesTable.dateDebut)),
       db.select().from(rhAbsencesTable).where(and(eq(rhAbsencesTable.cooperativeId, coopId), eq(rhAbsencesTable.personnelId, id))).orderBy(desc(rhAbsencesTable.dateDebut)),
-      db.select().from(rhHistoriqueTable).where(and(eq(rhHistoriqueTable.cooperativeId, coopId), eq(rhHistoriqueTable.personnelId, id))).orderBy(desc(rhHistoriqueTable.createdAt)),
+      db.select({
+        id: rhHistoriqueTable.id,
+        cooperativeId: rhHistoriqueTable.cooperativeId,
+        personnelId: rhHistoriqueTable.personnelId,
+        entite: rhHistoriqueTable.entite,
+        entiteId: rhHistoriqueTable.entiteId,
+        action: rhHistoriqueTable.action,
+        details: rhHistoriqueTable.details,
+        faitPar: rhHistoriqueTable.faitPar,
+        faitParNom: usersTable.nom,
+        faitParPrenoms: usersTable.prenoms,
+        faitParEmail: usersTable.email,
+        createdAt: rhHistoriqueTable.createdAt,
+      }).from(rhHistoriqueTable)
+        .leftJoin(usersTable, and(eq(usersTable.id, rhHistoriqueTable.faitPar), eq(usersTable.cooperativeId, coopId)))
+        .where(and(eq(rhHistoriqueTable.cooperativeId, coopId), eq(rhHistoriqueTable.personnelId, id)))
+        .orderBy(desc(rhHistoriqueTable.createdAt)),
     ]);
     res.json({ personnel: row, contrats, documents: documents.map((document) => documentView(document)), conges, absences, historique });
   } catch (err) {
@@ -615,6 +631,11 @@ export async function downloadRhDocumentFile(req: Request, res: Response): Promi
     }
     const objectFile = await objectStorageService.getObjectEntityFile(document.fichierPath);
     const response = await objectStorageService.downloadObject(objectFile, 0);
+    await logHistory(coopId, document.personnelId, "document", id, "consultation_fichier", {
+      nom: document.fichierNom ?? "document",
+      typeMime: document.fichierMimeType ?? "application/octet-stream",
+      taille: document.fichierTaille ?? 0,
+    }, req.user?.id ?? null);
     res.status(response.status);
     response.headers.forEach((value, key) => res.setHeader(key, value));
     res.setHeader("Content-Disposition", `attachment; filename="${safeFileName(document.fichierNom ?? "document")}"`);
