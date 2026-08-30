@@ -429,7 +429,9 @@ function OngletEnAttente() {
 
   const params: Record<string, string> = {};
   if (filtreSource) params["source"] = filtreSource;
-  if (filtreStatut) params["statut"] = filtreStatut;
+  // Envoyer aussi la valeur vide : l'API distingue l'absence du paramètre
+  // (filtre par défaut « en_attente ») d'un statut vide (tous les statuts).
+  params["statut"] = filtreStatut;
   if (filtreDebut) params["date_debut"] = filtreDebut;
   if (filtreFin) params["date_fin"] = filtreFin;
 
