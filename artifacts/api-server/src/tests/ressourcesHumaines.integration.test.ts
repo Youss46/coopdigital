@@ -3,7 +3,7 @@ import type { Server } from "node:http";
 import jwt from "jsonwebtoken";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { pool } from "@workspace/db";
-import { ObjectStorageService } from "../lib/objectStorage.js";
+import { ObjectNotFoundError, ObjectStorageService } from "../lib/objectStorage.js";
 import ressourcesHumainesRouter from "../routes/ressourcesHumaines.js";
 
 const enabled = process.env.RUN_POSTGRES_INTEGRATION === "1" && Boolean(process.env.DATABASE_URL);
@@ -363,6 +363,74 @@ describe.skipIf(!enabled)("décisions de congés RH sur PostgreSQL", () => {
       expect(dossierBJson.historique.every((entry) =>
         entry.cooperativeId === cooperativeB && entry.personnelId === personnelB,
       )).toBe(true);
+    } finally {
+      getObjectEntityFile.mockRestore();
+      downloadObject.mockRestore();
+    }
+  });
+
+  it("ne journalise pas un téléchargement lorsque le stockage échoue ou ne retrouve plus le fichier", async () => {
+    const missingDocument = await insertDocument(
+      cooperativeA,
+      personnelA,
+      `/objects/rh-documents/${cooperativeA}/${personnelA}/document-missing.pdf`,
+      "contrat-missing.pdf",
+    );
+    const unavailableDocument = await insertDocument(
+      cooperativeA,
+      personnelA,
+      `/objects/rh-documents/${cooperativeA}/${personnelA}/document-unavailable.pdf`,
+      "contrat-unavailable.pdf",
+    );
+
+    const getObjectEntityFile = vi
+      .spyOn(ObjectStorageService.prototype, "getObjectEntityFile")
+      .mockImplementation(async (objectPath) => {
+        if (objectPath.endsWith("document-missing.pdf")) {
+          throw new ObjectNotFoundError();
+        }
+        return Object.create(null);
+      });
+    const downloadObject = vi
+      .spyOn(ObjectStorageService.prototype, "downloadObject")
+      .mockRejectedValue(new Error("Stockage RH indisponible"));
+
+    try {
+      const missingDownload = await fetch(`${baseUrl}/rh/documents/${missingDocument}/fichier`, {
+        headers: { Authorization: `Bearer ${token(userA, cooperativeA)}` },
+      });
+      expect(missingDownload.status).toBe(404);
+      expect(await missingDownload.json()).toMatchObject({ erreur: "Fichier RH introuvable" });
+
+      const unavailableDownload = await fetch(`${baseUrl}/rh/documents/${unavailableDocument}/fichier`, {
+        headers: { Authorization: `Bearer ${token(userA, cooperativeA)}` },
+      });
+      expect(unavailableDownload.status).toBe(500);
+      expect(await unavailableDownload.json()).toMatchObject({ erreur: "Erreur interne du serveur" });
+
+      const auditRows = await pool.query(
+        `SELECT id
+         FROM rh_historique
+         WHERE cooperative_id = $1
+           AND entite = 'document'
+           AND entite_id = ANY($2::int[])
+           AND action = 'consultation_fichier'`,
+        [cooperativeA, [missingDocument, unavailableDocument]],
+      );
+      expect(auditRows.rows).toHaveLength(0);
+
+      const dossier = await fetch(`${baseUrl}/rh/personnel/${personnelA}`, {
+        headers: { Authorization: `Bearer ${token(userA, cooperativeA)}` },
+      });
+      expect(dossier.status).toBe(200);
+      const dossierJson = await dossier.json() as {
+        historique: Array<{ entiteId: number | null; action: string }>;
+      };
+      const consultationIds = dossierJson.historique
+        .filter((entry) => entry.action === "consultation_fichier")
+        .map((entry) => entry.entiteId);
+      expect(consultationIds).not.toContain(missingDocument);
+      expect(consultationIds).not.toContain(unavailableDocument);
     } finally {
       getObjectEntityFile.mockRestore();
       downloadObject.mockRestore();

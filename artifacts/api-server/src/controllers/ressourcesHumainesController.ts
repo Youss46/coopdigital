@@ -224,7 +224,11 @@ function handleError(req: Request, res: Response, err: unknown, operation: strin
     res.status(401).json({ erreur: "Coopérative non associée au compte" });
     return;
   }
-  req.log.error({ err }, operation);
+  if (req.log) {
+    req.log.error({ err }, operation);
+  } else {
+    logger.error({ err }, operation);
+  }
   res.status(500).json({ erreur: "Erreur interne du serveur" });
 }
 
