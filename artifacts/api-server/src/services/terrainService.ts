@@ -30,7 +30,7 @@ function formatFcfa(n: number): string {
 // ─── Auth terrain ──────────────────────────────────────────────────────────
 
 export async function loginTerrain(telephone: string, motDePasse: string) {
-  const secret = process.env["JWT_SECRET"];
+  const secret = process.env["JWT_SECRET"] ?? process.env["SESSION_SECRET"];
   if (!secret) throw new Error("JWT_SECRET non configuré");
 
   const tel = telephone.trim().replace(/\s+/g, "");
