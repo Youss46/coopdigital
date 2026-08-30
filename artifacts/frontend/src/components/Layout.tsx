@@ -95,6 +95,7 @@ function SystemBanner() {
 const NAV_ICON_LIST: React.ElementType[] = [
   TrendingUp,     // /dashboard/pca
   LayoutDashboard,// /dashboard
+  Truck,          // /logistique
   LayoutDashboard,// /dashboard-delegue
   Navigation,     // /missions (agent_terrain)
   Users,          // /membres

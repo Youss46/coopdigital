@@ -23,6 +23,7 @@ export const ROLE_CATALOG = [
   { key: "chauffeur", label: "Chauffeur", description: "Transport et livraisons" },
   { key: "responsable_rh", label: "Responsable RH", description: "Dossiers du personnel, congés et suivi administratif" },
   { key: "sacherie", label: "Responsable Sacherie", description: "Gestion des sacs, attributions et inventaire" },
+  { key: "responsable_logistique", label: "Responsable Logistique", description: "Pilotage des stocks, entrepôts, transports et expéditions" },
 ] as const satisfies ReadonlyArray<{ key: (typeof USER_ROLES)[number]; label: string; description: string }>;
 
 const ROLE_KEYS = ROLE_CATALOG.map((role) => role.key);

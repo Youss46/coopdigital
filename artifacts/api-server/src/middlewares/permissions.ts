@@ -49,17 +49,21 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
 
   // MODULE M03 — STOCKS
   stocks: {
-    lire:                ["pca", "directeur", "magasinier", "responsable_tracabilite", "auditeur"],
+    lire:                ["pca", "directeur", "magasinier", "responsable_tracabilite", "responsable_logistique", "auditeur"],
     entree:              ["pca", "directeur"],
     sortie:              ["pca", "directeur"],
     creer_entrepot:      ["pca", "directeur"],
     modifier_entrepot:   ["pca", "directeur"],
     supprimer_entrepot:  ["pca"],
-    voir_alertes:        ["pca", "directeur", "magasinier", "responsable_tracabilite"],
+    voir_alertes:        ["pca", "directeur", "magasinier", "responsable_tracabilite", "responsable_logistique"],
+  },
+
+  logistique: {
+    lire: ["pca", "directeur", "magasinier", "responsable_logistique", "auditeur"],
   },
 
   sacherie: {
-    lire:        ["pca", "directeur", "magasinier", "responsable_tracabilite", "auditeur", "sacherie"],
+    lire:        ["pca", "directeur", "magasinier", "responsable_tracabilite", "responsable_logistique", "auditeur", "sacherie"],
     gerer_types: ["pca", "directeur", "sacherie"],
     mouvement:   ["pca", "directeur", "magasinier", "sacherie"],
     ajuster:     ["pca", "directeur", "sacherie"],
@@ -418,7 +422,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
 
   // MODULE — EXPÉDITIONS PORT
   expeditions: {
-    lire:         ["pca", "directeur", "responsable_tracabilite", "auditeur"],
+    lire:         ["pca", "directeur", "responsable_tracabilite", "responsable_logistique", "auditeur"],
     creer:        ["pca", "directeur", "responsable_tracabilite"],
     modifier:     ["pca", "directeur", "responsable_tracabilite"],
     valider:      ["pca", "directeur"],
@@ -459,7 +463,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
   // La consultation est ouverte à l'audit, mais les opérations qui modifient
   // le stock ou le transfert restent réservées à la direction.
   entrepots_delegues: {
-    lire:   ["pca", "directeur", "auditeur"],
+    lire:   ["pca", "directeur", "responsable_logistique", "auditeur"],
     gerer:  ["pca", "directeur"],
   },
 

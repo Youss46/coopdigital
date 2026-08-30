@@ -20,6 +20,7 @@ export const NAV_ITEMS: NavItemConfig[] = [
   // ── Dashboards ──────────────────────────────────────────────────────────────
   { href: "/dashboard/pca",          label: "Vue PCA",                   roles: ["pca"],                                                                       category: "Tableau de bord" },
   { href: "/dashboard",              label: "Tableau de bord",           roles: ["pca","directeur","comptable","magasinier","responsable_tracabilite","auditeur"], category: "Tableau de bord" },
+  { href: "/logistique",              label: "Logistique",                roles: ["pca","directeur","magasinier","responsable_logistique","auditeur"], category: "Logistique" },
   { href: "/dashboard-caissier",    label: "Tableau de bord",           roles: ["caissier"],                                                                          category: "Tableau de bord" },
   { href: "/dashboard-delegue",      label: "Tableau de bord délégué",   roles: ["delegue"],                                                                   category: "Tableau de bord" },
 
@@ -35,8 +36,8 @@ export const NAV_ITEMS: NavItemConfig[] = [
   { href: "/campagnes",              label: "Campagnes",                 roles: ["pca","directeur","comptable","magasinier","delegue","auditeur"],              category: "Collecte" },
   { href: "/livraisons",             label: "Livraisons",                roles: ["pca","directeur","comptable","caissier","magasinier","delegue","auditeur"],          category: "Collecte" },
   { href: "/sessions-pesee",         label: "Sessions de pesée",         roles: ["pca","directeur","magasinier","auditeur"],                                    category: "Collecte" },
-  { href: "/transport",              label: "Transport",                 roles: ["pca","directeur","auditeur","magasinier"],                                    category: "Collecte" },
-  { href: "/expeditions",            label: "Expéditions port",          roles: ["pca","directeur","responsable_tracabilite","auditeur"],                      category: "Collecte" },
+  { href: "/transport",              label: "Transport",                 roles: ["pca","directeur","auditeur","magasinier","responsable_logistique"],                                    category: "Collecte" },
+  { href: "/expeditions",            label: "Expéditions port",          roles: ["pca","directeur","responsable_tracabilite","responsable_logistique","auditeur"],                      category: "Collecte" },
 
   // ── Traçabilité ──────────────────────────────────────────────────────────────
   { href: "/tracabilite",            label: "Traçabilité",               roles: ["pca","directeur","responsable_tracabilite","auditeur"],                      category: "Traçabilité" },
@@ -47,9 +48,9 @@ export const NAV_ITEMS: NavItemConfig[] = [
   { href: "/missions",               label: "Missions terrain",          roles: ["responsable_tracabilite"],                                                   category: "Traçabilité" },
 
   // ── Stocks ───────────────────────────────────────────────────────────────────
-  { href: "/stocks",                 label: "Stocks",                    roles: ["pca","directeur","magasinier","responsable_tracabilite","auditeur"],              category: "Stocks" },
-  { href: "/sacherie",               label: "Sacherie",                  roles: ["pca","directeur","magasinier","sacherie","auditeur"],                              category: "Stocks" },
-  { href: "/entrepots",              label: "Entrepôts délégués",        roles: ["pca","directeur","auditeur"],                                               category: "Stocks" },
+  { href: "/stocks",                 label: "Stocks",                    roles: ["pca","directeur","magasinier","responsable_tracabilite","responsable_logistique","auditeur"],              category: "Stocks" },
+  { href: "/sacherie",               label: "Sacherie",                  roles: ["pca","directeur","magasinier","responsable_logistique","sacherie","auditeur"],                              category: "Stocks" },
+  { href: "/entrepots",              label: "Entrepôts délégués",        roles: ["pca","directeur","responsable_logistique","auditeur"],                                               category: "Stocks" },
   { href: "/mon-entrepot",           label: "Mon entrepôt",              roles: ["delegue"],                                                                   category: "Stocks" },
   { href: "/refus",                  label: "Stocks refoulés",           roles: ["pca","directeur","magasinier","auditeur"],                                    category: "Stocks" },
   { href: "/bons-reception-membres", label: "Bons de réception",         roles: ["pca","directeur","magasinier","auditeur"],                                    category: "Stocks" },

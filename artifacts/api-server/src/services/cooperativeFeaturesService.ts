@@ -18,6 +18,7 @@ export interface FeatureDefinition {
 
 export const FEATURE_CATALOG: FeatureDefinition[] = [
   { key: "dashboard", label: "Tableaux de bord", category: "Pilotage", description: "Vues de synthèse et indicateurs", dependsOn: [] },
+  { key: "logistique", label: "Logistique", category: "Logistique", description: "Pilotage transversal des stocks, entrepôts et flux", dependsOn: ["stocks"] },
   { key: "membres", label: "Membres", category: "Membres", description: "Fiches et suivi des membres", dependsOn: [] },
   { key: "campagnes", label: "Campagnes", category: "Collecte", description: "Campagnes de collecte", dependsOn: [] },
   { key: "livraisons", label: "Livraisons", category: "Collecte", description: "Réception et suivi des livraisons", dependsOn: ["membres"] },
@@ -187,6 +188,7 @@ export function featureKeyForPath(pathname: string): string | null {
     ["/formations-rse", "formations_rse"], ["/charges-diverses", "charges_diverses"], ["/mobile-marchand", "mobile_marchand"],
     ["/comptabilite", "comptabilite"], ["/reconciliation", "reconciliation"], ["/investissements", "investissements"],
     ["/dashboard", "dashboard"], ["/membres", "membres"], ["/campagnes", "campagnes"], ["/livraisons", "livraisons"],
+    ["/logistique", "logistique"],
     ["/transport", "transport"], ["/expeditions", "expeditions"], ["/tracabilite", "tracabilite"], ["/parcelles", "parcelles"],
     ["/certifications", "certifications"], ["/enquetes", "enquetes"], ["/stocks", "stocks"], ["/entrepots", "entrepots"],
     ["/missions", "missions"], ["/sacherie", "sacherie"], ["/lots", "tracabilite"],

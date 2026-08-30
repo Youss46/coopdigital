@@ -18,3 +18,19 @@ describe("intégration frontend Sacherie", () => {
     expect(PERMISSIONS.sacherie.ajuster).not.toContain("auditeur");
   });
 });
+
+describe("intégration frontend Logistique", () => {
+  it("expose le poste de pilotage et le rôle dédié", () => {
+    expect(NAV_ITEMS.find((item) => item.href === "/logistique")).toMatchObject({
+      label: "Logistique",
+      roles: expect.arrayContaining(["responsable_logistique"]),
+    });
+    expect(featureKeyForPath("/logistique")).toBe("logistique");
+  });
+
+  it("réserve les opérations financières aux rôles financiers", () => {
+    expect(PERMISSIONS.logistique.lire).toEqual(expect.arrayContaining(["responsable_logistique"]));
+    expect(PERMISSIONS.logistique.lire).not.toContain("comptable");
+    expect(PERMISSIONS.transport.creer_bon).not.toContain("responsable_logistique");
+  });
+});

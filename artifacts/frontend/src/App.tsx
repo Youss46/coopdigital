@@ -82,6 +82,7 @@ import MissionEnqueteDetailPage from "@/pages/MissionEnqueteDetailPage";
 import CertificationsDashboardPage from "@/pages/CertificationsDashboardPage";
 import ChargesDiversesPage from "@/pages/ChargesDiversesPage";
 import SacheriePage from "@/pages/SacheriePage";
+import LogistiquePage from "@/pages/LogistiquePage";
 import Layout from "@/components/Layout";
 import NotFound from "@/pages/not-found";
 import { Toaster } from "@/components/ui/sonner";
@@ -146,6 +147,7 @@ function AppRoutes() {
     utilisateur?.role === "agent_terrain" ? "/missions" :
     utilisateur?.role === "delegue"       ? "/dashboard-delegue" :
     utilisateur?.role === "caissier"      ? "/dashboard-caissier" :
+    utilisateur?.role === "responsable_logistique" ? "/logistique" :
     "/dashboard";
   return (
     <Switch>
@@ -164,6 +166,9 @@ function AppRoutes() {
       </Route>
       <Route path="/dashboard-caissier">
         <ProtectedRoute component={DashboardCaissier} />
+      </Route>
+      <Route path="/logistique">
+        <ProtectedRoute component={LogistiquePage} roles={["pca", "directeur", "magasinier", "responsable_logistique", "auditeur"]} />
       </Route>
       <Route path="/membres/:id">
         <ProtectedRoute component={MembreFiche} />
@@ -199,10 +204,10 @@ function AppRoutes() {
         <ProtectedRoute component={ParcellePage} roles={["pca", "directeur", "responsable_tracabilite", "auditeur"]} />
       </Route>
       <Route path="/stocks">
-        <ProtectedRoute component={StocksPage} roles={["pca", "directeur", "magasinier", "responsable_tracabilite", "auditeur"]} />
+        <ProtectedRoute component={StocksPage} roles={["pca", "directeur", "magasinier", "responsable_tracabilite", "responsable_logistique", "auditeur"]} />
       </Route>
       <Route path="/sacherie">
-        <ProtectedRoute component={SacheriePage} roles={["pca", "directeur", "magasinier", "sacherie", "auditeur"]} />
+        <ProtectedRoute component={SacheriePage} roles={["pca", "directeur", "magasinier", "responsable_logistique", "sacherie", "auditeur"]} />
       </Route>
       <Route path="/exportateurs">
         <ProtectedRoute component={ExportateursPage} />
@@ -292,7 +297,7 @@ function AppRoutes() {
         <ProtectedRoute component={MonProfilPage} />
       </Route>
       <Route path="/transport">
-        <ProtectedRoute component={TransportPage} roles={["pca", "directeur", "magasinier", "auditeur"]} />
+        <ProtectedRoute component={TransportPage} roles={["pca", "directeur", "magasinier", "responsable_logistique", "auditeur"]} />
       </Route>
       <Route path="/equipements">
         <ProtectedRoute component={EquipementsPage} roles={["pca", "directeur", "auditeur"]} />
@@ -346,13 +351,13 @@ function AppRoutes() {
         <ProtectedRoute component={NouvelleExpeditionPage} roles={["pca", "directeur", "responsable_tracabilite"]} writeOnly />
       </Route>
       <Route path="/expeditions/:id">
-        <ProtectedRoute component={ExpeditionDetailPage} roles={["pca", "directeur", "responsable_tracabilite", "auditeur"]} />
+        <ProtectedRoute component={ExpeditionDetailPage} roles={["pca", "directeur", "responsable_tracabilite", "responsable_logistique", "auditeur"]} />
       </Route>
       <Route path="/expeditions">
-        <ProtectedRoute component={ExpeditionsPage} roles={["pca", "directeur", "responsable_tracabilite", "auditeur"]} />
+        <ProtectedRoute component={ExpeditionsPage} roles={["pca", "directeur", "responsable_tracabilite", "responsable_logistique", "auditeur"]} />
       </Route>
       <Route path="/entrepots">
-        <ProtectedRoute component={EntrepotsPage} roles={["pca", "directeur", "auditeur"]} />
+        <ProtectedRoute component={EntrepotsPage} roles={["pca", "directeur", "responsable_logistique", "auditeur"]} />
       </Route>
       <Route path="/peseurs">
         <ProtectedRoute component={PeseursPage} roles={["pca", "directeur"]} />

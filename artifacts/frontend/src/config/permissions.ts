@@ -34,13 +34,17 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
   },
 
   stocks: {
-    lire:               ["pca", "directeur", "magasinier", "responsable_tracabilite", "auditeur"],
+    lire:               ["pca", "directeur", "magasinier", "responsable_tracabilite", "responsable_logistique", "auditeur"],
     entree:             ["pca", "directeur"],
     sortie:             ["pca", "directeur"],
     creer_entrepot:     ["pca", "directeur"],
     modifier_entrepot:  ["pca", "directeur"],
     supprimer_entrepot: ["pca"],
-    voir_alertes:       ["pca", "directeur", "magasinier", "responsable_tracabilite"],
+    voir_alertes:       ["pca", "directeur", "magasinier", "responsable_tracabilite", "responsable_logistique"],
+  },
+
+  logistique: {
+    lire: ["pca", "directeur", "magasinier", "responsable_logistique", "auditeur"],
   },
 
   avances: {
@@ -206,7 +210,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
   },
 
   sacherie: {
-    lire:        ["pca", "directeur", "magasinier", "responsable_tracabilite", "auditeur", "sacherie"],
+    lire:        ["pca", "directeur", "magasinier", "responsable_tracabilite", "responsable_logistique", "auditeur", "sacherie"],
     gerer_types: ["pca", "directeur", "sacherie"],
     mouvement:   ["pca", "directeur", "magasinier", "sacherie"],
     ajuster:     ["pca", "directeur", "sacherie"],
@@ -227,7 +231,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
   },
 
   transport: {
-    lire:        ["pca", "directeur", "magasinier", "auditeur"],
+    lire:        ["pca", "directeur", "magasinier", "responsable_logistique", "auditeur"],
     creer_bon:   ["pca", "directeur", "magasinier"],
     soumettre:   ["pca", "directeur", "magasinier"],
     traiter:     ["pca", "directeur", "magasinier"],
@@ -276,7 +280,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
   },
 
   expeditions: {
-    lire:         ["pca", "directeur", "responsable_tracabilite", "auditeur"],
+    lire:         ["pca", "directeur", "responsable_tracabilite", "responsable_logistique", "auditeur"],
     creer:        ["pca", "directeur", "responsable_tracabilite"],
     modifier:     ["pca", "directeur", "responsable_tracabilite"],
     valider:      ["pca", "directeur"],
