@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { hasPermission } from "../middlewares/permissions.js";
+import { ObjectStorageService, objectStorageClient } from "../lib/objectStorage.js";
 import {
   cleanupOrphanedRhDocuments,
   inclusiveDays,
@@ -109,5 +110,94 @@ describe("module RH", () => {
 
     expect(result).toMatchObject({ scanned: 1, skippedWithoutMetadata: 1, deleted: 0, errors: 1 });
     expect(deleted).toEqual([]);
+  });
+
+  it("réconcilie un préfixe GCS représentatif sans bloquer sur une lecture ou suppression", async () => {
+    const now = new Date("2026-08-30T12:00:00.000Z");
+    const referenced = "/objects/rh-documents/1/2/3/document.pdf";
+    const recentOrphan = "/objects/rh-documents/1/2/5/recent.pdf";
+    const oldOrphan = "/objects/rh-documents/1/2/4/orphan.pdf";
+    const deleted: string[] = [];
+    const metadata = new Map<string, string>([
+      ["private/rh-documents/1/2/3/document.pdf", "2026-08-28T12:00:00.000Z"],
+      ["private/rh-documents/1/2/5/recent.pdf", "2026-08-30T08:00:00.000Z"],
+      ["private/rh-documents/1/2/4/orphan.pdf", "2026-08-28T12:00:00.000Z"],
+      ["private/rh-documents/1/2/7/fails-delete.pdf", "2026-08-27T12:00:00.000Z"],
+    ]);
+    const objectNames = [
+      "private/rh-documents/",
+      ...metadata.keys(),
+      "private/rh-documents/1/2/8/fails-metadata.pdf",
+    ];
+
+    const fakeFiles = new Map(
+      objectNames
+        .filter((name) => !name.endsWith("/"))
+        .map((name) => [
+          name,
+          {
+            name,
+            getMetadata: async () => {
+              if (name.endsWith("fails-metadata.pdf")) {
+                throw new Error("metadata unavailable");
+              }
+              const timestamp = metadata.get(name);
+              return [{ timeCreated: timestamp, updated: timestamp }];
+            },
+            exists: async () => [true] as [boolean],
+            delete: async () => {
+              if (name.endsWith("fails-delete.pdf")) {
+                throw new Error("delete unavailable");
+              }
+              deleted.push(name);
+            },
+          },
+        ]),
+    );
+    const fakeBucket = {
+      getFiles: async ({ prefix }: { prefix: string }) => {
+        expect(prefix).toBe("private/rh-documents/");
+        return [[...fakeFiles.values()]];
+      },
+      file: (name: string) => fakeFiles.get(name),
+    };
+    const bucketSpy = vi
+      .spyOn(objectStorageClient, "bucket")
+      .mockReturnValue(fakeBucket as unknown as ReturnType<typeof objectStorageClient.bucket>);
+    const previousPrivateDir = process.env["PRIVATE_OBJECT_DIR"];
+    process.env["PRIVATE_OBJECT_DIR"] = "/bucket/private";
+    const executor = {
+      select: vi.fn().mockReturnValue({
+        from: () => ({
+          where: async () => [{ fichierPath: referenced }],
+        }),
+      }),
+    };
+
+    try {
+      const result = await cleanupOrphanedRhDocuments({
+        executor,
+        storage: new ObjectStorageService(),
+        now,
+      });
+
+      expect(result).toMatchObject({
+        scanned: 5,
+        referenced: 1,
+        orphaned: 2,
+        skippedRecent: 1,
+        skippedWithoutMetadata: 1,
+        deleted: 1,
+        errors: 2,
+      });
+      expect(deleted).toEqual(["private/rh-documents/1/2/4/orphan.pdf"]);
+    } finally {
+      bucketSpy.mockRestore();
+      if (previousPrivateDir === undefined) {
+        delete process.env["PRIVATE_OBJECT_DIR"];
+      } else {
+        process.env["PRIVATE_OBJECT_DIR"] = previousPrivateDir;
+      }
+    }
   });
 });
