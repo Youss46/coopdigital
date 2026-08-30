@@ -24,7 +24,8 @@ When a JWT expires, the server returns 401. Every frontend must detect this and 
 - `setOnUnauthorized` must be exported from `lib/api-client-react/src/index.ts`.
 
 ### Terrain app (`artifacts/terrain`)
-- `apiFetch` in `artifacts/terrain/src/lib/api.ts` checks `res.status === 401` explicitly, calls `clearAuth()` and `window.location.href = .../login`.
+- `apiFetch` in `artifacts/terrain/src/lib/api.ts` checks `res.status === 401` explicitly, calls `clearAuth()`, stores the server reason, and redirects to `.../login`.
+- The startup cleanup in `getStoredActiveAuth()` must remove only session keys; calling `clearAuth()` there erases the pending error message before the login screen can render it.
 
 ### Portail app (`artifacts/portail`)
 - `req` in `artifacts/portail/src/lib/api.ts` checks `res.status === 401` explicitly, calls `clearToken()` and `window.location.href = .../connexion`.
