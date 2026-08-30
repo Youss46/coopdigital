@@ -96,4 +96,12 @@ describe("session terrain persistée", () => {
     expect(isAccountDisabled()).toBe(false);
     expect(getAuthMessage()).toBeNull();
   });
+
+  it("conserve le message de refus de session au redémarrage de l'application", () => {
+    clearAuth();
+    localStorage.setItem("terrain_auth_message", "Session refusée par le serveur : compte non rattaché.");
+
+    expect(getStoredActiveAuth()).toBeNull();
+    expect(getAuthMessage()).toBe("Session refusée par le serveur : compte non rattaché.");
+  });
 });

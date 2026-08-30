@@ -58,16 +58,20 @@ export function getStoredActiveAuth(now = Date.now()): StoredTerrainAuth | null 
   const token = getToken();
   const user = getUser();
   if (!token || !user || isTerrainSessionIdle(getLastAuthActivity(), now)) {
-    clearAuth();
+    clearStoredSession();
     return null;
   }
   return { token, user };
 }
 
-export function clearAuth() {
+function clearStoredSession() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
   localStorage.removeItem(ACTIVITY_KEY);
+}
+
+export function clearAuth() {
+  clearStoredSession();
   clearAuthMessage();
 }
 
