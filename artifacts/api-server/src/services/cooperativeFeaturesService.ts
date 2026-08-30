@@ -72,6 +72,7 @@ export const FEATURE_CATALOG: FeatureDefinition[] = [
   { key: "gouvernance", label: "Gouvernance", category: "Organisation", description: "Gouvernance coopérative", dependsOn: [] },
   { key: "communication", label: "Communication", category: "Organisation", description: "Messages et annonces", dependsOn: [] },
   { key: "delegues", label: "Délégués", category: "Organisation", description: "Délégués terrain", dependsOn: ["membres"] },
+  { key: "peseurs", label: "Peseurs", category: "Organisation", description: "Comptes et suivi des peseurs terrain", dependsOn: [] },
   { key: "delegues_localites", label: "Délégués de localités", category: "Organisation", description: "Taux et commissions des localités", dependsOn: ["membres"] },
   { key: "administration", label: "Administration", category: "Organisation", description: "Comptes et utilisateurs", dependsOn: [] },
   { key: "parametres", label: "Paramètres", category: "Organisation", description: "Paramètres de la coopérative", dependsOn: [] },
@@ -199,7 +200,8 @@ export function featureKeyForPath(pathname: string): string | null {
     ["/salaires", "salaires"], ["/rh", "rh"], ["/formations", "formations"], ["/equipements", "equipements"], ["/archives", "archives"],
     ["/previsions", "previsions"], ["/reporting", "reporting"], ["/rapport-gestion", "rapport_gestion"], ["/anomalies", "anomalies"],
     ["/audit", "audit"], ["/gouvernance", "gouvernance"], ["/communication", "communication"], ["/delegues", "delegues"],
-    ["/peseurs", "delegues"], ["/mes-peseurs", "delegues"], ["/parametres", "parametres"], ["/config", "parametres"],
+    ["/users/peseurs", "peseurs"], ["/users/mes-peseurs", "peseurs"],
+    ["/peseurs", "peseurs"], ["/mes-peseurs", "peseurs"], ["/parametres", "parametres"], ["/config", "parametres"],
   ];
   return prefixes.find(([prefix]) => path === prefix || path.startsWith(`${prefix}/`))?.[1] ?? null;
 }

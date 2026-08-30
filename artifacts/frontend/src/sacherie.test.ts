@@ -26,6 +26,8 @@ describe("intégration frontend Logistique", () => {
       roles: expect.arrayContaining(["responsable_logistique"]),
     });
     expect(featureKeyForPath("/logistique")).toBe("logistique");
+    expect(featureKeyForPath("/peseurs")).toBe("peseurs");
+    expect(featureKeyForPath("/mes-peseurs")).toBe("peseurs");
   });
 
   it("réserve les opérations financières aux rôles financiers", () => {

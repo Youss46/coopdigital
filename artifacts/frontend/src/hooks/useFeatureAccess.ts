@@ -63,7 +63,7 @@ export function featureKeyForPath(pathname: string): string | null {
     ["/fiscalite", "fiscalite"], ["/salaires", "salaires"], ["/rh", "rh"], ["/formations", "formations"], ["/equipements", "equipements"],
     ["/archives", "archives"], ["/previsions", "previsions"], ["/reporting", "reporting"], ["/rapport-gestion", "rapport_gestion"],
     ["/anomalies", "anomalies"], ["/audit", "audit"], ["/gouvernance", "gouvernance"], ["/communication", "communication"],
-    ["/delegues", "delegues"], ["/peseurs", "delegues"], ["/mes-peseurs", "delegues"], ["/parametres", "parametres"],
+    ["/peseurs", "peseurs"], ["/mes-peseurs", "peseurs"], ["/parametres", "parametres"],
   ];
   return prefixes.find(([prefix]) => path === prefix || path.startsWith(`${prefix}/`))?.[1] ?? null;
 }

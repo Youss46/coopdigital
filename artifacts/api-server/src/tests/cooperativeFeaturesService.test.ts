@@ -15,6 +15,9 @@ describe("cooperative features", () => {
     expect(featureKeyForPath("/terrain/collecte")).toBe("livraisons");
     expect(featureKeyForPath("/terrain/enquetes/12")).toBe("enquetes");
     expect(featureKeyForPath("/terrain/entrepot")).toBe("entrepots");
+    expect(featureKeyForPath("/users/peseurs/admin")).toBe("peseurs");
+    expect(featureKeyForPath("/peseurs")).toBe("peseurs");
+    expect(featureKeyForPath("/mes-peseurs")).toBe("peseurs");
     expect(featureKeyForPath("/config/features")).toBe("parametres");
     expect(featureKeyForPath("/unknown")).toBeNull();
   });
@@ -37,5 +40,10 @@ describe("cooperative features", () => {
   it("keeps local-delegate commissions independent from field delegates", () => {
     const feature = FEATURE_CATALOG.find((candidate) => candidate.key === "delegues_localites");
     expect(feature?.dependsOn).toEqual(["membres"]);
+  });
+
+  it("keeps peseurs independent from the field-delegate module", () => {
+    const feature = FEATURE_CATALOG.find((candidate) => candidate.key === "peseurs");
+    expect(feature?.dependsOn).toEqual([]);
   });
 });
