@@ -45,9 +45,7 @@ export default function Login() {
       setLocation("/");
     } catch (err) {
       const msg = (err as Error).message || "";
-      if (msg === "COMPTE_CENTRAL") {
-        setErreur("Ce compte est géré par la base centrale. Vous ne pouvez pas vous connecter directement. Contactez votre coopérative.");
-      } else if (isAccountDisabled()) {
+      if (isAccountDisabled()) {
         setErreur(getAuthMessage() ?? COMPTE_DESACTIVE_MESSAGE);
       } else {
         setErreur(msg || "Numéro ou mot de passe incorrect");

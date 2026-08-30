@@ -4,7 +4,6 @@ import {
   setAuthMessage,
   markAccountDisabled,
   COMPTE_DESACTIVE_MESSAGE,
-  COOPERATIVE_MISSING_MESSAGE,
 } from "./auth";
 import { queueOp, queueGpsOp, queueEnqueteOp, type PendingOpType, type GpsOp } from "./idb";
 import {
@@ -22,49 +21,71 @@ const BASE = `${import.meta.env.VITE_API_URL ?? ""}/api/terrain`;
 type ApiErrorBody = {
   code?: string;
   erreur?: string;
+  message?: string;
 };
+
+export class TerrainApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly code: string | undefined,
+    public readonly endpoint: string,
+  ) {
+    super(message);
+    this.name = "TerrainApiError";
+  }
+}
 
 async function readErrorBody(res: Response): Promise<ApiErrorBody> {
   return await res.json().catch(() => ({})) as ApiErrorBody;
 }
 
+function getEndpoint(path: string): string {
+  const requestUrl = `${BASE}${path}`;
+  try {
+    return new URL(requestUrl, window.location.origin).toString();
+  } catch {
+    return requestUrl;
+  }
+}
+
 function throwApiError(
   res: Response,
   body: ApiErrorBody,
+  path = "",
   skipSessionExpiry = false,
 ): never {
+  const detail = body.erreur || body.message || `Réponse HTTP ${res.status} sans message`;
+  const endpoint = getEndpoint(path);
+  const diagnostic = `${detail} [HTTP ${res.status}${body.code ? ` · ${body.code}` : ""} · ${endpoint}]`;
+  const error = new TerrainApiError(diagnostic, res.status, body.code, endpoint);
+
   if (body.code === "COMPTE_DESACTIVE") {
-    const message = body.erreur || COMPTE_DESACTIVE_MESSAGE;
-    markAccountDisabled(message);
+    markAccountDisabled(diagnostic || COMPTE_DESACTIVE_MESSAGE);
     window.location.href = `${import.meta.env.BASE_URL ?? "/"}login`;
-    throw new Error(message);
+    throw error;
   }
 
   if (
     body.code === "COOPERATIVE_MISSING"
-    || body.erreur === "Non autorisé"
     || body.erreur?.includes("Coopérative non associée")
   ) {
-    const message = body.erreur === "Non autorisé"
-      ? COOPERATIVE_MISSING_MESSAGE
-      : (body.erreur || COOPERATIVE_MISSING_MESSAGE);
     if (!skipSessionExpiry) {
       clearAuth();
-      setAuthMessage(message);
+      setAuthMessage(diagnostic);
       window.location.href = `${import.meta.env.BASE_URL ?? "/"}login`;
     }
-    throw new Error(message);
+    throw error;
   }
 
   if (res.status === 401 && !skipSessionExpiry) {
-    const detail = body.erreur || "Le serveur a refusé la session terrain.";
     clearAuth();
-    setAuthMessage(`Session refusée par le serveur : ${detail}`);
+    setAuthMessage(diagnostic);
     window.location.href = `${import.meta.env.BASE_URL ?? "/"}login`;
-    throw new Error("Session expirée");
+    throw error;
   }
 
-  throw new Error(body.erreur || `Erreur ${res.status}`);
+  throw error;
 }
 
 async function apiFetch<T>(path: string, options: RequestInit = {}, skipSessionExpiry = false): Promise<T> {
@@ -76,7 +97,7 @@ async function apiFetch<T>(path: string, options: RequestInit = {}, skipSessionE
   };
   const res = await fetch(`${BASE}${path}`, { ...options, headers });
   if (!res.ok) {
-    throwApiError(res, await readErrorBody(res), skipSessionExpiry);
+    throwApiError(res, await readErrorBody(res), path, skipSessionExpiry);
   }
   return res.json() as Promise<T>;
 }
@@ -194,7 +215,7 @@ export async function telechargerReleveCommissions(campagneId?: number): Promise
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!res.ok) {
-    throwApiError(res, await readErrorBody(res));
+    throwApiError(res, await readErrorBody(res), `/commissions/releve${qs}`);
   }
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
@@ -323,7 +344,7 @@ export async function imprimerRecuLivraison(livraisonId: number): Promise<void> 
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!res.ok) {
-    throwApiError(res, await readErrorBody(res));
+    throwApiError(res, await readErrorBody(res), `/recu/livraison/${livraisonId}`);
   }
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
@@ -474,7 +495,7 @@ async function apiPeseeFetch<T>(path: string, options: RequestInit = {}): Promis
   };
   const res = await fetch(`${PESEE_BASE}${path}`, { ...options, headers, cache: "no-store" });
   if (!res.ok) {
-    throwApiError(res, await readErrorBody(res));
+    throwApiError(res, await readErrorBody(res), path);
   }
   return res.json() as Promise<T>;
 }
@@ -539,7 +560,7 @@ export async function createSessionPesee(data: {
     throw new SessionEnCoursError(body.sessionId!, body.numeroSession ?? "");
   }
   if (!res.ok) {
-    throwApiError(res, await readErrorBody(res));
+    throwApiError(res, await readErrorBody(res), "/pesee/sessions");
   }
   return res.json();
 }
