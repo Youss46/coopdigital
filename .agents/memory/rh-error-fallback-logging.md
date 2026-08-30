@@ -14,3 +14,9 @@ Les alertes de disponibilité du stockage RH doivent compter uniquement les éch
 **Why:** Une panne de la journalisation métier ne doit pas produire un faux diagnostic d’indisponibilité du stockage.
 
 **How to apply:** Délimiter explicitement la phase de lecture objet dans le contrôleur avant d’incrémenter le compteur d’incidents.
+
+Les alertes de panne RH partagées entre instances doivent utiliser une ligne PostgreSQL verrouillée par coopérative; seule une lecture réussie peut réinitialiser cet état.
+
+**Why:** Un compteur mémoire perd le signal au redémarrage et deux instances peuvent franchir le seuil en même temps; la transaction rend le franchissement unique et durable.
+
+**How to apply:** Conserver la fenêtre et le seuil dans le calcul, faire l’incrément et le marquage d’alerte sous verrou, puis supprimer l’état après téléchargement réussi.

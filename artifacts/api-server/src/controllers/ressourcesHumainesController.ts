@@ -14,7 +14,7 @@ import {
   rhHistoriqueTable,
 } from "@workspace/db";
 import { ObjectNotFoundError, ObjectStorageService } from "../lib/objectStorage.js";
-import { logger, recordRhStorageReadFailure } from "../lib/logger.js";
+import { logger, recordRhStorageReadFailure, resetRhStorageReadFailureState } from "../lib/logger.js";
 
 const CONGE_SOLDE_ANNUEL = 26;
 const ECHEANCE_JOURS = 60;
@@ -788,6 +788,7 @@ export async function downloadRhDocumentFile(req: Request, res: Response): Promi
     const objectFile = await objectStorageService.getObjectEntityFile(document.fichierPath);
     const response = await objectStorageService.downloadObject(objectFile, 0);
     storageReadInProgress = false;
+    await resetRhStorageReadFailureState(coopId);
     await logHistory(coopId, document.personnelId, "document", id, "consultation_fichier", {
       nom: document.fichierNom ?? "document",
       typeMime: document.fichierMimeType ?? "application/octet-stream",
@@ -807,7 +808,7 @@ export async function downloadRhDocumentFile(req: Request, res: Response): Promi
       return;
     }
     if (storageReadInProgress && coopId !== null) {
-      const failure = recordRhStorageReadFailure(coopId);
+      const failure = await recordRhStorageReadFailure(coopId);
       const context = {
         event: "rh_storage_read_failure",
         cooperativeId: coopId,

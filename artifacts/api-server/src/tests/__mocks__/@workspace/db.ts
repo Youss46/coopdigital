@@ -68,6 +68,14 @@ export const rhDocumentsTable = {
   ...makeTable("rh_documents"),
   fichierPath: {},
 };
+export const rhStorageFailureStatesTable = {
+  ...makeTable("rh_storage_failure_states"),
+  cooperativeId: {},
+  failureCount: {},
+  windowStartedAt: {},
+  alertSent: {},
+  updatedAt: {},
+};
 export const obligationsFiscalesTable = {
   ...makeTable("obligations_fiscales"),
   cooperativeId: {}, typeTaxe: {}, actif: {}, tauxPct: {}, id: {},

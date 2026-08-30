@@ -1,5 +1,6 @@
 import {
   date,
+  boolean,
   integer,
   jsonb,
   pgTable,
@@ -111,8 +112,23 @@ export const rhHistoriqueTable = pgTable("rh_historique", {
   index("rh_historique_personnel_idx").on(table.cooperativeId, table.personnelId),
 ]);
 
+/**
+ * État durable des incidents de lecture du stockage RH.
+ *
+ * Une seule ligne par coopérative permet de partager la fenêtre d'alerte entre
+ * plusieurs instances API et de la conserver lors d'un redémarrage.
+ */
+export const rhStorageFailureStatesTable = pgTable("rh_storage_failure_states", {
+  cooperativeId: integer("cooperative_id").primaryKey().references(() => cooperativesTable.id, { onDelete: "cascade" }),
+  failureCount: integer("failure_count").notNull().default(0),
+  windowStartedAt: timestamp("window_started_at", { withTimezone: true }).notNull(),
+  alertSent: boolean("alert_sent").notNull().default(false),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export type RhContrat = typeof rhContratsTable.$inferSelect;
 export type RhDocument = typeof rhDocumentsTable.$inferSelect;
 export type RhConge = typeof rhCongesTable.$inferSelect;
 export type RhAbsence = typeof rhAbsencesTable.$inferSelect;
 export type RhHistorique = typeof rhHistoriqueTable.$inferSelect;
+export type RhStorageFailureState = typeof rhStorageFailureStatesTable.$inferSelect;

@@ -4,7 +4,12 @@ import jwt from "jsonwebtoken";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { pool } from "@workspace/db";
 import { ObjectNotFoundError, ObjectStorageService } from "../lib/objectStorage.js";
-import { logger, resetRhStorageReadFailureCounters } from "../lib/logger.js";
+import {
+  logger,
+  recordRhStorageReadFailure,
+  resetRhStorageReadFailureCounters,
+  resetRhStorageReadFailureState,
+} from "../lib/logger.js";
 import ressourcesHumainesRouter from "../routes/ressourcesHumaines.js";
 
 const enabled = process.env.RUN_POSTGRES_INTEGRATION === "1" && Boolean(process.env.DATABASE_URL);
@@ -462,7 +467,53 @@ describe.skipIf(!enabled)("décisions de congés RH sur PostgreSQL", () => {
       getObjectEntityFile.mockRestore();
       downloadObject.mockRestore();
       loggerError.mockRestore();
-      resetRhStorageReadFailureCounters();
+      await resetRhStorageReadFailureCounters();
+      if (previousThreshold === undefined) {
+        delete process.env["RH_STORAGE_FAILURE_ALERT_THRESHOLD"];
+      } else {
+        process.env["RH_STORAGE_FAILURE_ALERT_THRESHOLD"] = previousThreshold;
+      }
+      if (previousWindow === undefined) {
+        delete process.env["RH_STORAGE_FAILURE_ALERT_WINDOW_SECONDS"];
+      } else {
+        process.env["RH_STORAGE_FAILURE_ALERT_WINDOW_SECONDS"] = previousWindow;
+      }
+    }
+  });
+
+  it("partage le compteur entre appels concurrents, le conserve en base et le réinitialise après succès", async () => {
+    const previousThreshold = process.env["RH_STORAGE_FAILURE_ALERT_THRESHOLD"];
+    const previousWindow = process.env["RH_STORAGE_FAILURE_ALERT_WINDOW_SECONDS"];
+    process.env["RH_STORAGE_FAILURE_ALERT_THRESHOLD"] = "3";
+    process.env["RH_STORAGE_FAILURE_ALERT_WINDOW_SECONDS"] = "60";
+    const startedAt = Date.now();
+
+    try {
+      await resetRhStorageReadFailureState(cooperativeA);
+      const reports = await Promise.all(
+        Array.from({ length: 8 }, (_, index) =>
+          recordRhStorageReadFailure(cooperativeA, startedAt + index),
+        ),
+      );
+
+      expect(reports.map((report) => report.count).sort((a, b) => a - b)).toEqual(
+        [1, 2, 3, 4, 5, 6, 7, 8],
+      );
+      expect(reports.filter((report) => report.shouldAlert)).toHaveLength(1);
+
+      const persisted = await pool.query(
+        `SELECT failure_count, alert_sent
+         FROM rh_storage_failure_states
+         WHERE cooperative_id = $1`,
+        [cooperativeA],
+      );
+      expect(persisted.rows[0]).toMatchObject({ failure_count: 8, alert_sent: true });
+
+      await resetRhStorageReadFailureState(cooperativeA);
+      const afterSuccessfulRead = await recordRhStorageReadFailure(cooperativeA, startedAt + 1_000);
+      expect(afterSuccessfulRead).toMatchObject({ count: 1, shouldAlert: false });
+    } finally {
+      await resetRhStorageReadFailureState(cooperativeA);
       if (previousThreshold === undefined) {
         delete process.env["RH_STORAGE_FAILURE_ALERT_THRESHOLD"];
       } else {

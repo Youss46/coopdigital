@@ -1,4 +1,6 @@
 import pino from "pino";
+import { eq } from "drizzle-orm";
+import { db, rhStorageFailureStatesTable } from "@workspace/db";
 
 const isProduction = process.env.NODE_ENV === "production";
 
@@ -55,19 +57,12 @@ function rhStorageFailureWindowSeconds(): number {
   );
 }
 
-/**
- * Counts storage read failures per cooperative in a rolling window.
- *
- * The returned alert is only true when the threshold is crossed for the
- * current window, preventing one failing storage from flooding operations
- * logs while still making the first sustained outage visible.
- */
-export function recordRhStorageReadFailure(
+function recordRhStorageReadFailureInMemory(
   cooperativeId: number,
-  now = Date.now(),
+  now: number,
+  threshold: number,
+  windowSeconds: number,
 ): RhStorageFailureReport {
-  const threshold = rhStorageFailureThreshold();
-  const windowSeconds = rhStorageFailureWindowSeconds();
   const windowMs = windowSeconds * 1000;
   const state = rhStorageFailures.get(cooperativeId) ?? { failures: [], alertSent: false };
   const recentFailures = state.failures.filter((timestamp) => now - timestamp <= windowMs);
@@ -91,7 +86,89 @@ export function recordRhStorageReadFailure(
   };
 }
 
-/** Resets in-memory counters, primarily for isolated tests and graceful shutdowns. */
-export function resetRhStorageReadFailureCounters(): void {
+/**
+ * Counts storage read failures per cooperative in a rolling window.
+ *
+ * The state is stored in PostgreSQL and updated while holding the cooperative
+ * row lock. This makes the threshold crossing atomic across API instances and
+ * keeps a pending alert across restarts.
+ */
+export async function recordRhStorageReadFailure(
+  cooperativeId: number,
+  now = Date.now(),
+): Promise<RhStorageFailureReport> {
+  const threshold = rhStorageFailureThreshold();
+  const windowSeconds = rhStorageFailureWindowSeconds();
+  const windowMs = windowSeconds * 1000;
+  const timestamp = new Date(now);
+
+  try {
+    return await db.transaction(async (tx) => {
+      await tx.insert(rhStorageFailureStatesTable).values({
+        cooperativeId,
+        failureCount: 0,
+        windowStartedAt: timestamp,
+        alertSent: false,
+        updatedAt: timestamp,
+      }).onConflictDoNothing();
+
+      const [state] = await tx
+        .select({
+          failureCount: rhStorageFailureStatesTable.failureCount,
+          windowStartedAt: rhStorageFailureStatesTable.windowStartedAt,
+          alertSent: rhStorageFailureStatesTable.alertSent,
+        })
+        .from(rhStorageFailureStatesTable)
+        .where(eq(rhStorageFailureStatesTable.cooperativeId, cooperativeId))
+        .for("update");
+
+      if (!state) {
+        throw new Error("État des incidents de stockage RH introuvable après insertion");
+      }
+
+      const withinWindow = now - state.windowStartedAt.getTime() <= windowMs;
+      const count = withinWindow ? state.failureCount + 1 : 1;
+      const alreadyAlerted = withinWindow && state.alertSent;
+      const shouldAlert = count >= threshold && !alreadyAlerted;
+
+      await tx.update(rhStorageFailureStatesTable)
+        .set({
+          failureCount: count,
+          windowStartedAt: withinWindow ? state.windowStartedAt : timestamp,
+          alertSent: alreadyAlerted || shouldAlert,
+          updatedAt: timestamp,
+        })
+        .where(eq(rhStorageFailureStatesTable.cooperativeId, cooperativeId));
+
+      rhStorageFailures.delete(cooperativeId);
+      return { count, threshold, windowSeconds, shouldAlert };
+    });
+  } catch (error) {
+    // Une panne du mécanisme d'alerte ne doit pas masquer la panne de lecture
+    // qui doit être renvoyée au client. Le repli local conserve au moins le
+    // comportement historique jusqu'au rétablissement de la base.
+    logger.error({ err: error, cooperativeId }, "Persistance de l'alerte de stockage RH indisponible");
+    return recordRhStorageReadFailureInMemory(cooperativeId, now, threshold, windowSeconds);
+  }
+}
+
+/** Clears a cooperative state after a successful storage read. */
+export async function resetRhStorageReadFailureState(cooperativeId: number): Promise<void> {
+  rhStorageFailures.delete(cooperativeId);
+  try {
+    await db.delete(rhStorageFailureStatesTable)
+      .where(eq(rhStorageFailureStatesTable.cooperativeId, cooperativeId));
+  } catch (error) {
+    logger.error({ err: error, cooperativeId }, "Réinitialisation de l'alerte de stockage RH impossible");
+  }
+}
+
+/** Clears persistent and in-memory counters, primarily for isolated tests. */
+export async function resetRhStorageReadFailureCounters(): Promise<void> {
   rhStorageFailures.clear();
+  try {
+    await db.delete(rhStorageFailureStatesTable);
+  } catch (error) {
+    logger.error({ err: error }, "Nettoyage des alertes de stockage RH impossible");
+  }
 }
