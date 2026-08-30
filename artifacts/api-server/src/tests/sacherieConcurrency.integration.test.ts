@@ -1,6 +1,6 @@
 import express from "express";
 import type { Server } from "node:http";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { pool } from "@workspace/db";
 import { createMouvementSacherie } from "../controllers/sacherieController.js";
 import {
@@ -95,20 +95,6 @@ describe.skipIf(!enabled)("idempotence de la sacherie sur PostgreSQL", () => {
     );
     typeSacId = typeSac.rows[0].id;
 
-    await client.query(
-      `INSERT INTO sacherie_mouvements
-         (cooperative_id, type_sac_id, type, quantite, reference, cree_par)
-       VALUES ($1, $2, 'entree', 10, $3, $4)`,
-      [cooperativeId, typeSacId, `TASK136-SEED-${suffix}`, userId],
-    );
-    await client.query(
-      `INSERT INTO sacherie_mouvements
-         (cooperative_id, type_sac_id, type, quantite, membre_id,
-          campagne_id, reference, cree_par)
-       VALUES ($1, $2, 'attribution', 4, $3, $4, $5, $6)`,
-      [cooperativeId, typeSacId, memberId, campaignId, `TASK136-ATTRIBUTION-${suffix}`, userId],
-    );
-
     await client.query(`
       CREATE FUNCTION ${identifier(delayFunction)}()
       RETURNS trigger
@@ -151,6 +137,26 @@ describe.skipIf(!enabled)("idempotence de la sacherie sur PostgreSQL", () => {
     baseUrl = `http://127.0.0.1:${address.port}`;
   });
 
+  beforeEach(async () => {
+    await client.query(
+      `DELETE FROM sacherie_mouvements WHERE cooperative_id = $1`,
+      [cooperativeId],
+    );
+    await client.query(
+      `INSERT INTO sacherie_mouvements
+         (cooperative_id, type_sac_id, type, quantite, reference, cree_par)
+       VALUES ($1, $2, 'entree', 10, $3, $4)`,
+      [cooperativeId, typeSacId, `TASK139-SEED-${suffix}`, userId],
+    );
+    await client.query(
+      `INSERT INTO sacherie_mouvements
+         (cooperative_id, type_sac_id, type, quantite, membre_id,
+          campagne_id, reference, cree_par)
+       VALUES ($1, $2, 'attribution', 4, $3, $4, $5, $6)`,
+      [cooperativeId, typeSacId, memberId, campaignId, `TASK139-ATTRIBUTION-${suffix}`, userId],
+    );
+  });
+
   afterAll(async () => {
     if (server) {
       await new Promise<void>((resolve, reject) => {
@@ -183,22 +189,30 @@ describe.skipIf(!enabled)("idempotence de la sacherie sur PostgreSQL", () => {
     client.release();
   });
 
-  async function request(quantity: number): Promise<Response> {
+  async function request(
+    type: "retour" | "perte",
+    quantity: number,
+    reference: string,
+  ): Promise<Response> {
     return fetch(`${baseUrl}/sacherie/mouvements`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        type: "retour",
+        type,
         typeSacId,
         quantite: quantity,
         membreId: memberId,
-        reference: `TASK136-RETURN-${suffix}`,
+        reference,
       }),
     });
   }
 
   it("retourne le même mouvement et ne débite qu'une fois malgré deux retours concurrents", async () => {
-    const responses = await Promise.all([request(4), request(4)]);
+    const reference = `TASK139-RETURN-${suffix}`;
+    const responses = await Promise.all([
+      request("retour", 4, reference),
+      request("retour", 4, reference),
+    ]);
     const bodies = await Promise.all(
       responses.map((response) => response.json() as Promise<MovementResponse>),
     );
@@ -219,7 +233,7 @@ describe.skipIf(!enabled)("idempotence de la sacherie sur PostgreSQL", () => {
     expect(calculateSacherieCentralStock(movements.rows)).toBe(10);
     expect(calculateSacherieMemberBalance(movements.rows, memberId)).toBe(0);
 
-    const conflicting = await request(5);
+    const conflicting = await request("retour", 5, reference);
     expect(conflicting.status).toBe(409);
     expect(await conflicting.json()).toMatchObject({
       code: "IDEMPOTENCY_CONFLICT",
@@ -229,7 +243,48 @@ describe.skipIf(!enabled)("idempotence de la sacherie sur PostgreSQL", () => {
       `SELECT count(*)::int AS count
        FROM sacherie_mouvements
        WHERE cooperative_id = $1 AND reference = $2`,
-      [cooperativeId, `TASK136-RETURN-${suffix}`],
+      [cooperativeId, reference],
+    );
+    expect(afterConflict.rows[0].count).toBe(1);
+  });
+
+  it("retient une perte membre une seule fois malgré deux appels concurrents", async () => {
+    const reference = `TASK139-LOSS-${suffix}`;
+    const responses = await Promise.all([
+      request("perte", 2, reference),
+      request("perte", 2, reference),
+    ]);
+    const bodies = await Promise.all(
+      responses.map((response) => response.json() as Promise<MovementResponse>),
+    );
+
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 201]);
+    expect(bodies[0].movement).toEqual(bodies[1].movement);
+    expect(bodies.map((body) => body.idempotent).sort()).toEqual([false, true]);
+
+    const movements = await client.query(
+      `SELECT type, quantite, membre_id AS "membreId", sens
+       FROM sacherie_mouvements
+       WHERE cooperative_id = $1 AND type_sac_id = $2
+       ORDER BY id`,
+      [cooperativeId, typeSacId],
+    );
+    expect(movements.rows).toHaveLength(3);
+    expect(movements.rows.filter((movement: { type: string }) => movement.type === "perte")).toHaveLength(1);
+    expect(calculateSacherieCentralStock(movements.rows)).toBe(6);
+    expect(calculateSacherieMemberBalance(movements.rows, memberId)).toBe(2);
+
+    const conflicting = await request("perte", 3, reference);
+    expect(conflicting.status).toBe(409);
+    expect(await conflicting.json()).toMatchObject({
+      code: "IDEMPOTENCY_CONFLICT",
+    });
+
+    const afterConflict = await client.query(
+      `SELECT count(*)::int AS count
+       FROM sacherie_mouvements
+       WHERE cooperative_id = $1 AND reference = $2`,
+      [cooperativeId, reference],
     );
     expect(afterConflict.rows[0].count).toBe(1);
   });
