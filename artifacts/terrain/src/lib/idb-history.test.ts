@@ -4,6 +4,13 @@ import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   createBrouillon,
+  createPrechargementBrouillon,
+  addLigneToBrouillon,
+  terminerBrouillon,
+  getPendingBrouillons,
+  incrementBrouillonTentatives,
+  retryBrouillon,
+  getBrouillon,
   getAllOps,
   incrementGpsTentatives,
   markBrouillonError,
@@ -180,6 +187,37 @@ describe("historique offline multi-files", () => {
     const synchronisee = (await getAllOps()).find((op) => op.localId === "gps-retry-history-1");
     expect(synchronisee).toMatchObject({ status: "synced" });
     expect(synchronisee?.errorMsg).toBeUndefined();
+  });
+
+  it("conserve une pré-pesée export locale et la remet en file après un rejet", async () => {
+    const draft = await createPrechargementBrouillon({
+      expeditionId: 88,
+      expeditionNumero: "EXP-088",
+      expeditionPoidsPrevuKg: "1200",
+      produit: "cacao",
+    });
+    const withLine = await addLigneToBrouillon(draft.localId, {
+      nbSacs: 24,
+      poidsBrutKg: 510,
+      tareKg: 10,
+    });
+    const completed = await terminerBrouillon(withLine.localId);
+
+    expect(completed).toMatchObject({
+      operation: "prechargement_export",
+      expeditionId: 88,
+      statut: "terminee",
+      syncStatus: "pending",
+      poidsTotalKg: 500,
+    });
+    expect(await getPendingBrouillons()).toHaveLength(1);
+
+    expect(await incrementBrouillonTentatives(completed.localId)).toBe(1);
+    expect(await incrementBrouillonTentatives(completed.localId)).toBe(2);
+    await retryBrouillon(completed.localId);
+    const retry = await getBrouillon(completed.localId);
+    expect(retry).toMatchObject({ syncStatus: "pending", tentatives: 0 });
+    expect(retry?.errorMsg).toBeUndefined();
   });
 });
 

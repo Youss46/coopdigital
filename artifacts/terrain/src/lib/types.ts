@@ -363,6 +363,12 @@ export interface BrouillonPesee {
   updatedAt: number;
   serverId?: number;
   numeroSession?: string;
+  /** Contexte d'une pré-pesée export créée hors connexion. */
+  expeditionId?: number;
+  expeditionNumero?: string;
+  expeditionPoidsPrevuKg?: string | null;
+  tentatives?: number;
+  syncedAt?: number;
   errorMsg?: string;
 }
 

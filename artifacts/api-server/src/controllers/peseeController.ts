@@ -305,9 +305,10 @@ export async function handleBatchCreateSession(req: Request, res: Response): Pro
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
   const peseurId = req.agent!.id;
 
-  const { localId, membreId, produit, operation, certificationCacao, lignes, statut } = req.body as {
+  const { localId, membreId, expeditionId, produit, operation, certificationCacao, lignes, statut } = req.body as {
     localId?: string;
     membreId?: number;
+    expeditionId?: number;
     produit?: string;
     operation?: string;
     certificationCacao?: string;
@@ -315,11 +316,19 @@ export async function handleBatchCreateSession(req: Request, res: Response): Pro
     statut?: "terminee" | "en_cours";
   };
 
-  if (!localId || !membreId || !Array.isArray(lignes) || lignes.length === 0) {
-    res.status(400).json({ erreur: "localId, membreId et au moins une ligne sont requis" });
+  if (!localId || !Array.isArray(lignes) || lignes.length === 0) {
+    res.status(400).json({ erreur: "localId et au moins une ligne sont requis" });
     return;
   }
-  if (!isCertificationCacao(certificationCacao)) {
+  if (operation === "prechargement_export" && !expeditionId) {
+    res.status(400).json({ erreur: "expeditionId est obligatoire pour synchroniser une pré-pesée export" });
+    return;
+  }
+  if (operation !== "prechargement_export" && !membreId) {
+    res.status(400).json({ erreur: "membreId est obligatoire pour synchroniser cette pesée" });
+    return;
+  }
+  if (operation !== "prechargement_export" && !isCertificationCacao(certificationCacao)) {
     res.status(400).json({ erreur: "Sélectionnez le type de certification du cacao avant de démarrer la pesée" });
     return;
   }
@@ -327,10 +336,11 @@ export async function handleBatchCreateSession(req: Request, res: Response): Pro
   try {
     const result = await creerSessionBatch(cooperativeId, peseurId, {
       localId,
-      membreId: Number(membreId),
+      membreId: membreId ? Number(membreId) : undefined,
+      expeditionId: expeditionId ? Number(expeditionId) : undefined,
       produit: produit ?? "cacao",
       operation: operation ?? "reception",
-      certificationCacao,
+      certificationCacao: isCertificationCacao(certificationCacao) ? certificationCacao : undefined,
       lignes,
       statut: statut ?? "terminee",
     });

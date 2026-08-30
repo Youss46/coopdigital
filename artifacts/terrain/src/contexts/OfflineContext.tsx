@@ -8,7 +8,8 @@ import {
   getPendingGpsOps, markGpsOpSynced, markGpsOpError, incrementGpsTentatives,
   retryGpsOp,
   getPendingEnqueteOps, markEnqueteOpSynced, markEnqueteOpError, incrementEnqueteTentatives,
-  getPendingBrouillons, markBrouillonSynced, markBrouillonError,
+  getPendingBrouillons, markBrouillonSynced, markBrouillonError, markBrouillonRetryable,
+  incrementBrouillonTentatives,
 } from "../lib/idb";
 import { syncOps, syncGpsOps, syncEnqueteOps, batchSyncBrouillon } from "../lib/api";
 import { isAccountDisabled } from "../lib/auth";
@@ -129,8 +130,17 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
             await markBrouillonSynced(brouillon.localId, result.sessionId, result.numeroSession);
             nbSucces++;
           } catch (err) {
-            await markBrouillonError(brouillon.localId, (err as Error).message);
+            const erreur = (err as Error).message || "Synchronisation refusée";
+            const tentatives = await incrementBrouillonTentatives(brouillon.localId);
+            if (tentatives >= 3) {
+              await markBrouillonError(brouillon.localId, `Rejet définitif après ${tentatives} tentatives : ${erreur}`);
+            } else {
+              // Reste dans la file pour une nouvelle reconnexion, mais l'erreur
+              // est visible immédiatement dans l'historique.
+              await markBrouillonRetryable(brouillon.localId, erreur);
+            }
             nbEchecs++;
+            erreurs.push(erreur);
           }
         }
       }

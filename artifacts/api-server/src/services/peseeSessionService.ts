@@ -44,14 +44,26 @@ export async function creerSessionBatch(
   peseurId: number,
   data: {
     localId: string;
-    membreId: number;
+    membreId?: number;
+    expeditionId?: number;
     produit: string;
     operation: string;
-    certificationCacao: CertificationCacao;
+    certificationCacao?: CertificationCacao;
     lignes: Array<{ localId: string; nbSacs: number; poidsBrutKg: number; tareKg: number; notes?: string }>;
     statut: "terminee" | "en_cours";
   },
 ) {
+  if (data.operation === "prechargement_export") {
+    if (!data.expeditionId) throw new Error("Une expédition est obligatoire pour synchroniser une pré-pesée");
+    return creerPrechargementBatch(cooperativeId, peseurId, {
+      ...data,
+      operation: "prechargement_export",
+      expeditionId: data.expeditionId,
+    });
+  }
+  if (!data.membreId) throw new Error("Un membre est obligatoire pour synchroniser cette pesée");
+  if (!data.certificationCacao) throw new Error("La certification du cacao est obligatoire");
+
   const offlineTag = `offline:${data.localId}`;
 
   // ── Idempotency : session déjà créée lors d'un précédent essai ? ──────────
@@ -136,6 +148,209 @@ export async function creerSessionBatch(
     numeroSession,
     poidsTotalKg: finalDetail?.poidsTotalKg ?? "0",
     nbSacsTotal: finalDetail?.nbSacsTotal ?? 0,
+  };
+}
+
+/**
+ * Synchronise une pré-pesée export locale en une seule transaction.
+ *
+ * L'expédition est verrouillée avant toute création : deux appareils ne
+ * peuvent donc ni créer deux sessions pour le même chargement, ni ajouter les
+ * lignes d'une session dans celle d'un autre appareil. La validation de
+ * l'expédition, des lignes, du poids et de la tolérance est faite côté serveur
+ * au moment de la clôture, jamais à partir de la seule copie locale.
+ */
+async function creerPrechargementBatch(
+  cooperativeId: number,
+  peseurId: number,
+  data: {
+    localId: string;
+    expeditionId: number;
+    produit: string;
+    operation: "prechargement_export";
+    lignes: Array<{ localId: string; nbSacs: number; poidsBrutKg: number; tareKg: number; notes?: string }>;
+    statut: "terminee" | "en_cours";
+  },
+) {
+  if (data.lignes.length === 0) throw new Error("Au moins une ligne est requise");
+  for (const ligne of data.lignes) {
+    if (!Number.isInteger(ligne.nbSacs) || ligne.nbSacs < 0) {
+      throw new Error("Le nombre de sacs est invalide");
+    }
+    if (!Number.isFinite(ligne.poidsBrutKg) || ligne.poidsBrutKg <= 0) {
+      throw new Error("Le poids brut d'une ligne doit être positif");
+    }
+    if (!Number.isFinite(ligne.tareKg) || ligne.tareKg < 0 || ligne.tareKg >= ligne.poidsBrutKg) {
+      throw new Error("La tare doit être positive et inférieure au poids brut");
+    }
+  }
+
+  const offlineTag = `offline:${data.localId}`;
+  const { numeroSession, numeroPesee } = await generateNumeroSession(cooperativeId);
+  const result = await db.transaction(async (tx: any) => {
+    const [expedition] = await tx
+      .select({
+        id: expeditionsTable.id,
+        statut: expeditionsTable.statut,
+        poidsPrevuKg: expeditionsTable.poidsPrevuKg,
+        poidsChargeKg: expeditionsTable.poidsChargeKg,
+      })
+      .from(expeditionsTable)
+      .where(and(
+        eq(expeditionsTable.id, data.expeditionId),
+        eq(expeditionsTable.cooperativeId, cooperativeId),
+      ))
+      .for("update")
+      .limit(1);
+
+    if (!expedition) throw new Error("Expédition introuvable");
+    if (expedition.statut !== "en_preparation") {
+      throw new Error("L'expédition n'est plus en préparation");
+    }
+    const poidsPrevu = Number(expedition.poidsPrevuKg ?? expedition.poidsChargeKg ?? 0);
+    if (!Number.isFinite(poidsPrevu) || poidsPrevu <= 0) {
+      throw new Error("L'expédition doit avoir un poids prévu supérieur à 0 kg");
+    }
+
+    const [sameLocal] = await tx
+      .select({
+        id: sessionsPeseeTable.id,
+        numeroSession: sessionsPeseeTable.numeroSession,
+        statut: sessionsPeseeTable.statut,
+        expeditionId: sessionsPeseeTable.expeditionId,
+      })
+      .from(sessionsPeseeTable)
+      .where(and(
+        eq(sessionsPeseeTable.cooperativeId, cooperativeId),
+        eq(sessionsPeseeTable.operation, "prechargement_export"),
+        eq(sessionsPeseeTable.notes, offlineTag),
+      ))
+      .for("update")
+      .limit(1);
+    if (sameLocal) {
+      if (sameLocal.expeditionId !== data.expeditionId) {
+        throw new Error("Cet identifiant local est déjà associé à une autre expédition");
+      }
+      return {
+        sessionId: sameLocal.id,
+        numeroSession: sameLocal.numeroSession,
+        alreadyProcessed: true,
+      };
+    }
+
+    const [associated] = await tx
+      .select({
+        id: sessionsPeseeTable.id,
+        statut: sessionsPeseeTable.statut,
+      })
+      .from(sessionsPeseeTable)
+      .where(and(
+        eq(sessionsPeseeTable.cooperativeId, cooperativeId),
+        eq(sessionsPeseeTable.expeditionId, data.expeditionId),
+        eq(sessionsPeseeTable.operation, "prechargement_export"),
+      ))
+      .for("update")
+      .limit(1);
+    if (associated) {
+      throw new Error("Cette expédition est déjà associée à une autre pré-pesée");
+    }
+
+    const [created] = await tx
+      .insert(sessionsPeseeTable)
+      .values({
+        cooperativeId,
+        numeroSession,
+        numeroPesee,
+        membreId: null,
+        fournisseurId: null,
+        produit: data.produit,
+        operation: "prechargement_export",
+        peseurId,
+        statut: "en_cours",
+        notes: offlineTag,
+        expeditionId: data.expeditionId,
+        certificationCacao: null,
+      })
+      .returning({ id: sessionsPeseeTable.id, numeroSession: sessionsPeseeTable.numeroSession });
+    if (!created) throw new Error("Impossible de créer la pré-pesée");
+
+    for (const [index, ligne] of data.lignes.entries()) {
+      await tx.insert(lignesPeseeTable).values({
+        sessionId: created.id,
+        numeroPassage: index + 1,
+        nbSacs: ligne.nbSacs,
+        poidsBrutKg: String(ligne.poidsBrutKg),
+        tareKg: String(ligne.tareKg),
+        notes: ligne.notes,
+      });
+    }
+
+    const [totaux] = await tx
+      .select({
+        poids: sql<number>`coalesce(sum(${lignesPeseeTable.poidsBrutKg}::numeric - ${lignesPeseeTable.tareKg}::numeric), 0)::float`,
+        nbSacs: sql<number>`coalesce(sum(${lignesPeseeTable.nbSacs}), 0)::int`,
+      })
+      .from(lignesPeseeTable)
+      .where(eq(lignesPeseeTable.sessionId, created.id));
+
+    if (data.statut === "terminee") {
+      const poidsPeseKg = Number(totaux?.poids ?? 0);
+      const ecartKg = poidsPeseKg - poidsPrevu;
+      const ecartPct = Math.abs(ecartKg) / poidsPrevu * 100;
+      const [config] = await tx
+        .select({ ecartMaxAutorisePct: configPeseeTable.ecartMaxAutorisePct })
+        .from(configPeseeTable)
+        .where(eq(configPeseeTable.cooperativeId, cooperativeId))
+        .limit(1);
+      const seuilPct = Number(config?.ecartMaxAutorisePct ?? 2);
+      const statutControle = ecartPct <= (Number.isFinite(seuilPct) ? seuilPct : 2)
+        ? "conforme"
+        : "a_justifier";
+
+      await tx.update(sessionsPeseeTable)
+        .set({
+          statut: "terminee",
+          dateFin: new Date(),
+          poidsTotalKg: String(poidsPeseKg),
+          nbSacsTotal: Number(totaux?.nbSacs ?? 0),
+          prechargementStatut: statutControle,
+          prechargementEcartKg: String(ecartKg),
+          prechargementEcartPct: String(ecartPct),
+        })
+        .where(and(
+          eq(sessionsPeseeTable.id, created.id),
+          eq(sessionsPeseeTable.statut, "en_cours"),
+        ));
+
+      await tx.insert(expeditionHistoriqueTable).values({
+        expeditionId: data.expeditionId,
+        statutPrecedent: expedition.statut,
+        statutNouveau: "pre_pesee_terminee",
+        faitPar: peseurId,
+        notes: `Pré-pesée ${created.numeroSession} : ${poidsPeseKg.toFixed(2)} kg pour ${poidsPrevu.toFixed(2)} kg prévus. Écart ${ecartKg.toFixed(2)} kg (${ecartPct.toFixed(2)} %) — ${statutControle}.`,
+      });
+    } else {
+      await tx.update(sessionsPeseeTable)
+        .set({
+          poidsTotalKg: String(totaux?.poids ?? 0),
+          nbSacsTotal: Number(totaux?.nbSacs ?? 0),
+        })
+        .where(eq(sessionsPeseeTable.id, created.id));
+    }
+
+    return {
+      sessionId: created.id,
+      numeroSession: created.numeroSession,
+      alreadyProcessed: false,
+    };
+  });
+
+  const detail = await getSessionDetail(cooperativeId, result.sessionId);
+  return {
+    sessionId: result.sessionId,
+    numeroSession: result.numeroSession,
+    poidsTotalKg: detail?.poidsTotalKg ?? "0",
+    nbSacsTotal: detail?.nbSacsTotal ?? 0,
   };
 }
 
@@ -235,17 +450,26 @@ export async function createSession(
       throw new Error("L'expédition doit avoir un poids prévu supérieur à 0 kg");
     }
 
-    const [active] = await db
-      .select({ id: sessionsPeseeTable.id, numeroSession: sessionsPeseeTable.numeroSession })
+    const [existing] = await db
+      .select({
+        id: sessionsPeseeTable.id,
+        numeroSession: sessionsPeseeTable.numeroSession,
+        statut: sessionsPeseeTable.statut,
+      })
       .from(sessionsPeseeTable)
       .where(and(
         eq(sessionsPeseeTable.cooperativeId, cooperativeId),
         eq(sessionsPeseeTable.expeditionId, data.expeditionId),
         eq(sessionsPeseeTable.operation, "prechargement_export"),
-        eq(sessionsPeseeTable.statut, "en_cours"),
       ))
+      .orderBy(desc(sessionsPeseeTable.createdAt))
       .limit(1);
-    if (active) throw new SessionEnCoursError(active.id, active.numeroSession);
+    if (existing?.statut === "en_cours") {
+      throw new SessionEnCoursError(existing.id, existing.numeroSession);
+    }
+    if (existing && existing.statut !== "annulee") {
+      throw new Error("Cette expédition est déjà associée à une pré-pesée clôturée");
+    }
 
     const { numeroSession, numeroPesee } = await generateNumeroSession(cooperativeId);
     const [session] = await db

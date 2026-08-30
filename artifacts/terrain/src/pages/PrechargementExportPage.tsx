@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { ArrowLeft, ChevronRight, Loader2, RefreshCw, Ship, Weight } from "lucide-react";
 import BottomNavPeseur from "../components/BottomNavPeseur";
 import { useOffline } from "../contexts/OfflineContext";
 import { getExpeditionsApreparer, createSessionPesee } from "../lib/api";
-import type { ExpeditionPrechargement } from "../lib/types";
+import { createPrechargementBrouillon, getBrouillons } from "../lib/idb";
+import type { BrouillonPesee, ExpeditionPrechargement } from "../lib/types";
 
 function poids(value: string | number | null | undefined) {
   const n = Number(value ?? 0);
@@ -18,6 +19,7 @@ export default function PrechargementExportPage() {
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState<number | null>(null);
   const [error, setError] = useState("");
+  const [drafts, setDrafts] = useState<BrouillonPesee[]>([]);
 
   async function scanQr(file: File) {
     setError("");
@@ -46,10 +48,16 @@ export default function PrechargementExportPage() {
   }
 
   async function refresh() {
-    if (!isOnline) return;
     setLoading(true);
     setError("");
-    try { setItems(await getExpeditionsApreparer()); }
+    try {
+      const [expeditions, allDrafts] = await Promise.all([
+        getExpeditionsApreparer(),
+        getBrouillons(),
+      ]);
+      setItems(expeditions);
+      setDrafts(allDrafts.filter((draft) => draft.operation === "prechargement_export"));
+    }
     catch (e) { setError((e as Error).message); }
     finally { setLoading(false); }
   }
@@ -57,12 +65,35 @@ export default function PrechargementExportPage() {
   useEffect(() => { void refresh(); }, [isOnline]);
 
   async function open(expedition: ExpeditionPrechargement) {
-    if (!isOnline) return;
+    const local = drafts.find((draft) => draft.expeditionId === expedition.id);
+    if (local && (local.syncStatus !== "synced" || !isOnline)) {
+      navigate(`/prechargement-session/b-${local.localId}`);
+      return;
+    }
+    if (local?.serverId && isOnline) {
+      navigate(`/prechargement-session/${local.serverId}`);
+      return;
+    }
+    if (!isOnline) {
+      try {
+        const draft = await createPrechargementBrouillon({
+          expeditionId: expedition.id,
+          expeditionNumero: expedition.numeroExpedition,
+          expeditionPoidsPrevuKg: expedition.poidsPrevuKg ?? expedition.poidsChargeKg,
+          produit: "cacao",
+        });
+        setDrafts((current) => [draft, ...current]);
+        navigate(`/prechargement-session/b-${draft.localId}`);
+      } catch (e) {
+        setError((e as Error).message);
+      }
+      return;
+    }
     const active = expedition.prechargement?.statut === "en_cours";
     setStarting(expedition.id);
     setError("");
     try {
-      const session = active
+      const session = active || expedition.prechargement?.statut === "terminee"
         ? expedition.prechargement
         : await createSessionPesee({ operation: "prechargement_export", expeditionId: expedition.id, produit: "cacao" });
       if (session) navigate(`/prechargement-session/${session.id}`);
@@ -72,13 +103,36 @@ export default function PrechargementExportPage() {
     } finally { setStarting(null); }
   }
 
+  const displayItems = useMemo(() => {
+    const known = new Set(items.map((item) => item.id));
+    const localOnly = drafts
+      .filter((draft) => draft.expeditionId && !known.has(draft.expeditionId))
+      .map((draft): ExpeditionPrechargement => ({
+        id: draft.expeditionId!,
+        numeroExpedition: draft.expeditionNumero ?? `Expédition #${draft.expeditionId}`,
+        statut: "en_preparation",
+        typeVehicule: "—",
+        immatriculation: null,
+        nomChauffeur: null,
+        transporteur: null,
+        port: "—",
+        poidsChargeKg: draft.expeditionPoidsPrevuKg ?? null,
+        poidsPrevuKg: draft.expeditionPoidsPrevuKg ?? null,
+        nombreSacs: null,
+        poidsChargeEffectifKg: null,
+        nombreSacsEffectif: null,
+        prechargement: null,
+      }));
+    return [...items, ...localOnly];
+  }, [drafts, items]);
+
   return (
     <div className="t-app">
       <header className="t-header t-header--peseur">
         <Link href="/" style={{ color: "#fff", display: "flex" }}><ArrowLeft size={20} /></Link>
         <div style={{ flex: 1, marginLeft: 12 }}>
           <div className="t-header__title">Chargements à préparer</div>
-          <div className="t-header__sub">Pré-pesée export · connecté uniquement</div>
+          <div className="t-header__sub">Pré-pesée export · contrôle stock au chargement</div>
         </div>
         <button onClick={() => void refresh()} disabled={loading || !isOnline} className="t-icon-btn" title="Actualiser">
           <RefreshCw size={18} />
@@ -87,12 +141,14 @@ export default function PrechargementExportPage() {
 
       <main className="t-main" style={{ padding: "16px 16px 90px" }}>
         {!isOnline && (
-          <div className="t-alert t-alert--warning">La pré-pesée export nécessite une connexion active.</div>
+          <div className="t-alert t-alert--warning">
+            Hors ligne : les expéditions déjà chargées restent disponibles et les passages seront synchronisés au retour du réseau.
+          </div>
         )}
         {error && <div className="t-alert t-alert--danger">{error}</div>}
         <label className="t-btn t-btn--ghost" style={{ width: "100%", marginBottom: 12, textAlign: "center", cursor: isOnline ? "pointer" : "not-allowed", opacity: isOnline ? 1 : .5 }}>
           Scanner le QR de l’expédition
-          <input
+            <input
             type="file"
             accept="image/*"
             capture="environment"
@@ -103,7 +159,7 @@ export default function PrechargementExportPage() {
         </label>
         {loading ? (
           <div className="t-loading"><Loader2 className="t-spin" size={24} /> Chargement…</div>
-        ) : items.length === 0 ? (
+        ) : displayItems.length === 0 ? (
           <div className="t-empty">
             <Ship size={34} />
             <strong>Aucune expédition à préparer</strong>
@@ -111,18 +167,31 @@ export default function PrechargementExportPage() {
           </div>
         ) : (
           <div style={{ display: "grid", gap: 10 }}>
-            {items.map((exp) => {
+            {displayItems.map((exp) => {
               const pre = exp.prechargement;
-              const status = pre?.statut === "en_cours"
-                ? "Pré-pesée en cours"
-                : pre?.prechargementStatut === "conforme" ? "Pré-pesée conforme"
-                : pre?.prechargementStatut === "a_justifier" ? "Écart à justifier"
-                : pre?.prechargementStatut === "valide" ? "Écart validé"
-                : "À peser";
-              const color = pre?.prechargementStatut === "conforme" || pre?.prechargementStatut === "valide"
-                ? "#15803d" : pre?.prechargementStatut === "a_justifier" ? "#b45309" : "#0e7490";
+              const local = drafts.find((draft) => draft.expeditionId === exp.id);
+              const status = local?.syncStatus === "error"
+                ? "Rejeté · à reprendre"
+                : local?.syncStatus === "pending" && local.statut === "terminee"
+                  ? "Local · à synchroniser"
+                  : local?.syncStatus === "pending"
+                    ? "Local · en cours"
+                    : local?.syncStatus === "synced"
+                      ? "Synchronisé"
+                      : pre?.statut === "en_cours"
+                        ? "Pré-pesée en cours"
+                        : pre?.prechargementStatut === "conforme" ? "Pré-pesée conforme"
+                        : pre?.prechargementStatut === "a_justifier" ? "Écart à justifier"
+                        : pre?.prechargementStatut === "valide" ? "Écart validé"
+                        : "À peser";
+              const color = local?.syncStatus === "error"
+                ? "#b91c1c"
+                : local?.syncStatus === "pending"
+                  ? "#b45309"
+                  : pre?.prechargementStatut === "conforme" || pre?.prechargementStatut === "valide"
+                    ? "#15803d" : pre?.prechargementStatut === "a_justifier" ? "#b45309" : "#0e7490";
               return (
-                <button key={exp.id} onClick={() => void open(exp)} disabled={starting === exp.id || !isOnline}
+                <button key={exp.id} onClick={() => void open(exp)} disabled={starting === exp.id}
                   style={{ textAlign: "left", border: "none", padding: 0, background: "transparent", cursor: "pointer" }}>
                   <div className="t-session-card">
                     <div className="t-session-card__stripe" style={{ background: color }} />

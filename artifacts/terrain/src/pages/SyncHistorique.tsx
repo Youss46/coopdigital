@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { getAllOps } from "../lib/idb";
+import { getAllOps, retryBrouillon } from "../lib/idb";
 import { useOffline } from "../contexts/OfflineContext";
 import OfflineBanner from "../components/OfflineBanner";
 import type { SyncHistoryOp } from "../lib/types";
@@ -11,7 +11,7 @@ const TYPE_LABELS: Record<string, string> = {
   avance:   "💰 Avance",
   gps_collecte: "📍 Collecte GPS",
   enquete: "📝 Enquête",
-  pesee_brouillon: "⚖️ Brouillon pesée",
+  pesee_brouillon: "⚖️ Pré-pesée export",
 };
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
@@ -38,6 +38,9 @@ function opLabel(op: SyncHistoryOp): string {
     return `Mission #${d.missionId ?? "?"} — membre #${d.membreId ?? "?"} — ${Object.keys(reponses ?? {}).length} réponse(s)`;
   }
   if (op.type === "pesee_brouillon") {
+    if (d.operation === "prechargement_export") {
+      return `${d.expeditionNumero ?? `expédition #${d.expeditionId ?? "?"}`} — ${d.poidsTotalKg ?? 0} kg — ${d.nbSacsTotal ?? 0} sac(s)`;
+    }
     const nom = [d.membreNom, d.membrePrenoms].filter(Boolean).join(" ");
     return `${nom || `membre #${d.membreId ?? "?"}`} — ${d.poidsTotalKg ?? 0} kg — ${d.nbSacsTotal ?? 0} sac(s)`;
   }
@@ -78,10 +81,15 @@ export default function SyncHistorique() {
   const nbError   = ops.filter((o) => displayStatus(o) === "error").length;
 
   async function retry(op: SyncHistoryOp) {
-    if (op.type !== "gps_collecte" || retryingId) return;
+    if ((op.type !== "gps_collecte" && op.type !== "pesee_brouillon") || retryingId) return;
     setRetryingId(op.localId);
     try {
-      await retryGpsOperation(op.localId);
+      if (op.type === "gps_collecte") {
+        await retryGpsOperation(op.localId);
+      } else {
+        await retryBrouillon(op.localId);
+        if (isOnline) await triggerSync();
+      }
       await reload();
     } finally {
       setRetryingId(null);
@@ -199,12 +207,14 @@ export default function SyncHistorique() {
                     {st.label}
                   </span>
                 </div>
-                 {op.type === "gps_collecte" && displayStatus(op) === "error" && (
+                  {(op.type === "gps_collecte" || op.type === "pesee_brouillon") && displayStatus(op) === "error" && (
                    <button
                      type="button"
                      onClick={() => void retry(op)}
                      disabled={retryingId !== null}
-                     aria-label={`Relancer l'opération GPS ${op.localId}`}
+                      aria-label={op.type === "gps_collecte"
+                        ? `Relancer l'opération GPS ${op.localId}`
+                        : `Reprendre la synchronisation ${op.localId}`}
                      style={{
                        marginTop: 10, width: "100%", padding: "8px 12px", border: "none",
                        borderRadius: 7, background: "var(--t-danger)", color: "#fff",
@@ -212,7 +222,7 @@ export default function SyncHistorique() {
                        opacity: retryingId && retryingId !== op.localId ? .55 : 1,
                      }}
                    >
-                     {retryingId === op.localId ? "⏳ Relance…" : "↻ Relancer"}
+                      {retryingId === op.localId ? "⏳ Reprise…" : "↻ Reprendre"}
                    </button>
                  )}
               </div>
