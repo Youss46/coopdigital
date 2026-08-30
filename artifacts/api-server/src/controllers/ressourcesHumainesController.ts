@@ -61,7 +61,7 @@ function validDate(value: unknown): string | null {
   const result = textOf(value);
   if (!result || !/^\d{4}-\d{2}-\d{2}$/.test(result)) return null;
   const parsed = new Date(`${result}T00:00:00Z`);
-  return Number.isNaN(parsed.getTime()) ? null : result;
+  return Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== result ? null : result;
 }
 
 function fileExtension(name: string): string {
@@ -653,8 +653,10 @@ export async function downloadRhDocumentFile(req: Request, res: Response): Promi
   }
 }
 
-async function annualLeaveBalance(coopId: number, personnelId: number, year: number) {
-  const rows = await db.select({ jours: rhCongesTable.jours, dateDebut: rhCongesTable.dateDebut }).from(rhCongesTable).where(and(
+type RhQueryExecutor = Pick<typeof db, "select">;
+
+async function annualLeaveBalance(executor: RhQueryExecutor, coopId: number, personnelId: number, year: number) {
+  const rows = await executor.select({ jours: rhCongesTable.jours, dateDebut: rhCongesTable.dateDebut }).from(rhCongesTable).where(and(
     eq(rhCongesTable.cooperativeId, coopId),
     eq(rhCongesTable.personnelId, personnelId),
     eq(rhCongesTable.type, "annuel"),
@@ -680,7 +682,7 @@ export async function listRhConges(req: Request, res: Response): Promise<void> {
       .orderBy(desc(rhCongesTable.createdAt));
     const year = Number(req.query["annee"] ?? new Date().getUTCFullYear());
     const personnelIds = [...new Set(rows.map((row) => row.conge.personnelId))];
-    const balances = await Promise.all(personnelIds.map(async (personnelId) => [personnelId, await annualLeaveBalance(coopId, personnelId, year)] as const));
+    const balances = await Promise.all(personnelIds.map(async (personnelId) => [personnelId, await annualLeaveBalance(db, coopId, personnelId, year)] as const));
     const balanceByPerson = new Map(balances);
     res.json(rows.map((row) => ({
       ...row.conge,
@@ -708,7 +710,7 @@ export async function createRhConge(req: Request, res: Response): Promise<void> 
     }
     const jours = inclusiveDays(dateDebut, dateFin);
     if (type === "annuel") {
-      const balance = await annualLeaveBalance(coopId, personnelId, Number(dateDebut.slice(0, 4)));
+      const balance = await annualLeaveBalance(db, coopId, personnelId, Number(dateDebut.slice(0, 4)));
       if (jours > balance.remaining) {
         res.status(409).json({ erreur: "Solde de congés annuel insuffisant", solde: balance });
         return;
@@ -735,35 +737,69 @@ export async function decideRhConge(req: Request, res: Response): Promise<void> 
       res.status(400).json({ erreur: "La décision doit être approuve ou refuse" });
       return;
     }
-    const [existing] = await db.select().from(rhCongesTable).where(and(eq(rhCongesTable.id, id), eq(rhCongesTable.cooperativeId, coopId))).limit(1);
-    if (!existing) {
+    const commentaire = textOf(body["commentaire"]);
+    const result = await db.transaction(async (tx) => {
+      const [existing] = await tx.select().from(rhCongesTable).where(and(
+        eq(rhCongesTable.id, id),
+        eq(rhCongesTable.cooperativeId, coopId),
+      )).for("update").limit(1);
+      if (!existing) return { kind: "not_found" as const };
+
+      // Every leave decision for a person locks the same personnel row. This
+      // serializes balance checks for different pending requests while
+      // keeping unrelated cooperatives independent.
+      const [personnel] = await tx.select({ id: personnelTable.id }).from(personnelTable).where(and(
+        eq(personnelTable.id, existing.personnelId),
+        eq(personnelTable.cooperativeId, coopId),
+      )).for("update").limit(1);
+      if (!personnel) return { kind: "not_found" as const };
+      if (existing.statut !== "demande") return { kind: "already_processed" as const };
+
+      if (decision === "approuve" && existing.type === "annuel") {
+        const balance = await annualLeaveBalance(tx, coopId, existing.personnelId, Number(existing.dateDebut.slice(0, 4)));
+        if (existing.jours > balance.remaining) {
+          return { kind: "insufficient_balance" as const, balance };
+        }
+      }
+
+      const [updated] = await tx.update(rhCongesTable).set({
+        statut: decision,
+        validePar: req.user?.id ?? null,
+        valideAt: new Date(),
+        commentaireValidation: commentaire,
+        updatedAt: new Date(),
+      }).where(and(eq(rhCongesTable.id, id), eq(rhCongesTable.statut, "demande"))).returning();
+      if (!updated) return { kind: "concurrent_update" as const };
+
+      await tx.insert(rhHistoriqueTable).values({
+        cooperativeId: coopId,
+        personnelId: existing.personnelId,
+        entite: "conge",
+        entiteId: id,
+        action: decision,
+        details: { commentaire },
+        faitPar: req.user?.id ?? null,
+      });
+      return { kind: "updated" as const, row: updated };
+    });
+
+    if (result.kind === "not_found") {
       res.status(404).json({ erreur: "Demande de congé introuvable" });
       return;
     }
-    if (existing.statut !== "demande") {
+    if (result.kind === "already_processed") {
       res.status(409).json({ erreur: "Cette demande a déjà été traitée" });
       return;
     }
-    if (decision === "approuve" && existing.type === "annuel") {
-      const balance = await annualLeaveBalance(coopId, existing.personnelId, Number(existing.dateDebut.slice(0, 4)));
-      if (existing.jours > balance.remaining) {
-        res.status(409).json({ erreur: "Solde de congés annuel insuffisant", solde: balance });
-        return;
-      }
+    if (result.kind === "insufficient_balance") {
+      res.status(409).json({ erreur: "Solde de congés annuel insuffisant", solde: result.balance });
+      return;
     }
-    const [updated] = await db.update(rhCongesTable).set({
-      statut: decision,
-      validePar: req.user?.id ?? null,
-      valideAt: new Date(),
-      commentaireValidation: textOf(body["commentaire"]),
-      updatedAt: new Date(),
-    }).where(and(eq(rhCongesTable.id, id), eq(rhCongesTable.statut, "demande"))).returning();
-    if (!updated) {
+    if (result.kind === "concurrent_update") {
       res.status(409).json({ erreur: "La demande a été traitée entre-temps" });
       return;
     }
-    await logHistory(coopId, existing.personnelId, "conge", id, decision, { commentaire: textOf(body["commentaire"]) }, req.user?.id ?? null);
-    res.json(updated);
+    res.json(result.row);
   } catch (err) {
     handleError(req, res, err, "decideRhConge");
   }
