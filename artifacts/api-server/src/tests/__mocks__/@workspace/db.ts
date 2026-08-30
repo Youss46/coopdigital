@@ -64,6 +64,10 @@ export const entrepotsDeleguesTable = makeTable("entrepots_delegues");
 export const bulletinsPaieTable = makeTable("bulletins_paie");
 export const lignesBulletinTable = makeTable("lignes_bulletin");
 export const personnelTable = makeTable("personnel");
+export const rhDocumentsTable = {
+  ...makeTable("rh_documents"),
+  fichierPath: {},
+};
 export const obligationsFiscalesTable = {
   ...makeTable("obligations_fiscales"),
   cooperativeId: {}, typeTaxe: {}, actif: {}, tauxPct: {}, id: {},

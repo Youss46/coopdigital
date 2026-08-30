@@ -52,6 +52,7 @@ import { initLicenceCrons } from "./services/licenceService";
 import { detecterAnomaliesComptables } from "./services/anomaliesIAService";
 import { db as dbCron, cooperativesTable as coopTable } from "@workspace/db";
 import { sql as sqlCron } from "drizzle-orm";
+import { cleanupOrphanedRhDocuments } from "./controllers/ressourcesHumainesController.js";
 
 initLicenceCrons();
 
@@ -133,3 +134,11 @@ cron.schedule("*/5 * * * *", () => {
     });
   }).catch((err: unknown) => logger.error({ err }, "Import supportService"));
 });
+
+// CRON stockage RH : réconciliation quotidienne à 03h15 (Africa/Abidjan).
+// La fonction applique une période de grâce et échoue en mode conservateur.
+cron.schedule("15 3 * * *", () => {
+  cleanupOrphanedRhDocuments()
+    .then((result) => logger.info({ ...result }, "CRON nettoyage pièces RH terminé"))
+    .catch((err: unknown) => logger.error({ err }, "Erreur cron nettoyage pièces RH"));
+}, { timezone: "Africa/Abidjan" });

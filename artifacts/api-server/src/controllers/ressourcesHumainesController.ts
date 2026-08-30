@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import multer from "multer";
 import { Readable } from "stream";
 import { randomUUID } from "crypto";
@@ -14,10 +14,13 @@ import {
   rhHistoriqueTable,
 } from "@workspace/db";
 import { ObjectNotFoundError, ObjectStorageService } from "../lib/objectStorage.js";
+import { logger } from "../lib/logger.js";
 
 const CONGE_SOLDE_ANNUEL = 26;
 const ECHEANCE_JOURS = 60;
 const RH_DOCUMENT_MAX_BYTES = 10 * 1024 * 1024;
+export const RH_DOCUMENT_ORPHAN_GRACE_HOURS = 24;
+const RH_DOCUMENT_OBJECT_PREFIX = "rh-documents/";
 const RH_DOCUMENT_TYPES: Record<string, string> = {
   ".pdf": "application/pdf",
   ".jpg": "image/jpeg",
@@ -28,6 +31,22 @@ const RH_DOCUMENT_TYPES: Record<string, string> = {
   ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 };
 const objectStorageService = new ObjectStorageService();
+
+type RhDocumentCleanupDb = Pick<typeof db, "select">;
+type RhDocumentCleanupStorage = Pick<
+  ObjectStorageService,
+  "listPrivateObjects" | "deletePrivateObject" | "normalizeObjectEntityPath"
+>;
+
+export interface RhDocumentOrphanCleanupResult {
+  scanned: number;
+  referenced: number;
+  orphaned: number;
+  skippedRecent: number;
+  skippedWithoutMetadata: number;
+  deleted: number;
+  errors: number;
+}
 
 class TenantError extends Error {
   readonly status = 401;
@@ -207,6 +226,136 @@ function handleError(req: Request, res: Response, err: unknown, operation: strin
   }
   req.log.error({ err }, operation);
   res.status(500).json({ erreur: "Erreur interne du serveur" });
+}
+
+function rhDocumentPath(rawPath: string, storage: RhDocumentCleanupStorage): string | null {
+  let normalizedPath = rawPath;
+  try {
+    normalizedPath = storage.normalizeObjectEntityPath(rawPath);
+  } catch (error) {
+    logger.warn({ err: error }, "Référence de pièce RH impossible à normaliser");
+    return null;
+  }
+  return normalizedPath.startsWith(`/objects/${RH_DOCUMENT_OBJECT_PREFIX}`)
+    ? normalizedPath
+    : null;
+}
+
+function orphanGracePeriodMs(): number {
+  const configuredHours = Number(process.env["RH_DOCUMENT_ORPHAN_GRACE_HOURS"]);
+  const hours = Number.isFinite(configuredHours) && configuredHours >= RH_DOCUMENT_ORPHAN_GRACE_HOURS
+    ? configuredHours
+    : RH_DOCUMENT_ORPHAN_GRACE_HOURS;
+  return hours * 60 * 60 * 1000;
+}
+
+/**
+ * Reconciles private RH objects with rh_documents.
+ *
+ * Safety rule: an unreferenced object is only deleted after the 24-hour grace
+ * period (or a larger configured period) and only when its creation timestamp
+ * is available. This protects uploads while their DB update is still pending
+ * and fails closed when storage metadata cannot be read. Detection and each
+ * deletion are logged; one failure never aborts the remaining cleanup.
+ */
+export async function cleanupOrphanedRhDocuments(options: {
+  executor?: RhDocumentCleanupDb;
+  storage?: RhDocumentCleanupStorage;
+  now?: Date;
+  gracePeriodMs?: number;
+} = {}): Promise<RhDocumentOrphanCleanupResult> {
+  const executor = options.executor ?? db;
+  const storage = options.storage ?? objectStorageService;
+  const now = options.now ?? new Date();
+  const gracePeriodMs = options.gracePeriodMs ?? orphanGracePeriodMs();
+  const result: RhDocumentOrphanCleanupResult = {
+    scanned: 0,
+    referenced: 0,
+    orphaned: 0,
+    skippedRecent: 0,
+    skippedWithoutMetadata: 0,
+    deleted: 0,
+    errors: 0,
+  };
+
+  let referencedPaths: Set<string>;
+  try {
+    const rows = await executor.select({ fichierPath: rhDocumentsTable.fichierPath })
+      .from(rhDocumentsTable)
+      .where(isNotNull(rhDocumentsTable.fichierPath));
+    referencedPaths = new Set(
+      rows
+        .map((row) => row.fichierPath)
+        .filter((path): path is string => typeof path === "string")
+        .map((path) => rhDocumentPath(path, storage))
+        .filter((path): path is string => path !== null),
+    );
+    result.referenced = referencedPaths.size;
+  } catch (error) {
+    result.errors++;
+    logger.error({ err: error }, "Nettoyage RH interrompu avant suppression — références DB indisponibles");
+    return result;
+  }
+
+  let objects;
+  try {
+    objects = await storage.listPrivateObjects(RH_DOCUMENT_OBJECT_PREFIX);
+  } catch (error) {
+    result.errors++;
+    logger.error({ err: error }, "Nettoyage RH interrompu avant suppression — lecture du stockage impossible");
+    return result;
+  }
+
+  result.scanned = objects.length;
+  for (const object of objects) {
+    if (object.metadataError) {
+      result.skippedWithoutMetadata++;
+      result.errors++;
+      logger.error(
+        { err: object.metadataError, objectPath: object.objectPath },
+        "Pièce RH candidate conservée — métadonnées du stockage illisibles",
+      );
+      continue;
+    }
+
+    if (referencedPaths.has(object.objectPath)) continue;
+
+    const createdAt = object.createdAt ?? object.updatedAt;
+    if (!createdAt) {
+      result.skippedWithoutMetadata++;
+      logger.warn(
+        { objectPath: object.objectPath },
+        "Pièce RH orpheline signalée mais conservée — date du stockage absente",
+      );
+      continue;
+    }
+
+    const ageMs = now.getTime() - createdAt.getTime();
+    if (!Number.isFinite(ageMs) || ageMs < gracePeriodMs) {
+      result.skippedRecent++;
+      logger.warn(
+        { objectPath: object.objectPath, ageHours: Math.max(0, ageMs) / 3_600_000 },
+        "Pièce RH non référencée signalée mais conservée pendant la période de grâce",
+      );
+      continue;
+    }
+
+    result.orphaned++;
+    logger.warn(
+      { objectPath: object.objectPath, ageHours: ageMs / 3_600_000 },
+      "Pièce RH orpheline détectée — suppression sûre engagée",
+    );
+    try {
+      await storage.deletePrivateObject(object.objectPath);
+      result.deleted++;
+      logger.info({ objectPath: object.objectPath }, "Pièce RH orpheline supprimée");
+    } catch (error) {
+      result.errors++;
+      logger.error({ err: error, objectPath: object.objectPath }, "Erreur suppression pièce RH orpheline");
+    }
+  }
+
+  return result;
 }
 
 const personnelProjection = {

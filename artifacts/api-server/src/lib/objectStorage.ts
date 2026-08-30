@@ -37,6 +37,13 @@ export class ObjectNotFoundError extends Error {
   }
 }
 
+export interface PrivateObjectMetadata {
+  objectPath: string;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+  metadataError?: unknown;
+}
+
 export class ObjectStorageService {
   constructor() {}
 
@@ -187,6 +194,55 @@ export class ObjectStorageService {
     await objectFile.delete({ ignoreNotFound: true });
   }
 
+  /**
+   * Lists private objects below a relative prefix.
+   *
+   * Metadata is loaded per object so one inaccessible object does not prevent
+   * callers from inspecting the rest of the prefix. A metadata error is
+   * returned on that object and callers must fail closed instead of deleting it.
+   */
+  async listPrivateObjects(prefix: string): Promise<PrivateObjectMetadata[]> {
+    const normalizedPrefix = prefix.replace(/^\/+/, "");
+    if (!normalizedPrefix || normalizedPrefix.includes("..") || normalizedPrefix.includes("//")) {
+      throw new Error("Invalid private object prefix");
+    }
+
+    const privateObjectDir = this.getPrivateObjectDir().replace(/\/+$/, "");
+    const privateDirPath = parseObjectPath(`${privateObjectDir}/`);
+    const { bucketName, objectName: objectPrefix } = parseObjectPath(
+      `${privateObjectDir}/${normalizedPrefix}`,
+    );
+    const fullPrefix = objectPrefix.endsWith("/") ? objectPrefix : `${objectPrefix}/`;
+    const privateRoot = privateDirPath.objectName.replace(/\/+$/, "");
+    const [files] = await objectStorageClient.bucket(bucketName).getFiles({ prefix: fullPrefix });
+
+    return Promise.all(
+      files
+        .filter((file) => !file.name.endsWith("/"))
+        .map(async (file): Promise<PrivateObjectMetadata> => {
+          const relativeName = privateRoot
+            ? file.name.slice(privateRoot.length).replace(/^\/+/, "")
+            : file.name;
+          const objectPath = `/objects/${relativeName}`;
+          try {
+            const [metadata] = await file.getMetadata();
+            return {
+              objectPath,
+              createdAt: parseObjectDate(metadata.timeCreated),
+              updatedAt: parseObjectDate(metadata.updated),
+            };
+          } catch (metadataError) {
+            return {
+              objectPath,
+              createdAt: null,
+              updatedAt: null,
+              metadataError,
+            };
+          }
+        }),
+    );
+  }
+
   normalizeObjectEntityPath(rawPath: string): string {
     if (!rawPath.startsWith("https://storage.googleapis.com/")) {
       return rawPath;
@@ -237,6 +293,12 @@ export class ObjectStorageService {
       requestedPermission: requestedPermission ?? ObjectPermission.READ,
     });
   }
+}
+
+function parseObjectDate(value: unknown): Date | null {
+  if (typeof value !== "string") return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function parseObjectPath(path: string): {
