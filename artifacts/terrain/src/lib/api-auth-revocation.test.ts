@@ -67,11 +67,11 @@ describe("révocation terrain côté client", () => {
 
     expect(getToken()).toBeNull();
     expect(isAccountDisabled()).toBe(true);
-    expect(getAuthMessage()).toBe(COMPTE_DESACTIVE_MESSAGE);
+    expect(getAuthMessage()).toMatch(/HTTP 403.*COMPTE_DESACTIVE/);
     expect((globalThis.window as { location: { href: string } }).location.href).toBe("/login");
   });
 
-  it("remplace le 401 générique Non autorisé par une cause de rattachement explicite", async () => {
+  it("conserve le détail réel d'un 401 Non autorisé", async () => {
     saveAuth("jwt-encore-valide", user);
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
       ok: false,
@@ -79,10 +79,10 @@ describe("révocation terrain côté client", () => {
       json: async () => ({ erreur: "Non autorisé" }),
     }));
 
-    await expect(apiGet("/profil")).rejects.toThrow(COOPERATIVE_MISSING_MESSAGE);
+    await expect(apiGet("/profil")).rejects.toThrow(/Non autorisé.*HTTP 401/);
 
     expect(getToken()).toBeNull();
-    expect(getAuthMessage()).toBe(COOPERATIVE_MISSING_MESSAGE);
+    expect(getAuthMessage()).toMatch(/Non autorisé.*HTTP 401/);
     expect((globalThis.window as { location: { href: string } }).location.href).toBe("/login");
   });
 
@@ -97,10 +97,26 @@ describe("révocation terrain côté client", () => {
       }),
     }));
 
-    await expect(apiGet("/profil")).rejects.toThrow(COOPERATIVE_MISSING_MESSAGE);
+    await expect(apiGet("/profil")).rejects.toThrow(/HTTP 403.*COOPERATIVE_MISSING/);
 
     expect(getToken()).toBeNull();
-    expect(getAuthMessage()).toBe(COOPERATIVE_MISSING_MESSAGE);
+    expect(getAuthMessage()).toMatch(/HTTP 403.*COOPERATIVE_MISSING/);
     expect((globalThis.window as { location: { href: string } }).location.href).toBe("/login");
+  });
+
+  it("conserve le code réel d'une fonctionnalité désactivée", async () => {
+    saveAuth("jwt-encore-valide", user);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      json: async () => ({
+        code: "FEATURE_DISABLED",
+        erreur: "La fonctionnalité pesee est désactivée pour cette coopérative",
+      }),
+    }));
+
+    await expect(apiGet("/pesee/sessions")).rejects.toThrow(/HTTP 403.*FEATURE_DISABLED/);
+    expect(getToken()).toBe("jwt-encore-valide");
+    expect((globalThis.window as { location: { href: string } }).location.href).toBe("");
   });
 });

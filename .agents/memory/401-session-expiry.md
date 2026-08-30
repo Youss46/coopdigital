@@ -24,9 +24,9 @@ When a JWT expires, the server returns 401. Every frontend must detect this and 
 - `setOnUnauthorized` must be exported from `lib/api-client-react/src/index.ts`.
 
 ### Terrain app (`artifacts/terrain`)
-- `apiFetch` in `artifacts/terrain/src/lib/api.ts` checks `res.status === 401` explicitly, calls `clearAuth()`, stores the server reason, and redirects to `.../login`.
+- `apiFetch` in `artifacts/terrain/src/lib/api.ts` checks `res.status === 401` explicitly, preserves the server detail plus HTTP status/code/endpoint, calls `clearAuth()`, and redirects to `.../login`.
 - The startup cleanup in `getStoredActiveAuth()` must remove only session keys; calling `clearAuth()` there erases the pending error message before the login screen can render it.
-- Legacy terrain endpoints may return `401 { erreur: "Non autorisé" }` for a missing cooperative; normalize this to an explicit cooperative-attachment message before redirecting.
+- Never reinterpret a generic `401 { erreur: "Non autorisé" }` as a missing cooperative; preserve the raw response so cooperative-specific and deployment-specific failures remain distinguishable.
 
 ### Portail app (`artifacts/portail`)
 - `req` in `artifacts/portail/src/lib/api.ts` checks `res.status === 401` explicitly, calls `clearToken()` and `window.location.href = .../connexion`.
