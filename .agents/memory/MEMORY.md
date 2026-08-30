@@ -96,3 +96,4 @@
 - [Configuration des fonctionnalités coopérative](cooperative-features.md) — absence de configuration = actif; les dépendances sont désactivées en cascade et le contrôle suit licence → fonctionnalité → permission.
 - [Configuration des rôles coopérative](cooperative-roles.md) — rôles tenant-scoped, actifs par défaut; blocage immédiat des tokens et protection du dernier PCA/Directeur.
 - [Journalisation d’erreur RH](rh-error-fallback-logging.md) — les tests Express isolés peuvent ne pas injecter req.log; les erreurs RH doivent conserver un logger de secours.
+- [Readiness PostgreSQL jetable](disposable-postgres-readiness.md) — avant une migration locale, attendre une requête SQL acceptée plutôt que la seule ouverture du port.
