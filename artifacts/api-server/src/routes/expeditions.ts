@@ -7,6 +7,7 @@ import {
   handleGetExpedition,
   handleCreateExpedition,
   handleChangerStatut,
+  handleValiderPrechargement,
   handleConfirmerReception,
   handleReglerFraisTransport,
   handleRapportEudr,
@@ -94,6 +95,12 @@ router.put(
   "/expeditions/:id/statut",
   checkPermission("expeditions", "modifier"),
   handleChangerStatut,
+);
+
+router.put(
+  "/expeditions/:id/prechargement/valider",
+  checkPermission("expeditions", "modifier"),
+  handleValiderPrechargement,
 );
 
 router.put(

@@ -424,6 +424,25 @@ export default function AccueilPeseur() {
                 </div>
               </div>
             </Link>
+
+            <Link href="/prechargement">
+              <div
+                className="t-peseur-tile"
+                style={{ background: "linear-gradient(145deg, #7c2d12 0%, #ea580c 100%)" }}
+              >
+                <div style={{
+                  width: 48, height: 48, borderRadius: 14,
+                  background: "rgba(255,255,255,.18)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <Truck size={26} color="#fff" strokeWidth={1.8} />
+                </div>
+                <div>
+                  <div className="t-peseur-tile__label">Pré-chargement export</div>
+                  <div className="t-peseur-tile__sub">Contrôler avant chargement</div>
+                </div>
+              </div>
+            </Link>
           </div>
         </section>
 

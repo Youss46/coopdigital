@@ -1,0 +1,120 @@
+import { useEffect, useState } from "react";
+import { Link, useLocation } from "wouter";
+import { ArrowLeft, CheckCircle2, Loader2, Plus, Trash2, AlertTriangle, Ship } from "lucide-react";
+import BottomNavPeseur from "../components/BottomNavPeseur";
+import ScaleWeightDisplay from "../components/ScaleWeightDisplay";
+import { NumericInput } from "../components/ui/numeric-input";
+import { useOffline } from "../contexts/OfflineContext";
+import { addLignePesee, deleteLignePesee, getSessionDetail, terminerSessionPesee } from "../lib/api";
+import type { SessionDetail } from "../lib/types";
+
+const fmt = (n: number) => n.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
+
+export default function PrechargementExportFlow({ params }: { params: { sessionId?: string } }) {
+  const [, navigate] = useLocation();
+  const { isOnline } = useOffline();
+  const [session, setSession] = useState<SessionDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [closing, setClosing] = useState(false);
+  const [done, setDone] = useState<SessionDetail | null>(null);
+  const [nbSacs, setNbSacs] = useState("");
+  const [brut, setBrut] = useState("");
+  const [tare, setTare] = useState("0");
+  const [notes, setNotes] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const id = Number(params.sessionId);
+    if (!id || !isOnline) { setLoading(false); return; }
+    getSessionDetail(id).then((s) => {
+      if (s.operation !== "prechargement_export") throw new Error("Session de pré-pesée invalide");
+      if (s.statut === "terminee") setDone(s); else setSession(s);
+    }).catch((e) => setError((e as Error).message)).finally(() => setLoading(false));
+  }, [params.sessionId, isOnline]);
+
+  async function addPassage() {
+    if (!session) return;
+    const poidsBrutKg = Number(brut);
+    const sacs = Number(nbSacs);
+    const tareKg = Number(tare || 0);
+    if (!Number.isFinite(poidsBrutKg) || poidsBrutKg <= 0) { setError("Saisissez un poids brut positif."); return; }
+    if (!Number.isFinite(tareKg) || tareKg < 0 || tareKg >= poidsBrutKg) { setError("La tare doit être positive et inférieure au poids brut."); return; }
+    if (!Number.isInteger(sacs) || sacs < 0) { setError("Nombre de sacs invalide."); return; }
+    try {
+      setError("");
+      setSession(await addLignePesee(session.id, { nbSacs: sacs, poidsBrutKg, tareKg, notes: notes || undefined }));
+      setNbSacs(""); setBrut(""); setTare("0"); setNotes("");
+    } catch (e) { setError((e as Error).message); }
+  }
+
+  async function closeSession() {
+    if (!session || session.lignes.length === 0) { setError("Ajoutez au moins un passage avant de clôturer."); return; }
+    if (!window.confirm("Clôturer la pré-pesée ? Le résultat sera comparé au poids prévu.")) return;
+    setClosing(true); setError("");
+    try { setDone(await terminerSessionPesee(session.id)); setSession(null); }
+    catch (e) { setError((e as Error).message); }
+    finally { setClosing(false); }
+  }
+
+  if (!isOnline) return <div className="t-app"><main className="t-main" style={{ padding: 24 }}><div className="t-alert t-alert--warning">La pré-pesée export nécessite une connexion active.</div><Link href="/prechargement">Retour</Link></main></div>;
+  if (loading) return <div className="t-loading"><Loader2 className="t-spin" /> Chargement…</div>;
+  if (done) {
+    const status = done.prechargementStatut;
+    return (
+      <div className="t-app">
+        <main className="t-main" style={{ padding: "32px 16px 90px" }}>
+          <div style={{ textAlign: "center" }}><CheckCircle2 size={54} color={status === "conforme" ? "#16a34a" : "#d97706"} /><h1 style={{ margin: "12px 0 4px" }}>Pré-pesée clôturée</h1><p style={{ color: "var(--t-muted)" }}>{done.numeroSession}</p></div>
+          <div className="t-card" style={{ marginTop: 22 }}>
+            <div style={{ fontWeight: 800, fontSize: "1.1rem" }}>{fmt(Number(done.poidsTotalKg))} kg · {done.nbSacsTotal} sacs</div>
+            <div style={{ marginTop: 8, color: status === "conforme" ? "#15803d" : "#b45309", fontWeight: 700 }}>
+              {status === "conforme" ? "Conforme à la tolérance" : "Écart à justifier avant chargement"}
+            </div>
+            {done.prechargementEcartKg && <div style={{ color: "var(--t-muted)", fontSize: ".82rem", marginTop: 5 }}>Écart : {fmt(Number(done.prechargementEcartKg))} kg ({fmt(Number(done.prechargementEcartPct))} %)</div>}
+          </div>
+          <button className="t-btn t-btn--primary" style={{ width: "100%", marginTop: 18 }} onClick={() => navigate("/prechargement")}>Retour aux chargements</button>
+        </main>
+        <BottomNavPeseur />
+      </div>
+    );
+  }
+  if (!session) return <div className="t-loading">{error || "Session introuvable"}</div>;
+
+  return (
+    <div className="t-app">
+      <header className="t-header t-header--peseur">
+        <Link href="/prechargement" style={{ color: "#fff", display: "flex" }}><ArrowLeft size={20} /></Link>
+        <div style={{ marginLeft: 12 }}><div className="t-header__title">Pré-pesée export</div><div className="t-header__sub">{session.numeroSession}</div></div>
+      </header>
+      <main className="t-main" style={{ padding: "16px 16px 100px" }}>
+        <div className="t-card" style={{ marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 9 }}><Ship size={19} color="var(--t-peseur)" /><strong>{session.numeroSession}</strong></div>
+          <div style={{ fontSize: ".82rem", color: "var(--t-muted)", marginTop: 6 }}>Les passages sont cumulés puis comparés au poids prévu de l’expédition.</div>
+          <div style={{ marginTop: 8, fontWeight: 800 }}>Total pré-pesé : {fmt(Number(session.poidsTotalKg))} kg · {session.nbSacsTotal} sacs</div>
+        </div>
+        {error && <div className="t-alert t-alert--danger">{error}</div>}
+        <ScaleWeightDisplay onUse={(v) => setBrut(String(v))} />
+        <div className="t-card">
+          <div className="t-form-row"><label>Nombre de sacs</label><NumericInput value={nbSacs} onChange={setNbSacs} placeholder="0" /></div>
+          <div className="t-form-row"><label>Poids brut (kg)</label><NumericInput value={brut} onChange={setBrut} placeholder="0,000" /></div>
+          <div className="t-form-row"><label>Tare (kg)</label><NumericInput value={tare} onChange={setTare} placeholder="0" /></div>
+          <div className="t-form-row"><label>Note (facultatif)</label><input className="t-input" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Observation du passage" /></div>
+          <button className="t-btn t-btn--primary" style={{ width: "100%", marginTop: 8 }} onClick={() => void addPassage()}><Plus size={17} /> Ajouter le passage</button>
+        </div>
+        <div style={{ marginTop: 14, display: "grid", gap: 7 }}>
+          {session.lignes.map((line) => {
+            const net = Number(line.poidsBrutKg) - Number(line.tareKg ?? 0);
+            return <div key={line.id} className="t-card" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px" }}>
+              <span style={{ color: "var(--t-muted)", fontSize: ".75rem" }}>#{line.numeroPassage}</span><span style={{ flex: 1, fontWeight: 700 }}>{fmt(net)} kg · {line.nbSacs} sacs</span>
+              <button onClick={() => deleteLignePesee(session.id, line.id).then(setSession).catch((e) => setError((e as Error).message))} className="t-icon-btn" title="Supprimer"><Trash2 size={16} /></button>
+            </div>;
+          })}
+        </div>
+        <button className="t-btn t-btn--primary" style={{ width: "100%", marginTop: 18 }} disabled={closing || session.lignes.length === 0} onClick={() => void closeSession()}>
+          {closing ? <><Loader2 className="t-spin" size={17} /> Clôture…</> : <><CheckCircle2 size={17} /> Clôturer la pré-pesée</>}
+        </button>
+        <div style={{ display: "flex", gap: 7, marginTop: 12, color: "var(--t-muted)", fontSize: ".74rem" }}><AlertTriangle size={15} /><span>Aucune livraison ni sortie de stock n’est créée à cette étape.</span></div>
+      </main>
+      <BottomNavPeseur />
+    </div>
+  );
+}

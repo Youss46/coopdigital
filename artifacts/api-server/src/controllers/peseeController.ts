@@ -16,6 +16,7 @@ import {
   SessionBonExistanteError,
   SessionTransfertExistanteError,
 } from "../services/peseeSessionService";
+import { listExpeditionsApreparer } from "../services/expeditionsService.js";
 import { isCertificationCacao } from "../lib/certificationCacao.js";
 import {
   CreateBalanceBody,
@@ -344,15 +345,15 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
   const cooperativeId = req.agent?.cooperativeId ?? req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
   const actorId = req.agent?.id ?? req.user?.id;
-  const { membreId, fournisseurId, produit, operation, balanceId, notes, transfertId, bonReceptionId, certificationCacao } = req.body as {
-    membreId?: number; fournisseurId?: number; produit?: string; operation?: string; balanceId?: number; notes?: string; transfertId?: number; bonReceptionId?: number; certificationCacao?: string;
+  const { membreId, fournisseurId, produit, operation, balanceId, notes, transfertId, bonReceptionId, expeditionId, certificationCacao } = req.body as {
+    membreId?: number; fournisseurId?: number; produit?: string; operation?: string; balanceId?: number; notes?: string; transfertId?: number; bonReceptionId?: number; expeditionId?: number; certificationCacao?: string;
   };
 
   if (operation === "reception_membre_delegue" && !bonReceptionId) {
     res.status(400).json({ erreur: "Un bon de réception est obligatoire pour démarrer la pesée d'un membre délégué" });
     return;
   }
-  if (!isCertificationCacao(certificationCacao)) {
+  if (operation !== "prechargement_export" && !isCertificationCacao(certificationCacao)) {
     res.status(400).json({ erreur: "Sélectionnez le type de certification du cacao avant de démarrer la pesée" });
     return;
   }
@@ -375,6 +376,7 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
       peseurId: actorId,
       transfertId: transfertId ? Number(transfertId) : undefined,
       bonReceptionId: bonReceptionId ? Number(bonReceptionId) : undefined,
+      expeditionId: expeditionId ? Number(expeditionId) : undefined,
       certificationCacao,
     });
     res.status(201).json(session);
@@ -416,7 +418,7 @@ export async function handleGetSessions(req: Request, res: Response): Promise<vo
   // être réutilisée par le cache HTTP après un changement de compte sur mobile.
   res.setHeader("Cache-Control", "private, no-store");
   res.setHeader("Vary", "Authorization");
-  const { statut, membreId, fournisseurId, limit, date_debut, date_fin } = req.query as { statut?: string; membreId?: string; fournisseurId?: string; limit?: string; date_debut?: string; date_fin?: string };
+  const { statut, membreId, fournisseurId, expeditionId, limit, date_debut, date_fin } = req.query as { statut?: string; membreId?: string; fournisseurId?: string; expeditionId?: string; limit?: string; date_debut?: string; date_fin?: string };
   // Peseur : ne voit que ses propres sessions (filtre par peseurId)
   const peseurId = req.agent?.role === "peseur" ? req.agent.id : undefined;
   try {
@@ -424,6 +426,7 @@ export async function handleGetSessions(req: Request, res: Response): Promise<vo
       statut,
       membreId: membreId ? parseInt(membreId) : undefined,
       fournisseurId: fournisseurId ? parseInt(fournisseurId) : undefined,
+      expeditionId: expeditionId ? parseInt(expeditionId) : undefined,
       limit: limit ? parseInt(limit) : undefined,
       peseurId,
       dateDebut: date_debut,
@@ -441,6 +444,20 @@ export async function handleGetSessions(req: Request, res: Response): Promise<vo
   } catch (err) {
     req.log.error(err, "handleGetSessions");
     res.status(500).json({ erreur: "Erreur récupération sessions" });
+  }
+}
+
+export async function handleGetExpeditionsApreparer(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.agent?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
+  res.setHeader("Cache-Control", "private, no-store");
+  res.setHeader("Vary", "Authorization");
+  try {
+    const expeditions = await listExpeditionsApreparer(cooperativeId);
+    res.json(expeditions);
+  } catch (err) {
+    req.log.error(err, "handleGetExpeditionsApreparer");
+    res.status(500).json({ erreur: "Erreur récupération des chargements à préparer" });
   }
 }
 

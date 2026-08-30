@@ -981,6 +981,13 @@
       "when": 1788483600000,
       "tag": "0139_cooperative_roles",
       "breakpoints": true
+    },
+    {
+      "idx": 140,
+      "version": "7",
+      "when": 1788487200000,
+      "tag": "0140_prechargement_export",
+      "breakpoints": true
     }
   ]
 }

@@ -15,6 +15,7 @@ import {
   detacherLot,
   genererNumeroExpedition,
   reglerFraisTransport,
+  validerPrechargement,
 } from "../services/expeditionsService";
 import { generateBonLivraison, generateBordereauTransport, generateRapportEudrPdf, generateConstatReception } from "../services/pdfService";
 
@@ -140,6 +141,21 @@ export async function handleChangerStatut(req: Request, res: Response): Promise<
     req.log.error({ err }, "handleChangerStatut");
     const msg = err instanceof Error ? err.message : "Erreur interne";
     res.status(400).json({ erreur: msg });
+  }
+}
+
+export async function handleValiderPrechargement(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  const userId = req.user?.id;
+  if (!cooperativeId || !userId) { res.status(403).json({ erreur: "Coopérative non associée" }); return; }
+  try {
+    const expeditionId = parseInt(String(req.params["id"]), 10);
+    const justification = String((req.body as { justification?: unknown }).justification ?? "");
+    const session = await validerPrechargement(cooperativeId, expeditionId, userId, justification);
+    res.json({ session });
+  } catch (err: unknown) {
+    req.log.error({ err }, "handleValiderPrechargement");
+    res.status(400).json({ erreur: err instanceof Error ? err.message : "Erreur interne" });
   }
 }
 

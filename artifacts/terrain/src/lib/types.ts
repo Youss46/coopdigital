@@ -456,6 +456,33 @@ export interface BonReceptionCreationOptions {
 
 // ─── Sessions de pesée ────────────────────────────────────────────────────────
 
+export interface ExpeditionPrechargement {
+  id: number;
+  numeroExpedition: string;
+  statut: string;
+  typeVehicule: string;
+  immatriculation: string | null;
+  nomChauffeur: string | null;
+  transporteur: string | null;
+  port: string;
+  poidsChargeKg: string | null;
+  poidsPrevuKg?: string | null;
+  nombreSacs: number | null;
+  poidsChargeEffectifKg?: string | null;
+  nombreSacsEffectif?: number | null;
+  prechargement: {
+    id: number;
+    numeroSession: string;
+    statut: "en_cours" | "terminee" | "annulee";
+    poidsTotalKg: string | null;
+    nbSacsTotal: number | null;
+    prechargementStatut: "conforme" | "a_justifier" | "valide" | null;
+    prechargementEcartKg: string | null;
+    prechargementEcartPct: string | null;
+    dateFin: string | null;
+  } | null;
+}
+
 export interface LignePesee {
   id: number;
   sessionId: number;
@@ -494,6 +521,10 @@ export interface SessionPesee {
   transfertId?: number | null;
   /** Pour les sessions de type 'reception_membre_delegue' */
   bonReceptionId?: number | null;
+  expeditionId?: number | null;
+  prechargementStatut?: "conforme" | "a_justifier" | "valide" | null;
+  prechargementEcartKg?: string | null;
+  prechargementEcartPct?: string | null;
   /** Certification du cacao déclarée par le peseur */
   certificationCacao?: string | null;
   createdAt: string;
