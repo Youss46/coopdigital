@@ -28,6 +28,7 @@ import VentesPage from "@/pages/VentesPage";
 import CreancesPage from "@/pages/CreancesPage";
 import CommunicationPage from "@/pages/CommunicationPage";
 import SalairesPage from "@/pages/SalairesPage";
+import RessourcesHumainesPage from "@/pages/RessourcesHumainesPage";
 import ReportingPage from "@/pages/ReportingPage";
 import RapportGestionPage from "@/pages/RapportGestionPage";
 import ComptabilitePage from "@/pages/ComptabilitePage";
@@ -210,6 +211,9 @@ function AppRoutes() {
       </Route>
       <Route path="/salaires">
         <ProtectedRoute component={SalairesPage} />
+      </Route>
+      <Route path="/rh">
+        <ProtectedRoute component={RessourcesHumainesPage} roles={["pca", "directeur", "comptable", "responsable_rh", "auditeur"]} />
       </Route>
       <Route path="/communication">
         <ProtectedRoute component={CommunicationPage} roles={["pca", "directeur", "caissier", "magasinier", "responsable_tracabilite", "delegue", "auditeur", "agent_terrain"]} />

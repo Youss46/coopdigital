@@ -7,7 +7,10 @@ export type UserRole =
   | "responsable_tracabilite"
   | "delegue"
   | "auditeur"
-  | "agent_terrain";
+  | "agent_terrain"
+  | "peseur"
+  | "chauffeur"
+  | "responsable_rh";
 
 /**
  * Vérifie si l'utilisateur `requesterRole` a le droit de créer un compte

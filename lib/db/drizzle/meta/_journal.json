@@ -981,6 +981,13 @@
       "when": 1788483600000,
       "tag": "0139_cooperative_roles",
       "breakpoints": true
+    },
+    {
+      "idx": 140,
+      "version": "7",
+      "when": 1788483700000,
+      "tag": "0140_ressources_humaines",
+      "breakpoints": true
     }
   ]
 }

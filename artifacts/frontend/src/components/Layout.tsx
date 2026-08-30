@@ -135,6 +135,7 @@ const NAV_ICON_LIST: React.ElementType[] = [
   TrendingDown,   // /charges-diverses
   BookOpen,       // /comptabilite
   Banknote,       // /salaires
+  Users,          // /rh
   GraduationCap,  // /formations
   GraduationCap,  // /formations-rse
   Package,        // /equipements

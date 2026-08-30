@@ -84,6 +84,7 @@ export const NAV_ITEMS: NavItemConfig[] = [
   { href: "/salaires",               label: "Salaires",                  roles: ["pca","directeur","comptable","auditeur"],                                    category: "Finances" },
 
   // ── RH & Social ──────────────────────────────────────────────────────────────
+  { href: "/rh",                     label: "Ressources humaines",         roles: ["pca","directeur","comptable","responsable_rh","auditeur"],                    category: "RH & Social" },
   { href: "/formations",             label: "Formations",                roles: ["pca","directeur","auditeur","delegue"],                                    category: "RH & Social" },
   { href: "/formations-rse",         label: "Formations RSE",            roles: ["pca","directeur","auditeur"],                                               category: "RH & Social" },
   { href: "/equipements",            label: "Équipements",               roles: ["pca","directeur","comptable","auditeur"],                                    category: "RH & Social" },

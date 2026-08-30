@@ -17,6 +17,7 @@ export * from "./communication";
 export * from "./comptabilite";
 export * from "./comptesTiers";
 export * from "./salaires";
+export * from "./ressources_humaines";
 export * from "./parts_sociales";
 export * from "./refus";
 export * from "./fournisseurs";

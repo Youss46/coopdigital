@@ -43,7 +43,8 @@ type UserRole =
   | "delegue"
   | "auditeur"
   | "agent_terrain"
-  | "peseur";
+  | "peseur"
+  | "responsable_rh";
 
 const ROLE_LABELS: Record<UserRole, string> = {
   pca: "PCA",
@@ -56,6 +57,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   auditeur: "Auditeur",
   agent_terrain: "Agent terrain",
   peseur: "Peseur",
+  responsable_rh: "Responsable RH",
 };
 
 const ROLE_BADGE_STYLE: Record<UserRole, { bg: string; text: string }> = {
@@ -69,6 +71,7 @@ const ROLE_BADGE_STYLE: Record<UserRole, { bg: string; text: string }> = {
   auditeur: { bg: "#a16207", text: "#ffffff" },
   agent_terrain: { bg: "#065f46", text: "#ffffff" },
   peseur: { bg: "#0369a1", text: "#ffffff" },
+  responsable_rh: { bg: "#7c3aed", text: "#ffffff" },
 };
 
 // Rôles créables selon le rôle du demandeur
@@ -84,6 +87,7 @@ function getRolesCreables(requesterRole: string): UserRole[] {
     "agent_terrain",
     "peseur",
     "auditeur",
+    "responsable_rh",
   ];
   if (requesterRole === "pca") return all;
   if (requesterRole === "directeur") return all.filter((r) => r !== "pca");

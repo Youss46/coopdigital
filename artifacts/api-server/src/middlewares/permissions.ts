@@ -162,6 +162,17 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     gerer_avances:       ["pca", "directeur", "comptable"],
   },
 
+  // MODULE RH — séparé des responsabilités de paie
+  rh: {
+    lire:             ["pca", "directeur", "comptable", "responsable_rh", "auditeur"],
+    modifier_dossier: ["pca", "directeur", "responsable_rh"],
+    gerer_contrats:   ["pca", "directeur", "responsable_rh"],
+    gerer_documents:  ["pca", "directeur", "responsable_rh"],
+    demander_conge:   ["pca", "directeur", "comptable", "responsable_rh"],
+    valider_conge:    ["pca", "directeur", "responsable_rh"],
+    gerer_absences:   ["pca", "directeur", "responsable_rh"],
+  },
+
   // MODULE — ÉQUIPEMENTS & IMMOBILISATIONS
   equipements: {
     lire:              ["pca", "directeur", "comptable", "auditeur"],
