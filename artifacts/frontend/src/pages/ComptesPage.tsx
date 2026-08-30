@@ -1,4 +1,5 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   useGetUsers,
@@ -122,11 +123,13 @@ function Initiales({ nom, prenoms }: { nom: string; prenoms: string }) {
 // ——— Modal création ———
 interface CreateModalProps {
   requesterRole: string;
+  availableRoles?: UserRole[];
+  rolesLoading: boolean;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-function CreateModal({ requesterRole, onClose, onSuccess }: CreateModalProps) {
+function CreateModal({ requesterRole, availableRoles, rolesLoading, onClose, onSuccess }: CreateModalProps) {
   const { toast } = useToast();
   const createMutation = useCreateUser();
   const [phase, setPhase] = useState<"form" | "succes">("form");
@@ -145,7 +148,14 @@ function CreateModal({ requesterRole, onClose, onSuccess }: CreateModalProps) {
     modeGestion: "autonome" as "autonome" | "central",
   });
 
-  const rolesDisponibles = getRolesCreables(requesterRole);
+  const rolesDisponibles = getRolesCreables(requesterRole)
+    .filter((role) => availableRoles?.includes(role) ?? false);
+
+  useEffect(() => {
+    if (form.role && !rolesDisponibles.includes(form.role)) {
+      setForm((current) => ({ ...current, role: "" }));
+    }
+  }, [form.role, rolesDisponibles.join(",")]);
 
   const regenerer = useCallback(() => {
     setMotDePasse(genererMotDePasse());
@@ -387,7 +397,7 @@ function CreateModal({ requesterRole, onClose, onSuccess }: CreateModalProps) {
                   onChange={(e) => setForm({ ...form, role: e.target.value as UserRole, section: "", zoneType: "", zoneNom: "", zoneVillages: "" })}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
                 >
-                  <option value="">Sélectionner un rôle…</option>
+                  <option value="">{rolesLoading ? "Chargement des rôles…" : "Sélectionner un rôle…"}</option>
                   {rolesDisponibles.map((r) => (
                     <option key={r} value={r}>{ROLE_LABELS[r]}</option>
                   ))}
@@ -1049,8 +1059,30 @@ export default function ComptesPage() {
 
   const requesterRole = utilisateur?.role ?? "";
   const requesterId = utilisateur?.id ?? 0;
+  const cooperativeId = utilisateur?.cooperativeId ?? null;
 
   const { data: comptes, isLoading, refetch } = useGetUsers();
+  const {
+    data: availableRoleOptions,
+    isLoading: rolesLoading,
+    refetch: refetchAvailableRoles,
+  } = useQuery({
+    queryKey: ["available-user-roles", cooperativeId],
+    queryFn: async () => {
+      const token = localStorage.getItem("coop_token") ?? "";
+      const base = import.meta.env.VITE_API_URL ?? "";
+      const response = await fetch(`${base}/api/users/roles/available`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error("Impossible de charger les rôles actifs");
+      return response.json() as Promise<Array<{ key: UserRole; label: string; description: string }>>;
+    },
+    enabled: !!cooperativeId && ["pca", "directeur"].includes(requesterRole),
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+    retry: 1,
+  });
   const deleteMutation = useDeleteUser();
   const toggleMutation = useToggleUserActif();
 
@@ -1321,8 +1353,10 @@ export default function ComptesPage() {
       {showCreate && !isFeatureReadOnly && (
         <CreateModal
           requesterRole={requesterRole}
+          availableRoles={availableRoleOptions?.map((role) => role.key)}
+          rolesLoading={rolesLoading}
           onClose={() => setShowCreate(false)}
-          onSuccess={() => void refetch()}
+          onSuccess={() => { void refetch(); void refetchAvailableRoles(); }}
         />
       )}
 

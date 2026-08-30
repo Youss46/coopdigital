@@ -3,6 +3,7 @@ import { authMiddleware } from "../middlewares/auth";
 import { auditMiddleware } from "../middlewares/auditMiddleware";
 import {
   listUsers,
+  listAvailableUserRoles,
   createUser,
   updateUser,
   resetUserPassword,
@@ -21,6 +22,7 @@ import {
 const router = Router();
 
 router.get("/users", authMiddleware, listUsers);
+router.get("/users/roles/available", authMiddleware, listAvailableUserRoles);
 // Gestion des peseurs (délégué : ses propres peseurs)
 router.get("/users/mes-peseurs",                    authMiddleware, getMesPeseurs);
 router.post("/users/peseurs",                       authMiddleware, createPeseurParDelegue);

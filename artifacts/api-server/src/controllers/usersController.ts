@@ -9,7 +9,11 @@ import {
   ToggleUserActifBody,
 } from "@workspace/api-zod";
 import { canCreateUser, canDeleteUser, canResetUserPassword } from "../middlewares/roleGuard";
-import { assertRoleActive, CooperativeRoleDisabledError } from "../services/cooperativeRolesService.js";
+import {
+  assertRoleActive,
+  CooperativeRoleDisabledError,
+  getCooperativeRoleConfig,
+} from "../services/cooperativeRolesService.js";
 
 const ROLES_ALLOWED_TO_MANAGE = ["pca", "directeur"];
 const ROLES_ALLOWED_CREATE_PESEUR = ["pca", "directeur", "delegue"];
@@ -52,6 +56,35 @@ export async function listUsers(req: Request, res: Response): Promise<void> {
     res.json(users);
   } catch (err) {
     req.log.error({ err }, "Erreur lors de la récupération des utilisateurs");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+// GET /users/roles/available
+// Retourne uniquement les rôles activés pour la coopérative du demandeur.
+export async function listAvailableUserRoles(req: Request, res: Response): Promise<void> {
+  if (!ROLES_ALLOWED_TO_MANAGE.includes(req.user?.role ?? "")) {
+    res.status(403).json({ erreur: "Accès réservé au PCA et au Directeur" });
+    return;
+  }
+
+  const cooperativeId = getCoopId(req);
+  if (!cooperativeId) {
+    res.status(401).json({ erreur: "Coopérative non associée au compte" });
+    return;
+  }
+
+  try {
+    const roles = await getCooperativeRoleConfig(cooperativeId);
+    if (!roles) {
+      res.status(404).json({ erreur: "Coopérative introuvable" });
+      return;
+    }
+    res.json(roles
+      .filter((role) => role.mode === "active")
+      .map(({ key, label, description }) => ({ key, label, description })));
+  } catch (err: unknown) {
+    req.log.error({ err }, "Erreur lors de la récupération des rôles actifs");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
