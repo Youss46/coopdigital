@@ -110,6 +110,7 @@ const NAV_ICON_LIST: React.ElementType[] = [
   MapPinned,      // /parcelles
   MapPin,         // /missions (responsable_tracabilite)
   Warehouse,      // /stocks
+  PackageCheck,   // /sacherie
   Warehouse,      // /entrepots
   Warehouse,      // /mon-entrepot
   PackageX,       // /refus

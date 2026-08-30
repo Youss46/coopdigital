@@ -10,7 +10,8 @@ export type UserRole =
   | "agent_terrain"
   | "peseur"
   | "chauffeur"
-  | "responsable_rh";
+  | "responsable_rh"
+  | "sacherie";
 
 /**
  * Vérifie si l'utilisateur `requesterRole` a le droit de créer un compte

@@ -81,6 +81,7 @@ import MissionsEnquetePage from "@/pages/MissionsEnquetePage";
 import MissionEnqueteDetailPage from "@/pages/MissionEnqueteDetailPage";
 import CertificationsDashboardPage from "@/pages/CertificationsDashboardPage";
 import ChargesDiversesPage from "@/pages/ChargesDiversesPage";
+import SacheriePage from "@/pages/SacheriePage";
 import Layout from "@/components/Layout";
 import NotFound from "@/pages/not-found";
 import { Toaster } from "@/components/ui/sonner";
@@ -199,6 +200,9 @@ function AppRoutes() {
       </Route>
       <Route path="/stocks">
         <ProtectedRoute component={StocksPage} roles={["pca", "directeur", "magasinier", "responsable_tracabilite", "auditeur"]} />
+      </Route>
+      <Route path="/sacherie">
+        <ProtectedRoute component={SacheriePage} roles={["pca", "directeur", "magasinier", "sacherie", "auditeur"]} />
       </Route>
       <Route path="/exportateurs">
         <ProtectedRoute component={ExportateursPage} />

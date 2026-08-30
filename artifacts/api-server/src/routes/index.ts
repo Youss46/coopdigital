@@ -69,6 +69,7 @@ import stationRouter from "./station";
 import chargesDiversesRouter from "./charges_diverses";
 import commissionsMembresDelaguesRouter from "./commissions_membres_delegues";
 import bonsReceptionRouter from "./bons_reception";
+import sacherieRouter from "./sacherie.js";
 import ressourcesHumainesRouter from "./ressourcesHumaines";
 import { denyComptableRestrictedModules } from "../middlewares/permissions";
 import { featureGuard } from "../middlewares/featureGuard";
@@ -189,5 +190,6 @@ router.use(primesRouter);
 router.use(chargesDiversesRouter);
 router.use(commissionsMembresDelaguesRouter);
 router.use(bonsReceptionRouter);
+router.use(sacherieRouter);
 
 export default router;

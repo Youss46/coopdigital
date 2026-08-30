@@ -1977,6 +1977,7 @@ export const UtilisateurCompteRole = {
   agent_terrain: 'agent_terrain',
   auditeur: 'auditeur',
   responsable_rh: 'responsable_rh',
+  sacherie: 'sacherie',
 } as const;
 
 /**
@@ -2021,6 +2022,7 @@ export const CreateUserInputRole = {
   delegue: 'delegue',
   peseur: 'peseur',
   responsable_rh: 'responsable_rh',
+  sacherie: 'sacherie',
 } as const;
 
 export type CreateUserInputModeGestion = typeof CreateUserInputModeGestion[keyof typeof CreateUserInputModeGestion] | null;

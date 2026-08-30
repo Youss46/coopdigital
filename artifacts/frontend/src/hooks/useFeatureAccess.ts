@@ -55,7 +55,7 @@ export function featureKeyForPath(pathname: string): string | null {
     ["/dashboard", "dashboard"], ["/membres", "membres"], ["/cartes-membres", "membres"], ["/campagnes", "campagnes"], ["/livraisons", "livraisons"],
     ["/transport", "transport"], ["/expeditions", "expeditions"], ["/tracabilite", "tracabilite"], ["/parcelles", "parcelles"],
     ["/certifications", "certifications"], ["/enquetes", "enquetes"], ["/stocks", "stocks"], ["/entrepots", "entrepots"],
-    ["/missions", "missions"],
+    ["/missions", "missions"], ["/sacherie", "sacherie"],
     ["/mon-entrepot", "entrepots"], ["/refus", "refus"], ["/avances", "avances"], ["/intrants", "intrants"],
     ["/reglements", "reglements"], ["/primes", "primes"], ["/fournisseurs", "fournisseurs"], ["/exportateurs", "exportateurs"],
     ["/ventes", "ventes"], ["/creances", "creances"], ["/prix", "prix"], ["/budget", "budget"], ["/emprunts", "emprunts"],

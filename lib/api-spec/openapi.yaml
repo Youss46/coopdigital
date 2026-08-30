@@ -9154,7 +9154,7 @@ components:
           nullable: true
         role:
           type: string
-          enum: [pca, directeur, comptable, caissier, magasinier, responsable_tracabilite, agent_terrain, auditeur, responsable_rh]
+          enum: [pca, directeur, comptable, caissier, magasinier, responsable_tracabilite, agent_terrain, auditeur, responsable_rh, sacherie]
         actif:
           type: boolean
         cooperativeId:
@@ -9187,7 +9187,7 @@ components:
           type: string
         role:
           type: string
-          enum: [pca, directeur, comptable, caissier, magasinier, responsable_tracabilite, agent_terrain, auditeur, delegue, peseur, responsable_rh]
+          enum: [pca, directeur, comptable, caissier, magasinier, responsable_tracabilite, agent_terrain, auditeur, delegue, peseur, responsable_rh, sacherie]
         motDePasse:
           type: string
           minLength: 8

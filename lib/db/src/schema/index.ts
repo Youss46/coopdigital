@@ -43,6 +43,7 @@ export * from "./rse";
 export * from "./dons";
 export * from "./planning";
 export * from "./formations";
+export * from "./sacherie";
 export * from "./caisse";
 export * from "./caisses_delegues";
 export * from "./fiscalite";

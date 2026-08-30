@@ -58,6 +58,13 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     voir_alertes:        ["pca", "directeur", "magasinier", "responsable_tracabilite"],
   },
 
+  sacherie: {
+    lire:        ["pca", "directeur", "magasinier", "responsable_tracabilite", "auditeur", "sacherie"],
+    gerer_types: ["pca", "directeur", "sacherie"],
+    mouvement:   ["pca", "directeur", "magasinier", "sacherie"],
+    ajuster:     ["pca", "directeur", "sacherie"],
+  },
+
   // MODULE M04 — AVANCES & PAIEMENTS
   avances: {
     lire:      ["pca", "directeur", "comptable", "caissier", "delegue", "auditeur"],

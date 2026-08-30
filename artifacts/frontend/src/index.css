@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap");
 @import "tailwindcss";
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
@@ -506,4 +507,203 @@ textarea:disabled {
     padding: 4px 0 0;
     text-align: center;
   }
+}
+
+/* ── Sacherie · poste de contrôle jute & cacao ───────────────────────────── */
+.sacherie-page {
+  --sac-ink: hsl(24 24% 16%);
+  --sac-brown: hsl(25 35% 23%);
+  --sac-brown-soft: hsl(28 29% 93%);
+  --sac-gold: hsl(40 62% 49%);
+  --sac-gold-soft: hsl(42 65% 91%);
+  --sac-sage: hsl(93 25% 42%);
+  --sac-sage-soft: hsl(92 27% 91%);
+  --sac-teal: hsl(165 25% 36%);
+  --sac-teal-soft: hsl(165 28% 91%);
+  --sac-rose: hsl(8 55% 54%);
+  --sac-rose-soft: hsl(9 67% 94%);
+  color: var(--sac-ink);
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 28px 34px 52px;
+  font-family: var(--app-font-sans);
+}
+.sacherie-page h1, .sacherie-page h2, .sacherie-page h3, .sacherie-page p { margin: 0; }
+.sacherie-header { display:flex; justify-content:space-between; gap:24px; align-items:flex-end; margin-bottom:28px; }
+.sacherie-kicker, .sacherie-overline, .sacherie-eyebrow { font-size:10px; font-weight:800; letter-spacing:.13em; text-transform:uppercase; color:hsl(24 10% 48%); }
+.sacherie-kicker { display:flex; align-items:center; gap:8px; color:var(--sac-brown); margin-bottom:9px; }
+.sacherie-kicker-mark { width:19px; height:3px; display:inline-block; background:var(--sac-gold); border-radius:9px; }
+.sacherie-header h1 { font-size:34px; line-height:1.05; letter-spacing:-.055em; font-weight:800; }
+.sacherie-header p:not(.sacherie-kicker) { color:hsl(24 10% 48%); margin-top:8px; font-size:13px; }
+.sacherie-header-actions { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+.sacherie-header-actions button { background:var(--sac-brown); border-color:var(--sac-brown); min-height:40px; }
+.sacherie-live { display:flex; align-items:center; gap:7px; font-size:11px; font-weight:700; color:var(--sac-sage); }
+.sacherie-live span { width:7px; height:7px; background:var(--sac-sage); border-radius:50%; box-shadow:0 0 0 3px var(--sac-sage-soft); }
+.sacherie-metrics-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-bottom:18px; }
+.sacherie-metric { position:relative; display:flex; align-items:flex-start; gap:13px; min-height:112px; padding:18px; border:1px solid hsl(35 21% 86%); border-radius:10px; background:hsl(42 50% 99%); overflow:hidden; }
+.sacherie-metric:after { content:""; position:absolute; right:-19px; bottom:-26px; width:76px; height:76px; border-radius:50%; border:1px solid currentColor; opacity:.08; }
+.sacherie-metric-icon { width:34px; height:34px; display:grid; place-items:center; border-radius:8px; flex:none; }
+.sacherie-metric-brown .sacherie-metric-icon { background:var(--sac-brown-soft); color:var(--sac-brown); }
+.sacherie-metric-teal .sacherie-metric-icon { background:var(--sac-teal-soft); color:var(--sac-teal); }
+.sacherie-metric-gold .sacherie-metric-icon { background:var(--sac-gold-soft); color:hsl(34 69% 38%); }
+.sacherie-metric-rose .sacherie-metric-icon { background:var(--sac-rose-soft); color:var(--sac-rose); }
+.sacherie-metric-sage .sacherie-metric-icon { background:var(--sac-sage-soft); color:var(--sac-sage); }
+.sacherie-metric-value { margin-top:6px !important; font-size:23px; font-weight:800; letter-spacing:-.04em; line-height:1; }
+.sacherie-metric-value span, .sacherie-big-number span { color:hsl(24 10% 48%); font-size:11px; font-weight:700; letter-spacing:0; }
+.sacherie-metric-caption { margin-top:8px !important; color:hsl(24 10% 48%); font-size:11px; }
+.sacherie-workspace { border:1px solid hsl(35 21% 86%); border-radius:12px; overflow:hidden; background:hsl(42 50% 99%); box-shadow:0 8px 30px hsl(25 35% 23% / .04); }
+.sacherie-tabs { display:flex; padding:0 8px; border-bottom:1px solid hsl(35 21% 86%); background:hsl(39 31% 95%); overflow-x:auto; }
+.sacherie-tabs button { position:relative; display:flex; align-items:center; gap:8px; border:0; background:transparent; padding:15px 16px 14px; color:hsl(24 10% 48%); font-size:12px; font-weight:700; white-space:nowrap; }
+.sacherie-tabs button:hover { color:var(--sac-brown); }
+.sacherie-tabs button.active { color:var(--sac-brown); }
+.sacherie-tabs button.active:after { content:""; position:absolute; bottom:-1px; left:14px; right:14px; height:2px; background:var(--sac-gold); }
+.sacherie-tabs small { display:grid; place-items:center; height:18px; min-width:18px; padding:0 5px; border-radius:12px; background:hsl(35 21% 86%); color:hsl(24 10% 48%); font-size:10px; }
+.sacherie-section { padding:27px 28px 32px; }
+.sacherie-section-heading { display:flex; justify-content:space-between; align-items:flex-start; gap:18px; }
+.sacherie-section-heading h2 { margin-top:5px; font-size:20px; letter-spacing:-.035em; font-weight:800; }
+.sacherie-section-note { margin-top:6px !important; font-size:12px; color:hsl(24 10% 48%); }
+.sacherie-text-button { display:flex; align-items:center; gap:3px; border:0; background:none; color:var(--sac-brown); font-size:12px; font-weight:800; padding:4px 0; white-space:nowrap; }
+.sacherie-text-button:hover { color:hsl(40 62% 36%); }
+.sacherie-overview-grid { display:grid; grid-template-columns:1.15fr .85fr; gap:14px; margin-top:21px; }
+.sacherie-stock-panel, .sacherie-alert-panel { min-height:218px; border:1px solid hsl(35 21% 86%); border-radius:10px; padding:21px; }
+.sacherie-stock-panel { background:linear-gradient(135deg, hsl(28 29% 95%), hsl(42 50% 99%)); }
+.sacherie-panel-top { display:flex; justify-content:space-between; }
+.sacherie-square-icon { width:40px; height:40px; display:grid; place-items:center; color:var(--sac-brown); background:hsl(42 65% 91%); border-radius:9px; }
+.sacherie-big-number { font-size:38px; line-height:1; font-weight:800; letter-spacing:-.06em; margin-top:9px !important; }
+.sacherie-stock-line { margin-top:28px; }
+.sacherie-stock-line > div:first-child { display:flex; justify-content:space-between; gap:10px; font-size:11px; color:hsl(24 10% 48%); }
+.sacherie-stock-line strong { color:var(--sac-ink); font-weight:700; }
+.sacherie-bar, .sacherie-mini-bar { height:7px; margin:11px 0 7px; background:hsl(35 21% 86%); border-radius:5px; overflow:hidden; }
+.sacherie-bar span { display:block; height:100%; background:var(--sac-teal); border-radius:5px; transition:width .3s ease; }
+.sacherie-panel-footer { display:flex; justify-content:space-between; align-items:center; gap:10px; border-top:1px solid hsl(35 21% 86%); margin-top:22px; padding-top:13px; font-size:10px; color:hsl(24 10% 48%); }
+.sacherie-panel-footer span:first-child { display:flex; gap:5px; align-items:center; color:var(--sac-sage); }
+.sacherie-panel-footer .font-mono { color:var(--sac-sage); letter-spacing:.12em; }
+.sacherie-alert-panel { background:hsl(42 50% 99%); }
+.sacherie-alert-panel.has-alert { background:var(--sac-rose-soft); border-color:hsl(8 55% 54% / .25); }
+.sacherie-alert-icon { display:grid; place-items:center; width:35px; height:35px; border-radius:8px; background:var(--sac-sage-soft); color:var(--sac-sage); }
+.has-alert .sacherie-alert-icon { background:hsl(8 55% 54% / .12); color:var(--sac-rose); }
+.sacherie-alert-panel h3 { margin-top:7px; font-size:16px; font-weight:800; }
+.sacherie-alert-panel p:not(.sacherie-eyebrow) { margin-top:5px; font-size:11px; line-height:1.5; color:hsl(24 10% 48%); }
+.sacherie-alert-list { margin-top:20px; border-top:1px solid hsl(8 55% 54% / .18); }
+.sacherie-alert-list button { display:grid; grid-template-columns:1fr auto auto; align-items:center; gap:9px; width:100%; border:0; border-bottom:1px solid hsl(8 55% 54% / .14); background:transparent; padding:10px 0; color:var(--sac-ink); font-size:11px; text-align:left; }
+.sacherie-alert-list button strong { color:var(--sac-rose); font-size:12px; }
+.sacherie-alert-list button em { color:hsl(24 10% 48%); font-size:10px; font-style:normal; font-weight:500; }
+.sacherie-subheading { margin-top:34px; }
+.sacherie-table-wrap { margin-top:16px; width:100%; overflow:auto; border:1px solid hsl(35 21% 86%); border-radius:9px; }
+.sacherie-table { width:100%; min-width:760px; border-collapse:collapse; font-size:11px; }
+.sacherie-table th { padding:11px 13px; text-align:left; color:hsl(24 10% 48%); font-size:9px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; background:hsl(39 31% 95%); }
+.sacherie-table td { padding:12px 13px; border-top:1px solid hsl(35 21% 90%); vertical-align:middle; white-space:nowrap; }
+.sacherie-table tbody tr:hover { background:hsl(39 31% 97%); }
+.sacherie-table td:first-child { display:flex; align-items:center; gap:8px; }
+.sacherie-table td:first-child strong { font-weight:700; }
+.sacherie-table td small { display:block; margin-top:3px; color:hsl(24 10% 48%); font-size:10px; }
+.sacherie-movement-icon { display:grid; place-items:center; width:27px; height:27px; border-radius:7px; }
+.sacherie-movement-icon.sage { color:var(--sac-sage); background:var(--sac-sage-soft); }
+.sacherie-movement-icon.gold { color:hsl(34 69% 38%); background:var(--sac-gold-soft); }
+.sacherie-movement-icon.teal { color:var(--sac-teal); background:var(--sac-teal-soft); }
+.sacherie-movement-icon.rose { color:var(--sac-rose); background:var(--sac-rose-soft); }
+.sacherie-movement-icon.ink { color:var(--sac-brown); background:var(--sac-brown-soft); }
+.quantity-in { color:var(--sac-sage); font-weight:800; }
+.quantity-out { color:var(--sac-rose); font-weight:800; }
+.sacherie-table code { font-family:var(--app-font-mono); font-size:10px; color:hsl(24 10% 48%); }
+.sacherie-type-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:13px; margin-top:21px; }
+.sacherie-type-card { padding:18px; border:1px solid hsl(35 21% 86%); border-radius:10px; background:hsl(42 50% 99%); transition:transform .18s ease, border-color .18s ease; }
+.sacherie-type-card:hover { transform:translateY(-2px); border-color:hsl(40 62% 49% / .6); }
+.sacherie-type-card.inactive { opacity:.62; }
+.sacherie-type-top { display:flex; justify-content:space-between; align-items:center; }
+.sacherie-type-glyph { display:grid; place-items:center; width:31px; height:31px; background:var(--sac-brown-soft); color:var(--sac-brown); border-radius:8px; }
+.sacherie-type-card h3 { margin-top:16px; font-size:14px; font-weight:800; }
+.sacherie-type-description { min-height:32px; margin-top:5px !important; color:hsl(24 10% 48%); font-size:11px; line-height:1.45; }
+.sacherie-status { display:inline-flex; align-items:center; gap:5px; padding:4px 7px; border-radius:5px; background:hsl(35 21% 93%); color:hsl(24 10% 48%); font-size:9px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
+.sacherie-status:before { content:""; width:5px; height:5px; border-radius:50%; background:hsl(24 10% 48%); }
+.sacherie-status.ok { color:var(--sac-sage); background:var(--sac-sage-soft); }
+.sacherie-status.ok:before { background:var(--sac-sage); }
+.sacherie-type-stock { display:flex; justify-content:space-between; margin-top:19px; }
+.sacherie-type-stock span { display:block; color:hsl(24 10% 48%); font-size:9px; }
+.sacherie-type-stock strong { display:block; margin-top:3px; font-size:18px; font-weight:800; }
+.sacherie-type-stock strong.warning { color:var(--sac-rose); }
+.sacherie-mini-bar { height:4px; margin-top:12px; }
+.sacherie-mini-bar span { display:block; height:100%; max-width:100%; background:var(--sac-sage); border-radius:5px; }
+.sacherie-mini-bar span.warning { background:var(--sac-rose); }
+.sacherie-card-actions { display:flex; justify-content:space-between; gap:8px; border-top:1px solid hsl(35 21% 90%); margin-top:15px; padding-top:11px; }
+.sacherie-card-actions button, .sacherie-row-action { display:flex; align-items:center; gap:5px; border:0; background:transparent; color:var(--sac-brown); font-size:10px; font-weight:800; }
+.sacherie-card-actions button:last-child { color:hsl(24 10% 48%); }
+.sacherie-toolbar, .sacherie-history-filters { display:flex; align-items:center; gap:12px; margin-top:20px; }
+.sacherie-search { display:flex; align-items:center; gap:8px; min-width:260px; max-width:390px; flex:1; height:36px; padding:0 11px; border:1px solid hsl(35 21% 78%); border-radius:7px; color:hsl(24 10% 48%); background:hsl(42 50% 99%); }
+.sacherie-search:focus-within { border-color:var(--sac-gold); box-shadow:0 0 0 2px hsl(40 62% 49% / .14); }
+.sacherie-search input { min-width:0; width:100%; border:0; outline:0; background:transparent; color:var(--sac-ink); font-size:12px; }
+.sacherie-search button { display:grid; border:0; background:transparent; color:hsl(24 10% 48%); }
+.sacherie-result-count { margin-left:auto; color:hsl(24 10% 48%); font-size:11px; font-weight:700; white-space:nowrap; }
+.sacherie-member-total { color:var(--sac-teal); font-family:var(--app-font-mono); font-size:19px; font-weight:500; white-space:nowrap; }
+.sacherie-member-total span { color:hsl(24 10% 48%); font-family:var(--app-font-sans); font-size:10px; }
+.sacherie-member-list { margin-top:16px; border:1px solid hsl(35 21% 86%); border-radius:9px; overflow:hidden; }
+.sacherie-member-row { display:flex; align-items:center; gap:13px; padding:13px 15px; border-bottom:1px solid hsl(35 21% 90%); }
+.sacherie-member-row:last-child { border-bottom:0; }
+.sacherie-member-row:hover { background:hsl(39 31% 97%); }
+.sacherie-avatar { display:grid; place-items:center; width:35px; height:35px; flex:none; border-radius:9px; background:var(--sac-brown-soft); color:var(--sac-brown); font-family:var(--app-font-mono); font-size:11px; font-weight:500; }
+.sacherie-member-balance { min-width:72px; text-align:right; }
+.sacherie-member-balance strong { display:block; font-size:16px; font-weight:800; }
+.sacherie-member-balance span { color:hsl(24 10% 48%); font-size:9px; }
+.sacherie-row-action { justify-content:center; width:28px; height:28px; color:hsl(24 10% 48%); }
+.sacherie-history-filters .sacherie-select { max-width:240px; }
+.sacherie-select { height:36px; padding:0 30px 0 10px; border:1px solid hsl(35 21% 78%); border-radius:7px; background:hsl(42 50% 99%); color:var(--sac-ink); font-size:11px; outline:none; }
+.sacherie-select:focus { border-color:var(--sac-gold); box-shadow:0 0 0 2px hsl(40 62% 49% / .14); }
+.sacherie-table-empty { display:flex; align-items:center; justify-content:center; gap:8px; min-height:90px; margin-top:16px; border:1px dashed hsl(35 21% 78%); border-radius:9px; color:hsl(24 10% 48%); font-size:11px; }
+.sacherie-error { display:flex; align-items:center; gap:12px; margin-bottom:18px; padding:14px 16px; border:1px solid hsl(8 55% 54% / .25); border-radius:9px; color:var(--sac-rose); background:var(--sac-rose-soft); }
+.sacherie-error > div { flex:1; }
+.sacherie-error p:last-child { color:hsl(24 10% 48%); margin-top:2px; }
+.sacherie-dialog { max-height:90dvh; overflow-y:auto; }
+.sacherie-dialog h2 { font-weight:800; letter-spacing:-.03em; }
+.sacherie-field { display:block; }
+.sacherie-field > span { display:block; margin-bottom:6px; color:var(--sac-ink); font-size:11px; font-weight:800; }
+.sacherie-field b { color:var(--sac-rose); }
+.sacherie-field em { color:hsl(24 10% 48%); font-size:10px; font-style:normal; font-weight:500; }
+.sacherie-textarea { width:100%; resize:vertical; border:1px solid hsl(35 21% 78%); border-radius:7px; padding:9px 11px; color:var(--sac-ink); background:transparent; font:inherit; font-size:12px; outline:none; }
+.sacherie-textarea:focus { border-color:var(--sac-gold); box-shadow:0 0 0 2px hsl(40 62% 49% / .14); }
+.sacherie-segmented { display:grid; grid-template-columns:repeat(5,1fr); gap:4px; padding:4px; background:hsl(39 31% 94%); border-radius:8px; }
+.sacherie-segmented button { min-height:31px; border:0; border-radius:5px; background:transparent; color:hsl(24 10% 48%); font-size:10px; font-weight:800; }
+.sacherie-segmented button.active { background:hsl(42 50% 99%); color:var(--sac-brown); box-shadow:0 1px 4px hsl(25 35% 23% / .12); }
+.sacherie-operation-icon { display:grid; place-items:center; width:38px; height:38px; flex:none; border-radius:9px; }
+.sacherie-operation-icon.sage { background:var(--sac-sage-soft); color:var(--sac-sage); }
+.sacherie-operation-icon.gold { background:var(--sac-gold-soft); color:hsl(34 69% 38%); }
+.sacherie-operation-icon.teal { background:var(--sac-teal-soft); color:var(--sac-teal); }
+.sacherie-operation-icon.rose { background:var(--sac-rose-soft); color:var(--sac-rose); }
+.sacherie-operation-icon.ink { background:var(--sac-brown-soft); color:var(--sac-brown); }
+.sacherie-direction { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.sacherie-direction button { display:flex; justify-content:center; align-items:center; gap:7px; min-height:35px; border:1px solid hsl(35 21% 78%); border-radius:7px; background:transparent; color:hsl(24 10% 48%); font-size:11px; font-weight:700; }
+.sacherie-direction button.active.plus { border-color:var(--sac-sage); background:var(--sac-sage-soft); color:var(--sac-sage); }
+.sacherie-direction button.active.moins { border-color:var(--sac-rose); background:var(--sac-rose-soft); color:var(--sac-rose); }
+.sacherie-form-context { display:flex; align-items:center; gap:8px; padding:10px; border-radius:7px; background:var(--sac-brown-soft); color:hsl(24 10% 48%); font-size:10px; }
+.sacherie-form-context strong { color:var(--sac-brown); }
+.sacherie-form-error { padding:9px 10px; border-radius:6px; background:var(--sac-rose-soft); color:var(--sac-rose); font-size:11px; font-weight:700; }
+@media (max-width: 900px) {
+  .sacherie-page { padding:22px 18px 42px; }
+  .sacherie-metrics-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .sacherie-type-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 640px) {
+  .sacherie-page { padding:17px 12px 32px; }
+  .sacherie-header { display:block; margin-bottom:21px; }
+  .sacherie-header h1 { font-size:29px; }
+  .sacherie-header-actions { justify-content:space-between; margin-top:18px; }
+  .sacherie-metrics-grid { gap:8px; }
+  .sacherie-metric { min-height:102px; padding:13px; gap:9px; }
+  .sacherie-metric-icon { width:29px; height:29px; }
+  .sacherie-metric-value { font-size:18px; }
+  .sacherie-metric-caption { font-size:9px; }
+  .sacherie-section { padding:21px 14px 25px; }
+  .sacherie-section-heading { display:block; }
+  .sacherie-section-heading > .sacherie-text-button, .sacherie-section-heading > button { margin-top:13px; }
+  .sacherie-overview-grid, .sacherie-type-grid { grid-template-columns:1fr; }
+  .sacherie-stock-panel, .sacherie-alert-panel { min-height:0; }
+  .sacherie-subheading { margin-top:27px; }
+  .sacherie-toolbar, .sacherie-history-filters { align-items:stretch; flex-wrap:wrap; }
+  .sacherie-search { min-width:0; flex-basis:100%; }
+  .sacherie-history-filters .sacherie-select { flex:1; max-width:none; }
+  .sacherie-member-total { margin-top:13px; }
+  .sacherie-member-row { gap:9px; padding:11px 9px; }
+  .sacherie-member-row .sacherie-status { display:none; }
+  .sacherie-member-balance { min-width:49px; }
+  .sacherie-dialog { max-width:calc(100% - 22px); padding:19px; }
+  .sacherie-segmented button { font-size:9px; padding:0 2px; }
 }
