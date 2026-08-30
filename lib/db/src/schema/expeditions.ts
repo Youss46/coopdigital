@@ -62,11 +62,6 @@ export const expeditionsTable = pgTable("expeditions", {
 
   dateDepart:           timestamp("date_depart", { withTimezone: true }),
   lieuDepart:           varchar("lieu_depart", { length: 255 }).default("Magasin central"),
-  /** Quantité demandée au moment de la préparation de l'expédition. */
-  poidsPrevuKg:         numeric("poids_prevu_kg", { precision: 12, scale: 2 }),
-  /** Quantité effectivement confirmée lors du chargement physique. */
-  poidsChargeEffectifKg: numeric("poids_charge_effectif_kg", { precision: 12, scale: 2 }),
-  nombreSacsEffectif:   integer("nombre_sacs_effectif"),
   poidsChargeKg:        numeric("poids_charge_kg", { precision: 12, scale: 2 }),
   nombreSacs:           integer("nombre_sacs"),
   numeroLots:           text("numero_lots"),

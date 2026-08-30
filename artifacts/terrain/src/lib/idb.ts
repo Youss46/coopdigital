@@ -324,8 +324,6 @@ export async function getAllOps(): Promise<SyncHistoryOp[]> {
           membreNom: brouillon.membreNom,
           membrePrenoms: brouillon.membrePrenoms,
           membreCode: brouillon.membreCode,
-          expeditionId: brouillon.expeditionId,
-          expeditionNumero: brouillon.expeditionNumero,
           produit: brouillon.produit,
           operation: brouillon.operation,
           statut: brouillon.statut,
@@ -339,8 +337,6 @@ export async function getAllOps(): Promise<SyncHistoryOp[]> {
           ? "synced"
           : brouillon.syncStatus === "error" ? "error" : "pending",
         errorMsg: brouillon.errorMsg,
-        tentatives: brouillon.tentatives,
-        syncedAt: brouillon.syncedAt,
       }));
       const results: SyncHistoryOp[] = [
         ...regularOps,
@@ -581,29 +577,6 @@ export async function createBrouillon(data: {
   });
 }
 
-/** Crée localement une pré-pesée export sans inventer de membre. */
-export async function createPrechargementBrouillon(data: {
-  expeditionId: number;
-  expeditionNumero: string;
-  expeditionPoidsPrevuKg: string | null;
-  produit: string;
-}): Promise<BrouillonPesee> {
-  return createBrouillon({
-    // Ces champs sont conservés pour la compatibilité du store historique et
-    // ne sont jamais envoyés au serveur pour l'opération export.
-    membreId: 0,
-    membreNom: "",
-    membrePrenoms: "",
-    membreCode: "",
-    produit: data.produit,
-    operation: "prechargement_export",
-    certificationCacao: "",
-  }).then(async (brouillon) => {
-    const updated = { ...brouillon, ...data };
-    return saveBrouillon(updated);
-  });
-}
-
 export async function getBrouillons(): Promise<BrouillonPesee[]> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
@@ -656,14 +629,7 @@ export async function addLigneToBrouillon(
   const lignes = [...brouillon.lignes, newLigne];
   const poidsTotalKg = lignes.reduce((acc, l) => acc + Math.max(0, l.poidsBrutKg - l.tareKg), 0);
   const nbSacsTotal = lignes.reduce((acc, l) => acc + l.nbSacs, 0);
-  return saveBrouillon({
-    ...brouillon,
-    lignes,
-    poidsTotalKg,
-    nbSacsTotal,
-    syncStatus: "pending",
-    errorMsg: undefined,
-  });
+  return saveBrouillon({ ...brouillon, lignes, poidsTotalKg, nbSacsTotal });
 }
 
 export async function deleteLigneFromBrouillon(localId: string, ligneLocalId: string): Promise<BrouillonPesee> {
@@ -674,14 +640,7 @@ export async function deleteLigneFromBrouillon(localId: string, ligneLocalId: st
     .map((l, idx) => ({ ...l, numeroPassage: idx + 1 }));
   const poidsTotalKg = lignes.reduce((acc, l) => acc + Math.max(0, l.poidsBrutKg - l.tareKg), 0);
   const nbSacsTotal = lignes.reduce((acc, l) => acc + l.nbSacs, 0);
-  return saveBrouillon({
-    ...brouillon,
-    lignes,
-    poidsTotalKg,
-    nbSacsTotal,
-    syncStatus: "pending",
-    errorMsg: undefined,
-  });
+  return saveBrouillon({ ...brouillon, lignes, poidsTotalKg, nbSacsTotal });
 }
 
 export async function terminerBrouillon(localId: string): Promise<BrouillonPesee> {
@@ -704,46 +663,13 @@ export async function annulerBrouillon(localId: string): Promise<void> {
 export async function markBrouillonSynced(localId: string, serverId: number, numeroSession: string): Promise<void> {
   const brouillon = await getBrouillon(localId);
   if (!brouillon) return;
-  await saveBrouillon({
-    ...brouillon,
-    syncStatus: "synced",
-    serverId,
-    numeroSession,
-    syncedAt: Date.now(),
-    errorMsg: undefined,
-  });
+  await saveBrouillon({ ...brouillon, syncStatus: "synced", serverId, numeroSession });
 }
 
 export async function markBrouillonError(localId: string, errorMsg: string): Promise<void> {
   const brouillon = await getBrouillon(localId);
   if (!brouillon) return;
   await saveBrouillon({ ...brouillon, syncStatus: "error", errorMsg });
-}
-
-export async function markBrouillonRetryable(localId: string, errorMsg: string): Promise<void> {
-  const brouillon = await getBrouillon(localId);
-  if (!brouillon) return;
-  await saveBrouillon({ ...brouillon, syncStatus: "pending", errorMsg });
-}
-
-export async function incrementBrouillonTentatives(localId: string): Promise<number> {
-  const brouillon = await getBrouillon(localId);
-  if (!brouillon) return 0;
-  const tentatives = (brouillon.tentatives ?? 0) + 1;
-  await saveBrouillon({ ...brouillon, tentatives });
-  return tentatives;
-}
-
-/** Remet un brouillon rejeté dans la file pour permettre une reprise explicite. */
-export async function retryBrouillon(localId: string): Promise<void> {
-  const brouillon = await getBrouillon(localId);
-  if (!brouillon) return;
-  await saveBrouillon({
-    ...brouillon,
-    syncStatus: "pending",
-    errorMsg: undefined,
-    tentatives: 0,
-  });
 }
 
 /** Retourne les brouillons terminés et non encore synchronisés. */

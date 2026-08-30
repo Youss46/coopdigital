@@ -94,4 +94,3 @@
 - [Frontend Vitest shared binary](frontend-vitest-shared-binary.md) — les tests frontend réutilisent Vitest depuis l’artifact API; la config doit éviter `vitest/config` local.
 - [Configuration des fonctionnalités coopérative](cooperative-features.md) — absence de configuration = actif; les dépendances sont désactivées en cascade et le contrôle suit licence → fonctionnalité → permission.
 - [Configuration des rôles coopérative](cooperative-roles.md) — rôles tenant-scoped, actifs par défaut; blocage immédiat des tokens et protection du dernier PCA/Directeur.
-- [Pré-pesée export](prechargement-export.md) — session dédiée liée à l’expédition; contrôle avant chargement, sans stock ni livraison avant la transition atomique à `charge`.

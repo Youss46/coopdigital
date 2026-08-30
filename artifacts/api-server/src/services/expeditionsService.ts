@@ -1,4 +1,4 @@
-import { db, expeditionsTable, expeditionLotsTable, expeditionHistoriqueTable, campagnesTable, membresTable, livraisonsTable, exportateursTable, vehiculesTable, chauffeursTable, lotsTable, lotLivraisonsTable, parcellesTable, ventesExportateursTable, entrepotsTable, mouvementsStockTable, traitementsRefusTable, sessionsPeseeTable } from "@workspace/db";
+import { db, expeditionsTable, expeditionLotsTable, expeditionHistoriqueTable, campagnesTable, membresTable, livraisonsTable, exportateursTable, vehiculesTable, chauffeursTable, lotsTable, lotLivraisonsTable, parcellesTable, ventesExportateursTable, entrepotsTable, mouvementsStockTable, traitementsRefusTable } from "@workspace/db";
 import { calculerPoidsAcceptePort } from "./venteReceptionService";
 import { eq, and, desc, sql, count, notInArray, inArray } from "drizzle-orm";
 import { proposerEcriture, proposerEcrituresDansTransaction } from "./comptabiliteService";
@@ -73,9 +73,6 @@ export async function listExpeditions(cooperativeId: number, filtres?: {
       port:             expeditionsTable.port,
       dateDepart:       expeditionsTable.dateDepart,
       poidsChargeKg:    expeditionsTable.poidsChargeKg,
-      poidsPrevuKg:     expeditionsTable.poidsPrevuKg,
-      poidsChargeEffectifKg: expeditionsTable.poidsChargeEffectifKg,
-      nombreSacsEffectif: expeditionsTable.nombreSacsEffectif,
       nombreSacs:       expeditionsTable.nombreSacs,
       poidsRecuPortKg:  expeditionsTable.poidsRecuPortKg,
       ecartPoidsKg:     expeditionsTable.ecartPoidsKg,
@@ -184,26 +181,6 @@ export async function getExpedition(cooperativeId: number, expeditionId: number)
     .where(eq(expeditionHistoriqueTable.expeditionId, expeditionId))
     .orderBy(desc(expeditionHistoriqueTable.dateChangement));
 
-  const [prechargement] = await db
-    .select({
-      id: sessionsPeseeTable.id,
-      numeroSession: sessionsPeseeTable.numeroSession,
-      statut: sessionsPeseeTable.statut,
-      poidsTotalKg: sessionsPeseeTable.poidsTotalKg,
-      nbSacsTotal: sessionsPeseeTable.nbSacsTotal,
-      prechargementStatut: sessionsPeseeTable.prechargementStatut,
-      prechargementEcartKg: sessionsPeseeTable.prechargementEcartKg,
-      prechargementEcartPct: sessionsPeseeTable.prechargementEcartPct,
-      dateFin: sessionsPeseeTable.dateFin,
-    })
-    .from(sessionsPeseeTable)
-    .where(and(
-      eq(sessionsPeseeTable.expeditionId, expeditionId),
-      eq(sessionsPeseeTable.operation, "prechargement_export"),
-    ))
-    .orderBy(desc(sessionsPeseeTable.createdAt))
-    .limit(1);
-
   // Détecte si TOUS les lots rattachés proviennent de fournisseurs externes (pas de membres)
   const lotIds = lots.map(l => l.lotId).filter((id): id is number => id !== null && id !== undefined);
   let lotsNonMembres = false;
@@ -219,117 +196,7 @@ export async function getExpedition(cooperativeId: number, expeditionId: number)
     lotsNonMembres = (membreCheck?.nb ?? 0) === 0;
   }
 
-  return { ...exp, lots, historique, lotsNonMembres, prechargement: prechargement ?? null };
-}
-
-/** Expéditions pouvant être préparées par le peseur terrain. */
-export async function listExpeditionsApreparer(cooperativeId: number) {
-  const expeditions = await listExpeditions(cooperativeId, { statut: "en_preparation" });
-  if (expeditions.length === 0) return [];
-
-  const sessions = await db
-    .select({
-      id: sessionsPeseeTable.id,
-      expeditionId: sessionsPeseeTable.expeditionId,
-      numeroSession: sessionsPeseeTable.numeroSession,
-      statut: sessionsPeseeTable.statut,
-      poidsTotalKg: sessionsPeseeTable.poidsTotalKg,
-      nbSacsTotal: sessionsPeseeTable.nbSacsTotal,
-      prechargementStatut: sessionsPeseeTable.prechargementStatut,
-      prechargementEcartKg: sessionsPeseeTable.prechargementEcartKg,
-      prechargementEcartPct: sessionsPeseeTable.prechargementEcartPct,
-      dateFin: sessionsPeseeTable.dateFin,
-      createdAt: sessionsPeseeTable.createdAt,
-    })
-    .from(sessionsPeseeTable)
-    .where(and(
-      eq(sessionsPeseeTable.cooperativeId, cooperativeId),
-      eq(sessionsPeseeTable.operation, "prechargement_export"),
-      inArray(sessionsPeseeTable.expeditionId, expeditions.map(e => e.id)),
-    ))
-    .orderBy(desc(sessionsPeseeTable.createdAt));
-
-  return expeditions.map(expedition => ({
-    ...expedition,
-    prechargement: sessions.find(s => s.expeditionId === expedition.id) ?? null,
-  }));
-}
-
-async function getDernierePrechargement(cooperativeId: number, expeditionId: number) {
-  const [session] = await db
-    .select({
-      id: sessionsPeseeTable.id,
-      numeroSession: sessionsPeseeTable.numeroSession,
-      statut: sessionsPeseeTable.statut,
-      poidsTotalKg: sessionsPeseeTable.poidsTotalKg,
-      nbSacsTotal: sessionsPeseeTable.nbSacsTotal,
-      prechargementStatut: sessionsPeseeTable.prechargementStatut,
-      prechargementEcartKg: sessionsPeseeTable.prechargementEcartKg,
-      prechargementEcartPct: sessionsPeseeTable.prechargementEcartPct,
-      prechargementJustification: sessionsPeseeTable.prechargementJustification,
-    })
-    .from(sessionsPeseeTable)
-    .where(and(
-      eq(sessionsPeseeTable.cooperativeId, cooperativeId),
-      eq(sessionsPeseeTable.expeditionId, expeditionId),
-      eq(sessionsPeseeTable.operation, "prechargement_export"),
-    ))
-    .orderBy(desc(sessionsPeseeTable.createdAt))
-    .limit(1);
-  return session ?? null;
-}
-
-/** Autorise exceptionnellement un écart après revue par un responsable. */
-export async function validerPrechargement(
-  cooperativeId: number,
-  expeditionId: number,
-  userId: number,
-  justification: string,
-) {
-  const texte = justification.trim();
-  if (texte.length < 5) throw new Error("Une justification d'au moins 5 caractères est obligatoire");
-
-  return db.transaction(async (tx: any) => {
-    const [expedition] = await tx
-      .select({ id: expeditionsTable.id, statut: expeditionsTable.statut })
-      .from(expeditionsTable)
-      .where(and(eq(expeditionsTable.id, expeditionId), eq(expeditionsTable.cooperativeId, cooperativeId)))
-      .for("update")
-      .limit(1);
-    if (!expedition) throw new Error("Expédition introuvable");
-    if (expedition.statut !== "en_preparation") throw new Error("L'expédition n'est plus en préparation");
-
-    const [session] = await tx
-      .select({ id: sessionsPeseeTable.id, statut: sessionsPeseeTable.statut, prechargementStatut: sessionsPeseeTable.prechargementStatut })
-      .from(sessionsPeseeTable)
-      .where(and(
-        eq(sessionsPeseeTable.cooperativeId, cooperativeId),
-        eq(sessionsPeseeTable.expeditionId, expeditionId),
-        eq(sessionsPeseeTable.operation, "prechargement_export"),
-      ))
-      .orderBy(desc(sessionsPeseeTable.createdAt))
-      .for("update")
-      .limit(1);
-    if (!session || session.statut !== "terminee") throw new Error("Aucune pré-pesée clôturée à valider");
-    if (session.prechargementStatut !== "a_justifier") throw new Error("Cette pré-pesée ne nécessite pas de validation");
-
-    const [updated] = await tx
-      .update(sessionsPeseeTable)
-      .set({
-        prechargementStatut: "valide",
-        prechargementJustification: texte,
-      })
-      .where(eq(sessionsPeseeTable.id, session.id))
-      .returning();
-    await tx.insert(expeditionHistoriqueTable).values({
-      expeditionId,
-      statutPrecedent: expedition.statut,
-      statutNouveau: "pre_pesee_validee",
-      faitPar: userId,
-      notes: `Pré-pesée validée exceptionnellement : ${texte}`,
-    });
-    return updated;
-  });
+  return { ...exp, lots, historique, lotsNonMembres };
 }
 
 // ── Lots disponibles pour rattachement ──────────────────────────────────────
@@ -566,9 +433,6 @@ export async function createExpedition(cooperativeId: number, userId: number, in
     dateDepart:         input.dateDepart ? new Date(input.dateDepart) : null,
     lieuDepart:         input.lieuDepart || "Magasin central",
     poidsChargeKg:      input.poidsChargeKg ? String(input.poidsChargeKg) : null,
-    poidsPrevuKg:       input.poidsChargeKg ? String(input.poidsChargeKg) : null,
-    poidsChargeEffectifKg: null,
-    nombreSacsEffectif: null,
     nombreSacs:         toIntOrNull(input.nombreSacs),
     numeroLots:         input.numeroLots || null,
     port:               input.port,
@@ -678,18 +542,16 @@ async function getPrixUnitaireExpedition(expeditionId: number): Promise<number> 
 // ── Déduction stock lors du chargement ──────────────────────────────────────
 // Appelé lors de la transition en_preparation → charge.
 // Pour chaque lot attaché à l'expédition, crée un mouvement de sortie dans
-// l'entrepôt source du lot. L'appelant fournit la transaction métier afin que
-// la sortie ne puisse pas être séparée de la transition d'expédition.
+// l'entrepôt source du lot. Non-bloquant : les erreurs sont loguées seulement.
 
 async function deduireStockChargement(
-  tx: ComptabiliteTransaction,
   expeditionId: number,
   cooperativeId: number,
   userId: number,
   numeroExpedition: string,
 ): Promise<void> {
   // Récupérer les lots attachés avec leur entrepôt source et leur poids
-  const lotsAttaches = await tx
+  const lotsAttaches = await db
     .select({
       lotId:       expeditionLotsTable.lotId,
       poidsKg:     expeditionLotsTable.poidsKg,
@@ -731,7 +593,7 @@ async function deduireStockChargement(
 
   // Pour chaque entrepôt impliqué, insérer un mouvement de sortie
   for (const [nomEntrepot, data] of parEntrepot) {
-    const [entrepot] = await tx
+    const [entrepot] = await db
       .select({ id: entrepotsTable.id })
       .from(entrepotsTable)
       .where(and(
@@ -748,7 +610,7 @@ async function deduireStockChargement(
       continue;
     }
 
-    await tx.insert(mouvementsStockTable).values({
+    await db.insert(mouvementsStockTable).values({
       entrepotId:  entrepot.id,
       lotId:       data.lotId,
       type:        "sortie",
@@ -798,17 +660,6 @@ export async function changerStatut(
     throw new Error(`Transition ${exp.statut} → ${nouveauStatut} non autorisée`);
   }
 
-  let prechargement: Awaited<ReturnType<typeof getDernierePrechargement>> | null = null;
-  if (nouveauStatut === "charge") {
-    prechargement = await getDernierePrechargement(cooperativeId, expeditionId);
-    if (!prechargement || prechargement.statut !== "terminee") {
-      throw new Error("Une pré-pesée export clôturée est obligatoire avant de confirmer le chargement");
-    }
-    if (prechargement.prechargementStatut !== "conforme" && prechargement.prechargementStatut !== "valide") {
-      throw new Error("La pré-pesée présente un écart hors tolérance : une validation motivée est obligatoire");
-    }
-  }
-
   const updateValues: Partial<typeof expeditionsTable.$inferInsert> = {
     statut: nouveauStatut as typeof expeditionsTable.$inferSelect["statut"],
     updatedAt: new Date(),
@@ -819,35 +670,39 @@ export async function changerStatut(
   }
   if (nouveauStatut === "arrive_port") {
     updateValues.dateArriveePort = new Date();
-  }
-  if (nouveauStatut === "charge" && prechargement) {
-    updateValues.poidsChargeEffectifKg = prechargement.poidsTotalKg;
-    updateValues.nombreSacsEffectif = prechargement.nbSacsTotal;
-  }
-
-  const prixKgChargement = nouveauStatut === "charge"
-    ? await getPrixUnitaireExpedition(expeditionId)
-    : 0;
-  const poidsComptable = exp.poidsChargeEffectifKg ?? prechargement?.poidsTotalKg ?? exp.poidsChargeKg;
-
-  await db.transaction(async (tx) => {
-    await tx.update(expeditionsTable).set(updateValues).where(eq(expeditionsTable.id, expeditionId));
-
-    await tx.insert(expeditionHistoriqueTable).values({
+    // Notification arrivée port (fire-and-forget)
+    void notifExpeditionArriveePort(
+      cooperativeId,
+      exp.numeroExpedition,
+      exp.port,
       expeditionId,
-      statutPrecedent: exp.statut,
-      statutNouveau:   nouveauStatut,
-      faitPar:         userId,
-      notes:           notes ?? null,
-      positionGps:     positionGps ?? null,
-    });
+    );
+  }
 
-    // Déduction stock + écriture comptable au chargement : les trois effets
-    // sont atomiques, une erreur annule aussi la transition de statut.
-    if (nouveauStatut === "charge") {
-      await deduireStockChargement(tx, expeditionId, cooperativeId, userId, exp.numeroExpedition);
+  await db.update(expeditionsTable).set(updateValues).where(eq(expeditionsTable.id, expeditionId));
 
-      const lotsChargement = await tx
+  await db.insert(expeditionHistoriqueTable).values({
+    expeditionId,
+    statutPrecedent: exp.statut,
+    statutNouveau:   nouveauStatut,
+    faitPar:         userId,
+    notes:           notes ?? null,
+    positionGps:     positionGps ?? null,
+  });
+
+  // Déduction stock + écriture comptable au chargement (en_preparation → charge)
+  if (nouveauStatut === "charge") {
+    // 1. Mouvement de sortie dans les entrepôts sources (non-bloquant)
+    try {
+      await deduireStockChargement(expeditionId, cooperativeId, userId, exp.numeroExpedition);
+    } catch (err) {
+      logger.error({ err }, "Erreur déduction stock chargement");
+    }
+
+    // 2. Mettre à jour expeditionsTable.nombreSacs avec le total des lots rattachés
+    //    et passer le statut des lots en "transit"
+    try {
+      const lotsChargement = await db
         .select({
           lotId:      expeditionLotsTable.lotId,
           nombreSacs: expeditionLotsTable.nombreSacs,
@@ -857,7 +712,8 @@ export async function changerStatut(
 
       const totalSacs = lotsChargement.reduce((sum, l) => sum + (l.nombreSacs ?? 0), 0);
       if (totalSacs > 0) {
-        await tx.update(expeditionsTable)
+        await db
+          .update(expeditionsTable)
           .set({ nombreSacs: totalSacs })
           .where(eq(expeditionsTable.id, expeditionId));
       }
@@ -866,47 +722,62 @@ export async function changerStatut(
         .map(l => l.lotId)
         .filter((id): id is number => id !== null);
       if (lotIds.length > 0) {
-        await tx.update(lotsTable)
+        await db
+          .update(lotsTable)
           .set({ statut: "transit" })
           .where(inArray(lotsTable.id, lotIds));
       }
-
-      if (poidsComptable && prixKgChargement > 0) {
-        await proposerEcrituresDansTransaction(tx, cooperativeId, [{
-          source:       "stock",
-          sourceId:     expeditionId,
-          libelle:      `Départ ${exp.numeroExpedition} vers Port ${exp.port}`,
-          compteDebit:  "381",
-          compteCredit: "311",
-          montantFcfa:  Math.round(parseFloat(String(poidsComptable)) * prixKgChargement),
-          date:         new Date().toISOString().split("T")[0]!,
-          numeroPiece:  exp.numeroExpedition,
-        }]);
-      }
+    } catch (err) {
+      logger.error({ err }, "Erreur mise à jour sacs/statut lots au chargement");
     }
 
-    // Les frais de transport d'un litige sont constatés avec sa résolution.
-    if (
-      nouveauStatut === "receptionne" &&
-      exp.statut === "litige" &&
-      exp.fraisTransportFcfa &&
-      Number(exp.fraisTransportFcfa) > 0
-    ) {
-      await proposerEcrituresDansTransaction(tx, cooperativeId, [{
+    // 3. Écriture comptable si prix unitaire connu (vente exportateur déjà saisie)
+    if (exp.poidsChargeKg) {
+      const dateStr = new Date().toISOString().split("T")[0]!;
+      const prixKg = await getPrixUnitaireExpedition(expeditionId);
+      if (prixKg > 0) {
+        const montant = Math.round(parseFloat(String(exp.poidsChargeKg)) * prixKg);
+        try {
+          await proposerEcriture(cooperativeId, {
+            source:       "stock",
+            sourceId:     expeditionId,
+            libelle:      `Départ ${exp.numeroExpedition} vers Port ${exp.port}`,
+            compteDebit:  "381",
+            compteCredit: "311",
+            montantFcfa:  montant,
+            date:         dateStr,
+            numeroPiece:  exp.numeroExpedition,
+          });
+        } catch (err) {
+          logger.error({ err }, "Erreur écriture comptable chargement");
+        }
+      }
+    }
+  }
+
+  // Une réception passée en litige peut être résolue ultérieurement. Si des
+  // frais de transport avaient été saisis à la réception, leur dette est
+  // constatée au moment où la réception devient définitivement acceptée.
+  if (
+    nouveauStatut === "receptionne" &&
+    exp.statut === "litige" &&
+    exp.fraisTransportFcfa &&
+    Number(exp.fraisTransportFcfa) > 0
+  ) {
+    try {
+      await proposerEcriture(cooperativeId, {
         source:      "transport",
         sourceId:    expeditionId,
         libelle:     `Frais transport ${exp.numeroExpedition}`,
-        compteDebit: "612",
+        compteDebit:  "612",
         compteCredit: "401",
-        montantFcfa: Math.round(Number(exp.fraisTransportFcfa)),
-        date:        new Date().toISOString().slice(0, 10),
-        numeroPiece: exp.numeroExpedition,
-      }]);
+        montantFcfa:  Math.round(Number(exp.fraisTransportFcfa)),
+        date:         new Date().toISOString().slice(0, 10),
+        numeroPiece:  exp.numeroExpedition,
+      });
+    } catch (err) {
+      logger.error({ err }, "Erreur écriture frais transport après résolution du litige");
     }
-  });
-
-  if (nouveauStatut === "arrive_port") {
-    void notifExpeditionArriveePort(cooperativeId, exp.numeroExpedition, exp.port, expeditionId);
   }
 
   return { ok: true, statut: nouveauStatut };
@@ -948,7 +819,7 @@ export async function confirmerReception(
     throw new Error("L'expédition doit être en transit ou arrivée au port pour confirmer la réception");
   }
 
-  const poidsCharge = parseFloat(String(exp.poidsChargeEffectifKg ?? exp.poidsPrevuKg ?? exp.poidsChargeKg ?? "0"));
+  const poidsCharge = parseFloat(String(exp.poidsChargeKg ?? "0"));
   const poidsRecu   = input.poidsRecuPortKg;
   const poidsRefoule = input.poidsRefuleKg ?? 0;
   const poidsAccepte = calculerPoidsAcceptePort(poidsRecu, poidsRefoule);

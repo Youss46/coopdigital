@@ -33,7 +33,6 @@ import {
   handleExpirerSessionsStales,
   handleGetBordereauSession,
   handleBatchCreateSession,
-  handleGetExpeditionsApreparer,
 } from "../controllers/peseeController";
 
 const router = Router();
@@ -64,7 +63,6 @@ router.put("/pesee/config",                  ...cooperativePeseeMiddleware, hand
 // Route fixe avant les routes paramétrées /:id
 router.post("/pesee/sessions/expirer",                terrainAuthMiddleware, peseurOrDelegueOnly, handleExpirerSessionsStales);
 router.post("/pesee/sessions/batch",                  terrainAuthMiddleware, peseurOrDelegueOnly, handleBatchCreateSession);
-router.get("/pesee/expeditions/prechargement",         terrainAuthMiddleware, peseurOnly, handleGetExpeditionsApreparer);
 router.post("/pesee/sessions",                        terrainAuthMiddleware, peseurOrDelegueOnly, handleCreateSession);
 router.get("/pesee/sessions",                         flexAuthMiddleware, denyComptableRestrictedModules, handleGetSessions);
 router.get("/pesee/sessions/:id",                     flexAuthMiddleware, denyComptableRestrictedModules, handleGetSession);

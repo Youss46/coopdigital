@@ -271,20 +271,6 @@ body {
 .t-btn--ghost    { background: transparent; color: var(--t-primary); border: 2px solid var(--t-primary); }
 .t-btn--sm       { height: 44px; font-size: .875rem; }
 
-.t-icon-btn {
-  border: 0;
-  background: rgba(255,255,255,.14);
-  color: inherit;
-  border-radius: 9px;
-  min-width: 36px;
-  min-height: 36px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-.t-icon-btn:disabled { opacity: .55; cursor: not-allowed; }
-
 /* ── Form fields ────────────────────────────────────────────── */
 .t-form {
   padding: 16px;
@@ -327,28 +313,6 @@ body {
   font-size: .8rem;
   color: var(--t-muted);
 }
-
-.t-form-row { display: grid; gap: 6px; margin-bottom: 12px; }
-.t-form-row label { font-size: .78rem; font-weight: 700; color: var(--t-muted); }
-
-.t-alert {
-  border-radius: 10px;
-  padding: 10px 12px;
-  margin-bottom: 12px;
-  font-size: .82rem;
-  line-height: 1.4;
-}
-.t-alert--warning { background: var(--t-warning-bg); color: var(--t-warning); }
-.t-alert--danger { background: var(--t-danger-bg); color: var(--t-danger); }
-.t-loading {
-  min-height: 180px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  color: var(--t-muted);
-}
-.t-spin { animation: t-spin .8s linear infinite; }
 
 /* ── Step indicator ──────────────────────────────────────────── */
 .t-steps {

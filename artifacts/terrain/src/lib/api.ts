@@ -4,10 +4,7 @@ import {
   markAccountDisabled,
   COMPTE_DESACTIVE_MESSAGE,
 } from "./auth";
-import {
-  queueOp, queueGpsOp, queueEnqueteOp, getCache, setCache,
-  type PendingOpType, type GpsOp,
-} from "./idb";
+import { queueOp, queueGpsOp, queueEnqueteOp, type PendingOpType, type GpsOp } from "./idb";
 import {
   GPS_CRS,
   normalizeGpsPoint,
@@ -494,8 +491,6 @@ export async function createSessionPesee(data: {
   transfertId?: number;
   /** Pour les sessions de réception membre délégué */
   bonReceptionId?: number;
-  /** Pour une session de pré-chargement export */
-  expeditionId?: number;
   /** Certification du cacao : 'RA' | 'FAIRTRADE' | 'ASR_1000' | 'ORDINAIRE' */
   certificationCacao?: string;
 }): Promise<import("./types").SessionPesee> {
@@ -535,44 +530,6 @@ export async function createSessionPesee(data: {
 
 export async function getBonsReceptionEnAttente(): Promise<import("./types").BonReceptionMembre[]> {
   return apiPeseeFetch<import("./types").BonReceptionMembre[]>("/terrain/bons-reception/en-attente");
-}
-
-export async function getExpeditionsApreparer(): Promise<import("./types").ExpeditionPrechargement[]> {
-  const cacheKey = getExpeditionsCacheKey();
-  if (typeof navigator !== "undefined" && !navigator.onLine) {
-    const cached = await getCache<import("./types").ExpeditionPrechargement[]>(cacheKey);
-    if (cached) return cached;
-    throw new Error("Aucune expédition n'a encore été mise en cache pour ce compte.");
-  }
-  try {
-    const expeditions = await apiPeseeFetch<import("./types").ExpeditionPrechargement[]>("/pesee/expeditions/prechargement");
-    await setCache(cacheKey, expeditions);
-    return expeditions;
-  } catch (error) {
-    // Une coupure peut survenir après navigator.onLine : le dernier état
-    // connu permet de continuer à travailler, sans jamais mélanger les comptes.
-    const cached = await getCache<import("./types").ExpeditionPrechargement[]>(cacheKey);
-    if (cached) return cached;
-    throw error;
-  }
-}
-
-function getExpeditionsCacheKey(): string {
-  const token = getToken();
-  let account = "unknown";
-  try {
-    const payload = token?.split(".")[1];
-    if (payload) {
-      const decoded = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/"))) as {
-        id?: number; userId?: number; cooperativeId?: number | null;
-      };
-      account = `${decoded.cooperativeId ?? "none"}_${decoded.id ?? decoded.userId ?? "unknown"}`;
-    }
-  } catch {
-    // Une clé de cache inconnue ne doit jamais permettre de réutiliser celle
-    // d'un autre compte.
-  }
-  return `expeditions_prechargement_${account}`;
 }
 
 export interface CreateBonReceptionTerrainInput {
@@ -706,14 +663,10 @@ export async function batchSyncBrouillon(brouillon: import("./types").BrouillonP
     method: "POST",
     body: JSON.stringify({
       localId: brouillon.localId,
+      membreId: brouillon.membreId,
       produit: brouillon.produit,
       operation: brouillon.operation,
-      ...(brouillon.operation === "prechargement_export"
-        ? { expeditionId: brouillon.expeditionId }
-        : {
-          membreId: brouillon.membreId,
-          certificationCacao: brouillon.certificationCacao,
-        }),
+      certificationCacao: brouillon.certificationCacao,
       lignes: brouillon.lignes.map((l) => ({
         localId: l.localId,
         nbSacs: l.nbSacs,

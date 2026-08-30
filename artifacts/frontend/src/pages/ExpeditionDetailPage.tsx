@@ -11,7 +11,6 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { NumericInput } from "@/components/ui/numeric-input";
-import { getPrechargementSummary } from "@/lib/prechargement";
 import {
   ArrowLeft, Ship, MapPin, CheckCircle2,
   ChevronRight, FileText, Users, Leaf, AlertCircle,
@@ -92,7 +91,7 @@ const MOTIFS_ECART = [
 
 export default function ExpeditionDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { token, utilisateur } = useAuth();
+  const { token } = useAuth();
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const qc = useQueryClient();
@@ -114,7 +113,6 @@ export default function ExpeditionDetailPage() {
   const [poidsRefoul, setPoidsRefoul] = useState("");
   const [nombreSacsRefoul, setNombreSacsRefoul] = useState("");
   const [motifRefoulement, setMotifRefoulement] = useState("");
-  const [justificationPrechargement, setJustificationPrechargement] = useState("");
 
   const { data: exp, isLoading } = useQuery<Record<string, unknown>>({
     queryKey: ["expedition", id],
@@ -160,17 +158,6 @@ export default function ExpeditionDetailPage() {
     onError: (err: Error) => toast({ title: "Erreur", description: err.message, variant: "destructive" }),
   });
 
-  const validationPrechargementMutation = useMutation({
-    mutationFn: (justification: string) =>
-      apiPut(`/api/expeditions/${id}/prechargement/valider`, token, { justification }),
-    onSuccess: () => {
-      toast({ title: "Pré-pesée validée", description: "Le chargement peut maintenant être confirmé." });
-      setJustificationPrechargement("");
-      void qc.invalidateQueries({ queryKey: ["expedition", id] });
-    },
-    onError: (err: Error) => toast({ title: "Validation impossible", description: err.message, variant: "destructive" }),
-  });
-
   const receptionMutation = useMutation({
     mutationFn: (body: unknown) => apiPut(`/api/expeditions/${id}/reception`, token, body),
     onSuccess: (data: unknown) => {
@@ -198,16 +185,7 @@ export default function ExpeditionDetailPage() {
   const fraisTransportPaye = String(exp.fraisTransportStatut ?? "non_paye") === "paye";
   const fraisTransportAnnule = statut === "annule" || String(exp.statutReception ?? "") === "annule";
 
-  const prechargementSummary = getPrechargementSummary(exp);
-  const {
-    poidsChargeKg: poidsCharge,
-    poidsPrevuKg: poidsPrevu,
-    nombreSacsCharge: sacsCharges,
-    prechargement,
-    statut: prechargementStatut,
-    terminee: prechargementTerminee,
-  } = prechargementSummary;
-  const canValidatePrechargement = ["pca", "directeur", "responsable_tracabilite"].includes(String(utilisateur?.role ?? ""));
+  const poidsCharge = parseFloat(String(exp.poidsChargeKg ?? "0"));
   const ecartKg = poidsRecu && poidsCharge
     ? poidsCharge - parseFloat(poidsRecu)
     : null;
@@ -216,6 +194,7 @@ export default function ExpeditionDetailPage() {
     : null;
 
   // Écart sacs — calculé uniquement si les deux valeurs sont connues
+  const sacsCharges = exp.nombreSacs ? parseInt(String(exp.nombreSacs)) : null;
   const ecartSacs = nombreSacsRecu && sacsCharges !== null
     ? sacsCharges - parseInt(nombreSacsRecu, 10)
     : null;
@@ -286,66 +265,6 @@ export default function ExpeditionDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Contrôle avant chargement physique */}
-      <Card className={prechargementStatut === "a_justifier" ? "border-orange-300" : prechargementStatut === "conforme" || prechargementStatut === "valide" ? "border-green-300" : "border-blue-200"}>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <CheckCircle2 className={`h-4 w-4 ${prechargementStatut === "a_justifier" ? "text-orange-500" : "text-blue-600"}`} />
-            Pré-pesée avant chargement
-            <Badge variant="outline" className="ml-auto">
-              {!prechargement ? "À effectuer" : prechargement?.statut === "en_cours" ? "En cours" : prechargementStatut === "conforme" ? "Conforme" : prechargementStatut === "valide" ? "Validée" : "À justifier"}
-            </Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-gray-500">Poids prévu</span>
-            <strong>{poidsPrevu > 0 ? `${poidsPrevu.toLocaleString("fr-FR")} kg` : "—"}</strong>
-          </div>
-          {prechargement && (
-            <>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-gray-500">Poids pré-pesé</span>
-                <strong>{prechargement.poidsTotalKg ? `${parseFloat(String(prechargement.poidsTotalKg)).toLocaleString("fr-FR")} kg` : "—"}</strong>
-              </div>
-              <div className="flex items-center justify-between gap-3 text-gray-600">
-                <span>Passages / sacs</span>
-                <span>{String(prechargement.nbSacsTotal ?? 0)} sacs · session {String(prechargement.numeroSession ?? "—")}</span>
-              </div>
-              {prechargement.prechargementEcartKg != null && (
-                <div className={`rounded-md p-2 ${prechargementStatut === "a_justifier" ? "bg-orange-50 text-orange-800" : "bg-green-50 text-green-800"}`}>
-                  Écart : {parseFloat(String(prechargement.prechargementEcartKg)).toFixed(2)} kg ({parseFloat(String(prechargement.prechargementEcartPct ?? 0)).toFixed(2)} %)
-                </div>
-              )}
-            </>
-          )}
-          {!prechargementTerminee && (
-            <p className="text-xs text-blue-700 bg-blue-50 rounded-md p-2">
-              Le peseur doit clôturer une pré-pesée connectée avant la confirmation du chargement. Aucun stock n’est déduit pendant cette étape.
-            </p>
-          )}
-          {prechargementStatut === "a_justifier" && canValidatePrechargement && (
-            <div className="space-y-2 border-t pt-3">
-              <Label htmlFor="justification-prechargement">Justification de l’écart</Label>
-              <Textarea
-                id="justification-prechargement"
-                value={justificationPrechargement}
-                onChange={(e) => setJustificationPrechargement(e.target.value)}
-                placeholder="Expliquez et validez l’écart constaté"
-                rows={2}
-              />
-              <Button
-                size="sm"
-                disabled={validationPrechargementMutation.isPending || justificationPrechargement.trim().length < 5}
-                onClick={() => validationPrechargementMutation.mutate(justificationPrechargement)}
-              >
-                {validationPrechargementMutation.isPending ? "Validation…" : "Valider l’écart"}
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       {/* Infos principales */}
       <div className="grid grid-cols-2 gap-4">
         <Card>
@@ -380,9 +299,6 @@ export default function ExpeditionDetailPage() {
           </CardHeader>
           <CardContent className="space-y-1 text-sm">
             <div className="font-semibold text-lg">{poidsCharge > 0 ? `${poidsCharge.toLocaleString("fr-FR")} kg` : "—"}</div>
-            {Boolean(exp.poidsChargeEffectifKg && exp.poidsPrevuKg) && (
-              <div className="text-gray-500">Prévu : {parseFloat(String(exp.poidsPrevuKg)).toLocaleString("fr-FR")} kg</div>
-            )}
             {Boolean(exp.nombreSacs) && <div className="text-gray-600">📦 {String(exp.nombreSacs)} sacs</div>}
             {Boolean(exp.lieuDepart) && <div className="text-gray-500">📍 Départ : {String(exp.lieuDepart)}</div>}
             {Boolean(exp.dateDepart) && <div className="text-gray-500">🕐 {new Date(String(exp.dateDepart)).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</div>}

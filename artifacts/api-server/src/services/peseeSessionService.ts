@@ -15,8 +15,6 @@ import {
   entrepotsDeleguesTable,
   usersTable,
   bonsReceptionMembresDeleguesTable,
-  expeditionsTable,
-  expeditionHistoriqueTable,
 } from "@workspace/db";
 import { eq, and, desc, sql, gte, lte, isNull, inArray, or } from "drizzle-orm";
 import { getPrixActuel } from "./terrainService.js";
@@ -44,26 +42,14 @@ export async function creerSessionBatch(
   peseurId: number,
   data: {
     localId: string;
-    membreId?: number;
-    expeditionId?: number;
+    membreId: number;
     produit: string;
     operation: string;
-    certificationCacao?: CertificationCacao;
+    certificationCacao: CertificationCacao;
     lignes: Array<{ localId: string; nbSacs: number; poidsBrutKg: number; tareKg: number; notes?: string }>;
     statut: "terminee" | "en_cours";
   },
 ) {
-  if (data.operation === "prechargement_export") {
-    if (!data.expeditionId) throw new Error("Une expédition est obligatoire pour synchroniser une pré-pesée");
-    return creerPrechargementBatch(cooperativeId, peseurId, {
-      ...data,
-      operation: "prechargement_export",
-      expeditionId: data.expeditionId,
-    });
-  }
-  if (!data.membreId) throw new Error("Un membre est obligatoire pour synchroniser cette pesée");
-  if (!data.certificationCacao) throw new Error("La certification du cacao est obligatoire");
-
   const offlineTag = `offline:${data.localId}`;
 
   // ── Idempotency : session déjà créée lors d'un précédent essai ? ──────────
@@ -151,209 +137,6 @@ export async function creerSessionBatch(
   };
 }
 
-/**
- * Synchronise une pré-pesée export locale en une seule transaction.
- *
- * L'expédition est verrouillée avant toute création : deux appareils ne
- * peuvent donc ni créer deux sessions pour le même chargement, ni ajouter les
- * lignes d'une session dans celle d'un autre appareil. La validation de
- * l'expédition, des lignes, du poids et de la tolérance est faite côté serveur
- * au moment de la clôture, jamais à partir de la seule copie locale.
- */
-async function creerPrechargementBatch(
-  cooperativeId: number,
-  peseurId: number,
-  data: {
-    localId: string;
-    expeditionId: number;
-    produit: string;
-    operation: "prechargement_export";
-    lignes: Array<{ localId: string; nbSacs: number; poidsBrutKg: number; tareKg: number; notes?: string }>;
-    statut: "terminee" | "en_cours";
-  },
-) {
-  if (data.lignes.length === 0) throw new Error("Au moins une ligne est requise");
-  for (const ligne of data.lignes) {
-    if (!Number.isInteger(ligne.nbSacs) || ligne.nbSacs < 0) {
-      throw new Error("Le nombre de sacs est invalide");
-    }
-    if (!Number.isFinite(ligne.poidsBrutKg) || ligne.poidsBrutKg <= 0) {
-      throw new Error("Le poids brut d'une ligne doit être positif");
-    }
-    if (!Number.isFinite(ligne.tareKg) || ligne.tareKg < 0 || ligne.tareKg >= ligne.poidsBrutKg) {
-      throw new Error("La tare doit être positive et inférieure au poids brut");
-    }
-  }
-
-  const offlineTag = `offline:${data.localId}`;
-  const { numeroSession, numeroPesee } = await generateNumeroSession(cooperativeId);
-  const result = await db.transaction(async (tx: any) => {
-    const [expedition] = await tx
-      .select({
-        id: expeditionsTable.id,
-        statut: expeditionsTable.statut,
-        poidsPrevuKg: expeditionsTable.poidsPrevuKg,
-        poidsChargeKg: expeditionsTable.poidsChargeKg,
-      })
-      .from(expeditionsTable)
-      .where(and(
-        eq(expeditionsTable.id, data.expeditionId),
-        eq(expeditionsTable.cooperativeId, cooperativeId),
-      ))
-      .for("update")
-      .limit(1);
-
-    if (!expedition) throw new Error("Expédition introuvable");
-    if (expedition.statut !== "en_preparation") {
-      throw new Error("L'expédition n'est plus en préparation");
-    }
-    const poidsPrevu = Number(expedition.poidsPrevuKg ?? expedition.poidsChargeKg ?? 0);
-    if (!Number.isFinite(poidsPrevu) || poidsPrevu <= 0) {
-      throw new Error("L'expédition doit avoir un poids prévu supérieur à 0 kg");
-    }
-
-    const [sameLocal] = await tx
-      .select({
-        id: sessionsPeseeTable.id,
-        numeroSession: sessionsPeseeTable.numeroSession,
-        statut: sessionsPeseeTable.statut,
-        expeditionId: sessionsPeseeTable.expeditionId,
-      })
-      .from(sessionsPeseeTable)
-      .where(and(
-        eq(sessionsPeseeTable.cooperativeId, cooperativeId),
-        eq(sessionsPeseeTable.operation, "prechargement_export"),
-        eq(sessionsPeseeTable.notes, offlineTag),
-      ))
-      .for("update")
-      .limit(1);
-    if (sameLocal) {
-      if (sameLocal.expeditionId !== data.expeditionId) {
-        throw new Error("Cet identifiant local est déjà associé à une autre expédition");
-      }
-      return {
-        sessionId: sameLocal.id,
-        numeroSession: sameLocal.numeroSession,
-        alreadyProcessed: true,
-      };
-    }
-
-    const [associated] = await tx
-      .select({
-        id: sessionsPeseeTable.id,
-        statut: sessionsPeseeTable.statut,
-      })
-      .from(sessionsPeseeTable)
-      .where(and(
-        eq(sessionsPeseeTable.cooperativeId, cooperativeId),
-        eq(sessionsPeseeTable.expeditionId, data.expeditionId),
-        eq(sessionsPeseeTable.operation, "prechargement_export"),
-      ))
-      .for("update")
-      .limit(1);
-    if (associated) {
-      throw new Error("Cette expédition est déjà associée à une autre pré-pesée");
-    }
-
-    const [created] = await tx
-      .insert(sessionsPeseeTable)
-      .values({
-        cooperativeId,
-        numeroSession,
-        numeroPesee,
-        membreId: null,
-        fournisseurId: null,
-        produit: data.produit,
-        operation: "prechargement_export",
-        peseurId,
-        statut: "en_cours",
-        notes: offlineTag,
-        expeditionId: data.expeditionId,
-        certificationCacao: null,
-      })
-      .returning({ id: sessionsPeseeTable.id, numeroSession: sessionsPeseeTable.numeroSession });
-    if (!created) throw new Error("Impossible de créer la pré-pesée");
-
-    for (const [index, ligne] of data.lignes.entries()) {
-      await tx.insert(lignesPeseeTable).values({
-        sessionId: created.id,
-        numeroPassage: index + 1,
-        nbSacs: ligne.nbSacs,
-        poidsBrutKg: String(ligne.poidsBrutKg),
-        tareKg: String(ligne.tareKg),
-        notes: ligne.notes,
-      });
-    }
-
-    const [totaux] = await tx
-      .select({
-        poids: sql<number>`coalesce(sum(${lignesPeseeTable.poidsBrutKg}::numeric - ${lignesPeseeTable.tareKg}::numeric), 0)::float`,
-        nbSacs: sql<number>`coalesce(sum(${lignesPeseeTable.nbSacs}), 0)::int`,
-      })
-      .from(lignesPeseeTable)
-      .where(eq(lignesPeseeTable.sessionId, created.id));
-
-    if (data.statut === "terminee") {
-      const poidsPeseKg = Number(totaux?.poids ?? 0);
-      const ecartKg = poidsPeseKg - poidsPrevu;
-      const ecartPct = Math.abs(ecartKg) / poidsPrevu * 100;
-      const [config] = await tx
-        .select({ ecartMaxAutorisePct: configPeseeTable.ecartMaxAutorisePct })
-        .from(configPeseeTable)
-        .where(eq(configPeseeTable.cooperativeId, cooperativeId))
-        .limit(1);
-      const seuilPct = Number(config?.ecartMaxAutorisePct ?? 2);
-      const statutControle = ecartPct <= (Number.isFinite(seuilPct) ? seuilPct : 2)
-        ? "conforme"
-        : "a_justifier";
-
-      await tx.update(sessionsPeseeTable)
-        .set({
-          statut: "terminee",
-          dateFin: new Date(),
-          poidsTotalKg: String(poidsPeseKg),
-          nbSacsTotal: Number(totaux?.nbSacs ?? 0),
-          prechargementStatut: statutControle,
-          prechargementEcartKg: String(ecartKg),
-          prechargementEcartPct: String(ecartPct),
-        })
-        .where(and(
-          eq(sessionsPeseeTable.id, created.id),
-          eq(sessionsPeseeTable.statut, "en_cours"),
-        ));
-
-      await tx.insert(expeditionHistoriqueTable).values({
-        expeditionId: data.expeditionId,
-        statutPrecedent: expedition.statut,
-        statutNouveau: "pre_pesee_terminee",
-        faitPar: peseurId,
-        notes: `Pré-pesée ${created.numeroSession} : ${poidsPeseKg.toFixed(2)} kg pour ${poidsPrevu.toFixed(2)} kg prévus. Écart ${ecartKg.toFixed(2)} kg (${ecartPct.toFixed(2)} %) — ${statutControle}.`,
-      });
-    } else {
-      await tx.update(sessionsPeseeTable)
-        .set({
-          poidsTotalKg: String(totaux?.poids ?? 0),
-          nbSacsTotal: Number(totaux?.nbSacs ?? 0),
-        })
-        .where(eq(sessionsPeseeTable.id, created.id));
-    }
-
-    return {
-      sessionId: created.id,
-      numeroSession: created.numeroSession,
-      alreadyProcessed: false,
-    };
-  });
-
-  const detail = await getSessionDetail(cooperativeId, result.sessionId);
-  return {
-    sessionId: result.sessionId,
-    numeroSession: result.numeroSession,
-    poidsTotalKg: detail?.poidsTotalKg ?? "0",
-    nbSacsTotal: detail?.nbSacsTotal ?? 0,
-  };
-}
-
 // ─── Génération numéro de session ─────────────────────────────────────────────
 async function generateNumeroSession(cooperativeId: number): Promise<{ numeroSession: string; numeroPesee: number }> {
   const { numero, annee } = await reserverNumeroPesee(cooperativeId);
@@ -410,87 +193,12 @@ export async function createSession(
     transfertId?: number;
     /** ID du bon de réception membre délégué */
     bonReceptionId?: number;
-    /** ID de l'expédition pour une session de pré-chargement export */
-    expeditionId?: number;
     /** Certification du cacao : 'RA' | 'FAIRTRADE' | 'ASR_1000' | 'ORDINAIRE' */
     certificationCacao?: string;
   },
 ) {
-  if (data.operation !== "prechargement_export" && !isCertificationCacao(data.certificationCacao)) {
+  if (!isCertificationCacao(data.certificationCacao)) {
     throw new Error("Le type de certification du cacao est obligatoire avant de démarrer la pesée");
-  }
-
-  // ── Pré-pesée export : contrôle séparé, sans membre, livraison ni stock ───
-  if (data.operation === "prechargement_export") {
-    if (!data.expeditionId) throw new Error("Une expédition est obligatoire pour démarrer une pré-pesée");
-    if (data.membreId || data.fournisseurId || data.transfertId || data.bonReceptionId) {
-      throw new Error("Une pré-pesée export ne peut être associée qu'à une expédition");
-    }
-
-    const [expedition] = await db
-      .select({
-        id: expeditionsTable.id,
-        statut: expeditionsTable.statut,
-        poidsPrevuKg: expeditionsTable.poidsPrevuKg,
-        poidsChargeKg: expeditionsTable.poidsChargeKg,
-      })
-      .from(expeditionsTable)
-      .where(and(
-        eq(expeditionsTable.id, data.expeditionId),
-        eq(expeditionsTable.cooperativeId, cooperativeId),
-      ))
-      .limit(1);
-
-    if (!expedition) throw new Error("Expédition introuvable");
-    if (expedition.statut !== "en_preparation") {
-      throw new Error("La pré-pesée est uniquement possible pour une expédition en préparation");
-    }
-    const poidsPrevu = Number(expedition.poidsPrevuKg ?? expedition.poidsChargeKg ?? 0);
-    if (!Number.isFinite(poidsPrevu) || poidsPrevu <= 0) {
-      throw new Error("L'expédition doit avoir un poids prévu supérieur à 0 kg");
-    }
-
-    const [existing] = await db
-      .select({
-        id: sessionsPeseeTable.id,
-        numeroSession: sessionsPeseeTable.numeroSession,
-        statut: sessionsPeseeTable.statut,
-      })
-      .from(sessionsPeseeTable)
-      .where(and(
-        eq(sessionsPeseeTable.cooperativeId, cooperativeId),
-        eq(sessionsPeseeTable.expeditionId, data.expeditionId),
-        eq(sessionsPeseeTable.operation, "prechargement_export"),
-      ))
-      .orderBy(desc(sessionsPeseeTable.createdAt))
-      .limit(1);
-    if (existing?.statut === "en_cours") {
-      throw new SessionEnCoursError(existing.id, existing.numeroSession);
-    }
-    if (existing && existing.statut !== "annulee") {
-      throw new Error("Cette expédition est déjà associée à une pré-pesée clôturée");
-    }
-
-    const { numeroSession, numeroPesee } = await generateNumeroSession(cooperativeId);
-    const [session] = await db
-      .insert(sessionsPeseeTable)
-      .values({
-        cooperativeId,
-        numeroSession,
-        numeroPesee,
-        membreId: null,
-        fournisseurId: null,
-        produit: data.produit ?? "cacao",
-        operation: "prechargement_export",
-        peseurId: data.peseurId,
-        balanceId: data.balanceId,
-        statut: "en_cours",
-        notes: data.notes,
-        expeditionId: data.expeditionId,
-        certificationCacao: null,
-      })
-      .returning();
-    return session!;
   }
 
   if (data.operation === "reception_membre_delegue" && !data.bonReceptionId) {
@@ -773,7 +481,7 @@ export async function createSession(
 // ─── Lister sessions (avec lignes count) ──────────────────────────────────────
 export async function getSessions(
   cooperativeId: number,
-  opts: { statut?: string; membreId?: number; fournisseurId?: number; expeditionId?: number; limit?: number; peseurId?: number; dateDebut?: string; dateFin?: string } = {},
+  opts: { statut?: string; membreId?: number; fournisseurId?: number; limit?: number; peseurId?: number; dateDebut?: string; dateFin?: string } = {},
 ) {
   const conditions = [eq(sessionsPeseeTable.cooperativeId, cooperativeId)];
   if (opts.statut) {
@@ -786,9 +494,6 @@ export async function getSessions(
   }
   if (opts.fournisseurId) {
     conditions.push(eq(sessionsPeseeTable.fournisseurId, opts.fournisseurId));
-  }
-  if (opts.expeditionId) {
-    conditions.push(eq(sessionsPeseeTable.expeditionId, opts.expeditionId));
   }
   // Peseur : ne voit que ses propres sessions
   if (opts.peseurId !== undefined) {
@@ -828,11 +533,6 @@ export async function getSessions(
       notes: sessionsPeseeTable.notes,
       livraisonId: sessionsPeseeTable.livraisonId,
       bonReceptionId: sessionsPeseeTable.bonReceptionId,
-      expeditionId: sessionsPeseeTable.expeditionId,
-      prechargementStatut: sessionsPeseeTable.prechargementStatut,
-      prechargementEcartKg: sessionsPeseeTable.prechargementEcartKg,
-      prechargementEcartPct: sessionsPeseeTable.prechargementEcartPct,
-      prechargementJustification: sessionsPeseeTable.prechargementJustification,
       createdAt: sessionsPeseeTable.createdAt,
     })
     .from(sessionsPeseeTable)
@@ -940,10 +640,6 @@ export async function getSessionDetail(cooperativeId: number, sessionId: number)
       livraisonId:    sessionsPeseeTable.livraisonId,
       transfertId:    sessionsPeseeTable.transfertId,
       bonReceptionId: sessionsPeseeTable.bonReceptionId,
-      expeditionId: sessionsPeseeTable.expeditionId,
-      prechargementStatut: sessionsPeseeTable.prechargementStatut,
-      prechargementEcartKg: sessionsPeseeTable.prechargementEcartKg,
-      prechargementEcartPct: sessionsPeseeTable.prechargementEcartPct,
       createdAt: sessionsPeseeTable.createdAt,
       // ── Contexte transfert (#15) ──────────────────────────────────────
       transfertNumero:           transfertsStockTable.numeroTransfert,
@@ -1158,121 +854,10 @@ async function deduireAvancesMembreDelegue(
   }
 }
 
-// ─── Finalisation d'une pré-pesée export ───────────────────────────────────────
-// Cette opération mesure et audite la préparation uniquement : elle ne crée
-// aucune livraison et ne touche pas au stock. La sortie intervient au passage
-// ultérieur de l'expédition au statut "charge".
-async function terminerPrechargement(cooperativeId: number, sessionId: number) {
-  const result = await db.transaction(async (tx: any) => {
-    const [session] = await tx
-      .select({
-        id: sessionsPeseeTable.id,
-        numeroSession: sessionsPeseeTable.numeroSession,
-        peseurId: sessionsPeseeTable.peseurId,
-        statut: sessionsPeseeTable.statut,
-        expeditionId: sessionsPeseeTable.expeditionId,
-      })
-      .from(sessionsPeseeTable)
-      .where(and(
-        eq(sessionsPeseeTable.id, sessionId),
-        eq(sessionsPeseeTable.cooperativeId, cooperativeId),
-        eq(sessionsPeseeTable.operation, "prechargement_export"),
-      ))
-      .for("update")
-      .limit(1);
-
-    if (!session) throw new Error("Session de pré-pesée introuvable");
-    if (session.statut !== "en_cours") throw new Error("Cette pré-pesée est déjà terminée ou annulée");
-    if (!session.expeditionId) throw new Error("La session n'est liée à aucune expédition");
-
-    const [expedition] = await tx
-      .select({
-        id: expeditionsTable.id,
-        statut: expeditionsTable.statut,
-        poidsPrevuKg: expeditionsTable.poidsPrevuKg,
-        poidsChargeKg: expeditionsTable.poidsChargeKg,
-      })
-      .from(expeditionsTable)
-      .where(and(
-        eq(expeditionsTable.id, session.expeditionId),
-        eq(expeditionsTable.cooperativeId, cooperativeId),
-      ))
-      .for("update")
-      .limit(1);
-    if (!expedition) throw new Error("Expédition introuvable");
-    if (expedition.statut !== "en_preparation") throw new Error("L'expédition n'est plus en préparation");
-
-    const [totaux] = await tx
-      .select({
-        poids: sql<number>`coalesce(sum(${lignesPeseeTable.poidsBrutKg}::numeric - ${lignesPeseeTable.tareKg}::numeric), 0)::float`,
-        nbSacs: sql<number>`coalesce(sum(${lignesPeseeTable.nbSacs}), 0)::int`,
-      })
-      .from(lignesPeseeTable)
-      .where(eq(lignesPeseeTable.sessionId, sessionId));
-
-    const poidsPeseKg = Number(totaux?.poids ?? 0);
-    if (!Number.isFinite(poidsPeseKg) || poidsPeseKg <= 0) {
-      throw new Error("Aucun poids net positif dans cette pré-pesée");
-    }
-
-    const poidsPrevu = Number(expedition.poidsPrevuKg ?? expedition.poidsChargeKg ?? 0);
-    if (!Number.isFinite(poidsPrevu) || poidsPrevu <= 0) {
-      throw new Error("L'expédition n'a pas de poids prévu exploitable");
-    }
-
-    const ecartKg = poidsPeseKg - poidsPrevu;
-    const ecartPct = Math.abs(ecartKg) / poidsPrevu * 100;
-    const [config] = await tx
-      .select({ ecartMaxAutorisePct: configPeseeTable.ecartMaxAutorisePct })
-      .from(configPeseeTable)
-      .where(eq(configPeseeTable.cooperativeId, cooperativeId))
-      .limit(1);
-    const seuilPct = Number(config?.ecartMaxAutorisePct ?? 2);
-    const statutControle = ecartPct <= (Number.isFinite(seuilPct) ? seuilPct : 2)
-      ? "conforme"
-      : "a_justifier";
-
-    const [updated] = await tx
-      .update(sessionsPeseeTable)
-      .set({
-        statut: "terminee",
-        dateFin: new Date(),
-        poidsTotalKg: String(poidsPeseKg),
-        nbSacsTotal: Number(totaux?.nbSacs ?? 0),
-        prechargementStatut: statutControle,
-        prechargementEcartKg: String(ecartKg),
-        prechargementEcartPct: String(ecartPct),
-      })
-      .where(and(
-        eq(sessionsPeseeTable.id, sessionId),
-        eq(sessionsPeseeTable.statut, "en_cours"),
-      ))
-      .returning();
-    if (!updated) throw new Error("La pré-pesée a été clôturée par une autre opération");
-
-    await tx.insert(expeditionHistoriqueTable).values({
-      expeditionId: session.expeditionId,
-      statutPrecedent: expedition.statut,
-      statutNouveau: "pre_pesee_terminee",
-      faitPar: session.peseurId ?? null,
-      notes: `Pré-pesée ${session.numeroSession} : ${poidsPeseKg.toFixed(2)} kg pour ${poidsPrevu.toFixed(2)} kg prévus. Écart ${ecartKg.toFixed(2)} kg (${ecartPct.toFixed(2)} %) — ${statutControle}.`,
-    });
-
-    return { updated, poidsPrevuKg: poidsPrevu, ecartKg, ecartPct, statutControle };
-  });
-
-  const detail = await getSessionDetail(cooperativeId, sessionId);
-  return { ...detail, ...result.updated, ...result, statut: "terminee" as const };
-}
-
 // ─── Terminer une session ─────────────────────────────────────────────────────
 export async function terminerSession(cooperativeId: number, sessionId: number) {
   const detail = await getSessionDetail(cooperativeId, sessionId);
   if (!detail) throw new Error("Session introuvable");
-  if (detail.operation === "prechargement_export") {
-    if (detail.statut === "terminee") return detail;
-    return terminerPrechargement(cooperativeId, sessionId);
-  }
   // Une répétition réseau sur un bon déjà finalisé est idempotente : elle rend
   // le même résultat sans relancer livraison, paiement ni stock.
   if (detail.statut === "terminee" && detail.bonReceptionId) {
