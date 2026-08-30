@@ -70,7 +70,7 @@ export const FEATURE_CATALOG: FeatureDefinition[] = [
   { key: "gouvernance", label: "Gouvernance", category: "Organisation", description: "Gouvernance coopérative", dependsOn: [] },
   { key: "communication", label: "Communication", category: "Organisation", description: "Messages et annonces", dependsOn: [] },
   { key: "delegues", label: "Délégués", category: "Organisation", description: "Délégués terrain", dependsOn: ["membres"] },
-  { key: "delegues_localites", label: "Délégués de localités", category: "Organisation", description: "Taux et commissions des localités", dependsOn: ["delegues"] },
+  { key: "delegues_localites", label: "Délégués de localités", category: "Organisation", description: "Taux et commissions des localités", dependsOn: ["membres"] },
   { key: "administration", label: "Administration", category: "Organisation", description: "Comptes et utilisateurs", dependsOn: [] },
   { key: "parametres", label: "Paramètres", category: "Organisation", description: "Paramètres de la coopérative", dependsOn: [] },
   { key: "hors_ligne", label: "Opérations hors ligne", category: "Hors ligne", description: "File locale et synchronisation", dependsOn: [] },

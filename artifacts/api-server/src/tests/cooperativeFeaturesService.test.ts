@@ -33,4 +33,9 @@ describe("cooperative features", () => {
     expect(keys.has("comptabilite")).toBe(true);
     expect(keys.has("missions")).toBe(true);
   });
+
+  it("keeps local-delegate commissions independent from field delegates", () => {
+    const feature = FEATURE_CATALOG.find((candidate) => candidate.key === "delegues_localites");
+    expect(feature?.dependsOn).toEqual(["membres"]);
+  });
 });
