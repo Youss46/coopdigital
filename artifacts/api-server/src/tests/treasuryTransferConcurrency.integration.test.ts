@@ -15,6 +15,32 @@ const enabled =
   process.env.RUN_POSTGRES_INTEGRATION === "1" &&
   Boolean(process.env.DATABASE_URL);
 
+const postgresReferenceDate =
+  process.env.POSTGRES_INTEGRATION_REFERENCE_DATE ?? "2026-08-29";
+
+function shiftIsoDate(date: string, days: number): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw new Error(
+      "POSTGRES_INTEGRATION_REFERENCE_DATE doit être une date ISO (AAAA-MM-JJ)",
+    );
+  }
+
+  const parsed = new Date(`${date}T00:00:00.000Z`);
+  if (
+    Number.isNaN(parsed.getTime()) ||
+    parsed.toISOString().slice(0, 10) !== date
+  ) {
+    throw new Error(
+      "POSTGRES_INTEGRATION_REFERENCE_DATE doit être une date civile valide",
+    );
+  }
+
+  parsed.setUTCDate(parsed.getUTCDate() + days);
+  return parsed.toISOString().slice(0, 10);
+}
+
+const postgresPreviousDate = shiftIsoDate(postgresReferenceDate, -1);
+
 /**
  * These tests deliberately run the production transfer services against two
  * independent PostgreSQL transactions. Run them against a disposable
@@ -23,6 +49,13 @@ const enabled =
  * RUN_POSTGRES_INTEGRATION=1 DATABASE_URL=... \
  *   pnpm --filter @workspace/api-server test:integration
  */
+describe("référence calendaire des virements banque-caisse", () => {
+  it("calcule correctement une date précédente lors d'un changement d'année", () => {
+    expect(shiftIsoDate("2026-01-01", -1)).toBe("2025-12-31");
+    expect(shiftIsoDate("2026-12-31", 1)).toBe("2027-01-01");
+  });
+});
+
 describe.skipIf(!enabled)("virements banque-caisse concurrents sur PostgreSQL", () => {
   let client: any;
   let cooperativeId: number;
@@ -201,13 +234,13 @@ describe.skipIf(!enabled)("virements banque-caisse concurrents sur PostgreSQL", 
           caisseId,
           montantFcfa: 175_000,
           reference: `TASK80-BANK-TO-CASH-${objectSuffix}`,
-          dateOperation: "2026-08-28",
+          dateOperation: postgresPreviousDate,
         }),
         virementVersBanque(caisseId, cooperativeId, {
           compteBancaireId,
           montantFcfa: 125_000,
           reference: `TASK80-CASH-TO-BANK-${objectSuffix}`,
-          dateOperation: "2026-08-28",
+          dateOperation: postgresPreviousDate,
         }),
       ]);
     } finally {
@@ -229,21 +262,21 @@ describe.skipIf(!enabled)("virements banque-caisse concurrents sur PostgreSQL", 
       [compteBancaireId, caisseId],
     );
     const bankMovements = await client.query(
-      `SELECT type, motif, montant_fcfa, solde_apres_fcfa
+      `SELECT type, motif, montant_fcfa, solde_apres_fcfa, date_operation::text
        FROM mouvements_banque
        WHERE compte_id = $1
        ORDER BY id`,
       [compteBancaireId],
     );
     const cashMovements = await client.query(
-      `SELECT type, motif, montant_fcfa, solde_apres_fcfa
+      `SELECT type, motif, montant_fcfa, solde_apres_fcfa, date_operation::text
        FROM mouvements_caisse
        WHERE caisse_id = $1
        ORDER BY id`,
       [caisseId],
     );
     const accounting = await client.query(
-      `SELECT montant_fcfa, compte_debit, compte_credit
+      `SELECT montant_fcfa, compte_debit, compte_credit, date_ecriture::text
        FROM ecritures_comptables
        WHERE cooperative_id = $1
        ORDER BY id`,
@@ -258,12 +291,14 @@ describe.skipIf(!enabled)("virements banque-caisse concurrents sur PostgreSQL", 
           motif: "virement_sortant",
           montant_fcfa: "175000",
           solde_apres_fcfa: "325000",
+          date_operation: postgresPreviousDate,
         }),
         expect.objectContaining({
           type: "credit",
           motif: "virement_entrant",
           montant_fcfa: "125000",
           solde_apres_fcfa: "450000",
+          date_operation: postgresPreviousDate,
         }),
       ]),
     );
@@ -274,12 +309,14 @@ describe.skipIf(!enabled)("virements banque-caisse concurrents sur PostgreSQL", 
           motif: "virement_banque",
           montant_fcfa: "175000",
           solde_apres_fcfa: "675000",
+          date_operation: postgresPreviousDate,
         }),
         expect.objectContaining({
           type: "sortie",
           motif: "depot_banque",
           montant_fcfa: "125000",
           solde_apres_fcfa: "550000",
+          date_operation: postgresPreviousDate,
         }),
       ]),
     );
@@ -289,11 +326,13 @@ describe.skipIf(!enabled)("virements banque-caisse concurrents sur PostgreSQL", 
           montant_fcfa: 175_000,
           compte_debit: "571",
           compte_credit: "521",
+          date_ecriture: postgresPreviousDate,
         }),
         expect.objectContaining({
           montant_fcfa: 125_000,
           compte_debit: "521",
           compte_credit: "571",
+          date_ecriture: postgresPreviousDate,
         }),
       ]),
     );
@@ -326,7 +365,7 @@ describe.skipIf(!enabled)("virements banque-caisse concurrents sur PostgreSQL", 
         caisseId,
         montantFcfa: 75_000,
         reference: `TASK80-ACCOUNTING-FAILURE-${objectSuffix}`,
-        dateOperation: "2026-08-28",
+        dateOperation: postgresPreviousDate,
       });
     } catch (error) {
       if (error instanceof Error) {
