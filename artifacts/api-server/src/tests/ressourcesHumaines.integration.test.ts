@@ -1,8 +1,9 @@
 import express from "express";
 import type { Server } from "node:http";
 import jwt from "jsonwebtoken";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { pool } from "@workspace/db";
+import { ObjectStorageService } from "../lib/objectStorage.js";
 import ressourcesHumainesRouter from "../routes/ressourcesHumaines.js";
 
 const enabled = process.env.RUN_POSTGRES_INTEGRATION === "1" && Boolean(process.env.DATABASE_URL);
@@ -17,6 +18,7 @@ describe.skipIf(!enabled)("décisions de congés RH sur PostgreSQL", () => {
   let userA: number;
   let userB: number;
   const createdLeaveIds: number[] = [];
+  const createdDocumentIds: number[] = [];
 
   beforeAll(async () => {
     const suffix = `${process.pid}-${Date.now()}`;
@@ -91,8 +93,11 @@ describe.skipIf(!enabled)("décisions de congés RH sur PostgreSQL", () => {
         server.close((error) => (error ? reject(error) : resolve()));
       });
     }
+    await pool.query(`DELETE FROM rh_historique WHERE cooperative_id IN ($1, $2)`, [cooperativeA, cooperativeB]);
+    if (createdDocumentIds.length > 0) {
+      await pool.query(`DELETE FROM rh_documents WHERE id = ANY($1::int[])`, [createdDocumentIds]);
+    }
     if (createdLeaveIds.length > 0) {
-      await pool.query(`DELETE FROM rh_historique WHERE entite = 'conge' AND entite_id = ANY($1::int[])`, [createdLeaveIds]);
       await pool.query(`DELETE FROM rh_conges WHERE id = ANY($1::int[])`, [createdLeaveIds]);
     }
     await pool.query(`DELETE FROM personnel WHERE id IN ($1, $2)`, [personnelA, personnelB]);
@@ -101,7 +106,9 @@ describe.skipIf(!enabled)("décisions de congés RH sur PostgreSQL", () => {
   });
 
   function token(userId: number, cooperativeId: number): string {
-    return jwt.sign({ id: userId, role: "responsable_rh", cooperativeId }, process.env.JWT_SECRET!);
+    const secret = process.env["JWT_SECRET"] ?? process.env["SESSION_SECRET"];
+    if (!secret) throw new Error("JWT_SECRET et SESSION_SECRET non configurés");
+    return jwt.sign({ id: userId, role: "responsable_rh", cooperativeId }, secret);
   }
 
   async function request(
@@ -136,6 +143,24 @@ describe.skipIf(!enabled)("décisions de congés RH sur PostgreSQL", () => {
     );
     const id = result.rows[0].id;
     createdLeaveIds.push(id);
+    return id;
+  }
+
+  async function insertDocument(
+    cooperativeId: number,
+    personnelId: number,
+    filePath: string,
+    fileName: string,
+  ): Promise<number> {
+    const result = await pool.query(
+      `INSERT INTO rh_documents
+        (cooperative_id, personnel_id, type, titre, fichier_path, fichier_nom, fichier_mime_type, fichier_taille)
+       VALUES ($1, $2, 'attestation', $3, $4, $5, 'application/pdf', 128)
+       RETURNING id`,
+      [cooperativeId, personnelId, `Justificatif ${fileName}`, filePath, fileName],
+    );
+    const id = result.rows[0].id;
+    createdDocumentIds.push(id);
     return id;
   }
 
@@ -222,5 +247,125 @@ describe.skipIf(!enabled)("décisions de congés RH sur PostgreSQL", () => {
       [cooperativeA, personnelA],
     );
     expect(Number(approved.rows[0].jours)).toBe(14);
+  });
+
+  it("journalise les téléchargements de justificatifs et isole l'historique par coopérative et dossier", async () => {
+    const documentA = await insertDocument(
+      cooperativeA,
+      personnelA,
+      `/objects/rh-documents/${cooperativeA}/${personnelA}/document-a.pdf`,
+      "contrat-a.pdf",
+    );
+    const documentB = await insertDocument(
+      cooperativeB,
+      personnelB,
+      `/objects/rh-documents/${cooperativeB}/${personnelB}/document-b.pdf`,
+      "contrat-b.pdf",
+    );
+
+    const getObjectEntityFile = vi
+      .spyOn(ObjectStorageService.prototype, "getObjectEntityFile")
+      .mockImplementation(async () => Object.create(null));
+    const downloadObject = vi
+      .spyOn(ObjectStorageService.prototype, "downloadObject")
+      .mockImplementation(async () => new Response("contenu du justificatif", {
+        status: 200,
+        headers: { "Content-Type": "application/pdf" },
+      }));
+
+    try {
+      const authorizedDownload = await fetch(`${baseUrl}/rh/documents/${documentA}/fichier`, {
+        headers: { Authorization: `Bearer ${token(userA, cooperativeA)}` },
+      });
+      expect(authorizedDownload.status).toBe(200);
+      expect(await authorizedDownload.text()).toBe("contenu du justificatif");
+
+      const crossTenantDownload = await fetch(`${baseUrl}/rh/documents/${documentA}/fichier`, {
+        headers: { Authorization: `Bearer ${token(userB, cooperativeB)}` },
+      });
+      expect(crossTenantDownload.status).toBe(404);
+
+      const auditRows = await pool.query(
+        `SELECT cooperative_id, personnel_id, entite, entite_id, action, details, fait_par, created_at
+         FROM rh_historique
+         WHERE entite = 'document' AND entite_id = $1 AND action = 'consultation_fichier'
+         ORDER BY id`,
+        [documentA],
+      );
+      expect(auditRows.rows).toHaveLength(1);
+      expect(auditRows.rows[0]).toMatchObject({
+        cooperative_id: cooperativeA,
+        personnel_id: personnelA,
+        entite: "document",
+        entite_id: documentA,
+        action: "consultation_fichier",
+        fait_par: userA,
+        details: {
+          nom: "contrat-a.pdf",
+          typeMime: "application/pdf",
+          taille: 128,
+        },
+      });
+      expect(auditRows.rows[0].created_at).toBeInstanceOf(Date);
+
+      const dossierA = await fetch(`${baseUrl}/rh/personnel/${personnelA}`, {
+        headers: { Authorization: `Bearer ${token(userA, cooperativeA)}` },
+      });
+      expect(dossierA.status).toBe(200);
+      const dossierAJson = await dossierA.json() as {
+        historique: Array<{
+          cooperativeId: number;
+          personnelId: number;
+          action: string;
+          entiteId: number | null;
+          faitPar: number | null;
+          createdAt: string;
+        }>;
+      };
+      expect(dossierAJson.historique).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          cooperativeId: cooperativeA,
+          personnelId: personnelA,
+          entiteId: documentA,
+          action: "consultation_fichier",
+          faitPar: userA,
+          createdAt: expect.any(String),
+        }),
+      ]));
+      expect(dossierAJson.historique.every((entry) =>
+        entry.cooperativeId === cooperativeA && entry.personnelId === personnelA,
+      )).toBe(true);
+
+      const dossierAFromB = await fetch(`${baseUrl}/rh/personnel/${personnelA}`, {
+        headers: { Authorization: `Bearer ${token(userB, cooperativeB)}` },
+      });
+      expect(dossierAFromB.status).toBe(404);
+
+      const authorizedDownloadB = await fetch(`${baseUrl}/rh/documents/${documentB}/fichier`, {
+        headers: { Authorization: `Bearer ${token(userB, cooperativeB)}` },
+      });
+      expect(authorizedDownloadB.status).toBe(200);
+
+      const dossierB = await fetch(`${baseUrl}/rh/personnel/${personnelB}`, {
+        headers: { Authorization: `Bearer ${token(userB, cooperativeB)}` },
+      });
+      expect(dossierB.status).toBe(200);
+      const dossierBJson = await dossierB.json() as {
+        historique: Array<{ cooperativeId: number; personnelId: number; entiteId: number | null }>;
+      };
+      expect(dossierBJson.historique).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          cooperativeId: cooperativeB,
+          personnelId: personnelB,
+          entiteId: documentB,
+        }),
+      ]));
+      expect(dossierBJson.historique.every((entry) =>
+        entry.cooperativeId === cooperativeB && entry.personnelId === personnelB,
+      )).toBe(true);
+    } finally {
+      getObjectEntityFile.mockRestore();
+      downloadObject.mockRestore();
+    }
   });
 });
