@@ -76,8 +76,9 @@ pnpm --filter @workspace/frontend run dev
 Le déploiement de l'API suit une chaîne de contrôles obligatoire :
 
 1. Le workflow **PostgreSQL Integration Tests** initialise une base PostgreSQL
-   éphémère et exécute les scénarios de ventilation des paiements et de
-   concurrence des chèques reçus.
+   éphémère et exécute les scénarios RH, de ventilation des paiements, de
+   virements de trésorerie, de concurrence des chèques reçus et de concurrence
+   de la sacherie.
 2. Le workflow **DB Migration (Railway)** ne peut appliquer les migrations
    Railway qu'après la réussite de ce contrôle. Il est déclenché sur les
    commits de `main`/`master` et peut aussi être lancé manuellement.
@@ -89,7 +90,7 @@ Le déploiement de l'API suit une chaîne de contrôles obligatoire :
 Dans les règles de protection de `main` (ou dans une ruleset GitHub), rendre
 obligatoire le contrôle exact :
 
-`PostgreSQL Integration Tests / Payment and received-cheque concurrency protection`
+`PostgreSQL Integration Tests / RH, payment, treasury, received-cheque, and sacherie concurrency protection`
 
 Activer aussi l'obligation de mise à jour de la branche avant fusion et
 interdire les contournements pour les administrateurs. Cette règle empêche une

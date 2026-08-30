@@ -9,6 +9,27 @@ args = ["pnpm", "store", "prune"]
 env = { "CI" = "true" }
 
 [workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "postgres-sacherie-concurrency"
+
+[[workflows.workflow]]
+name = "postgres-sacherie-concurrency"
+author = "agent"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "RUN_POSTGRES_INTEGRATION=1 pnpm --filter @workspace/api-server run test:integration:sacherie"
 
 [agent]
 stack = "BEST_EFFORT_FALLBACK"

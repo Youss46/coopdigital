@@ -54,11 +54,13 @@ jobs:
       - name: Run RH PostgreSQL integration tests
         run: pnpm --filter @workspace/api-server run test:integration:rh
 
-      - name: Run payment, treasury, received-cheque, and sacherie PostgreSQL integration tests
+      - name: Run payment, treasury, and received-cheque PostgreSQL integration tests
         run: |
           pnpm --filter @workspace/api-server run test:integration:payment-ventilation
           pnpm --filter @workspace/api-server run test:integration:treasury-transfer
-          pnpm --filter @workspace/api-server run test:integration:sacherie
+
+      - name: Run sacherie concurrency PostgreSQL integration tests
+        run: pnpm --filter @workspace/api-server run test:integration:sacherie
 
       # The service container is disposable, but also clear it explicitly so a
       # failed test cannot leave fixtures behind if this job is ever reused.
