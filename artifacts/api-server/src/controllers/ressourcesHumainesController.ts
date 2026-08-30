@@ -1,5 +1,8 @@
 import { type Request, type Response } from "express";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import multer from "multer";
+import { Readable } from "stream";
+import { randomUUID } from "crypto";
 import {
   db,
   personnelTable,
@@ -10,9 +13,21 @@ import {
   rhDocumentsTable,
   rhHistoriqueTable,
 } from "@workspace/db";
+import { ObjectNotFoundError, ObjectStorageService } from "../lib/objectStorage.js";
 
 const CONGE_SOLDE_ANNUEL = 26;
 const ECHEANCE_JOURS = 60;
+const RH_DOCUMENT_MAX_BYTES = 10 * 1024 * 1024;
+const RH_DOCUMENT_TYPES: Record<string, string> = {
+  ".pdf": "application/pdf",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".webp": "image/webp",
+  ".doc": "application/msword",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+};
+const objectStorageService = new ObjectStorageService();
 
 class TenantError extends Error {
   readonly status = 401;
@@ -47,6 +62,97 @@ function validDate(value: unknown): string | null {
   if (!result || !/^\d{4}-\d{2}-\d{2}$/.test(result)) return null;
   const parsed = new Date(`${result}T00:00:00Z`);
   return Number.isNaN(parsed.getTime()) ? null : result;
+}
+
+function fileExtension(name: string): string {
+  const lastDot = name.lastIndexOf(".");
+  return lastDot >= 0 ? name.slice(lastDot).toLowerCase() : "";
+}
+
+export function validateRhDocumentFile(file: {
+  originalname: string;
+  mimetype: string;
+  size: number;
+  buffer?: Buffer;
+}): string | null {
+  const extension = fileExtension(file.originalname);
+  const expectedMimeType = RH_DOCUMENT_TYPES[extension];
+  if (!expectedMimeType) {
+    return "Format non supporté. Utilisez PDF, JPG, PNG, WEBP, DOC ou DOCX.";
+  }
+  if (file.size > RH_DOCUMENT_MAX_BYTES) {
+    return "Le fichier dépasse la taille maximale de 10 Mo.";
+  }
+  if (file.mimetype !== expectedMimeType) {
+    return "Le type MIME du fichier ne correspond pas à son extension.";
+  }
+  if (!file.buffer) return null;
+
+  const startsWith = (bytes: number[]) => bytes.every((byte, index) => file.buffer![index] === byte);
+  const validSignature = extension === ".pdf"
+    ? file.buffer.subarray(0, 5).toString("ascii") === "%PDF-"
+    : extension === ".png"
+      ? startsWith([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+      : extension === ".jpg" || extension === ".jpeg"
+        ? startsWith([0xff, 0xd8, 0xff])
+        : extension === ".webp"
+          ? file.buffer.subarray(0, 4).toString("ascii") === "RIFF"
+            && file.buffer.subarray(8, 12).toString("ascii") === "WEBP"
+          : extension === ".docx"
+            ? startsWith([0x50, 0x4b, 0x03, 0x04])
+            : startsWith([0xd0, 0xcf, 0x11, 0xe0]);
+  return validSignature ? null : "Le contenu du fichier ne correspond pas à un document valide.";
+}
+
+export const rhDocumentUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: RH_DOCUMENT_MAX_BYTES },
+  fileFilter: (_req, file, callback) => {
+    const error = validateRhDocumentFile({ ...file, size: 0 });
+    if (error) {
+      callback(new Error(error));
+    } else {
+      callback(null, true);
+    }
+  },
+});
+
+export function rhDocumentUploadMiddleware(
+  req: Request,
+  res: Response,
+  next: (error?: unknown) => void,
+): void {
+  rhDocumentUpload.single("fichier")(req, res, (error) => {
+    if (!error) {
+      next();
+      return;
+    }
+    if (error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE") {
+      res.status(413).json({ erreur: "Le fichier dépasse la taille maximale de 10 Mo." });
+      return;
+    }
+    res.status(400).json({ erreur: error instanceof Error ? error.message : "Fichier invalide" });
+  });
+}
+
+function safeFileName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9._ ()-]/g, "_").slice(0, 180) || "document";
+}
+
+function documentView(row: typeof rhDocumentsTable.$inferSelect, personnelNom?: string) {
+  const { fichierPath, fichierNom, fichierMimeType, fichierTaille, ...document } = row;
+  return {
+    ...document,
+    ...(personnelNom ? { personnelNom } : {}),
+    pieceJointe: fichierPath
+      ? {
+          nom: fichierNom ?? "document",
+          typeMime: fichierMimeType ?? "application/octet-stream",
+          taille: fichierTaille ?? 0,
+          url: `/api/rh/documents/${row.id}/fichier`,
+        }
+      : null,
+  };
 }
 
 export function inclusiveDays(start: string, end: string): number {
@@ -167,7 +273,7 @@ export async function getRhPersonnel(req: Request, res: Response): Promise<void>
       db.select().from(rhAbsencesTable).where(and(eq(rhAbsencesTable.cooperativeId, coopId), eq(rhAbsencesTable.personnelId, id))).orderBy(desc(rhAbsencesTable.dateDebut)),
       db.select().from(rhHistoriqueTable).where(and(eq(rhHistoriqueTable.cooperativeId, coopId), eq(rhHistoriqueTable.personnelId, id))).orderBy(desc(rhHistoriqueTable.createdAt)),
     ]);
-    res.json({ personnel: row, contrats, documents, conges, absences, historique });
+    res.json({ personnel: row, contrats, documents: documents.map((document) => documentView(document)), conges, absences, historique });
   } catch (err) {
     handleError(req, res, err, "getRhPersonnel");
   }
@@ -349,7 +455,7 @@ export async function listRhDocuments(req: Request, res: Response): Promise<void
       .innerJoin(personnelTable, eq(personnelTable.id, rhDocumentsTable.personnelId))
       .where(eq(rhDocumentsTable.cooperativeId, coopId))
       .orderBy(asc(rhDocumentsTable.dateExpiration), desc(rhDocumentsTable.createdAt));
-    res.json(rows.map((row) => ({ ...row.document, personnelNom: `${row.nom} ${row.prenoms}` })));
+    res.json(rows.map((row) => documentView(row.document, `${row.nom} ${row.prenoms}`)));
   } catch (err) {
     handleError(req, res, err, "listRhDocuments");
   }
@@ -380,7 +486,7 @@ export async function createRhDocument(req: Request, res: Response): Promise<voi
       createdBy: req.user?.id ?? null,
     }).returning();
     await logHistory(coopId, personnelId, "document", row?.id ?? null, "creation", { type, titre }, req.user?.id ?? null);
-    res.status(201).json(row);
+    res.status(201).json(documentView(row));
   } catch (err) {
     handleError(req, res, err, "createRhDocument");
   }
@@ -406,9 +512,123 @@ export async function updateRhDocument(req: Request, res: Response): Promise<voi
     if (body["dateExpiration"] !== undefined) updates.dateExpiration = body["dateExpiration"] ? validDate(body["dateExpiration"]) : null;
     const [updated] = await db.update(rhDocumentsTable).set(updates).where(eq(rhDocumentsTable.id, id)).returning();
     await logHistory(coopId, existing.personnelId, "document", id, "modification", { champs: Object.keys(updates) }, req.user?.id ?? null);
-    res.json(updated);
+    res.json(documentView(updated));
   } catch (err) {
     handleError(req, res, err, "updateRhDocument");
+  }
+}
+
+export async function uploadRhDocumentFile(req: Request, res: Response): Promise<void> {
+  try {
+    const coopId = cooperativeId(req);
+    const id = idOf(req.params["id"]);
+    const [existing] = await db.select().from(rhDocumentsTable).where(
+      and(eq(rhDocumentsTable.id, id), eq(rhDocumentsTable.cooperativeId, coopId)),
+    ).limit(1);
+    if (!existing) {
+      res.status(404).json({ erreur: "Document introuvable" });
+      return;
+    }
+    if (!req.file) {
+      res.status(400).json({ erreur: "Fichier requis" });
+      return;
+    }
+    const validationError = validateRhDocumentFile(req.file);
+    if (validationError) {
+      res.status(400).json({ erreur: validationError });
+      return;
+    }
+
+    const extension = fileExtension(req.file.originalname);
+    const objectPath = `/objects/rh-documents/${coopId}/${existing.personnelId}/${id}/${randomUUID()}${extension}`;
+    await objectStorageService.uploadPrivateObject(objectPath, req.file.buffer, req.file.mimetype);
+
+    let updated: typeof existing | undefined;
+    try {
+      [updated] = await db.update(rhDocumentsTable).set({
+        fichierPath: objectPath,
+        fichierNom: safeFileName(req.file.originalname),
+        fichierMimeType: req.file.mimetype,
+        fichierTaille: req.file.size,
+        updatedAt: new Date(),
+      }).where(and(eq(rhDocumentsTable.id, id), eq(rhDocumentsTable.cooperativeId, coopId))).returning();
+    } catch (error) {
+      await objectStorageService.deletePrivateObject(objectPath).catch((cleanupError) => req.log.warn({ err: cleanupError }, "Impossible de supprimer le nouveau fichier RH après échec DB"));
+      throw error;
+    }
+    if (!updated) {
+      await objectStorageService.deletePrivateObject(objectPath).catch(() => undefined);
+      res.status(404).json({ erreur: "Document introuvable" });
+      return;
+    }
+    if (existing.fichierPath && existing.fichierPath !== objectPath) {
+      await objectStorageService.deletePrivateObject(existing.fichierPath).catch((error) => req.log.warn({ err: error }, "Ancien fichier RH impossible à supprimer"));
+    }
+    await logHistory(coopId, existing.personnelId, "document", id, existing.fichierPath ? "remplacement_fichier" : "ajout_fichier", {
+      nom: safeFileName(req.file.originalname),
+      taille: req.file.size,
+    }, req.user?.id ?? null);
+    res.json(documentView(updated));
+  } catch (err) {
+    handleError(req, res, err, "uploadRhDocumentFile");
+  }
+}
+
+export async function deleteRhDocumentFile(req: Request, res: Response): Promise<void> {
+  try {
+    const coopId = cooperativeId(req);
+    const id = idOf(req.params["id"]);
+    const [existing] = await db.select().from(rhDocumentsTable).where(
+      and(eq(rhDocumentsTable.id, id), eq(rhDocumentsTable.cooperativeId, coopId)),
+    ).limit(1);
+    if (!existing) {
+      res.status(404).json({ erreur: "Document introuvable" });
+      return;
+    }
+    const [updated] = await db.update(rhDocumentsTable).set({
+      fichierPath: null,
+      fichierNom: null,
+      fichierMimeType: null,
+      fichierTaille: null,
+      updatedAt: new Date(),
+    }).where(and(eq(rhDocumentsTable.id, id), eq(rhDocumentsTable.cooperativeId, coopId))).returning();
+    if (existing.fichierPath) {
+      await objectStorageService.deletePrivateObject(existing.fichierPath).catch((error) => req.log.warn({ err: error }, "Fichier RH impossible à supprimer du stockage"));
+    }
+    await logHistory(coopId, existing.personnelId, "document", id, "suppression_fichier", {}, req.user?.id ?? null);
+    res.json(documentView(updated));
+  } catch (err) {
+    handleError(req, res, err, "deleteRhDocumentFile");
+  }
+}
+
+export async function downloadRhDocumentFile(req: Request, res: Response): Promise<void> {
+  try {
+    const coopId = cooperativeId(req);
+    const id = idOf(req.params["id"]);
+    const [document] = await db.select().from(rhDocumentsTable).where(
+      and(eq(rhDocumentsTable.id, id), eq(rhDocumentsTable.cooperativeId, coopId)),
+    ).limit(1);
+    if (!document || !document.fichierPath) {
+      res.status(404).json({ erreur: "Fichier RH introuvable" });
+      return;
+    }
+    const objectFile = await objectStorageService.getObjectEntityFile(document.fichierPath);
+    const response = await objectStorageService.downloadObject(objectFile, 0);
+    res.status(response.status);
+    response.headers.forEach((value, key) => res.setHeader(key, value));
+    res.setHeader("Content-Disposition", `attachment; filename="${safeFileName(document.fichierNom ?? "document")}"`);
+    if (response.body) {
+      Readable.fromWeb(response.body as ReadableStream<Uint8Array>).pipe(res);
+    } else {
+      res.end();
+    }
+  } catch (err) {
+    if (err instanceof ObjectNotFoundError) {
+      res.status(404).json({ erreur: "Fichier RH introuvable" });
+      return;
+    }
+    handleError(req, res, err, "downloadRhDocumentFile");
   }
 }
 

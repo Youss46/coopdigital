@@ -20,6 +20,9 @@ router.put("/rh/contrats/:id", checkPermission("rh", "gerer_contrats"), ctrl.upd
 router.get("/rh/documents", checkPermission("rh", "lire"), ctrl.listRhDocuments);
 router.post("/rh/documents", checkPermission("rh", "gerer_documents"), ctrl.createRhDocument);
 router.put("/rh/documents/:id", checkPermission("rh", "gerer_documents"), ctrl.updateRhDocument);
+router.get("/rh/documents/:id/fichier", checkPermission("rh", "lire"), ctrl.downloadRhDocumentFile);
+router.post("/rh/documents/:id/fichier", checkPermission("rh", "gerer_documents"), ctrl.rhDocumentUploadMiddleware, ctrl.uploadRhDocumentFile);
+router.delete("/rh/documents/:id/fichier", checkPermission("rh", "gerer_documents"), ctrl.deleteRhDocumentFile);
 
 router.get("/rh/conges", checkPermission("rh", "lire"), ctrl.listRhConges);
 router.post("/rh/conges", checkPermission("rh", "demander_conge"), ctrl.createRhConge);

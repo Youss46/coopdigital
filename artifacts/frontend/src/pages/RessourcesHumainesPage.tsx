@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle, BriefcaseBusiness, CalendarDays, Check, Clock3, FileText,
-  History, Pencil, Plus, RefreshCw, ShieldCheck, UserRound, Users,
+  History, Pencil, Plus, RefreshCw, ShieldCheck, Trash2, Upload, UserRound, Users,
   XCircle,
 } from "lucide-react";
 import { usePermission } from "@/hooks/usePermission";
@@ -27,6 +27,38 @@ async function apiMutate<T>(path: string, method: "POST" | "PUT", body: unknown)
   return response.json() as Promise<T>;
 }
 
+async function apiUpload<T>(path: string, file: File): Promise<T> {
+  const body = new FormData();
+  body.append("fichier", file);
+  const response = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token()}` },
+    body,
+  });
+  if (!response.ok) throw new Error((await response.json().catch(() => null) as { erreur?: string } | null)?.erreur ?? `Erreur ${response.status}`);
+  return response.json() as Promise<T>;
+}
+
+async function apiDelete<T>(path: string): Promise<T> {
+  const response = await fetch(`${BASE}${path}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token()}` },
+  });
+  if (!response.ok) throw new Error((await response.json().catch(() => null) as { erreur?: string } | null)?.erreur ?? `Erreur ${response.status}`);
+  return response.json() as Promise<T>;
+}
+
+async function downloadRhFile(path: string, fileName: string) {
+  const response = await fetch(`${BASE}${path}`, { headers: { Authorization: `Bearer ${token()}` } });
+  if (!response.ok) throw new Error((await response.json().catch(() => null) as { erreur?: string } | null)?.erreur ?? `Erreur ${response.status}`);
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 type Personnel = {
   id: number; nom: string; prenoms: string; poste: string; roleSysteme: string | null;
   userId: number | null; dateEmbauche: string; dateFinContrat: string | null;
@@ -43,7 +75,7 @@ type Dashboard = {
   echeances: { id: number; nature: string; personnelId: number; date: string; titre: string; urgent: boolean }[];
 };
 type Contract = { id: number; personnelId: number; personnelNom: string; poste: string; type: string; reference: string | null; dateDebut: string; dateFin: string | null; dateSignature: string | null; statut: string; notes: string | null };
-type Document = { id: number; personnelId: number; personnelNom: string; type: string; titre: string; reference: string | null; dateDocument: string | null; dateExpiration: string | null; url: string | null; notes: string | null };
+type Document = { id: number; personnelId: number; personnelNom: string; type: string; titre: string; reference: string | null; dateDocument: string | null; dateExpiration: string | null; url: string | null; notes: string | null; pieceJointe: { nom: string; typeMime: string; taille: number; url: string } | null };
 type Leave = { id: number; personnelId: number; personnelNom: string; poste: string; type: string; dateDebut: string; dateFin: string; jours: number; motif: string | null; statut: string; solde?: { entitlement: number; used: number; remaining: number } };
 type Absence = { id: number; personnelId: number; personnelNom: string; poste: string; type: string; dateDebut: string; dateFin: string; jours: number; motif: string | null; justificatifUrl: string | null; statut: string };
 
@@ -166,16 +198,46 @@ function DossiersTab({ personnel, users, selected, selectedId, onSelect, canEdit
 }
 
 function ContractsTab({ personnel, contracts, documents, canContracts, canDocuments, onSaved }: { personnel: Personnel[]; contracts: Contract[]; documents: Document[]; canContracts: boolean; canDocuments: boolean; onSaved: () => void }) {
+  const { toast } = useToast();
   const [section, setSection] = useState<"contrats" | "documents">("contrats");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<Record<string, string>>({ personnelId: "", type: "cdi", titre: "", dateDebut: "", dateFin: "", dateExpiration: "", reference: "", url: "", notes: "" });
   const contractMut = useRhMutation("/api/rh/contrats", "POST", () => { setShowForm(false); onSaved(); });
   const documentMut = useRhMutation("/api/rh/documents", "POST", () => { setShowForm(false); onSaved(); });
+  const uploadFile = useMutation({
+    mutationFn: ({ id, file }: { id: number; file: File }) => apiUpload<Document>(`/api/rh/documents/${id}/fichier`, file),
+    onSuccess: () => { toast({ title: "Pièce jointe enregistrée" }); onSaved(); },
+    onError: (error: Error) => toast({ title: "Dépôt impossible", description: error.message, variant: "destructive" }),
+  });
+  const deleteFile = useMutation({
+    mutationFn: (id: number) => apiDelete<Document>(`/api/rh/documents/${id}/fichier`),
+    onSuccess: () => { toast({ title: "Pièce jointe retirée" }); onSaved(); },
+    onError: (error: Error) => toast({ title: "Retrait impossible", description: error.message, variant: "destructive" }),
+  });
   const canCreate = section === "contrats" ? canContracts : canDocuments;
   function update(key: string, value: string) { setForm({ ...form, [key]: value }); }
-  return <div className="space-y-5"><div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div className="flex gap-2"><button className={`${buttonClass} ${section === "contrats" ? "bg-emerald-700 text-white" : "border border-slate-200 text-slate-600"}`} onClick={() => setSection("contrats")}><BriefcaseBusiness size={16} />Contrats</button><button className={`${buttonClass} ${section === "documents" ? "bg-emerald-700 text-white" : "border border-slate-200 text-slate-600"}`} onClick={() => setSection("documents")}><FileText size={16} />Documents</button></div>{canCreate && <button className={`${buttonClass} bg-emerald-700 text-white`} onClick={() => setShowForm(!showForm)}><Plus size={16} />Ajouter</button>}</div>
-    {showForm && <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4"><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Field label="Personnel"><select className={inputClass} value={form.personnelId} onChange={(e) => update("personnelId", e.target.value)}><option value="">Sélectionner…</option>{personnel.filter((p) => p.statut !== "sorti").map((p) => <option key={p.id} value={p.id}>{p.nom} {p.prenoms}</option>)}</select></Field>{section === "contrats" ? <><Field label="Type"><select className={inputClass} value={form.type} onChange={(e) => update("type", e.target.value)}><option value="cdi">CDI</option><option value="cdd">CDD</option><option value="journalier">Journalier</option><option value="stagiaire">Stagiaire</option></select></Field><Field label="Début"><input type="date" className={inputClass} value={form.dateDebut} onChange={(e) => update("dateDebut", e.target.value)} /></Field><Field label="Fin (facultatif)"><input type="date" className={inputClass} value={form.dateFin} onChange={(e) => update("dateFin", e.target.value)} /></Field></> : <><Field label="Type"><select className={inputClass} value={form.type} onChange={(e) => update("type", e.target.value)}><option value="cni">CNI</option><option value="cnps">Attestation CNPS</option><option value="diplome">Diplôme</option><option value="medical">Certificat médical</option><option value="autre">Autre</option></select></Field><Field label="Titre"><input className={inputClass} value={form.titre} onChange={(e) => update("titre", e.target.value)} /></Field><Field label="Expiration"><input type="date" className={inputClass} value={form.dateExpiration} onChange={(e) => update("dateExpiration", e.target.value)} /></Field></>}</div><div className="mt-3 flex justify-end gap-2"><button className={`${buttonClass} border border-slate-200 bg-white text-slate-600`} onClick={() => setShowForm(false)}>Annuler</button><button className={`${buttonClass} bg-emerald-700 text-white`} disabled={!form.personnelId || (section === "contrats" ? !form.dateDebut : !form.titre) || contractMut.isPending || documentMut.isPending} onClick={() => section === "contrats" ? contractMut.mutate({ personnelId: Number(form.personnelId), type: form.type, dateDebut: form.dateDebut, dateFin: form.dateFin || null, reference: form.reference || null, notes: form.notes || null }) : documentMut.mutate({ personnelId: Number(form.personnelId), type: form.type, titre: form.titre, dateExpiration: form.dateExpiration || null, reference: form.reference || null, url: form.url || null, notes: form.notes || null })}><Check size={16} />Enregistrer</button></div></div>}
-    {section === "contrats" ? <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm"><table className="w-full min-w-[700px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Personnel</th><th className="p-3">Type</th><th className="p-3">Période</th><th className="p-3">Statut</th><th className="p-3">Référence</th></tr></thead><tbody className="divide-y divide-slate-100">{contracts.map((row) => <tr key={row.id}><td className="p-3 font-medium text-slate-800">{row.personnelNom}<div className="text-xs font-normal text-slate-500">{row.poste}</div></td><td className="p-3">{row.type.toUpperCase()}</td><td className="p-3">{dateLabel(row.dateDebut)} → {dateLabel(row.dateFin)}</td><td className="p-3"><StatusBadge value={row.statut} /></td><td className="p-3 text-slate-500">{row.reference ?? "—"}</td></tr>)}</tbody></table>{contracts.length === 0 && <p className="p-8 text-center text-sm text-slate-500">Aucun contrat suivi.</p>}</div> : <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm"><table className="w-full min-w-[700px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Personnel</th><th className="p-3">Document</th><th className="p-3">Date</th><th className="p-3">Expiration</th><th className="p-3">Lien</th></tr></thead><tbody className="divide-y divide-slate-100">{documents.map((row) => <tr key={row.id}><td className="p-3 font-medium text-slate-800">{row.personnelNom}</td><td className="p-3">{row.titre}<div className="text-xs text-slate-500">{row.type}</div></td><td className="p-3">{dateLabel(row.dateDocument)}</td><td className={`p-3 ${row.dateExpiration && row.dateExpiration < new Date().toISOString().slice(0, 10) ? "font-semibold text-red-600" : "text-slate-600"}`}>{dateLabel(row.dateExpiration)}</td><td className="p-3">{row.url ? <a className="text-emerald-700 underline" href={row.url} target="_blank" rel="noreferrer">Ouvrir</a> : "—"}</td></tr>)}</tbody></table>{documents.length === 0 && <p className="p-8 text-center text-sm text-slate-500">Aucun document suivi.</p>}</div>}</div>;
+  function fileSize(bytes: number) {
+    if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} Ko`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
+  }
+  return <div className="space-y-5">
+    <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+      <div className="flex gap-2">
+        <button className={`${buttonClass} ${section === "contrats" ? "bg-emerald-700 text-white" : "border border-slate-200 text-slate-600"}`} onClick={() => setSection("contrats")}><BriefcaseBusiness size={16} />Contrats</button>
+        <button className={`${buttonClass} ${section === "documents" ? "bg-emerald-700 text-white" : "border border-slate-200 text-slate-600"}`} onClick={() => setSection("documents")}><FileText size={16} />Documents</button>
+      </div>
+      {canCreate && <button className={`${buttonClass} bg-emerald-700 text-white`} onClick={() => setShowForm(!showForm)}><Plus size={16} />Ajouter</button>}
+    </div>
+    {showForm && <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Field label="Personnel"><select className={inputClass} value={form.personnelId} onChange={(e) => update("personnelId", e.target.value)}><option value="">Sélectionner…</option>{personnel.filter((p) => p.statut !== "sorti").map((p) => <option key={p.id} value={p.id}>{p.nom} {p.prenoms}</option>)}</select></Field>
+        {section === "contrats" ? <><Field label="Type"><select className={inputClass} value={form.type} onChange={(e) => update("type", e.target.value)}><option value="cdi">CDI</option><option value="cdd">CDD</option><option value="journalier">Journalier</option><option value="stagiaire">Stagiaire</option></select></Field><Field label="Début"><input type="date" className={inputClass} value={form.dateDebut} onChange={(e) => update("dateDebut", e.target.value)} /></Field><Field label="Fin (facultatif)"><input type="date" className={inputClass} value={form.dateFin} onChange={(e) => update("dateFin", e.target.value)} /></Field></> : <><Field label="Type"><select className={inputClass} value={form.type} onChange={(e) => update("type", e.target.value)}><option value="cni">CNI</option><option value="cnps">Attestation CNPS</option><option value="diplome">Diplôme</option><option value="medical">Certificat médical</option><option value="autre">Autre</option></select></Field><Field label="Titre"><input className={inputClass} value={form.titre} onChange={(e) => update("titre", e.target.value)} /></Field><Field label="Expiration"><input type="date" className={inputClass} value={form.dateExpiration} onChange={(e) => update("dateExpiration", e.target.value)} /></Field></>}
+      </div>
+      {section === "documents" && <p className="mt-3 text-xs text-slate-600">Vous pourrez joindre le fichier juste après la création du document. Formats acceptés : PDF, JPG, PNG, WEBP, DOC ou DOCX, 10 Mo maximum.</p>}
+      <div className="mt-3 flex justify-end gap-2"><button className={`${buttonClass} border border-slate-200 bg-white text-slate-600`} onClick={() => setShowForm(false)}>Annuler</button><button className={`${buttonClass} bg-emerald-700 text-white`} disabled={!form.personnelId || (section === "contrats" ? !form.dateDebut : !form.titre) || contractMut.isPending || documentMut.isPending} onClick={() => section === "contrats" ? contractMut.mutate({ personnelId: Number(form.personnelId), type: form.type, dateDebut: form.dateDebut, dateFin: form.dateFin || null, reference: form.reference || null, notes: form.notes || null }) : documentMut.mutate({ personnelId: Number(form.personnelId), type: form.type, titre: form.titre, dateExpiration: form.dateExpiration || null, reference: form.reference || null, url: form.url || null, notes: form.notes || null })}><Check size={16} />Enregistrer</button></div>
+    </div>}
+    {section === "contrats" ? <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm"><table className="w-full min-w-[700px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Personnel</th><th className="p-3">Type</th><th className="p-3">Période</th><th className="p-3">Statut</th><th className="p-3">Référence</th></tr></thead><tbody className="divide-y divide-slate-100">{contracts.map((row) => <tr key={row.id}><td className="p-3 font-medium text-slate-800">{row.personnelNom}<div className="text-xs font-normal text-slate-500">{row.poste}</div></td><td className="p-3">{row.type.toUpperCase()}</td><td className="p-3">{dateLabel(row.dateDebut)} → {dateLabel(row.dateFin)}</td><td className="p-3"><StatusBadge value={row.statut} /></td><td className="p-3 text-slate-500">{row.reference ?? "—"}</td></tr>)}</tbody></table>{contracts.length === 0 && <p className="p-8 text-center text-sm text-slate-500">Aucun contrat suivi.</p>}</div> : <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm"><table className="w-full min-w-[900px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Personnel</th><th className="p-3">Document</th><th className="p-3">Date</th><th className="p-3">Expiration</th><th className="p-3">Pièce jointe</th><th className="p-3">Action</th></tr></thead><tbody className="divide-y divide-slate-100">{documents.map((row) => <tr key={row.id}><td className="p-3 font-medium text-slate-800">{row.personnelNom}</td><td className="p-3">{row.titre}<div className="text-xs text-slate-500">{row.type}</div></td><td className="p-3">{dateLabel(row.dateDocument)}</td><td className={`p-3 ${row.dateExpiration && row.dateExpiration < new Date().toISOString().slice(0, 10) ? "font-semibold text-red-600" : "text-slate-600"}`}>{dateLabel(row.dateExpiration)}</td><td className="p-3">{row.pieceJointe ? <button className="text-left text-emerald-700 hover:underline" onClick={() => void downloadRhFile(row.pieceJointe!.url, row.pieceJointe!.nom).catch((error: Error) => toast({ title: "Téléchargement impossible", description: error.message, variant: "destructive" }))}><span className="block max-w-[190px] truncate font-medium">{row.pieceJointe.nom}</span><span className="text-xs text-slate-500">{fileSize(row.pieceJointe.taille)}</span></button> : <span className="text-slate-400">Aucune pièce</span>}</td><td className="p-3"><div className="flex items-center gap-2">{canDocuments && <><input id={`rh-file-${row.id}`} className="sr-only" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,application/pdf,image/jpeg,image/png,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" disabled={uploadFile.isPending} onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ""; if (file) uploadFile.mutate({ id: row.id, file }); }} /><label htmlFor={`rh-file-${row.id}`} className={`${buttonClass} cursor-pointer border border-slate-200 bg-white text-slate-600 hover:bg-slate-50`}><Upload size={15} />{row.pieceJointe ? "Remplacer" : "Joindre"}</label>{row.pieceJointe && <button className={`${buttonClass} border border-red-100 bg-red-50 px-2 text-red-700`} disabled={deleteFile.isPending} title="Retirer la pièce jointe" onClick={() => { if (window.confirm("Retirer cette pièce jointe ?")) deleteFile.mutate(row.id); }}><Trash2 size={15} /></button>}</>}</div></td></tr>)}</tbody></table>{documents.length === 0 && <p className="p-8 text-center text-sm text-slate-500">Aucun document suivi.</p>}</div>}
+  </div>;
 }
 
 function LeaveTab({ personnel, leaves, absences, canRequestLeave, canApproveLeave, canAbsences, onSaved }: { personnel: Personnel[]; leaves: Leave[]; absences: Absence[]; canRequestLeave: boolean; canApproveLeave: boolean; canAbsences: boolean; onSaved: () => void }) {

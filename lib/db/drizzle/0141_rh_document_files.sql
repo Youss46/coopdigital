@@ -1,0 +1,4 @@
+ALTER TABLE rh_documents ADD COLUMN IF NOT EXISTS fichier_path TEXT;
+ALTER TABLE rh_documents ADD COLUMN IF NOT EXISTS fichier_nom VARCHAR(180);
+ALTER TABLE rh_documents ADD COLUMN IF NOT EXISTS fichier_mime_type VARCHAR(120);
+ALTER TABLE rh_documents ADD COLUMN IF NOT EXISTS fichier_taille INTEGER;

@@ -154,6 +154,39 @@ export class ObjectStorageService {
     return objectFile;
   }
 
+  async uploadPrivateObject(
+    objectPath: string,
+    contents: Buffer,
+    contentType: string,
+  ): Promise<void> {
+    if (!objectPath.startsWith("/objects/")) {
+      throw new ObjectNotFoundError();
+    }
+
+    const entityId = objectPath.slice("/objects/".length);
+    if (!entityId || entityId.includes("..") || entityId.includes("//")) {
+      throw new Error("Invalid private object path");
+    }
+
+    let entityDir = this.getPrivateObjectDir();
+    if (!entityDir.endsWith("/")) {
+      entityDir = `${entityDir}/`;
+    }
+    const { bucketName, objectName } = parseObjectPath(`${entityDir}${entityId}`);
+    await objectStorageClient.bucket(bucketName).file(objectName).save(contents, {
+      resumable: false,
+      metadata: {
+        contentType,
+        cacheControl: "private, no-store",
+      },
+    });
+  }
+
+  async deletePrivateObject(objectPath: string): Promise<void> {
+    const objectFile = await this.getObjectEntityFile(objectPath);
+    await objectFile.delete({ ignoreNotFound: true });
+  }
+
   normalizeObjectEntityPath(rawPath: string): string {
     if (!rawPath.startsWith("https://storage.googleapis.com/")) {
       return rawPath;

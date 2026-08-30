@@ -88,6 +88,12 @@ router.get("/storage/objects/*path", async (req: Request, res: Response) => {
   try {
     const raw = req.params.path;
     const wildcardPath = Array.isArray(raw) ? raw.join("/") : raw;
+    // Les pièces RH sont servies exclusivement par la route RH, qui vérifie
+    // la coopérative du dossier avant d'accéder à l'objet privé.
+    if (wildcardPath.startsWith("rh-documents/")) {
+      res.status(404).json({ error: "Object not found" });
+      return;
+    }
     const objectPath = `/objects/${wildcardPath}`;
     const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
 

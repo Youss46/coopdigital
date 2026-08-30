@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { hasPermission } from "../middlewares/permissions.js";
-import { inclusiveDays } from "../controllers/ressourcesHumainesController.js";
+import { inclusiveDays, validateRhDocumentFile } from "../controllers/ressourcesHumainesController.js";
 
 describe("module RH", () => {
   it("calcule les jours de congé sur une période inclusive", () => {
@@ -16,5 +16,35 @@ describe("module RH", () => {
     expect(hasPermission("comptable", "rh", "modifier_dossier")).toBe(false);
     expect(hasPermission("auditeur", "rh", "lire")).toBe(true);
     expect(hasPermission("auditeur", "rh", "gerer_documents")).toBe(false);
+  });
+
+  it("contrôle le format, le type MIME, la taille et la signature des pièces RH", () => {
+    expect(validateRhDocumentFile({
+      originalname: "attestation.pdf",
+      mimetype: "application/pdf",
+      size: 128,
+      buffer: Buffer.from("%PDF-1.7"),
+    })).toBeNull();
+    expect(validateRhDocumentFile({
+      originalname: "attestation.exe",
+      mimetype: "application/octet-stream",
+      size: 128,
+    })).toContain("Format non supporté");
+    expect(validateRhDocumentFile({
+      originalname: "attestation.pdf",
+      mimetype: "application/pdf",
+      size: 10 * 1024 * 1024 + 1,
+    })).toContain("10 Mo");
+    expect(validateRhDocumentFile({
+      originalname: "attestation.pdf",
+      mimetype: "application/pdf",
+      size: 128,
+      buffer: Buffer.from("not a PDF"),
+    })).toContain("contenu");
+    expect(validateRhDocumentFile({
+      originalname: "attestation.pdf",
+      mimetype: "image/png",
+      size: 128,
+    })).toContain("MIME");
   });
 });
