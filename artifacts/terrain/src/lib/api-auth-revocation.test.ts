@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { apiGet } from "./api";
 import {
   clearAuth,
+  COOPERATIVE_MISSING_MESSAGE,
   getAuthMessage,
   getToken,
   isAccountDisabled,
@@ -67,6 +68,39 @@ describe("révocation terrain côté client", () => {
     expect(getToken()).toBeNull();
     expect(isAccountDisabled()).toBe(true);
     expect(getAuthMessage()).toBe(COMPTE_DESACTIVE_MESSAGE);
+    expect((globalThis.window as { location: { href: string } }).location.href).toBe("/login");
+  });
+
+  it("remplace le 401 générique Non autorisé par une cause de rattachement explicite", async () => {
+    saveAuth("jwt-encore-valide", user);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({ erreur: "Non autorisé" }),
+    }));
+
+    await expect(apiGet("/profil")).rejects.toThrow(COOPERATIVE_MISSING_MESSAGE);
+
+    expect(getToken()).toBeNull();
+    expect(getAuthMessage()).toBe(COOPERATIVE_MISSING_MESSAGE);
+    expect((globalThis.window as { location: { href: string } }).location.href).toBe("/login");
+  });
+
+  it("redirige aussi pour le code de coopérative manquante renvoyé en 403", async () => {
+    saveAuth("jwt-encore-valide", user);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      json: async () => ({
+        code: "COOPERATIVE_MISSING",
+        erreur: COOPERATIVE_MISSING_MESSAGE,
+      }),
+    }));
+
+    await expect(apiGet("/profil")).rejects.toThrow(COOPERATIVE_MISSING_MESSAGE);
+
+    expect(getToken()).toBeNull();
+    expect(getAuthMessage()).toBe(COOPERATIVE_MISSING_MESSAGE);
     expect((globalThis.window as { location: { href: string } }).location.href).toBe("/login");
   });
 });

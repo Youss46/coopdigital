@@ -10,6 +10,8 @@ export const TERRAIN_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 export const COMPTE_DESACTIVE_CODE = "COMPTE_DESACTIVE";
 export const COMPTE_DESACTIVE_MESSAGE =
   "Votre compte a été désactivé par l’administration. Contactez votre responsable.";
+export const COOPERATIVE_MISSING_MESSAGE =
+  "Ce compte terrain n’est rattaché à aucune coopérative. Contactez l’administration.";
 
 export interface StoredTerrainAuth {
   token: string;

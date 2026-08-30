@@ -4,6 +4,7 @@ import {
   setAuthMessage,
   markAccountDisabled,
   COMPTE_DESACTIVE_MESSAGE,
+  COOPERATIVE_MISSING_MESSAGE,
 } from "./auth";
 import { queueOp, queueGpsOp, queueEnqueteOp, type PendingOpType, type GpsOp } from "./idb";
 import {
@@ -36,6 +37,22 @@ function throwApiError(
     const message = body.erreur || COMPTE_DESACTIVE_MESSAGE;
     markAccountDisabled(message);
     window.location.href = `${import.meta.env.BASE_URL ?? "/"}login`;
+    throw new Error(message);
+  }
+
+  if (
+    body.code === "COOPERATIVE_MISSING"
+    || body.erreur === "Non autorisé"
+    || body.erreur?.includes("Coopérative non associée")
+  ) {
+    const message = body.erreur === "Non autorisé"
+      ? COOPERATIVE_MISSING_MESSAGE
+      : (body.erreur || COOPERATIVE_MISSING_MESSAGE);
+    if (!skipSessionExpiry) {
+      clearAuth();
+      setAuthMessage(message);
+      window.location.href = `${import.meta.env.BASE_URL ?? "/"}login`;
+    }
     throw new Error(message);
   }
 
