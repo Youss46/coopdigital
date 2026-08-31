@@ -103,8 +103,8 @@ async function apiFetch<T>(path: string, options: RequestInit = {}, skipSessionE
 }
 
 export function apiGet<T>(path: string): Promise<T> { return apiFetch<T>(path); }
-export function apiPost<T>(path: string, data: unknown): Promise<T> {
-  return apiFetch<T>(path, { method: "POST", body: JSON.stringify(data) });
+export function apiPost<T>(path: string, data: unknown, skipSessionExpiry = false): Promise<T> {
+  return apiFetch<T>(path, { method: "POST", body: JSON.stringify(data) }, skipSessionExpiry);
 }
 export function apiPut<T>(path: string, data: unknown): Promise<T> {
   return apiFetch<T>(path, { method: "PUT", body: JSON.stringify(data) });

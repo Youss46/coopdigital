@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { apiGet } from "./api";
+import { apiGet, apiPost } from "./api";
 import {
   clearAuth,
   COOPERATIVE_MISSING_MESSAGE,
@@ -117,6 +117,24 @@ describe("révocation terrain côté client", () => {
 
     await expect(apiGet("/pesee/sessions")).rejects.toThrow(/HTTP 403.*FEATURE_DISABLED/);
     expect(getToken()).toBe("jwt-encore-valide");
+    expect((globalThis.window as { location: { href: string } }).location.href).toBe("");
+  });
+
+  it("ne déconnecte pas la session pour un refus de souscription Push facultative", async () => {
+    saveAuth("jwt-encore-valide", user);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({ erreur: "Non autorisé" }),
+    }));
+
+    await expect(apiPost("/push/subscribe", {
+      endpoint: "https://push.example/subscription",
+      keys: { p256dh: "p256dh", auth: "auth" },
+    }, true)).rejects.toThrow(/Non autorisé.*HTTP 401/);
+
+    expect(getToken()).toBe("jwt-encore-valide");
+    expect(getAuthMessage()).toBeNull();
     expect((globalThis.window as { location: { href: string } }).location.href).toBe("");
   });
 });

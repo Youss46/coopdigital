@@ -38,13 +38,15 @@ async function registerPushSubscription(): Promise<void> {
       applicationServerKey: urlBase64ToUint8Array(vapidKey).buffer as ArrayBuffer,
     });
 
+    // Une souscription Push est facultative : un refus ne doit jamais
+    // effacer la session terrain ni rediriger l'utilisateur vers la connexion.
     await apiPost("/push/subscribe", {
       endpoint: sub.endpoint,
       keys: {
         p256dh: btoa(String.fromCharCode(...new Uint8Array(sub.getKey("p256dh")!))),
         auth:   btoa(String.fromCharCode(...new Uint8Array(sub.getKey("auth")!))),
       },
-    });
+    }, true);
   } catch {
     // Push non disponible sur cet appareil — on ignore silencieusement
   }
