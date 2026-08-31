@@ -109,6 +109,122 @@ function fullName(member?: Pick<Delegate, "nom" | "prenoms"> | null) {
   return [member.nom, member.prenoms].filter(Boolean).join(" ");
 }
 
+function normalizeSearchText(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+
+function MemberSelector({
+  members,
+  value,
+  onChange,
+  required,
+  allowCentral,
+  testId,
+}: {
+  members: Delegate[];
+  value: string;
+  onChange: (value: string) => void;
+  required: boolean;
+  allowCentral: boolean;
+  testId: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const selectedMember = members.find((member) => String(member.id) === value);
+  const normalizedQuery = normalizeSearchText(query);
+  const filteredMembers = useMemo(() => {
+    if (!normalizedQuery) return members;
+    return members.filter((member) => normalizeSearchText([
+      fullName(member),
+      member.numeroMembre ?? "",
+      member.village ?? "",
+    ].join(" ")).includes(normalizedQuery));
+  }, [members, normalizedQuery]);
+
+  function selectMember(memberId: string) {
+    onChange(memberId);
+    setQuery("");
+    setOpen(false);
+  }
+
+  return (
+    <div className="sacherie-member-picker">
+      <div className={`sacherie-member-picker-control${open ? " is-open" : ""}`}>
+        <Search size={15} aria-hidden="true" />
+        <input
+          role="combobox"
+          aria-expanded={open}
+          aria-controls={`${testId}-options`}
+          aria-autocomplete="list"
+          value={open ? query : selectedMember ? fullName(selectedMember) : ""}
+          onChange={(event) => { setQuery(event.target.value); setOpen(true); }}
+          onFocus={() => { setQuery(""); setOpen(true); }}
+          onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+          placeholder={selectedMember ? fullName(selectedMember) : allowCentral ? "Rechercher ou choisir Stock central" : "Rechercher un membre"}
+          aria-label="Rechercher un membre délégué par nom ou prénom"
+          data-testid={testId}
+        />
+        {selectedMember && (
+          <button
+            type="button"
+            className="sacherie-member-picker-clear"
+            aria-label="Effacer le membre sélectionné"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => selectMember("")}
+          >
+            <X size={14} />
+          </button>
+        )}
+      </div>
+      {open && (
+        <div id={`${testId}-options`} className="sacherie-member-picker-options" role="listbox">
+          {allowCentral && !normalizedQuery && (
+            <button
+              type="button"
+              role="option"
+              aria-selected={!selectedMember}
+              className={`sacherie-member-picker-option${!selectedMember ? " selected" : ""}`}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => selectMember("")}
+            >
+              <strong>Stock central</strong>
+              <small>Aucun membre délégué</small>
+            </button>
+          )}
+          {filteredMembers.map((member) => (
+            <button
+              key={member.id}
+              type="button"
+              role="option"
+              aria-selected={String(member.id) === value}
+              className={`sacherie-member-picker-option${String(member.id) === value ? " selected" : ""}`}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => selectMember(String(member.id))}
+            >
+              <strong>{fullName(member)}</strong>
+              <small>
+                {[
+                  member.numeroMembre,
+                  member.village,
+                  `${member.sacsDetenus} détenus`,
+                ].filter(Boolean).join(" · ")}
+              </small>
+            </button>
+          ))}
+          {!filteredMembers.length && (
+            <p className="sacherie-member-picker-empty">
+              Aucun membre trouvé pour « {query} »
+            </p>
+          )}
+          {required && !members.length && (
+            <p className="sacherie-member-picker-empty">Aucun membre délégué disponible.</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const movementMeta: Record<MovementType, { label: string; short: string; icon: typeof ArrowDownToLine; tone: string }> = {
   entree: { label: "Entrée stock", short: "Entrée", icon: ArrowDownToLine, tone: "sage" },
   attribution: { label: "Attribution", short: "Attribution", icon: ArrowUpFromLine, tone: "gold" },
@@ -249,7 +365,7 @@ function MovementDialog({ open, onOpenChange, types, members, campaigns, default
             <label className="sacherie-field"><span>Quantité <b>*</b></span><Input type="number" min="1" step="1" value={quantite} onChange={(e) => setQuantite(e.target.value)} placeholder="0" data-testid="input-movement-quantity" /></label>
           </div>
           {isAdjustment && <div className="sacherie-direction" role="group" aria-label="Sens de l’ajustement"><button type="button" className={sens === "plus" ? "active plus" : ""} onClick={() => setSens("plus")} data-testid="button-adjustment-plus"><Plus size={15} /> Ajouter au stock</button><button type="button" className={sens === "moins" ? "active moins" : ""} onClick={() => setSens("moins")} data-testid="button-adjustment-minus"><ArrowUpFromLine size={15} /> Retirer du stock</button></div>}
-          {(isAttribution || isReturn || isLoss) && <label className="sacherie-field"><span>Membre délégué {isAttribution || isReturn ? <b>*</b> : <em>(facultatif pour une perte centrale)</em>}</span><select value={membreId} onChange={(e) => setMembreId(e.target.value)} className="sacherie-select" data-testid="select-movement-member"><option value="">{isLoss ? "Stock central" : "Sélectionner un membre"}</option>{members.map((member) => <option key={member.id} value={member.id}>{fullName(member)} · {member.sacsDetenus} détenus</option>)}</select></label>}
+          {(isAttribution || isReturn || isLoss) && <label className="sacherie-field"><span>Membre délégué {isAttribution || isReturn ? <b>*</b> : <em>(facultatif pour une perte centrale)</em>}</span><MemberSelector members={members} value={membreId} onChange={setMembreId} required={isAttribution || isReturn} allowCentral={isLoss} testId="select-movement-member" /></label>}
           {isAttribution && <label className="sacherie-field"><span>Campagne <b>*</b></span><select value={campagneId} onChange={(e) => setCampagneId(e.target.value)} className="sacherie-select" data-testid="select-movement-campaign"><option value="">Sélectionner une campagne</option>{campaigns.map((campaign) => <option key={campaign.id} value={campaign.id}>{campaign.libelle}{campaign.statut === "ouverte" ? " · ouverte" : ""}</option>)}</select></label>}
           <label className="sacherie-field"><span>Motif ou précision</span><textarea value={motif} onChange={(e) => setMotif(e.target.value)} rows={2} className="sacherie-textarea" placeholder={isLoss ? "Décrire la perte constatée" : "Note opérationnelle (facultatif)"} data-testid="input-movement-reason" /></label>
           {selected && <div className="sacherie-form-context"><PackageOpen size={15} /><span><strong>{selected.nom}</strong> · stock après opération estimé selon le mouvement</span></div>}
