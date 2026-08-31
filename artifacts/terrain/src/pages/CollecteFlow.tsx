@@ -88,6 +88,8 @@ export default function CollecteFlow() {
 
   const poidsBrutNum = parseFloat(poidsBrut) || 0;
   const retenueNum = parseFloat(retenueKg) || 0;
+  const nombreSacsNum = Number(nombreSacs);
+  const nombreSacsInvalide = !Number.isSafeInteger(nombreSacsNum) || nombreSacsNum <= 0;
   const poidsNet = Math.max(0, poidsBrutNum - retenueNum);
   const montantBrut = prix ? Math.round(poidsNet * prix.prixBordChampFcfa) : 0;
   // Plafond de l'avance (déduction maximale possible = intégral)
@@ -103,6 +105,10 @@ export default function CollecteFlow() {
 
   async function handleConfirmer() {
     if (!fournisseur || !poidsBrut || !prix) return;
+    if (nombreSacsInvalide) {
+      setErreur("Le nombre de sacs est obligatoire et doit être supérieur à zéro.");
+      return;
+    }
     setSubmitting(true);
     setErreur("");
     const localId = crypto.randomUUID();
@@ -112,7 +118,7 @@ export default function CollecteFlow() {
           ...(isExterne
             ? { fournisseurId: fournisseur.id }
             : { membreId: fournisseur.id }),
-          nombreSacs: parseInt(nombreSacs) || 1,
+          nombreSacs: nombreSacsNum,
           poidsBrutKg: poidsBrutNum,
           retenueKg: retenueNum,
           localId,
@@ -272,7 +278,7 @@ export default function CollecteFlow() {
 
             <div className="t-form">
               <div className="t-field">
-                <label className="t-label">Nombre de sacs</label>
+                <label className="t-label">Nombre de sacs *</label>
                 <NumericInput
                   decimal={false}
                   className="t-input t-input--lg"
@@ -282,8 +288,14 @@ export default function CollecteFlow() {
                     setRetenueKg(tareFromNombreSacs(value));
                   }}
                   min="1"
-                  placeholder="Ex: 5"
+                  placeholder="Ex : 5"
+                  aria-required="true"
                 />
+                {nombreSacsInvalide && (
+                  <div style={{ color: "var(--t-danger)", fontSize: ".75rem", marginTop: 4 }}>
+                    Indiquez le nombre de sacs (au moins 1).
+                  </div>
+                )}
               </div>
 
               {/* Lecture automatique depuis la balance RS232 (service local) */}
@@ -361,7 +373,7 @@ export default function CollecteFlow() {
 
               <button
                 className="t-btn t-btn--primary"
-                disabled={!poidsBrut || parseFloat(poidsBrut) <= 0 || !certificationCacao}
+                disabled={nombreSacsInvalide || !poidsBrut || parseFloat(poidsBrut) <= 0 || !certificationCacao}
                 onClick={() => setStep(3)}
               >
                 Continuer →

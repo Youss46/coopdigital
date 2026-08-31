@@ -453,6 +453,9 @@ export async function enregistrerCollecte(
   };
   const membreId = normaliserId(data.membreId);
   const fournisseurId = normaliserId(data.fournisseurId);
+  if (!Number.isSafeInteger(data.nombreSacs) || data.nombreSacs <= 0) {
+    throw new Error("Le nombre de sacs est obligatoire et doit être supérieur à zéro");
+  }
   if ((membreId && fournisseurId) || (!membreId && !fournisseurId)) {
     throw new Error("Un membre ou un fournisseur externe doit être sélectionné, mais pas les deux");
   }

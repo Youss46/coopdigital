@@ -50,6 +50,9 @@ export async function creerSessionBatch(
     statut: "terminee" | "en_cours";
   },
 ) {
+  if (data.lignes.some((ligne) => !Number.isSafeInteger(ligne.nbSacs) || ligne.nbSacs <= 0)) {
+    throw new Error("Le nombre de sacs est obligatoire et doit être supérieur à zéro pour chaque passage");
+  }
   const offlineTag = `offline:${data.localId}`;
 
   // ── Idempotency : session déjà créée lors d'un précédent essai ? ──────────
@@ -680,6 +683,9 @@ export async function addLigne(
   sessionId: number,
   data: { nbSacs: number; poidsBrutKg: number; tareKg?: number; notes?: string },
 ) {
+  if (!Number.isSafeInteger(data.nbSacs) || data.nbSacs <= 0) {
+    throw new Error("Le nombre de sacs est obligatoire et doit être supérieur à zéro");
+  }
   // Tout est dans une transaction avec verrou FOR UPDATE sur la session.
   // Cela sérialise avec finaliserReceptionTransfertTx (qui prend le même verrou).
   return db.transaction(async (tx: any) => {

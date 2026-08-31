@@ -158,6 +158,8 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
   // Éditions en cours par avance : avanceId → { planType, montantPartiel, reportDate }
   const [avancePlanEdits, setAvancePlanEdits] = useState<Record<number, { planType: string; montantPartiel: string; reportDate: string }>>({});
   const [plansSaving, setPlansSaving] = useState(false);
+  const nbSacsNum = Number(nbSacs);
+  const nbSacsInvalide = !Number.isSafeInteger(nbSacsNum) || nbSacsNum <= 0;
   const [plansSaved, setPlansSaved] = useState(false);
 
   // Estimation avant conversion
@@ -442,6 +444,10 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
 
   // ── Ajouter une ligne ──────────────────────────────────────────────────────
   async function handleAjouterLigne() {
+    if (nbSacsInvalide) {
+      setErreur("Le nombre de sacs est obligatoire et doit être supérieur à zéro.");
+      return;
+    }
     if (!session || !poidsBrut) return;
     if (session.statut !== "en_cours") {
       if (session.statut === "terminee") {
@@ -461,7 +467,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
       if (brouillon) {
         // Mode hors ligne : ajouter la ligne dans le brouillon local
         const updated = await addLigneToBrouillon(brouillon.localId, {
-          nbSacs: parseInt(nbSacs) || 0,
+          nbSacs: nbSacsNum,
           poidsBrutKg: poidsNum,
           tareKg: parseFloat(tare) || 0,
           notes: notesLigne || undefined,
@@ -470,7 +476,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
         setSession(brouillonToSyntheticSession(updated));
       } else {
         const updated = await addLignePesee(session.id, {
-          nbSacs: parseInt(nbSacs) || 0,
+          nbSacs: nbSacsNum,
           poidsBrutKg: poidsNum,
           tareKg: parseFloat(tare) || 0,
           notes: notesLigne || undefined,
@@ -1176,7 +1182,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
                 <div className="t-field">
-                  <label className="t-label">Nb de sacs</label>
+                   <label className="t-label">Nb de sacs *</label>
                   <NumericInput
                     decimal={false}
                     className="t-input t-input--lg"
@@ -1185,9 +1191,15 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
                       setNbSacs(value);
                       setTare(tareFromNombreSacs(value));
                     }}
-                    min="0"
-                    placeholder="0"
+                     min="1"
+                     placeholder="Ex : 5"
+                     aria-required="true"
                   />
+                   {nbSacsInvalide && (
+                     <div style={{ color: "var(--t-danger)", fontSize: ".75rem", marginTop: 4 }}>
+                       Indiquez le nombre de sacs (au moins 1).
+                     </div>
+                   )}
                 </div>
                 <div className="t-field">
                   <label className="t-label">Tare (kg) · 1 kg par sac</label>
@@ -1264,7 +1276,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
                   background: "linear-gradient(135deg, var(--t-peseur-dark) 0%, var(--t-peseur) 100%)",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                 }}
-                disabled={!sessionSaisissable || sessionMembreDelegueIncomplete || !poidsBrut || parseFloat(poidsBrut) <= 0 || ajoutLoading}
+                 disabled={nbSacsInvalide || !sessionSaisissable || sessionMembreDelegueIncomplete || !poidsBrut || parseFloat(poidsBrut) <= 0 || ajoutLoading}
                 onClick={handleAjouterLigne}
               >
                 {ajoutLoading

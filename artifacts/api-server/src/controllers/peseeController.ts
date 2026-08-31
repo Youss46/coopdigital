@@ -318,6 +318,10 @@ export async function handleBatchCreateSession(req: Request, res: Response): Pro
     res.status(400).json({ erreur: "localId, membreId et au moins une ligne sont requis" });
     return;
   }
+  if (lignes.some((ligne) => !Number.isSafeInteger(Number(ligne.nbSacs)) || Number(ligne.nbSacs) <= 0)) {
+    res.status(400).json({ erreur: "Le nombre de sacs est obligatoire et doit être supérieur à zéro pour chaque passage" });
+    return;
+  }
   if (!isCertificationCacao(certificationCacao)) {
     res.status(400).json({ erreur: "Sélectionnez le type de certification du cacao avant de démarrer la pesée" });
     return;
@@ -491,10 +495,15 @@ export async function handleAddLigne(req: Request, res: Response): Promise<void>
     nbSacs?: number; poidsBrutKg?: number; tareKg?: number; notes?: string;
   };
   if (!poidsBrutKg || poidsBrutKg <= 0) { res.status(400).json({ erreur: "Poids invalide" }); return; }
+  const nbSacsNum = Number(nbSacs);
+  if (!Number.isSafeInteger(nbSacsNum) || nbSacsNum <= 0) {
+    res.status(400).json({ erreur: "Le nombre de sacs est obligatoire et doit être supérieur à zéro" });
+    return;
+  }
   if (!await guardCentralPeseurForReceptionSession(req, res, cooperativeId, sessionId)) return;
   try {
     const ligne = await addLigne(cooperativeId, sessionId, {
-      nbSacs: nbSacs ?? 0,
+      nbSacs: nbSacsNum,
       poidsBrutKg,
       tareKg,
       notes,

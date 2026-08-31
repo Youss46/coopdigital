@@ -98,3 +98,4 @@
 - [Journalisation d’erreur RH](rh-error-fallback-logging.md) — les tests Express isolés peuvent ne pas injecter req.log; les erreurs RH doivent conserver un logger de secours.
 - [Readiness PostgreSQL jetable](disposable-postgres-readiness.md) — avant une migration locale, attendre une requête SQL acceptée plutôt que la seule ouverture du port.
 - [Liaison coopérative des JWT terrain](terrain-jwt-cooperative-binding.md) — ne jamais émettre de JWT terrain pour un compte sans coopérative; sinon le premier appel métier ressemble à une session expirée.
+- [Nombre de sacs obligatoire peseur](peseur-nombre-sacs-obligatoire.md) — chaque passage de pesée doit déclarer un entier strictement positif, en ligne comme hors ligne.

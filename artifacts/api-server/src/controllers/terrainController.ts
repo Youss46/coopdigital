@@ -187,8 +187,13 @@ export async function postCollecteHandler(req: Request, res: Response): Promise<
     avanceMontantPartiel?: number;
     certificationCacao?: string;
   };
+  const nombreSacsNum = Number(nombreSacs);
   if ((!membreId && !fournisseurId) || !poidsBrutKg) {
     res.status(400).json({ erreur: "Données manquantes (membreId ou fournisseurId requis)" });
+    return;
+  }
+  if (!Number.isSafeInteger(nombreSacsNum) || nombreSacsNum <= 0) {
+    res.status(400).json({ erreur: "Le nombre de sacs est obligatoire et doit être supérieur à zéro" });
     return;
   }
 
@@ -203,7 +208,7 @@ export async function postCollecteHandler(req: Request, res: Response): Promise<
     const result = await terrainService.enregistrerCollecte(effectiveAgentId, cooperativeId, {
       membreId: membreId ? Number(membreId) : undefined,
       fournisseurId: fournisseurId ? Number(fournisseurId) : undefined,
-      nombreSacs: nombreSacs ?? 1,
+      nombreSacs: nombreSacsNum,
       poidsBrutKg,
       retenueKg: retenueKg ?? 0,
       peseurId,
