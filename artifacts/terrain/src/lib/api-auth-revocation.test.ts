@@ -67,7 +67,8 @@ describe("révocation terrain côté client", () => {
 
     expect(getToken()).toBeNull();
     expect(isAccountDisabled()).toBe(true);
-    expect(getAuthMessage()).toMatch(/HTTP 403.*COMPTE_DESACTIVE/);
+    expect(getAuthMessage()).toBe(COMPTE_DESACTIVE_MESSAGE);
+    expect(getAuthMessage()).not.toMatch(/https?:\/\/|\/api\//);
     expect((globalThis.window as { location: { href: string } }).location.href).toBe("/login");
   });
 
@@ -79,10 +80,14 @@ describe("révocation terrain côté client", () => {
       json: async () => ({ erreur: "Non autorisé" }),
     }));
 
-    await expect(apiGet("/profil")).rejects.toThrow(/Non autorisé.*HTTP 401/);
+    await expect(apiGet("/profil")).rejects.toMatchObject({
+      message: "Votre session a expiré. Veuillez vous reconnecter.",
+      diagnostic: expect.stringMatching(/Non autorisé.*HTTP 401/),
+    });
 
     expect(getToken()).toBeNull();
-    expect(getAuthMessage()).toMatch(/Non autorisé.*HTTP 401/);
+    expect(getAuthMessage()).toBe("Votre session a expiré. Veuillez vous reconnecter.");
+    expect(getAuthMessage()).not.toMatch(/https?:\/\/|\/api\//);
     expect((globalThis.window as { location: { href: string } }).location.href).toBe("/login");
   });
 
@@ -97,10 +102,14 @@ describe("révocation terrain côté client", () => {
       }),
     }));
 
-    await expect(apiGet("/profil")).rejects.toThrow(/HTTP 403.*COOPERATIVE_MISSING/);
+    await expect(apiGet("/profil")).rejects.toMatchObject({
+      message: "Ce compte terrain n’est rattaché à aucune coopérative. Contactez l’administration.",
+      diagnostic: expect.stringMatching(/HTTP 403.*COOPERATIVE_MISSING/),
+    });
 
     expect(getToken()).toBeNull();
-    expect(getAuthMessage()).toMatch(/HTTP 403.*COOPERATIVE_MISSING/);
+    expect(getAuthMessage()).toBe("Ce compte terrain n’est rattaché à aucune coopérative. Contactez l’administration.");
+    expect(getAuthMessage()).not.toMatch(/https?:\/\/|\/api\//);
     expect((globalThis.window as { location: { href: string } }).location.href).toBe("/login");
   });
 
@@ -115,7 +124,10 @@ describe("révocation terrain côté client", () => {
       }),
     }));
 
-    await expect(apiGet("/pesee/sessions")).rejects.toThrow(/HTTP 403.*FEATURE_DISABLED/);
+    await expect(apiGet("/pesee/sessions")).rejects.toMatchObject({
+      message: "La fonctionnalité pesee est désactivée pour cette coopérative",
+      diagnostic: expect.stringMatching(/HTTP 403.*FEATURE_DISABLED/),
+    });
     expect(getToken()).toBe("jwt-encore-valide");
     expect((globalThis.window as { location: { href: string } }).location.href).toBe("");
   });
@@ -131,7 +143,10 @@ describe("révocation terrain côté client", () => {
     await expect(apiPost("/push/subscribe", {
       endpoint: "https://push.example/subscription",
       keys: { p256dh: "p256dh", auth: "auth" },
-    }, true)).rejects.toThrow(/Non autorisé.*HTTP 401/);
+    }, true)).rejects.toMatchObject({
+      message: "Votre session a expiré. Veuillez vous reconnecter.",
+      diagnostic: expect.stringMatching(/Non autorisé.*HTTP 401/),
+    });
 
     expect(getToken()).toBe("jwt-encore-valide");
     expect(getAuthMessage()).toBeNull();

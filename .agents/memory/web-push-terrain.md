@@ -13,5 +13,6 @@ Le Service Worker terrain (public/sw.js) lit `{ titre, message, url }` dans les 
 - VAPID keys dans env vars shared : `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`.
 - Push fonctionne uniquement en PROD (le hook usePushSubscription vérifie `import.meta.env.PROD`).
 - L’échec `401/403` de la souscription Push est non bloquant et ne doit jamais déclencher la déconnexion globale de la session terrain.
+- Les messages d’authentification affichés doivent rester publics et sans diagnostic HTTP; les anciens messages stockés sont nettoyés avant affichage.
 - Table `push_subscriptions` : userId + endpoint UNIQUE — un appareil par paire.
 - Subscriptions expirées (HTTP 410/404) sont auto-supprimées lors de l'envoi.

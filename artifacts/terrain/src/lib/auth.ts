@@ -78,11 +78,17 @@ export function clearAuth() {
 }
 
 export function setAuthMessage(message: string) {
-  localStorage.setItem(AUTH_MESSAGE_KEY, message);
+  localStorage.setItem(AUTH_MESSAGE_KEY, sanitizeAuthMessage(message));
 }
 
 export function getAuthMessage(): string | null {
-  return localStorage.getItem(AUTH_MESSAGE_KEY);
+  const message = localStorage.getItem(AUTH_MESSAGE_KEY);
+  return message ? sanitizeAuthMessage(message) : null;
+}
+
+/** Ne jamais exposer dans l'interface le diagnostic HTTP qui peut contenir l'URL de l'API. */
+function sanitizeAuthMessage(message: string): string {
+  return message.replace(/\s*\[HTTP\s+\d{3}[^\]]*\]\s*$/i, "").trim();
 }
 
 export function clearAuthMessage() {

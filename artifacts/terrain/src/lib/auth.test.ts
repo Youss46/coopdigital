@@ -104,4 +104,14 @@ describe("session terrain persistée", () => {
     expect(getStoredActiveAuth()).toBeNull();
     expect(getAuthMessage()).toBe("Session refusée par le serveur : compte non rattaché.");
   });
+
+  it("masque le diagnostic HTTP historique qui contient l'URL de l'API", () => {
+    localStorage.setItem(
+      "terrain_auth_message",
+      "Numéro ou mot de passe incorrect [HTTP 401 · https://workspaceapi.example/api/terrain/auth/login]",
+    );
+
+    expect(getAuthMessage()).toBe("Numéro ou mot de passe incorrect");
+    expect(getAuthMessage()).not.toMatch(/https?:\/\/|\/api\//);
+  });
 });

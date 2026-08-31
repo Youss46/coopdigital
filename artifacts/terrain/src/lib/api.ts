@@ -30,6 +30,7 @@ export class TerrainApiError extends Error {
     public readonly status: number,
     public readonly code: string | undefined,
     public readonly endpoint: string,
+    public readonly diagnostic: string = message,
   ) {
     super(message);
     this.name = "TerrainApiError";
@@ -58,10 +59,24 @@ function throwApiError(
   const detail = body.erreur || body.message || `Réponse HTTP ${res.status} sans message`;
   const endpoint = getEndpoint(path);
   const diagnostic = `${detail} [HTTP ${res.status}${body.code ? ` · ${body.code}` : ""} · ${endpoint}]`;
-  const error = new TerrainApiError(diagnostic, res.status, body.code, endpoint);
+  const publicMessage =
+    body.code === "COMPTE_DESACTIVE"
+      ? COMPTE_DESACTIVE_MESSAGE
+      : body.code === "COOPERATIVE_MISSING" || body.erreur?.includes("Coopérative non associée")
+        ? "Ce compte terrain n’est rattaché à aucune coopérative. Contactez l’administration."
+        : res.status === 401 && path === "/auth/login"
+          ? "Numéro ou mot de passe incorrect"
+          : res.status === 401
+            ? "Votre session a expiré. Veuillez vous reconnecter."
+            : detail;
+  const error = new TerrainApiError(publicMessage, res.status, body.code, endpoint, diagnostic);
+
+  if (import.meta.env.DEV) {
+    console.error("[Terrain API]", diagnostic);
+  }
 
   if (body.code === "COMPTE_DESACTIVE") {
-    markAccountDisabled(diagnostic || COMPTE_DESACTIVE_MESSAGE);
+    markAccountDisabled(publicMessage);
     window.location.href = `${import.meta.env.BASE_URL ?? "/"}login`;
     throw error;
   }
@@ -72,7 +87,7 @@ function throwApiError(
   ) {
     if (!skipSessionExpiry) {
       clearAuth();
-      setAuthMessage(diagnostic);
+      setAuthMessage(publicMessage);
       window.location.href = `${import.meta.env.BASE_URL ?? "/"}login`;
     }
     throw error;
@@ -80,7 +95,7 @@ function throwApiError(
 
   if (res.status === 401 && !skipSessionExpiry) {
     clearAuth();
-    setAuthMessage(diagnostic);
+    setAuthMessage(publicMessage);
     window.location.href = `${import.meta.env.BASE_URL ?? "/"}login`;
     throw error;
   }
