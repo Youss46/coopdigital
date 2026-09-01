@@ -1,4 +1,5 @@
 import { type Request, type Response, type NextFunction } from "express";
+import { canOperateSacherie } from "../services/cooperativeSacherieService.js";
 
 // ─── Matrice des permissions RBAC ───────────────────────────────────────────
 
@@ -546,6 +547,21 @@ export function checkPermission(module: string, action: string) {
       res.status(403).json({
         erreur: "Accès refusé",
         message: `Votre rôle (${role}) ne permet pas cette action.`,
+      });
+      return;
+    }
+    next();
+  };
+}
+
+export function checkSacheriePermission(action: "mouvement" | "gerer_types" | "ajuster") {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const role = req.user?.role ?? "";
+    const cooperativeId = req.user?.cooperativeId;
+    if (cooperativeId == null || !await canOperateSacherie(cooperativeId, role)) {
+      res.status(403).json({
+        erreur: "Accès refusé",
+        message: "Ce rôle n'est pas responsable des opérations Sacherie pour cette coopérative.",
       });
       return;
     }

@@ -10,6 +10,8 @@ import {
   updateCooperativeFeaturesHandler,
   getCooperativeRolesHandler,
   updateCooperativeRolesHandler,
+  getCooperativeSacherieConfigHandler,
+  updateCooperativeSacherieConfigHandler,
   updateCooperativeHandler,
   getPlansHandler,
   updatePlanHandler,
@@ -57,6 +59,8 @@ router.get("/m15/cooperatives/:id/features", getCooperativeFeaturesHandler);
 router.put("/m15/cooperatives/:id/features", requireM15Role("superadmin"), updateCooperativeFeaturesHandler);
 router.get("/m15/cooperatives/:id/roles", getCooperativeRolesHandler);
 router.put("/m15/cooperatives/:id/roles", requireM15Role("superadmin"), updateCooperativeRolesHandler);
+router.get("/m15/cooperatives/:id/sacherie-config", getCooperativeSacherieConfigHandler);
+router.put("/m15/cooperatives/:id/sacherie-config", requireM15Role("superadmin"), updateCooperativeSacherieConfigHandler);
 router.put("/m15/cooperatives/:id", requireM15Role("superadmin", "admin"), updateCooperativeHandler);
 
 router.post("/m15/licences/generer", requireM15Role("superadmin", "admin"), genererLicenceHandler);

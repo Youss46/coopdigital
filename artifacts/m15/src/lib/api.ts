@@ -195,6 +195,29 @@ export async function updateCooperativeRoles(
   });
 }
 
+export type SacherieResponsibleMode = "magasinier" | "sacherie" | "les_deux";
+export interface CooperativeSacherieConfig {
+  cooperativeId: number;
+  responsibleMode: SacherieResponsibleMode;
+  source: "custom" | "default";
+  updatedAt: string | null;
+}
+
+export async function fetchCooperativeSacherieConfig(id: number): Promise<CooperativeSacherieConfig> {
+  return request<CooperativeSacherieConfig>(`/m15/cooperatives/${id}/sacherie-config`);
+}
+
+export async function updateCooperativeSacherieConfig(
+  id: number,
+  responsibleMode: SacherieResponsibleMode,
+  reason?: string,
+): Promise<CooperativeSacherieConfig> {
+  return request<CooperativeSacherieConfig>(`/m15/cooperatives/${id}/sacherie-config`, {
+    method: "PUT",
+    body: JSON.stringify({ responsibleMode, reason }),
+  });
+}
+
 export interface CreationCoopResult {
   cooperative: CoopDetail["cooperative"];
   cleLicence: string;

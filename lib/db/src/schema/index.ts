@@ -73,3 +73,4 @@ export * from "./bons_reception_membres_delegues";
 export * from "./balancesSage";
 export * from "./cooperative_features";
 export * from "./cooperative_roles";
+export * from "./cooperative_sacherie";

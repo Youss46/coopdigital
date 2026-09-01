@@ -1009,6 +1009,13 @@
       "when": 1788483900000,
       "tag": "0143_sacherie",
       "breakpoints": true
+    },
+    {
+      "idx": 144,
+      "version": "7",
+      "when": 1788484000000,
+      "tag": "0144_cooperative_sacherie",
+      "breakpoints": true
     }
   ]
 }

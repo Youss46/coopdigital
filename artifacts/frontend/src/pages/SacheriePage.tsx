@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { usePermission } from "@/hooks/usePermission";
+import { useAuth } from "@/contexts/AuthContext";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 const token = () => localStorage.getItem("coop_token") ?? "";
@@ -74,6 +75,8 @@ type Movement = {
   createdAt: string;
 };
 type Campaign = { id: number; libelle: string; statut?: string };
+type SacherieResponsibleMode = "magasinier" | "sacherie" | "les_deux";
+type SacherieConfig = { responsibleMode: SacherieResponsibleMode };
 type Resume = {
   stockDisponible: number;
   sacsDetenus: number;
@@ -386,15 +389,25 @@ export default function SacheriePage() {
   const [historyType, setHistoryType] = useState("all");
   const [historyKind, setHistoryKind] = useState("all");
   const [memberSearch, setMemberSearch] = useState("");
-  const canManageTypes = usePermission("sacherie", "gerer_types");
-  const canMove = usePermission("sacherie", "mouvement");
-  const canAdjust = usePermission("sacherie", "ajuster");
+  const { utilisateur } = useAuth();
+  const canRead = usePermission("sacherie", "lire");
   const queryClient = useQueryClient();
   const resume = useQuery<Resume>({ queryKey: ["sacherie-resume"], queryFn: () => api("/api/sacherie/resume") });
   const types = useQuery<SacType[]>({ queryKey: ["sacherie-types"], queryFn: () => api("/api/sacherie/types") });
   const members = useQuery<Delegate[]>({ queryKey: ["sacherie-membres"], queryFn: () => api("/api/sacherie/membres") });
   const movements = useQuery<Movement[]>({ queryKey: ["sacherie-mouvements"], queryFn: () => api("/api/sacherie/mouvements") });
   const campaigns = useQuery<Campaign[]>({ queryKey: ["sacherie-campagnes"], queryFn: () => api("/api/campagnes"), staleTime: 60_000 });
+  const sacherieConfig = useQuery<SacherieConfig>({ queryKey: ["sacherie-config"], queryFn: () => api("/api/sacherie/config"), staleTime: 60_000 });
+  const role = utilisateur?.role ?? "";
+  const mode = sacherieConfig.data?.responsibleMode;
+  const roleIsSacherieResponsible = role === "pca" || role === "directeur" ||
+    (mode === "magasinier" && role === "magasinier") ||
+    (mode === "sacherie" && role === "sacherie") ||
+    (mode === "les_deux" && (role === "magasinier" || role === "sacherie"));
+  const canOperateSacherie = canRead && roleIsSacherieResponsible;
+  const canManageTypes = canOperateSacherie;
+  const canMove = canOperateSacherie;
+  const canAdjust = canOperateSacherie;
   const toggleType = useMutation({
     mutationFn: ({ id, actif }: { id: number; actif: boolean }) => api(`/api/sacherie/types/${id}`, { method: "PATCH", body: JSON.stringify({ actif }) }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["sacherie-types"] }); queryClient.invalidateQueries({ queryKey: ["sacherie-resume"] }); },

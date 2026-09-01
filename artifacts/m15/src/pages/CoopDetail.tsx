@@ -8,9 +8,10 @@ import {
   resetPasswordPca, updatePca, activerCooperative,
   fetchCooperativeFeatures, updateCooperativeFeatures,
   fetchCooperativeRoles, updateCooperativeRoles,
+  fetchCooperativeSacherieConfig, updateCooperativeSacherieConfig,
   formatDate, formatFcfa, statutColor, statutLabel, joursColor,
   type CoopDetail as CoopDetailType, type Plan, type CooperativeFeature, type CooperativeFeatureHistory, type FeatureMode,
-  type CooperativeRole, type CooperativeRoleHistory, type CooperativeRoleMode,
+  type CooperativeRole, type CooperativeRoleHistory, type CooperativeRoleMode, type CooperativeSacherieConfig, type SacherieResponsibleMode,
 } from "@/lib/api";
 import {
   Loader2, AlertCircle, ArrowLeft, CheckCircle2, PauseCircle, XCircle,
@@ -87,6 +88,11 @@ export default function CoopDetail() {
   const [rolesSaving, setRolesSaving] = useState(false);
   const [roleError, setRoleError] = useState("");
   const [roleReason, setRoleReason] = useState("");
+  const [sacherieConfig, setSacherieConfig] = useState<CooperativeSacherieConfig | null>(null);
+  const [sacherieMode, setSacherieMode] = useState<SacherieResponsibleMode>("les_deux");
+  const [sacherieSaving, setSacherieSaving] = useState(false);
+  const [sacherieError, setSacherieError] = useState("");
+  const [sacherieReason, setSacherieReason] = useState("");
 
   // Reset PCA result
   const [resetResult, setResetResult] = useState<{ motdepasse_clair: string; email: string; sms_envoye: boolean; telephone: string | null } | null>(null);
@@ -100,10 +106,11 @@ export default function CoopDetail() {
   async function load() {
     setLoading(true); setError("");
     try {
-      const [d, ps, fs, rs] = await Promise.all([fetchCooperative(id), fetchPlans(), fetchCooperativeFeatures(id), fetchCooperativeRoles(id)]);
+      const [d, ps, fs, rs, sc] = await Promise.all([fetchCooperative(id), fetchPlans(), fetchCooperativeFeatures(id), fetchCooperativeRoles(id), fetchCooperativeSacherieConfig(id)]);
       setData(d); setPlans(ps);
       setFeatures(fs.features); setFeatureHistory(fs.history);
       setRoles(rs.roles); setRoleHistory(rs.history);
+      setSacherieConfig(sc); setSacherieMode(sc.responsibleMode);
     } catch (e) { setError(e instanceof Error ? e.message : "Erreur"); }
     finally { setLoading(false); }
   }
@@ -242,6 +249,15 @@ export default function CoopDetail() {
       setRoles(rs.roles); setRoleHistory(rs.history); setRoleReason("");
     } catch (e) { setRoleError(e instanceof Error ? e.message : "Erreur"); }
     finally { setRolesSaving(false); }
+  }
+
+  async function saveSacherieConfig() {
+    setSacherieSaving(true); setSacherieError("");
+    try {
+      const sc = await updateCooperativeSacherieConfig(id, sacherieMode, sacherieReason || undefined);
+      setSacherieConfig(sc); setSacherieMode(sc.responsibleMode); setSacherieReason("");
+    } catch (e) { setSacherieError(e instanceof Error ? e.message : "Erreur"); }
+    finally { setSacherieSaving(false); }
   }
 
   const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
@@ -582,6 +598,58 @@ export default function CoopDetail() {
                     </button>
                   </div>
                   {roleError && <div className="text-destructive text-sm flex items-center gap-1 mt-3"><AlertCircle size={14} /> {roleError}</div>}
+                  <div className="mt-5 rounded-lg border bg-muted/20 p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <h3 className="text-sm font-semibold">Responsable du service Sacherie</h3>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Choisissez quel rôle peut enregistrer les mouvements, gérer les types de sacs et effectuer les ajustements Sacherie.
+                          Les autres responsabilités du Magasinier restent inchangées.
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-[11px] text-muted-foreground">
+                        {sacherieConfig?.source === "custom" ? "Configuration personnalisée" : "Configuration par défaut"}
+                      </span>
+                    </div>
+                    <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+                      <div className="flex-1">
+                        <label className="text-xs font-medium text-muted-foreground" htmlFor="sacherie-responsible-mode">Rôle responsable</label>
+                        <select
+                          id="sacherie-responsible-mode"
+                          value={sacherieMode}
+                          onChange={(event) => setSacherieMode(event.target.value as SacherieResponsibleMode)}
+                          disabled={!canManageFeatures || sacherieSaving}
+                          className="mt-1 w-full rounded-lg border bg-background px-3 py-2.5 text-sm"
+                        >
+                          <option value="magasinier">Magasinier uniquement</option>
+                          <option value="sacherie">Responsable Sacherie uniquement</option>
+                          <option value="les_deux">Magasinier et Responsable Sacherie</option>
+                        </select>
+                      </div>
+                      {canManageFeatures && (
+                        <button
+                          onClick={() => void saveSacherieConfig()}
+                          disabled={sacherieSaving || rolesLoading}
+                          className="flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-60"
+                        >
+                          {sacherieSaving && <Loader2 size={14} className="animate-spin" />} Enregistrer
+                        </button>
+                      )}
+                    </div>
+                    {sacherieError && <div className="mt-3 flex items-center gap-1 text-sm text-destructive"><AlertCircle size={14} /> {sacherieError}</div>}
+                    {canManageFeatures && (
+                      <div className="mt-3">
+                        <label className="text-xs font-medium text-muted-foreground" htmlFor="sacherie-config-reason">Motif du changement (facultatif)</label>
+                        <input
+                          id="sacherie-config-reason"
+                          value={sacherieReason}
+                          onChange={(event) => setSacherieReason(event.target.value)}
+                          className={inputCls + " mt-1"}
+                          placeholder="Ex. Organisation du magasin"
+                        />
+                      </div>
+                    )}
+                  </div>
                   <div className="mt-5 divide-y border rounded-lg">
                     {roles.map((role) => (
                       <div key={role.key} className="p-3 flex flex-col sm:flex-row sm:items-center gap-3">

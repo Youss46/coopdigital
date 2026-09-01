@@ -99,3 +99,4 @@
 - [Readiness PostgreSQL jetable](disposable-postgres-readiness.md) — avant une migration locale, attendre une requête SQL acceptée plutôt que la seule ouverture du port.
 - [Liaison coopérative des JWT terrain](terrain-jwt-cooperative-binding.md) — ne jamais émettre de JWT terrain pour un compte sans coopérative; sinon le premier appel métier ressemble à une session expirée.
 - [Nombre de sacs obligatoire peseur](peseur-nombre-sacs-obligatoire.md) — chaque passage de pesée doit déclarer un entier strictement positif, en ligne comme hors ligne.
+- [Responsabilité Sacherie par coopérative](cooperative-sacherie-responsibility.md) — choisir Magasinier, Responsable Sacherie ou les deux sans désactiver le rôle Magasinier global.

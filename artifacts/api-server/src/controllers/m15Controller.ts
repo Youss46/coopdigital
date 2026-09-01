@@ -2,6 +2,11 @@ import { type Request, type Response } from "express";
 import * as licenceService from "../services/licenceService.js";
 import * as cooperativeFeaturesService from "../services/cooperativeFeaturesService.js";
 import * as cooperativeRolesService from "../services/cooperativeRolesService.js";
+import {
+  getCooperativeSacherieConfig,
+  updateCooperativeSacherieConfig,
+} from "../services/cooperativeSacherieService.js";
+import { sacherieResponsibleModes } from "@workspace/db";
 import { db } from "@workspace/db";
 import { plansAbonnementTable, licencesTable, cooperativeFeatureModes, cooperativeRoleModes } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -218,6 +223,41 @@ export async function updateCooperativeRolesHandler(req: Request, res: Response)
     req.log.error({ err }, "Erreur mise à jour rôles coop M15");
     const error = err as Error & { code?: string };
     res.status(400).json({ code: error.code, erreur: error.message });
+  }
+}
+
+export async function getCooperativeSacherieConfigHandler(req: Request, res: Response): Promise<void> {
+  const id = parseInt(String(req.params["id"]), 10);
+  if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+  try {
+    const config = await getCooperativeSacherieConfig(id);
+    if (!config) { res.status(404).json({ erreur: "Coopérative introuvable" }); return; }
+    res.json(config);
+  } catch (err) {
+    req.log.error({ err }, "Erreur configuration Sacherie coop M15");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function updateCooperativeSacherieConfigHandler(req: Request, res: Response): Promise<void> {
+  const id = parseInt(String(req.params["id"]), 10);
+  const body = req.body as { responsibleMode?: string; reason?: string };
+  const responsibleMode = String(body.responsibleMode ?? "");
+  if (isNaN(id) || !sacherieResponsibleModes.includes(responsibleMode as (typeof sacherieResponsibleModes)[number])) {
+    res.status(400).json({ erreur: "ID et mode de responsabilité Sacherie invalides" });
+    return;
+  }
+  try {
+    const config = await updateCooperativeSacherieConfig(
+      id,
+      responsibleMode as (typeof sacherieResponsibleModes)[number],
+      m15UserId(req),
+      body.reason,
+    );
+    res.json(config);
+  } catch (err) {
+    req.log.error({ err }, "Erreur mise à jour configuration Sacherie coop M15");
+    res.status(400).json({ erreur: (err as Error).message });
   }
 }
 

@@ -14,6 +14,7 @@ import {
   type SacherieMovementType,
   type SacherieAdjustmentDirection,
 } from "../services/sacherieRules.js";
+import { getCooperativeSacherieConfig } from "../services/cooperativeSacherieService.js";
 
 const MEMBER_DELEGATE_CATEGORY = "délégué de localités";
 const MOVEMENT_TYPES: SacherieMovementType[] = ["entree", "attribution", "retour", "perte", "ajustement"];
@@ -85,6 +86,25 @@ export async function listTypesSacs(req: Request, res: Response): Promise<void> 
     res.json(articles.map((article) => stockView(article, byType.get(article.id) ?? [])));
   } catch (error) {
     req.log.error({ err: error }, "Erreur listTypesSacs");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+export async function getSacherieConfig(req: Request, res: Response): Promise<void> {
+  const cooperativeId = cooperativeIdOf(req);
+  if (cooperativeId === null) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+  try {
+    const config = await getCooperativeSacherieConfig(cooperativeId);
+    if (!config) {
+      res.status(404).json({ erreur: "Coopérative introuvable" });
+      return;
+    }
+    res.json(config);
+  } catch (error) {
+    req.log.error({ err: error }, "Erreur getSacherieConfig");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
