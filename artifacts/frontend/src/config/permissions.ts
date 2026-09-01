@@ -211,9 +211,9 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
 
   sacherie: {
     lire:        ["pca", "directeur", "magasinier", "responsable_tracabilite", "responsable_logistique", "auditeur", "sacherie"],
-    gerer_types: ["pca", "directeur", "sacherie"],
+    gerer_types: ["pca", "directeur", "magasinier", "sacherie"],
     mouvement:   ["pca", "directeur", "magasinier", "sacherie"],
-    ajuster:     ["pca", "directeur", "sacherie"],
+    ajuster:     ["pca", "directeur", "magasinier", "sacherie"],
   },
 
   equipements: {

@@ -399,7 +399,10 @@ export default function SacheriePage() {
   const campaigns = useQuery<Campaign[]>({ queryKey: ["sacherie-campagnes"], queryFn: () => api("/api/campagnes"), staleTime: 60_000 });
   const sacherieConfig = useQuery<SacherieConfig>({ queryKey: ["sacherie-config"], queryFn: () => api("/api/sacherie/config"), staleTime: 60_000 });
   const role = utilisateur?.role ?? "";
-  const mode = sacherieConfig.data?.responsibleMode;
+  // Avant la première réponse, conserver le comportement historique : les
+  // deux rôles opérationnels voient les actions. Le serveur reste la source
+  // d'autorité si la configuration est explicitement différente.
+  const mode = sacherieConfig.data?.responsibleMode ?? "les_deux";
   const roleIsSacherieResponsible = role === "pca" || role === "directeur" ||
     (mode === "magasinier" && role === "magasinier") ||
     (mode === "sacherie" && role === "sacherie") ||

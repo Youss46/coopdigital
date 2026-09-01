@@ -14,6 +14,7 @@ describe("intégration frontend Sacherie", () => {
 
   it("garde les droits de lecture séparés des mouvements et ajustements", () => {
     expect(PERMISSIONS.sacherie.lire).toEqual(expect.arrayContaining(["auditeur", "sacherie"]));
+    expect(PERMISSIONS.sacherie.gerer_types).toEqual(expect.arrayContaining(["magasinier", "sacherie"]));
     expect(PERMISSIONS.sacherie.mouvement).toEqual(expect.arrayContaining(["magasinier", "sacherie"]));
     expect(PERMISSIONS.sacherie.ajuster).not.toContain("auditeur");
   });
