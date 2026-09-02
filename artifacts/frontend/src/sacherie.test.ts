@@ -37,3 +37,10 @@ describe("intégration frontend Logistique", () => {
     expect(PERMISSIONS.transport.creer_bon).not.toContain("responsable_logistique");
   });
 });
+
+describe("intégration frontend Bons de réception", () => {
+  it("autorise le Magasinier à créer et annuler un bon", () => {
+    expect(PERMISSIONS.bons_reception.creer).toContain("magasinier");
+    expect(PERMISSIONS.bons_reception.annuler).toContain("magasinier");
+  });
+});

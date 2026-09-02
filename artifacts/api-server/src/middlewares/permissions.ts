@@ -59,6 +59,14 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     voir_alertes:        ["pca", "directeur", "magasinier", "responsable_tracabilite", "responsable_logistique"],
   },
 
+  // Le bon de réception est le parcours d'entrée dédié du Magasinier.
+  // Ce droit reste distinct de l'entrée de stock générique.
+  bons_reception: {
+    lire:    ["pca", "directeur", "magasinier", "auditeur"],
+    creer:   ["pca", "directeur", "magasinier"],
+    annuler: ["pca", "directeur", "magasinier"],
+  },
+
   logistique: {
     lire: ["pca", "directeur", "magasinier", "responsable_logistique", "auditeur"],
   },
