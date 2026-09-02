@@ -1,4 +1,4 @@
-import { db, expeditionsTable, expeditionLotsTable, expeditionHistoriqueTable, campagnesTable, membresTable, livraisonsTable, exportateursTable, vehiculesTable, chauffeursTable, lotsTable, lotLivraisonsTable, parcellesTable, ventesExportateursTable, entrepotsTable, mouvementsStockTable, traitementsRefusTable } from "@workspace/db";
+import { db, expeditionsTable, expeditionLotsTable, expeditionHistoriqueTable, campagnesTable, membresTable, livraisonsTable, exportateursTable, vehiculesTable, chauffeursTable, lotsTable, lotLivraisonsTable, parcellesTable, ventesExportateursTable, entrepotsTable, mouvementsStockTable, traitementsRefusTable, sessionsPeseeTable, configPeseeTable } from "@workspace/db";
 import { calculerPoidsAcceptePort } from "./venteReceptionService";
 import { eq, and, desc, sql, count, notInArray, inArray } from "drizzle-orm";
 import { proposerEcriture, proposerEcrituresDansTransaction } from "./comptabiliteService";
@@ -181,6 +181,49 @@ export async function getExpedition(cooperativeId: number, expeditionId: number)
     .where(eq(expeditionHistoriqueTable.expeditionId, expeditionId))
     .orderBy(desc(expeditionHistoriqueTable.dateChangement));
 
+  const controles = await db
+    .select({
+      id: sessionsPeseeTable.id,
+      numeroSession: sessionsPeseeTable.numeroSession,
+      numeroPesee: sessionsPeseeTable.numeroPesee,
+      statut: sessionsPeseeTable.statut,
+      poidsTotalKg: sessionsPeseeTable.poidsTotalKg,
+      nbSacsTotal: sessionsPeseeTable.nbSacsTotal,
+      dateDebut: sessionsPeseeTable.dateDebut,
+      dateFin: sessionsPeseeTable.dateFin,
+      certificationCacao: sessionsPeseeTable.certificationCacao,
+      notes: sessionsPeseeTable.notes,
+    })
+    .from(sessionsPeseeTable)
+    .where(and(
+      eq(sessionsPeseeTable.expeditionId, expeditionId),
+      eq(sessionsPeseeTable.operation, "controle_chargement"),
+    ))
+    .orderBy(desc(sessionsPeseeTable.createdAt));
+
+  const poidsAttenduLotsKg = lots.reduce((total, lot) => total + Number(lot.poidsKg ?? 0), 0);
+  const poidsDeclareExpeditionKg = Number(exp.poidsChargeKg ?? 0);
+  const poidsAttenduKg = poidsAttenduLotsKg > 0 ? poidsAttenduLotsKg : poidsDeclareExpeditionKg;
+  const dernierControle = controles.find((controle) => controle.statut === "terminee");
+  const poidsControleKg = dernierControle ? Number(dernierControle.poidsTotalKg ?? 0) : null;
+  const ecartKg = poidsControleKg != null ? poidsControleKg - poidsAttenduKg : null;
+  const ecartPct = poidsControleKg != null && poidsAttenduKg > 0
+    ? Math.abs(ecartKg!) / poidsAttenduKg * 100
+    : null;
+  const [peseeConfig] = await db
+    .select({ ecartMaxAutorisePct: configPeseeTable.ecartMaxAutorisePct })
+    .from(configPeseeTable)
+    .where(eq(configPeseeTable.cooperativeId, cooperativeId))
+    .limit(1);
+  const seuilConformePct = Number(peseeConfig?.ecartMaxAutorisePct ?? 2);
+  const statutEcart = poidsControleKg == null
+    ? "non_controle"
+    : ecartPct! <= seuilConformePct
+      ? "conforme"
+      : ecartPct! <= seuilConformePct * 2
+        ? "a_justifier"
+        : "bloque";
+
   // Détecte si TOUS les lots rattachés proviennent de fournisseurs externes (pas de membres)
   const lotIds = lots.map(l => l.lotId).filter((id): id is number => id !== null && id !== undefined);
   let lotsNonMembres = false;
@@ -196,7 +239,23 @@ export async function getExpedition(cooperativeId: number, expeditionId: number)
     lotsNonMembres = (membreCheck?.nb ?? 0) === 0;
   }
 
-  return { ...exp, lots, historique, lotsNonMembres };
+  return {
+    ...exp,
+    lots,
+    historique,
+    lotsNonMembres,
+    controleTonnage: {
+      poidsDeclareExpeditionKg,
+      poidsAttenduLotsKg,
+      poidsAttenduKg,
+      poidsControleKg,
+      ecartKg,
+      ecartPct,
+      statutEcart,
+      seuilConformePct,
+      sessions: controles,
+    },
+  };
 }
 
 // ── Lots disponibles pour rattachement ──────────────────────────────────────

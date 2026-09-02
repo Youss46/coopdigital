@@ -57,3 +57,14 @@ qui laisse au peseur un bon affiché comme reprenable mais impossible à saisir.
 
 **How to apply:** valider ce paramètre dans toute interface d'administration
 et le normaliser côté service avant de calculer l'expiration.
+
+Une session `controle_chargement` liée à une expédition doit être refusée par la
+conversion en livraison depuis la session, à l'intérieur de la transaction qui
+verrouille et relit la session.
+
+**Why:** un garde uniquement placé avant la transaction est contournable par
+une course concurrente et rend les tests isolés dépendants d'une lecture
+supplémentaire non simulée.
+
+**How to apply:** sélectionner `operation` et `expeditionId` dans la relecture
+verrouillée, puis lever l'erreur avant tout effet métier de conversion.

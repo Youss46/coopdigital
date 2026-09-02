@@ -20,6 +20,13 @@ import {
   handleRapportEudrPdf,
   handleProchainNumero,
   handleConstatReception,
+  handleListExpeditionControls,
+  handleStartExpeditionControl,
+  handleGetExpeditionControl,
+  handleAddExpeditionControlLine,
+  handleDeleteExpeditionControlLine,
+  handleFinishExpeditionControl,
+  handleCancelExpeditionControl,
 } from "../controllers/expeditionsController";
 
 const router = Router();
@@ -76,6 +83,48 @@ router.post(
   "/expeditions/:id/lots",
   checkPermission("expeditions", "modifier"),
   handleRattacherLot,
+);
+
+router.get(
+  "/expeditions/:id/pesee-controle",
+  checkPermission("expeditions", "lire"),
+  handleListExpeditionControls,
+);
+
+router.post(
+  "/expeditions/:id/pesee-controle",
+  checkPermission("expeditions", "modifier"),
+  handleStartExpeditionControl,
+);
+
+router.get(
+  "/expeditions/:id/pesee-controle/:sessionId",
+  checkPermission("expeditions", "lire"),
+  handleGetExpeditionControl,
+);
+
+router.post(
+  "/expeditions/:id/pesee-controle/:sessionId/lignes",
+  checkPermission("expeditions", "modifier"),
+  handleAddExpeditionControlLine,
+);
+
+router.delete(
+  "/expeditions/:id/pesee-controle/:sessionId/lignes/:ligneId",
+  checkPermission("expeditions", "modifier"),
+  handleDeleteExpeditionControlLine,
+);
+
+router.put(
+  "/expeditions/:id/pesee-controle/:sessionId/terminer",
+  checkPermission("expeditions", "modifier"),
+  handleFinishExpeditionControl,
+);
+
+router.put(
+  "/expeditions/:id/pesee-controle/:sessionId/annuler",
+  checkPermission("expeditions", "modifier"),
+  handleCancelExpeditionControl,
 );
 
 router.delete(

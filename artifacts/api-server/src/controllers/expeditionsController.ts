@@ -16,6 +16,16 @@ import {
   genererNumeroExpedition,
   reglerFraisTransport,
 } from "../services/expeditionsService";
+import {
+  addLigne,
+  annulerSession,
+  createExpeditionControlSession,
+  deleteLigne,
+  getSessionDetail,
+  terminerSession,
+  SessionExpeditionExistanteError,
+} from "../services/peseeSessionService.js";
+import { isCertificationCacao } from "../lib/certificationCacao.js";
 import { generateBonLivraison, generateBordereauTransport, generateRapportEudrPdf, generateConstatReception } from "../services/pdfService";
 
 export async function handleProchainNumero(req: Request, res: Response): Promise<void> {
@@ -84,6 +94,140 @@ export async function handleGetExpedition(req: Request, res: Response): Promise<
   } catch (err) {
     req.log.error({ err }, "handleGetExpedition");
     res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+function getExpeditionId(req: Request): number {
+  return Number.parseInt(String(req.params["id"] ?? "0"), 10);
+}
+
+async function getControlSession(req: Request, cooperativeId: number) {
+  const expeditionId = getExpeditionId(req);
+  const sessionId = Number.parseInt(String(req.params["sessionId"] ?? "0"), 10);
+  const session = await getSessionDetail(cooperativeId, sessionId);
+  if (!session || session.expeditionId !== expeditionId || session.operation !== "controle_chargement") {
+    return null;
+  }
+  return session;
+}
+
+export async function handleListExpeditionControls(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(403).json({ erreur: "Coopérative non associée" }); return; }
+  try {
+    const expedition = await getExpedition(cooperativeId, getExpeditionId(req));
+    if (!expedition) { res.status(404).json({ erreur: "Expédition introuvable" }); return; }
+    res.json(expedition.controleTonnage);
+  } catch (err) {
+    req.log.error({ err }, "handleListExpeditionControls");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function handleStartExpeditionControl(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(403).json({ erreur: "Coopérative non associée" }); return; }
+  const certificationCacao = req.body?.certification_cacao ?? req.body?.certificationCacao;
+  if (!isCertificationCacao(certificationCacao)) {
+    res.status(400).json({ erreur: "Le type de certification du cacao est obligatoire" });
+    return;
+  }
+  try {
+    const session = await createExpeditionControlSession(cooperativeId, getExpeditionId(req), {
+      peseurId: req.user?.role === "peseur" ? req.user.id : undefined,
+      balanceId: req.body?.balance_id ?? req.body?.balanceId,
+      certificationCacao,
+      notes: req.body?.notes,
+    });
+    res.status(201).json(session);
+  } catch (err) {
+    if (err instanceof SessionExpeditionExistanteError) {
+      res.status(409).json({ erreur: err.message, sessionId: err.sessionId, numeroSession: err.numeroSession });
+      return;
+    }
+    req.log.error({ err }, "handleStartExpeditionControl");
+    res.status(400).json({ erreur: err instanceof Error ? err.message : "Impossible de démarrer le contrôle" });
+  }
+}
+
+export async function handleGetExpeditionControl(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(403).json({ erreur: "Coopérative non associée" }); return; }
+  try {
+    const session = await getControlSession(req, cooperativeId);
+    if (!session) { res.status(404).json({ erreur: "Contrôle de chargement introuvable" }); return; }
+    res.json(session);
+  } catch (err) {
+    req.log.error({ err }, "handleGetExpeditionControl");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function handleAddExpeditionControlLine(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(403).json({ erreur: "Coopérative non associée" }); return; }
+  const nbSacs = Number(req.body?.nb_sacs ?? req.body?.nbSacs);
+  const poidsBrutKg = Number(req.body?.poids_brut_kg ?? req.body?.poidsBrutKg);
+  const tareKg = Number(req.body?.tare_kg ?? req.body?.tareKg ?? 0);
+  if (!Number.isSafeInteger(nbSacs) || nbSacs <= 0) {
+    res.status(400).json({ erreur: "Le nombre de sacs est obligatoire et doit être supérieur à zéro" });
+    return;
+  }
+  if (!Number.isFinite(poidsBrutKg) || poidsBrutKg <= 0 || !Number.isFinite(tareKg) || tareKg < 0 || tareKg >= poidsBrutKg) {
+    res.status(400).json({ erreur: "Poids brut ou tare invalide" });
+    return;
+  }
+  try {
+    const session = await getControlSession(req, cooperativeId);
+    if (!session) { res.status(404).json({ erreur: "Contrôle de chargement introuvable" }); return; }
+    const ligne = await addLigne(cooperativeId, session.id, {
+      nbSacs, poidsBrutKg, tareKg, notes: req.body?.notes,
+    });
+    res.status(201).json({ ligne, session: await getSessionDetail(cooperativeId, session.id) });
+  } catch (err) {
+    req.log.error({ err }, "handleAddExpeditionControlLine");
+    res.status(400).json({ erreur: err instanceof Error ? err.message : "Impossible d'ajouter le passage" });
+  }
+}
+
+export async function handleDeleteExpeditionControlLine(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(403).json({ erreur: "Coopérative non associée" }); return; }
+  try {
+    const session = await getControlSession(req, cooperativeId);
+    if (!session) { res.status(404).json({ erreur: "Contrôle de chargement introuvable" }); return; }
+    await deleteLigne(cooperativeId, session.id, Number.parseInt(String(req.params["ligneId"] ?? "0"), 10));
+    res.json({ ok: true, session: await getSessionDetail(cooperativeId, session.id) });
+  } catch (err) {
+    req.log.error({ err }, "handleDeleteExpeditionControlLine");
+    res.status(400).json({ erreur: err instanceof Error ? err.message : "Impossible de supprimer le passage" });
+  }
+}
+
+export async function handleFinishExpeditionControl(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(403).json({ erreur: "Coopérative non associée" }); return; }
+  try {
+    const session = await getControlSession(req, cooperativeId);
+    if (!session) { res.status(404).json({ erreur: "Contrôle de chargement introuvable" }); return; }
+    res.json(await terminerSession(cooperativeId, session.id));
+  } catch (err) {
+    req.log.error({ err }, "handleFinishExpeditionControl");
+    res.status(400).json({ erreur: err instanceof Error ? err.message : "Impossible de clôturer le contrôle" });
+  }
+}
+
+export async function handleCancelExpeditionControl(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(403).json({ erreur: "Coopérative non associée" }); return; }
+  try {
+    const session = await getControlSession(req, cooperativeId);
+    if (!session) { res.status(404).json({ erreur: "Contrôle de chargement introuvable" }); return; }
+    await annulerSession(cooperativeId, session.id);
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "handleCancelExpeditionControl");
+    res.status(400).json({ erreur: err instanceof Error ? err.message : "Impossible d'annuler le contrôle" });
   }
 }
 

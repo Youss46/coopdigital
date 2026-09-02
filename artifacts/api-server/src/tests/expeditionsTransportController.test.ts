@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   listFraisTransportARegler: vi.fn(),
+  createExpeditionControlSession: vi.fn(),
 }));
 
 vi.mock("../services/expeditionsService", () => ({
@@ -29,7 +30,20 @@ vi.mock("../services/pdfService", () => ({
   generateConstatReception: vi.fn(),
 }));
 
-const { handleListFraisTransportARegler } = await import("../controllers/expeditionsController");
+vi.mock("../services/peseeSessionService.js", () => ({
+  addLigne: vi.fn(),
+  annulerSession: vi.fn(),
+  createExpeditionControlSession: mocks.createExpeditionControlSession,
+  deleteLigne: vi.fn(),
+  getSessionDetail: vi.fn(),
+  terminerSession: vi.fn(),
+  SessionExpeditionExistanteError: class SessionExpeditionExistanteError extends Error {},
+}));
+
+const {
+  handleListFraisTransportARegler,
+  handleStartExpeditionControl,
+} = await import("../controllers/expeditionsController");
 
 function makeReq(cooperativeId: number | null) {
   return {
@@ -81,5 +95,40 @@ describe("liste des frais d'exportation à régler", () => {
 
     expect(res.status).toHaveBeenCalledWith(500);
     expect(res.json).toHaveBeenCalledWith({ erreur: "Erreur interne" });
+  });
+
+  it("démarre un contrôle distinct avec la certification déclarée", async () => {
+    const session = { id: 44, operation: "controle_chargement", expeditionId: 12 };
+    mocks.createExpeditionControlSession.mockResolvedValueOnce(session);
+    const res = makeRes();
+    const req = {
+      user: { id: 9, role: "responsable_tracabilite", cooperativeId: 7 },
+      params: { id: "12" },
+      body: { certification_cacao: "RA" },
+      log: { error: vi.fn() },
+    } as never;
+
+    await handleStartExpeditionControl(req, res as never);
+
+    expect(mocks.createExpeditionControlSession).toHaveBeenCalledWith(7, 12, expect.objectContaining({
+      certificationCacao: "RA",
+    }));
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.json).toHaveBeenCalledWith(session);
+  });
+
+  it("refuse le démarrage d'un contrôle sans certification", async () => {
+    const res = makeRes();
+    const req = {
+      user: { id: 9, role: "responsable_tracabilite", cooperativeId: 7 },
+      params: { id: "12" },
+      body: {},
+      log: { error: vi.fn() },
+    } as never;
+
+    await handleStartExpeditionControl(req, res as never);
+
+    expect(mocks.createExpeditionControlSession).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(400);
   });
 });

@@ -6,6 +6,7 @@ import { cooperativesTable } from "./cooperatives";
 import { usersTable } from "./users";
 import { membresTable } from "./membres";
 import { fournisseursTable } from "./fournisseurs";
+import { expeditionsTable } from "./expeditions";
 
 // ─── Sessions de pesée ────────────────────────────────────────────────────────
 
@@ -42,6 +43,8 @@ export const sessionsPeseeTable = pgTable("sessions_pesee", {
   transfertId:    integer("transfert_id"),
   /** Pour les sessions de type 'reception_membre_delegue' : ID du bon de réception */
   bonReceptionId: integer("bon_reception_id"),
+  /** Pour les sessions de type 'controle_chargement' : ID de l'expédition contrôlée */
+  expeditionId:   integer("expedition_id").references(() => expeditionsTable.id),
   /** Certification du cacao déclarée par le peseur : 'RA' | 'FAIRTRADE' | 'ASR_1000' | 'ORDINAIRE' */
   certificationCacao: varchar("certification_cacao", { length: 20 }),
   dateDebut:      timestamp("date_debut", { withTimezone: true }).defaultNow().notNull(),

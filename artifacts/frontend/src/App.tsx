@@ -351,10 +351,10 @@ function AppRoutes() {
         <ProtectedRoute component={NouvelleExpeditionPage} roles={["pca", "directeur", "responsable_tracabilite"]} writeOnly />
       </Route>
       <Route path="/expeditions/:id">
-        <ProtectedRoute component={ExpeditionDetailPage} roles={["pca", "directeur", "responsable_tracabilite", "responsable_logistique", "auditeur"]} />
+        <ProtectedRoute component={ExpeditionDetailPage} roles={["pca", "directeur", "responsable_tracabilite", "responsable_logistique", "peseur", "auditeur"]} />
       </Route>
       <Route path="/expeditions">
-        <ProtectedRoute component={ExpeditionsPage} roles={["pca", "directeur", "responsable_tracabilite", "responsable_logistique", "auditeur"]} />
+        <ProtectedRoute component={ExpeditionsPage} roles={["pca", "directeur", "responsable_tracabilite", "responsable_logistique", "peseur", "auditeur"]} />
       </Route>
       <Route path="/entrepots">
         <ProtectedRoute component={EntrepotsPage} roles={["pca", "directeur", "responsable_logistique", "auditeur"]} />

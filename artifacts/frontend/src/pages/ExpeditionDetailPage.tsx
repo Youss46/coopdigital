@@ -14,7 +14,7 @@ import { NumericInput } from "@/components/ui/numeric-input";
 import {
   ArrowLeft, Ship, MapPin, CheckCircle2,
   ChevronRight, FileText, Users, Leaf, AlertCircle,
-  Plus, Unlink, Link, Download,
+  Plus, Unlink, Link, Download, Scale,
 } from "lucide-react";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
@@ -64,6 +64,43 @@ interface LotDisponible {
   qrCodeLot: string;
 }
 
+interface ControleSession {
+  id: number;
+  numeroSession: string;
+  numeroPesee: number | null;
+  statut: "en_cours" | "terminee" | "annulee";
+  poidsTotalKg: string | null;
+  nbSacsTotal: number | null;
+  dateDebut: string;
+  dateFin: string | null;
+  certificationCacao: string | null;
+  notes: string | null;
+}
+
+interface ControleTonnage {
+  poidsDeclareExpeditionKg: number;
+  poidsAttenduLotsKg: number;
+  poidsAttenduKg: number;
+  poidsControleKg: number | null;
+  ecartKg: number | null;
+  ecartPct: number | null;
+  statutEcart: "non_controle" | "conforme" | "a_justifier" | "bloque";
+  seuilConformePct: number;
+  sessions: ControleSession[];
+}
+
+interface ControleDetail extends ControleSession {
+  expeditionId: number;
+  lignes: Array<{
+    id: number;
+    numeroPassage: number;
+    nbSacs: number;
+    poidsBrutKg: string;
+    tareKg: string | null;
+    notes: string | null;
+  }>;
+}
+
 const STATUT_CONFIG: Record<string, { label: string; color: string; step: number }> = {
   en_preparation: { label: "En préparation", color: "text-gray-600",   step: 0 },
   charge:         { label: "Chargé",          color: "text-blue-600",   step: 1 },
@@ -91,7 +128,7 @@ const MOTIFS_ECART = [
 
 export default function ExpeditionDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { token } = useAuth();
+  const { token, utilisateur } = useAuth();
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const qc = useQueryClient();
@@ -113,6 +150,10 @@ export default function ExpeditionDetailPage() {
   const [poidsRefoul, setPoidsRefoul] = useState("");
   const [nombreSacsRefoul, setNombreSacsRefoul] = useState("");
   const [motifRefoulement, setMotifRefoulement] = useState("");
+  const [certificationControle, setCertificationControle] = useState("");
+  const [controlSacs, setControlSacs] = useState("");
+  const [controlBrut, setControlBrut] = useState("");
+  const [controlTare, setControlTare] = useState("0");
 
   const { data: exp, isLoading } = useQuery<Record<string, unknown>>({
     queryKey: ["expedition", id],
@@ -124,6 +165,61 @@ export default function ExpeditionDetailPage() {
     queryKey: ["expedition-lots-dispo", id],
     queryFn: () => apiFetch(`/api/expeditions/${id}/lots-disponibles`, token),
     enabled: !!id && showLotsPanel,
+  });
+
+  const controlSummary = (exp?.controleTonnage ?? null) as ControleTonnage | null;
+  const activeControl = controlSummary?.sessions.find((session) => session.statut === "en_cours") ?? null;
+  const { data: activeControlDetail } = useQuery<ControleDetail>({
+    queryKey: ["expedition-control-detail", id, activeControl?.id],
+    queryFn: () => apiFetch(`/api/expeditions/${id}/pesee-controle/${activeControl!.id}`, token),
+    enabled: !!id && activeControl != null,
+  });
+
+  const startControlMutation = useMutation({
+    mutationFn: () => apiPost(`/api/expeditions/${id}/pesee-controle`, token, {
+      certification_cacao: certificationControle,
+    }),
+    onSuccess: () => {
+      toast({ title: "Contrôle de chargement démarré" });
+      void qc.invalidateQueries({ queryKey: ["expedition", id] });
+    },
+    onError: (err: Error) => toast({ title: "Impossible de démarrer le contrôle", description: err.message, variant: "destructive" }),
+  });
+
+  const addControlLineMutation = useMutation({
+    mutationFn: () => apiPost(`/api/expeditions/${id}/pesee-controle/${activeControl!.id}/lignes`, token, {
+      nb_sacs: Number(controlSacs),
+      poids_brut_kg: Number(controlBrut),
+      tare_kg: Number(controlTare || 0),
+    }),
+    onSuccess: () => {
+      setControlSacs("");
+      setControlBrut("");
+      setControlTare("0");
+      toast({ title: "Passage enregistré" });
+      void qc.invalidateQueries({ queryKey: ["expedition", id] });
+      void qc.invalidateQueries({ queryKey: ["expedition-control-detail", id, activeControl?.id] });
+    },
+    onError: (err: Error) => toast({ title: "Impossible d'enregistrer le passage", description: err.message, variant: "destructive" }),
+  });
+
+  const finishControlMutation = useMutation({
+    mutationFn: () => apiPut(`/api/expeditions/${id}/pesee-controle/${activeControl!.id}/terminer`, token, {}),
+    onSuccess: () => {
+      toast({ title: "Contrôle de chargement clôturé" });
+      void qc.invalidateQueries({ queryKey: ["expedition", id] });
+      void qc.invalidateQueries({ queryKey: ["expedition-control-detail", id, activeControl?.id] });
+    },
+    onError: (err: Error) => toast({ title: "Impossible de clôturer le contrôle", description: err.message, variant: "destructive" }),
+  });
+
+  const cancelControlMutation = useMutation({
+    mutationFn: () => apiPut(`/api/expeditions/${id}/pesee-controle/${activeControl!.id}/annuler`, token, {}),
+    onSuccess: () => {
+      toast({ title: "Contrôle annulé" });
+      void qc.invalidateQueries({ queryKey: ["expedition", id] });
+    },
+    onError: (err: Error) => toast({ title: "Impossible d'annuler le contrôle", description: err.message, variant: "destructive" }),
   });
 
   const rattacherMutation = useMutation({
@@ -178,6 +274,7 @@ export default function ExpeditionDetailPage() {
   if (isLoading) return <div className="p-8 text-center text-gray-500">Chargement…</div>;
   if (!exp) return <div className="p-8 text-center text-gray-500">Expédition introuvable</div>;
 
+  const canManageControl = ["pca", "directeur", "responsable_tracabilite", "peseur"].includes(utilisateur?.role ?? "");
   const statut = String(exp.statut ?? "");
   const cfg = STATUT_CONFIG[statut] ?? { label: statut, color: "text-gray-600", step: 0 };
   const transition = TRANSITIONS[statut];
@@ -329,6 +426,191 @@ export default function ExpeditionDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Contrôle du tonnage chargé — vérification distincte de la confirmation */}
+      {controlSummary && (
+        <Card className={
+          controlSummary.statutEcart === "conforme" ? "border-green-200" :
+          controlSummary.statutEcart === "a_justifier" ? "border-orange-200" :
+          controlSummary.statutEcart === "bloque" ? "border-red-200" : "border-slate-200"
+        }>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Scale className="h-4 w-4 text-indigo-600" />
+              Contrôle du tonnage chargé
+              <Badge variant="outline" className="ml-auto">
+                {controlSummary.statutEcart === "non_controle" ? "Non contrôlé" :
+                 controlSummary.statutEcart === "conforme" ? "Conforme" :
+                 controlSummary.statutEcart === "a_justifier" ? "À justifier" : "Anomalie bloquante"}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-xs text-gray-500">
+              Pesée par sacs et passages, sans création de livraison, paiement ou mouvement de stock.
+              Cette vérification reste distincte de la confirmation du chargement.
+            </p>
+
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 text-sm">
+              <div className="rounded-md bg-slate-50 p-3">
+                <div className="text-xs text-gray-500">Poids déclaré expédition</div>
+                <strong>{controlSummary.poidsDeclareExpeditionKg.toLocaleString("fr-FR")} kg</strong>
+              </div>
+              <div className="rounded-md bg-slate-50 p-3">
+                <div className="text-xs text-gray-500">Poids attendu des lots</div>
+                <strong>{controlSummary.poidsAttenduLotsKg > 0 ? `${controlSummary.poidsAttenduLotsKg.toLocaleString("fr-FR")} kg` : "—"}</strong>
+              </div>
+              <div className="rounded-md bg-slate-50 p-3">
+                <div className="text-xs text-gray-500">Poids contrôlé</div>
+                <strong>{controlSummary.poidsControleKg != null ? `${controlSummary.poidsControleKg.toLocaleString("fr-FR")} kg` : "—"}</strong>
+              </div>
+              <div className="rounded-md bg-slate-50 p-3">
+                <div className="text-xs text-gray-500">Écart</div>
+                <strong className={
+                  controlSummary.statutEcart === "conforme" ? "text-green-700" :
+                  controlSummary.statutEcart === "non_controle" ? "text-gray-500" : "text-orange-700"
+                }>
+                  {controlSummary.ecartKg != null
+                    ? `${controlSummary.ecartKg > 0 ? "+" : ""}${controlSummary.ecartKg.toFixed(2)} kg (${controlSummary.ecartPct?.toFixed(2)}%)`
+                    : "—"}
+                </strong>
+              </div>
+            </div>
+
+            {activeControl && (
+              <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="text-sm font-semibold text-indigo-900">Session {activeControl.numeroSession}</div>
+                    <div className="text-xs text-indigo-700">En cours · saisie par passages</div>
+                  </div>
+                  <div className="text-sm font-semibold text-indigo-900">
+                    {Number(activeControlDetail?.poidsTotalKg ?? activeControl.poidsTotalKg ?? 0).toLocaleString("fr-FR")} kg · {activeControlDetail?.nbSacsTotal ?? activeControl.nbSacsTotal ?? 0} sacs
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div>
+                    <Label className="text-xs">Nombre de sacs *</Label>
+                    <NumericInput decimal={false} min="1" value={controlSacs} onChange={setControlSacs} placeholder="Ex : 25" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Poids brut (kg) *</Label>
+                    <NumericInput min="0" value={controlBrut} onChange={setControlBrut} placeholder="Ex : 1 250" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Tare (kg)</Label>
+                    <NumericInput min="0" value={controlTare} onChange={setControlTare} placeholder="0" />
+                  </div>
+                </div>
+
+                {activeControlDetail?.lignes && activeControlDetail.lignes.length > 0 && (
+                  <div className="overflow-x-auto rounded border bg-white">
+                    <table className="w-full text-xs">
+                      <thead className="border-b bg-gray-50 text-gray-500">
+                        <tr>
+                          <th className="px-3 py-2 text-left">Passage</th>
+                          <th className="px-3 py-2 text-right">Sacs</th>
+                          <th className="px-3 py-2 text-right">Brut</th>
+                          <th className="px-3 py-2 text-right">Tare</th>
+                          <th className="px-3 py-2 text-right">Net</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {activeControlDetail.lignes.map((ligne) => {
+                          const net = Number(ligne.poidsBrutKg) - Number(ligne.tareKg ?? 0);
+                          return (
+                            <tr key={ligne.id}>
+                              <td className="px-3 py-2">#{ligne.numeroPassage}</td>
+                              <td className="px-3 py-2 text-right">{ligne.nbSacs}</td>
+                              <td className="px-3 py-2 text-right">{Number(ligne.poidsBrutKg).toLocaleString("fr-FR")}</td>
+                              <td className="px-3 py-2 text-right">{Number(ligne.tareKg ?? 0).toLocaleString("fr-FR")}</td>
+                              <td className="px-3 py-2 text-right font-semibold">{net.toLocaleString("fr-FR")}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={cancelControlMutation.isPending}
+                    onClick={() => cancelControlMutation.mutate()}
+                  >
+                    Annuler la session
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="bg-indigo-700 hover:bg-indigo-800"
+                    disabled={addControlLineMutation.isPending || !controlSacs || !controlBrut}
+                    onClick={() => addControlLineMutation.mutate()}
+                  >
+                    <Plus className="mr-1 h-3 w-3" />
+                    {addControlLineMutation.isPending ? "Enregistrement…" : "Ajouter le passage"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="bg-green-700 hover:bg-green-800"
+                    disabled={finishControlMutation.isPending || !(activeControlDetail?.lignes?.length)}
+                    onClick={() => finishControlMutation.mutate()}
+                  >
+                    <CheckCircle2 className="mr-1 h-3 w-3" />
+                    {finishControlMutation.isPending ? "Clôture…" : "Clôturer le contrôle"}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {!activeControl && canManageControl && ["en_preparation", "charge"].includes(statut) && (
+              <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                  <div className="flex-1">
+                    <Label className="text-xs">Certification déclarée pour cette pesée *</Label>
+                    <Select value={certificationControle || undefined} onValueChange={setCertificationControle}>
+                      <SelectTrigger className="bg-white"><SelectValue placeholder="Sélectionner la certification…" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="RA">Rainforest Alliance</SelectItem>
+                        <SelectItem value="FAIRTRADE">Fairtrade</SelectItem>
+                        <SelectItem value="ASR_1000">ASR 1000</SelectItem>
+                        <SelectItem value="ORDINAIRE">Ordinaire</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    className="bg-indigo-700 hover:bg-indigo-800"
+                    disabled={startControlMutation.isPending || !certificationControle}
+                    onClick={() => startControlMutation.mutate()}
+                  >
+                    <Scale className="mr-2 h-4 w-4" />
+                    {startControlMutation.isPending ? "Démarrage…" : "Démarrer une pesée de contrôle"}
+                  </Button>
+                </div>
+                <p className="mt-2 text-xs text-indigo-700">Contrôle facultatif : il ne remplace pas « Confirmer le chargement ».</p>
+              </div>
+            )}
+
+            {controlSummary.sessions.length > 0 && (
+              <div className="border-t pt-3">
+                <div className="mb-2 text-xs font-semibold text-gray-600">Historique des contrôles</div>
+                <div className="space-y-1">
+                  {controlSummary.sessions.map((session) => (
+                    <div key={session.id} className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-600">
+                      <span className="font-mono">{session.numeroSession}</span>
+                      <span>{session.statut === "en_cours" ? "En cours" : session.statut === "terminee" ? "Terminée" : "Annulée"}</span>
+                      <span>{Number(session.poidsTotalKg ?? 0).toLocaleString("fr-FR")} kg · {session.nbSacsTotal ?? 0} sacs</span>
+                      <span>{new Date(session.dateDebut).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Dette transporteur et règlement de trésorerie */}
       {fraisTransportMontant > 0 && (

@@ -15,6 +15,7 @@ import {
   entrepotsDeleguesTable,
   usersTable,
   bonsReceptionMembresDeleguesTable,
+  expeditionsTable,
 } from "@workspace/db";
 import { eq, and, desc, sql, gte, lte, isNull, inArray, or } from "drizzle-orm";
 import { getPrixActuel } from "./terrainService.js";
@@ -178,6 +179,105 @@ export class SessionTransfertExistanteError extends Error {
   constructor(public readonly sessionId: number) {
     super(`Une session de pesée est déjà associée à ce transfert (session #${sessionId})`);
     this.name = "SessionTransfertExistanteError";
+  }
+}
+
+/** Une seule pesée de contrôle peut être active sur une expédition. */
+export class SessionExpeditionExistanteError extends Error {
+  readonly code = "SESSION_EXPEDITION_EXISTANTE";
+  constructor(
+    public readonly sessionId: number,
+    public readonly numeroSession: string,
+  ) {
+    super(`Une pesée de contrôle est déjà en cours pour cette expédition (${numeroSession})`);
+    this.name = "SessionExpeditionExistanteError";
+  }
+}
+
+/**
+ * Crée une session de pesée par sacs destinée uniquement à vérifier le
+ * tonnage d'une expédition. Elle n'est liée à aucun membre et ne peut donc
+ * pas déclencher de livraison, paiement, commission ou mouvement de stock.
+ */
+export async function createExpeditionControlSession(
+  cooperativeId: number,
+  expeditionId: number,
+  data: {
+    peseurId?: number;
+    balanceId?: number;
+    certificationCacao: string;
+    notes?: string;
+  },
+) {
+  if (!isCertificationCacao(data.certificationCacao)) {
+    throw new Error("Le type de certification du cacao est obligatoire avant de démarrer la pesée");
+  }
+
+  const { numeroSession, numeroPesee } = await generateNumeroSession(cooperativeId);
+  try {
+    return await db.transaction(async (tx: any) => {
+      const [expedition] = await tx
+        .select({ id: expeditionsTable.id, statut: expeditionsTable.statut })
+        .from(expeditionsTable)
+        .where(and(
+          eq(expeditionsTable.id, expeditionId),
+          eq(expeditionsTable.cooperativeId, cooperativeId),
+        ))
+        .for("update")
+        .limit(1);
+
+      if (!expedition) throw new Error("Expédition introuvable");
+      if (expedition.statut !== "en_preparation" && expedition.statut !== "charge") {
+        throw new Error("La pesée de contrôle est disponible pendant la préparation ou le chargement");
+      }
+
+      const [active] = await tx
+        .select({ id: sessionsPeseeTable.id, numeroSession: sessionsPeseeTable.numeroSession })
+        .from(sessionsPeseeTable)
+        .where(and(
+          eq(sessionsPeseeTable.expeditionId, expeditionId),
+          eq(sessionsPeseeTable.statut, "en_cours"),
+        ))
+        .limit(1);
+      if (active) throw new SessionExpeditionExistanteError(active.id, active.numeroSession);
+
+      const [session] = await tx
+        .insert(sessionsPeseeTable)
+        .values({
+          cooperativeId,
+          numeroSession,
+          numeroPesee,
+          membreId: null,
+          fournisseurId: null,
+          produit: "cacao",
+          operation: "controle_chargement",
+          peseurId: data.peseurId,
+          balanceId: data.balanceId,
+          statut: "en_cours",
+          notes: data.notes,
+          expeditionId,
+          certificationCacao: data.certificationCacao,
+        })
+        .returning();
+
+      return session!;
+    });
+  } catch (err) {
+    if (err instanceof SessionExpeditionExistanteError) throw err;
+    if (!(typeof err === "object" && err !== null && (err as Record<string, unknown>)["code"] === "23505")) {
+      throw err;
+    }
+
+    const [active] = await db
+      .select({ id: sessionsPeseeTable.id, numeroSession: sessionsPeseeTable.numeroSession })
+      .from(sessionsPeseeTable)
+      .where(and(
+        eq(sessionsPeseeTable.expeditionId, expeditionId),
+        eq(sessionsPeseeTable.statut, "en_cours"),
+      ))
+      .limit(1);
+    if (active) throw new SessionExpeditionExistanteError(active.id, active.numeroSession);
+    throw err;
   }
 }
 
@@ -484,7 +584,7 @@ export async function createSession(
 // ─── Lister sessions (avec lignes count) ──────────────────────────────────────
 export async function getSessions(
   cooperativeId: number,
-  opts: { statut?: string; membreId?: number; fournisseurId?: number; limit?: number; peseurId?: number; dateDebut?: string; dateFin?: string } = {},
+  opts: { statut?: string; membreId?: number; fournisseurId?: number; expeditionId?: number; limit?: number; peseurId?: number; dateDebut?: string; dateFin?: string } = {},
 ) {
   const conditions = [eq(sessionsPeseeTable.cooperativeId, cooperativeId)];
   if (opts.statut) {
@@ -497,6 +597,9 @@ export async function getSessions(
   }
   if (opts.fournisseurId) {
     conditions.push(eq(sessionsPeseeTable.fournisseurId, opts.fournisseurId));
+  }
+  if (opts.expeditionId) {
+    conditions.push(eq(sessionsPeseeTable.expeditionId, opts.expeditionId));
   }
   // Peseur : ne voit que ses propres sessions
   if (opts.peseurId !== undefined) {
@@ -536,6 +639,7 @@ export async function getSessions(
       notes: sessionsPeseeTable.notes,
       livraisonId: sessionsPeseeTable.livraisonId,
       bonReceptionId: sessionsPeseeTable.bonReceptionId,
+      expeditionId: sessionsPeseeTable.expeditionId,
       createdAt: sessionsPeseeTable.createdAt,
     })
     .from(sessionsPeseeTable)
@@ -602,6 +706,7 @@ export async function getSessions(
       notes: sql<string | null>`null`,
       livraisonId: livraisonsTable.id,
       bonReceptionId: sql<number | null>`null`,
+      expeditionId: sql<number | null>`null`,
       createdAt: livraisonsTable.createdAt,
     })
     .from(livraisonsTable)
@@ -643,6 +748,7 @@ export async function getSessionDetail(cooperativeId: number, sessionId: number)
       livraisonId:    sessionsPeseeTable.livraisonId,
       transfertId:    sessionsPeseeTable.transfertId,
       bonReceptionId: sessionsPeseeTable.bonReceptionId,
+      expeditionId:   sessionsPeseeTable.expeditionId,
       createdAt: sessionsPeseeTable.createdAt,
       // ── Contexte transfert (#15) ──────────────────────────────────────
       transfertNumero:           transfertsStockTable.numeroTransfert,
@@ -956,6 +1062,17 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
         eq(bonsReceptionMembresDeleguesTable.id, detail.bonReceptionId),
         eq(bonsReceptionMembresDeleguesTable.sessionPeseeId, sessionId),
       ));
+  }
+
+  // Le contrôle de chargement reste strictement logistique : il ne déclenche
+  // aucune livraison, commission, paiement ou mouvement de stock.
+  if (detail.operation === "controle_chargement" && detail.expeditionId != null) {
+    return {
+      ...detail,
+      statut: "terminee" as const,
+      dateFin: updated?.dateFin,
+      livraisonId: null,
+    };
   }
 
   // Commission + livraison + paiement pour les membres délégués de localités.
@@ -1377,6 +1494,8 @@ export async function creerLivraisonDepuisSession(
         livraisonId: sessionsPeseeTable.livraisonId,
         dateFin: sessionsPeseeTable.dateFin,
         bonReceptionId: sessionsPeseeTable.bonReceptionId,
+        operation: sessionsPeseeTable.operation,
+        expeditionId: sessionsPeseeTable.expeditionId,
       })
       .from(sessionsPeseeTable)
       .where(and(eq(sessionsPeseeTable.id, sessionId), eq(sessionsPeseeTable.cooperativeId, cooperativeId)))
@@ -1384,6 +1503,9 @@ export async function creerLivraisonDepuisSession(
       .limit(1);
 
     if (!session) throw new Error("Session introuvable");
+    if (session.operation === "controle_chargement" || session.expeditionId != null) {
+      throw new Error("Une pesée de contrôle de chargement ne peut pas être convertie en livraison");
+    }
     if (session.statut !== "terminee") throw new Error("La session doit être terminée avant d'être convertie en livraison");
     if (session.livraisonId) throw new Error("Une livraison a déjà été créée pour cette session");
     if (!session.membreId && !session.fournisseurId) throw new Error("La session ne comporte pas de membre ou fournisseur — impossible de créer une livraison");

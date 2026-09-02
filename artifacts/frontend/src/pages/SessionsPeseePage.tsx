@@ -57,6 +57,7 @@ interface SessionPesee {
   dateFin: string | null;
   notes: string | null;
   livraisonId: number | null;
+  expeditionId: number | null;
   createdAt: string;
 }
 
@@ -377,7 +378,10 @@ export default function SessionsPeseePage() {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
     const tiers = `${s.membreNom ?? s.fournisseurNom ?? ""} ${s.membrePrenoms ?? s.fournisseurPrenoms ?? ""}`.toLowerCase();
-    return tiers.includes(q) || s.numeroSession.toLowerCase().includes(q);
+    return tiers.includes(q)
+      || s.numeroSession.toLowerCase().includes(q)
+      || s.operation.toLowerCase().includes(q)
+      || (s.expeditionId != null && String(s.expeditionId).includes(q));
   });
 
   // KPIs
@@ -551,7 +555,9 @@ export default function SessionsPeseePage() {
                     <div style={{ fontFamily: "monospace", fontSize: ".78rem", color: "#374151", fontWeight: 600 }}>
                       {s.numeroSession}
                       <div style={{ fontFamily: "inherit", fontSize: ".68rem", color: s.type === "simple" ? "#7c3aed" : "#64748b", marginTop: 3 }}>
-                        {s.type === "simple" ? "Pesée simple" : "Pesée groupée"}
+                        {s.operation === "controle_chargement"
+                          ? `Contrôle chargement · Expédition #${s.expeditionId ?? "—"}`
+                          : s.type === "simple" ? "Pesée simple" : "Pesée groupée"}
                       </div>
                     </div>
 

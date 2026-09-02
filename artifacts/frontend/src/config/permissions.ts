@@ -286,9 +286,9 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
   },
 
   expeditions: {
-    lire:         ["pca", "directeur", "responsable_tracabilite", "responsable_logistique", "auditeur"],
+    lire:         ["pca", "directeur", "responsable_tracabilite", "responsable_logistique", "peseur", "auditeur"],
     creer:        ["pca", "directeur", "responsable_tracabilite"],
-    modifier:     ["pca", "directeur", "responsable_tracabilite"],
+    modifier:     ["pca", "directeur", "responsable_tracabilite", "peseur"],
     valider:      ["pca", "directeur"],
     litige:       ["pca", "directeur"],
     rapport_eudr: ["pca", "directeur", "responsable_tracabilite", "auditeur"],
