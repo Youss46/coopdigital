@@ -1,4 +1,4 @@
-import { db, expeditionsTable, expeditionLotsTable, expeditionHistoriqueTable, campagnesTable, membresTable, livraisonsTable, exportateursTable, vehiculesTable, chauffeursTable, lotsTable, lotLivraisonsTable, parcellesTable, ventesExportateursTable, entrepotsTable, mouvementsStockTable, traitementsRefusTable, sessionsPeseeTable, configPeseeTable } from "@workspace/db";
+import { db, expeditionsTable, expeditionLotsTable, expeditionHistoriqueTable, campagnesTable, membresTable, livraisonsTable, exportateursTable, vehiculesTable, chauffeursTable, lotsTable, lotLivraisonsTable, parcellesTable, ventesExportateursTable, entrepotsTable, mouvementsStockTable, traitementsRefusTable, sessionsPeseeTable, configPeseeTable, configCooperativeTable } from "@workspace/db";
 import { calculerPoidsAcceptePort } from "./venteReceptionService";
 import { eq, and, desc, sql, count, notInArray, inArray } from "drizzle-orm";
 import { proposerEcriture, proposerEcrituresDansTransaction } from "./comptabiliteService";
@@ -7,6 +7,74 @@ import { enregistrerMouvement as enregistrerMouvementBanque } from "./banqueServ
 import type { ComptabiliteTransaction } from "./comptabiliteService.js";
 import { notifExpeditionArriveePort, notifExpeditionLitige } from "./notificationService.js";
 import { logger } from "../lib/logger";
+
+type StatutEcartControle = "non_controle" | "conforme" | "a_justifier" | "bloque";
+
+export function calculerStatutEcartControle(
+  poidsControleKg: number | null,
+  poidsAttenduKg: number,
+  seuilConformePct: number,
+): StatutEcartControle {
+  if (poidsControleKg == null) return "non_controle";
+  if (poidsAttenduKg <= 0) return "bloque";
+
+  const ecartPct = Math.abs(poidsControleKg - poidsAttenduKg) / poidsAttenduKg * 100;
+  if (ecartPct <= seuilConformePct) return "conforme";
+  if (ecartPct <= seuilConformePct * 2) return "a_justifier";
+  return "bloque";
+}
+
+async function controleChargementAutorise(
+  cooperativeId: number,
+  expeditionId: number,
+  poidsChargeKg: string | number | null,
+): Promise<boolean> {
+  const [cooperativeConfig] = await db
+    .select({ obligatoire: configCooperativeTable.controleChargementObligatoire })
+    .from(configCooperativeTable)
+    .where(eq(configCooperativeTable.cooperativeId, cooperativeId))
+    .limit(1);
+
+  if (cooperativeConfig?.obligatoire !== true) return true;
+
+  const [dernierControle] = await db
+    .select({
+      poidsTotalKg: sessionsPeseeTable.poidsTotalKg,
+    })
+    .from(sessionsPeseeTable)
+    .where(and(
+      eq(sessionsPeseeTable.expeditionId, expeditionId),
+      eq(sessionsPeseeTable.operation, "controle_chargement"),
+      eq(sessionsPeseeTable.statut, "terminee"),
+    ))
+    .orderBy(desc(sessionsPeseeTable.createdAt))
+    .limit(1);
+
+  if (!dernierControle) return false;
+
+  const [lotsPoids] = await db
+    .select({
+      total: sql<string>`COALESCE(SUM(${expeditionLotsTable.poidsKg}), 0)`,
+    })
+    .from(expeditionLotsTable)
+    .where(eq(expeditionLotsTable.expeditionId, expeditionId));
+
+  const poidsAttenduLotsKg = Number(lotsPoids?.total ?? 0);
+  const poidsAttenduKg = poidsAttenduLotsKg > 0 ? poidsAttenduLotsKg : Number(poidsChargeKg ?? 0);
+  const [peseeConfig] = await db
+    .select({ ecartMaxAutorisePct: configPeseeTable.ecartMaxAutorisePct })
+    .from(configPeseeTable)
+    .where(eq(configPeseeTable.cooperativeId, cooperativeId))
+    .limit(1);
+  const seuilConformePct = Number(peseeConfig?.ecartMaxAutorisePct ?? 2);
+  const statutEcart = calculerStatutEcartControle(
+    dernierControle.poidsTotalKg == null ? null : Number(dernierControle.poidsTotalKg),
+    poidsAttenduKg,
+    seuilConformePct,
+  );
+
+  return statutEcart === "conforme" || statutEcart === "a_justifier";
+}
 
 // ── Numérotation automatique EXP-AAAA-XXXX ──────────────────────────────────
 
@@ -215,14 +283,13 @@ export async function getExpedition(cooperativeId: number, expeditionId: number)
     .from(configPeseeTable)
     .where(eq(configPeseeTable.cooperativeId, cooperativeId))
     .limit(1);
+  const [cooperativeConfig] = await db
+    .select({ controleChargementObligatoire: configCooperativeTable.controleChargementObligatoire })
+    .from(configCooperativeTable)
+    .where(eq(configCooperativeTable.cooperativeId, cooperativeId))
+    .limit(1);
   const seuilConformePct = Number(peseeConfig?.ecartMaxAutorisePct ?? 2);
-  const statutEcart = poidsControleKg == null
-    ? "non_controle"
-    : ecartPct! <= seuilConformePct
-      ? "conforme"
-      : ecartPct! <= seuilConformePct * 2
-        ? "a_justifier"
-        : "bloque";
+  const statutEcart = calculerStatutEcartControle(poidsControleKg, poidsAttenduKg, seuilConformePct);
 
   // Détecte si TOUS les lots rattachés proviennent de fournisseurs externes (pas de membres)
   const lotIds = lots.map(l => l.lotId).filter((id): id is number => id !== null && id !== undefined);
@@ -253,6 +320,7 @@ export async function getExpedition(cooperativeId: number, expeditionId: number)
       ecartPct,
       statutEcart,
       seuilConformePct,
+      obligatoire: cooperativeConfig?.controleChargementObligatoire === true,
       sessions: controles,
     },
   };
@@ -717,6 +785,15 @@ export async function changerStatut(
   const trans = TRANSITIONS_VALIDES[exp.statut] ?? [];
   if (!trans.includes(nouveauStatut)) {
     throw new Error(`Transition ${exp.statut} → ${nouveauStatut} non autorisée`);
+  }
+
+  if (
+    nouveauStatut === "charge" &&
+    !(await controleChargementAutorise(cooperativeId, expeditionId, exp.poidsChargeKg))
+  ) {
+    throw new Error(
+      "Le contrôle de chargement doit être clôturé avec un écart acceptable ou à justifier avant de confirmer le chargement",
+    );
   }
 
   const updateValues: Partial<typeof expeditionsTable.$inferInsert> = {

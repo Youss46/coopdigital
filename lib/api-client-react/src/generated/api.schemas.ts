@@ -3896,6 +3896,7 @@ export interface ConfigCooperative {
   couleur_primaire?: string | null;
   couleur_secondaire?: string | null;
   pied_de_page_pdf?: string | null;
+  controle_chargement_obligatoire?: boolean;
   updated_at?: string | null;
 }
 
@@ -3935,6 +3936,7 @@ export interface UpdateConfigBody {
   couleur_primaire?: string;
   couleur_secondaire?: string;
   pied_de_page_pdf?: string;
+  controle_chargement_obligatoire?: boolean;
 }
 
 export type DocumentOfficielType = typeof DocumentOfficielType[keyof typeof DocumentOfficielType];

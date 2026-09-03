@@ -58,6 +58,7 @@ function toApiConfig(row: ConfigCooperative) {
     couleur_primaire:           row.couleurPrimaire,
     couleur_secondaire:         row.couleurSecondaire,
     pied_de_page_pdf:           row.piedDePagePdf,
+    controle_chargement_obligatoire: row.controleChargementObligatoire,
     updated_at:                 row.updatedAt,
   };
 }
@@ -144,6 +145,7 @@ export async function handleUpdateConfig(req: Request, res: Response): Promise<v
       couleurPrimaire:          d.couleur_primaire         ?? undefined,
       couleurSecondaire:        d.couleur_secondaire       ?? undefined,
       piedDePagePdf:            d.pied_de_page_pdf         ?? undefined,
+      controleChargementObligatoire: d.controle_chargement_obligatoire ?? undefined,
     });
 
     invalidateLogoCache(cooperativeId);

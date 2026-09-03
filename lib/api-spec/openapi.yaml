@@ -11490,6 +11490,7 @@ components:
         couleur_primaire:           { type: string, nullable: true }
         couleur_secondaire:         { type: string, nullable: true }
         pied_de_page_pdf:           { type: string, nullable: true }
+        controle_chargement_obligatoire: { type: boolean }
         updated_at:                 { type: string, format: date-time, nullable: true }
 
     UpdateConfigBody:
@@ -11530,6 +11531,7 @@ components:
         couleur_primaire:           { type: string }
         couleur_secondaire:         { type: string }
         pied_de_page_pdf:           { type: string }
+        controle_chargement_obligatoire: { type: boolean }
 
     DocumentOfficiel:
       type: object

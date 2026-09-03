@@ -313,9 +313,13 @@ export default function ParametresPage() {
       "zone_collecte","superficie_totale_ha","valeur_nominale_part_fcfa",
       "nbre_parts_min","cotisation_annuelle_fcfa","quorum_ag_pct",
       "couleur_primaire","couleur_secondaire","pied_de_page_pdf",
+      "controle_chargement_obligatoire",
     ];
     for (const f of fields) init[f] = c[f] != null ? String(c[f]) : "";
     init["exercice_fiscal_debut_mois"] = c["exercice_fiscal_debut_mois"] != null ? String(c["exercice_fiscal_debut_mois"]) : "1";
+    init["controle_chargement_obligatoire"] = c["controle_chargement_obligatoire"] != null
+      ? String(c["controle_chargement_obligatoire"])
+      : "false";
     setForm(init);
     setInitialized(true);
   }
@@ -359,6 +363,7 @@ export default function ParametresPage() {
       couleur_primaire:           v("couleur_primaire") || undefined,
       couleur_secondaire:         v("couleur_secondaire") || undefined,
       pied_de_page_pdf:           v("pied_de_page_pdf") || undefined,
+      controle_chargement_obligatoire: v("controle_chargement_obligatoire") === "true",
     };
   }
 
@@ -822,6 +827,29 @@ export default function ParametresPage() {
                 <Input type="number" disabled={!canEdit} value={v("quorum_ag_pct")} onChange={(e) => set("quorum_ag_pct", e.target.value)} min={0} max={100} />
               </div>
             </div>
+          </div>
+
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <h2 className="font-semibold text-gray-800 mb-2">Contrôle des expéditions</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              Cette règle s’applique uniquement à la confirmation du chargement. Le contrôle reste une opération distincte.
+            </p>
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                data-testid="switch-controle-chargement-obligatoire"
+                type="checkbox"
+                disabled={!canEdit}
+                checked={v("controle_chargement_obligatoire") === "true"}
+                onChange={(e) => set("controle_chargement_obligatoire", String(e.target.checked))}
+                className="mt-1 h-4 w-4 rounded border-gray-300 text-green-700 focus:ring-green-600"
+              />
+              <span>
+                <span className="block font-medium text-gray-800">Rendre le contrôle de chargement obligatoire</span>
+                <span className="block text-xs text-gray-500 mt-1">
+                  Une expédition ne pourra passer à « Chargé » qu’après la clôture d’un contrôle avec un écart conforme ou à justifier.
+                </span>
+              </span>
+            </label>
           </div>
 
           <div className="bg-white rounded-xl border border-gray-200 p-5">

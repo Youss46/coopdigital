@@ -58,6 +58,7 @@ export const IndicateurRse = makeTable("indicateurs_rse");
 export const sessionsPeseeTable = makeTable("sessions_pesee");
 export const lignesPeseeTable = makeTable("lignes_pesee");
 export const configPeseeTable = makeTable("config_pesee");
+export const configCooperativeTable = makeTable("config_cooperative");
 export const transfertsStockTable = makeTable("transferts_stock");
 export const entrepotsDeleguesTable = makeTable("entrepots_delegues");
 // Additional tables used by pdfService and other modules

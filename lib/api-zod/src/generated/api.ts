@@ -6207,6 +6207,7 @@ export const GetConfigResponse = zod.object({
   "couleur_primaire": zod.string().nullish(),
   "couleur_secondaire": zod.string().nullish(),
   "pied_de_page_pdf": zod.string().nullish(),
+  "controle_chargement_obligatoire": zod.boolean().optional(),
   "updated_at": zod.coerce.date().nullish()
 })
 
@@ -6249,7 +6250,8 @@ export const UpdateConfigBody = zod.object({
   "quorum_ag_pct": zod.number().optional(),
   "couleur_primaire": zod.string().optional(),
   "couleur_secondaire": zod.string().optional(),
-  "pied_de_page_pdf": zod.string().optional()
+  "pied_de_page_pdf": zod.string().optional(),
+  "controle_chargement_obligatoire": zod.boolean().optional()
 })
 
 export const UpdateConfigResponse = zod.object({
@@ -6291,6 +6293,7 @@ export const UpdateConfigResponse = zod.object({
   "couleur_primaire": zod.string().nullish(),
   "couleur_secondaire": zod.string().nullish(),
   "pied_de_page_pdf": zod.string().nullish(),
+  "controle_chargement_obligatoire": zod.boolean().optional(),
   "updated_at": zod.coerce.date().nullish()
 })
 

@@ -50,6 +50,7 @@ export const configCooperativeTable = pgTable("config_cooperative", {
   couleurPrimaire:          varchar("couleur_primaire", { length: 20 }).default("#1a4731"),
   couleurSecondaire:        varchar("couleur_secondaire", { length: 20 }).default("#c4962a"),
   piedDePagePdf:            text("pied_de_page_pdf"),
+  controleChargementObligatoire: boolean("controle_chargement_obligatoire").notNull().default(false),
 
   updatedAt:                timestamp("updated_at", { withTimezone: true }).defaultNow(),
   updatedBy:                integer("updated_by").references(() => usersTable.id, { onDelete: "set null" }),

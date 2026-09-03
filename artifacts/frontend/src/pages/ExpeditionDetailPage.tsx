@@ -78,6 +78,7 @@ interface ControleSession {
 }
 
 interface ControleTonnage {
+  obligatoire: boolean;
   poidsDeclareExpeditionKg: number;
   poidsAttenduLotsKg: number;
   poidsAttenduKg: number;
@@ -315,6 +316,8 @@ export default function ExpeditionDetailPage() {
 
   const lots = Array.isArray(exp.lots) ? exp.lots as Record<string, unknown>[] : [];
   const lotsNonMembres = exp.lotsNonMembres === true;
+  const controleChargementBloque = Boolean(controlSummary?.obligatoire) &&
+    !["conforme", "a_justifier"].includes(controlSummary?.statutEcart ?? "");
   const historique = Array.isArray(exp.historique) ? exp.historique as Record<string, unknown>[] : [];
   const documents = Array.isArray(exp.documents) ? exp.documents as Record<string, unknown>[] : [];
 
@@ -443,6 +446,9 @@ export default function ExpeditionDetailPage() {
                  controlSummary.statutEcart === "conforme" ? "Conforme" :
                  controlSummary.statutEcart === "a_justifier" ? "À justifier" : "Anomalie bloquante"}
               </Badge>
+              {controlSummary.obligatoire && (
+                <Badge className="bg-indigo-100 text-indigo-700 hover:bg-indigo-100">Obligatoire</Badge>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -589,7 +595,11 @@ export default function ExpeditionDetailPage() {
                     {startControlMutation.isPending ? "Démarrage…" : "Démarrer une pesée de contrôle"}
                   </Button>
                 </div>
-                <p className="mt-2 text-xs text-indigo-700">Contrôle facultatif : il ne remplace pas « Confirmer le chargement ».</p>
+                <p className="mt-2 text-xs text-indigo-700">
+                  {controlSummary.obligatoire
+                    ? "Contrôle obligatoire : clôturez-le avec un écart conforme ou à justifier avant de confirmer le chargement."
+                    : "Contrôle facultatif : il ne remplace pas « Confirmer le chargement »."}
+                </p>
               </div>
             )}
 
@@ -1171,21 +1181,29 @@ export default function ExpeditionDetailPage() {
       {/* Actions */}
       {transition && !showReception && (
         <Card className="border-green-200 bg-green-50">
-          <CardContent className="p-4 flex items-center justify-between">
-            <p className="text-sm text-green-700">Prochaine étape disponible</p>
-            <Button
-              className="bg-green-700 hover:bg-green-800 gap-2"
-              disabled={statutMutation.isPending}
-              onClick={() => {
-                if (transition.next === "reception") {
-                  setShowReception(true);
-                } else {
-                  statutMutation.mutate({ statut: transition.next, notes });
-                }
-              }}
-            >
-              {transition.label} <ChevronRight className="h-4 w-4" />
-            </Button>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-green-700">Prochaine étape disponible</p>
+              <Button
+                data-testid="button-confirmer-chargement"
+                className="bg-green-700 hover:bg-green-800 gap-2"
+                disabled={statutMutation.isPending || (transition.next === "charge" && controleChargementBloque)}
+                onClick={() => {
+                  if (transition.next === "reception") {
+                    setShowReception(true);
+                  } else {
+                    statutMutation.mutate({ statut: transition.next, notes });
+                  }
+                }}
+              >
+                {transition.label} <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+            {transition.next === "charge" && controleChargementBloque && (
+              <p className="mt-2 text-xs text-amber-700">
+                Confirmation bloquée : le contrôle obligatoire doit être clôturé avec un écart acceptable ou justifié.
+              </p>
+            )}
           </CardContent>
         </Card>
       )}
