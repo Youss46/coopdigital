@@ -7,6 +7,7 @@ import {
   terminerSession,
   SessionExpeditionExistanteError,
 } from "../services/peseeSessionService.js";
+import { changerStatut } from "../services/expeditionsService.js";
 
 const enabled =
   process.env.RUN_POSTGRES_INTEGRATION === "1" &&
@@ -33,6 +34,7 @@ describe.skipIf(!enabled)(
     let expeditionId: number;
     let concurrentExpeditionId: number;
     let sessionId: number;
+    let transitionExpeditionSequence = 0;
 
     async function readEffectCounts(): Promise<EffectCounts> {
       const result = await client.query(
@@ -75,6 +77,47 @@ describe.skipIf(!enabled)(
       return result.rows[0] as EffectCounts;
     }
 
+    async function setControleChargementObligatoire(obligatoire: boolean) {
+      await client.query(
+        `UPDATE config_cooperative
+            SET controle_chargement_obligatoire = $2
+          WHERE cooperative_id = $1`,
+        [cooperativeId, obligatoire],
+      );
+    }
+
+    async function createTransitionExpedition(poidsChargeKg: number): Promise<number> {
+      transitionExpeditionSequence += 1;
+      const expedition = await client.query(
+        `INSERT INTO expeditions
+          (cooperative_id, numero_expedition, type_vehicule, port,
+           poids_charge_kg, statut, exportateur_nom)
+         VALUES ($1, $2, 'location', 'San Pedro', $3, 'en_preparation',
+                 'Exportateur de test')
+         RETURNING id`,
+        [
+          cooperativeId,
+          `ET-${process.pid}-${Date.now()}-${transitionExpeditionSequence}`,
+          poidsChargeKg,
+        ],
+      );
+      return expedition.rows[0].id;
+    }
+
+    async function createTermineeControl(expeditionIdToControl: number, poidsNetKg: number) {
+      const session = await createExpeditionControlSession(
+        cooperativeId,
+        expeditionIdToControl,
+        { certificationCacao: "ORDINAIRE" },
+      );
+      await addLigne(cooperativeId, session.id, {
+        nbSacs: 10,
+        poidsBrutKg: poidsNetKg + 10,
+        tareKg: 10,
+      });
+      return terminerSession(cooperativeId, session.id);
+    }
+
     beforeAll(async () => {
       client = await pool.connect();
       const suffix = `${process.pid}-${Date.now()}`;
@@ -97,6 +140,13 @@ describe.skipIf(!enabled)(
         [cooperativeId],
       );
       campaignId = campaign.rows[0].id;
+
+      await client.query(
+        `INSERT INTO config_cooperative
+          (cooperative_id, controle_chargement_obligatoire)
+         VALUES ($1, true)`,
+        [cooperativeId],
+      );
 
       const expedition = await client.query(
         `INSERT INTO expeditions
@@ -208,8 +258,8 @@ describe.skipIf(!enabled)(
           );
           await client.query(
             `DELETE FROM expeditions
-              WHERE id IN ($1, $2)`,
-            [expeditionId, concurrentExpeditionId],
+              WHERE cooperative_id = $1`,
+            [cooperativeId],
           );
           await client.query(
             `DELETE FROM historique_prix
@@ -230,6 +280,73 @@ describe.skipIf(!enabled)(
       } finally {
         client.release();
       }
+    });
+
+    it("refuse le chargement sans contrôle clôturé et conserve le statut", async () => {
+      await setControleChargementObligatoire(true);
+
+      await expect(
+        changerStatut(cooperativeId, expeditionId, 1, "charge"),
+      ).rejects.toThrow(
+        "Le contrôle de chargement doit être clôturé avec un écart acceptable ou à justifier avant de confirmer le chargement",
+      );
+
+      const persisted = await client.query(
+        `SELECT statut FROM expeditions WHERE id = $1`,
+        [expeditionId],
+      );
+      expect(persisted.rows[0].statut).toBe("en_preparation");
+    });
+
+    it("autorise le chargement après un contrôle conforme", async () => {
+      await setControleChargementObligatoire(true);
+      const id = await createTransitionExpedition(1000);
+
+      const controle = await createTermineeControl(id, 1000);
+      expect(controle.statut).toBe("terminee");
+
+      await expect(
+        changerStatut(cooperativeId, id, 1, "charge"),
+      ).resolves.toMatchObject({ ok: true, statut: "charge" });
+
+      const persisted = await client.query(
+        `SELECT statut FROM expeditions WHERE id = $1`,
+        [id],
+      );
+      expect(persisted.rows[0].statut).toBe("charge");
+    });
+
+    it("autorise le chargement après un contrôle à justifier", async () => {
+      await setControleChargementObligatoire(true);
+      const id = await createTransitionExpedition(1000);
+
+      const controle = await createTermineeControl(id, 1030);
+      expect(controle.statut).toBe("terminee");
+
+      await expect(
+        changerStatut(cooperativeId, id, 1, "charge"),
+      ).resolves.toMatchObject({ ok: true, statut: "charge" });
+
+      const persisted = await client.query(
+        `SELECT statut FROM expeditions WHERE id = $1`,
+        [id],
+      );
+      expect(persisted.rows[0].statut).toBe("charge");
+    });
+
+    it("préserve le comportement historique quand le contrôle obligatoire est désactivé", async () => {
+      await setControleChargementObligatoire(false);
+      const id = await createTransitionExpedition(1000);
+
+      await expect(
+        changerStatut(cooperativeId, id, 1, "charge"),
+      ).resolves.toMatchObject({ ok: true, statut: "charge" });
+
+      const persisted = await client.query(
+        `SELECT statut FROM expeditions WHERE id = $1`,
+        [id],
+      );
+      expect(persisted.rows[0].statut).toBe("charge");
     });
 
     it("clôture les passages sans livraison, paiement, commission, avance, vente ni stock", async () => {
