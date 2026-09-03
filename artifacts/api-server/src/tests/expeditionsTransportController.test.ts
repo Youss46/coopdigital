@@ -1,9 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({
-  listFraisTransportARegler: vi.fn(),
-  createExpeditionControlSession: vi.fn(),
-}));
+const mocks = vi.hoisted(() => {
+  class SessionExpeditionExistanteError extends Error {
+    readonly code = "SESSION_EXPEDITION_EXISTANTE";
+    constructor(
+      public readonly sessionId: number,
+      public readonly numeroSession: string,
+    ) {
+      super(`Une pesée de contrôle est déjà en cours pour cette expédition (${numeroSession})`);
+      this.name = "SessionExpeditionExistanteError";
+    }
+  }
+
+  return {
+    listFraisTransportARegler: vi.fn(),
+    createExpeditionControlSession: vi.fn(),
+    SessionExpeditionExistanteError,
+  };
+});
 
 vi.mock("../services/expeditionsService", () => ({
   listExpeditions: vi.fn(),
@@ -37,7 +51,7 @@ vi.mock("../services/peseeSessionService.js", () => ({
   deleteLigne: vi.fn(),
   getSessionDetail: vi.fn(),
   terminerSession: vi.fn(),
-  SessionExpeditionExistanteError: class SessionExpeditionExistanteError extends Error {},
+  SessionExpeditionExistanteError: mocks.SessionExpeditionExistanteError,
 }));
 
 const {
@@ -130,5 +144,27 @@ describe("liste des frais d'exportation à régler", () => {
 
     expect(mocks.createExpeditionControlSession).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  it("retourne le conflit et la session déjà ouverte", async () => {
+    mocks.createExpeditionControlSession.mockRejectedValueOnce(
+      new mocks.SessionExpeditionExistanteError(44, "PSE-2026-00044"),
+    );
+    const res = makeRes();
+    const req = {
+      user: { id: 9, role: "responsable_tracabilite", cooperativeId: 7 },
+      params: { id: "12" },
+      body: { certification_cacao: "RA" },
+      log: { error: vi.fn() },
+    } as never;
+
+    await handleStartExpeditionControl(req, res as never);
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json).toHaveBeenCalledWith({
+      erreur: "Une pesée de contrôle est déjà en cours pour cette expédition (PSE-2026-00044)",
+      sessionId: 44,
+      numeroSession: "PSE-2026-00044",
+    });
   });
 });
