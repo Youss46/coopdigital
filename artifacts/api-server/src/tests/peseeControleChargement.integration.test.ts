@@ -5,6 +5,7 @@ import {
   creerLivraisonDepuisSession,
   createExpeditionControlSession,
   terminerSession,
+  SessionExpeditionExistanteError,
 } from "../services/peseeSessionService.js";
 
 const enabled =
@@ -30,6 +31,7 @@ describe.skipIf(!enabled)(
     let cooperativeId: number;
     let campaignId: number;
     let expeditionId: number;
+    let concurrentExpeditionId: number;
     let sessionId: number;
 
     async function readEffectCounts(): Promise<EffectCounts> {
@@ -103,9 +105,20 @@ describe.skipIf(!enabled)(
          VALUES ($1, $2, 'location', 'San Pedro', 'en_preparation',
                  'Exportateur de test')
          RETURNING id`,
-        [cooperativeId, `EXP-CONTROLE-${suffix}`],
+        [cooperativeId, `E-${suffix}`],
       );
       expeditionId = expedition.rows[0].id;
+
+      const concurrentExpedition = await client.query(
+        `INSERT INTO expeditions
+          (cooperative_id, numero_expedition, type_vehicule, port,
+           statut, exportateur_nom)
+         VALUES ($1, $2, 'location', 'San Pedro', 'en_preparation',
+                 'Exportateur de test')
+         RETURNING id`,
+        [cooperativeId, `EC-${suffix}`],
+      );
+      concurrentExpeditionId = concurrentExpedition.rows[0].id;
 
       // Some disposable databases are provisioned by schema push rather than
       // by the migration that introduced this index. The production service
@@ -189,9 +202,14 @@ describe.skipIf(!enabled)(
             [cooperativeId],
           );
           await client.query(
+            `DELETE FROM sequences_pesee
+              WHERE cooperative_id = $1`,
+            [cooperativeId],
+          );
+          await client.query(
             `DELETE FROM expeditions
-              WHERE id = $1`,
-            [expeditionId],
+              WHERE id IN ($1, $2)`,
+            [expeditionId, concurrentExpeditionId],
           );
           await client.query(
             `DELETE FROM historique_prix
@@ -268,6 +286,47 @@ describe.skipIf(!enabled)(
         expedition_id: expeditionId,
         livraison_id: null,
       });
+    });
+
+    it("ne conserve qu'une session quand deux contrôles démarrent en concurrence", async () => {
+      const results = await Promise.allSettled([
+        createExpeditionControlSession(
+          cooperativeId,
+          concurrentExpeditionId,
+          { certificationCacao: "ORDINAIRE" },
+        ),
+        createExpeditionControlSession(
+          cooperativeId,
+          concurrentExpeditionId,
+          { certificationCacao: "ORDINAIRE" },
+        ),
+      ]);
+
+      const successes = results.filter(
+        (result): result is PromiseFulfilledResult<Awaited<ReturnType<typeof createExpeditionControlSession>>> =>
+          result.status === "fulfilled",
+      );
+      const failures = results.filter(
+        (result): result is PromiseRejectedResult => result.status === "rejected",
+      );
+
+      expect(successes).toHaveLength(1);
+      expect(failures).toHaveLength(1);
+      expect(failures[0].reason).toBeInstanceOf(SessionExpeditionExistanteError);
+      expect(failures[0].reason).toMatchObject({
+        code: "SESSION_EXPEDITION_EXISTANTE",
+      });
+
+      const persisted = await client.query(
+        `SELECT count(*)::int AS count
+           FROM sessions_pesee
+          WHERE cooperative_id = $1
+            AND expedition_id = $2
+            AND operation = 'controle_chargement'
+            AND statut = 'en_cours'`,
+        [cooperativeId, concurrentExpeditionId],
+      );
+      expect(persisted.rows[0].count).toBe(1);
     });
   },
 );
