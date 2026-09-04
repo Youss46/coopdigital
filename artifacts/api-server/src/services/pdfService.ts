@@ -865,6 +865,26 @@ export async function generateRecuLivraison(livraisonId: number, cooperativeId: 
     .leftJoin(peseurUserAlias, eq(livraisonsTable.peseurId, peseurUserAlias.id))
     .where(eq(livraisonsTable.id, livraisonId));
   if (!row) throw new Error("Livraison introuvable");
+  const statutLivraisonNormalise = (row.statutPaiement ?? "").trim().toUpperCase();
+  const livraisonPayee = statutLivraisonNormalise === "PAYÉ" || statutLivraisonNormalise === "PAYE";
+  const [dernierReglement] = livraisonPayee
+    ? await db
+      .select({
+        dateValidation: paiementsTable.dateValidation,
+        createdAt: paiementsTable.createdAt,
+      })
+      .from(paiementsTable)
+      .where(and(
+        eq(paiementsTable.livraisonId, livraisonId),
+        inArray(paiementsTable.statut, ["effectue", "confirme"]),
+      ))
+      .orderBy(desc(paiementsTable.dateValidation), desc(paiementsTable.createdAt), desc(paiementsTable.id))
+      .limit(1)
+    : [];
+  const dateReglementLivraison = dernierReglement?.dateValidation ?? dernierReglement?.createdAt ?? null;
+  if (livraisonPayee && !dateReglementLivraison) {
+    throw new Error("Livraison payée sans date de règlement");
+  }
 
   const [campagne, mentionCertif] = await Promise.all([
     getCampagneEnCours(cooperativeId),
@@ -904,6 +924,9 @@ export async function generateRecuLivraison(livraisonId: number, cooperativeId: 
     ["N° Reçu",            ref],
     ["Campagne",           campagne ?? "—"],
     ["Date de livraison",  formaterDate(row.dateLivraison)],
+    ...(dateReglementLivraison
+      ? [["Date de règlement", formaterDateHeure(dateReglementLivraison)] as [string, string]]
+      : []),
     ["Heure de pesée",     row.createdAt
       ? new Date(row.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Africa/Abidjan" })
       : "—"],
@@ -1014,6 +1037,7 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
     referenceTransaction: paiementsTable.referenceTransaction,
     statut: paiementsTable.statut,
     createdAt: paiementsTable.createdAt,
+    dateValidation: paiementsTable.dateValidation,
     libelle: paiementsTable.libelle,
     livraisonId: paiementsTable.livraisonId,
     membreNom: membresTable.nom,
@@ -1051,6 +1075,11 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
     .leftJoin(saisiseurPayAlias, eq(paiementsTable.agentSaisiseurId, saisiseurPayAlias.id))
     .where(eq(paiementsTable.id, paiementId));
   if (!row) throw new Error("Paiement introuvable");
+  const paiementRegle = row.statut === "effectue" || row.statut === "confirme";
+  const dateReglement = paiementRegle ? (row.dateValidation ?? row.createdAt) : null;
+  if (paiementRegle && !dateReglement) {
+    throw new Error("Paiement effectué sans date de règlement");
+  }
   const paiementLignes = await db
     .select()
     .from(paiementLignesTable)
@@ -1125,6 +1154,9 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
     ["N° Reçu",              ref],
     ["Campagne",             campagne ?? "—"],
     ["Date",                 formaterDateHeure(row.createdAt)],
+    ...(dateReglement
+      ? [["Date de règlement", formaterDateHeure(dateReglement)] as [string, string]]
+      : []),
     ["Mode de paiement",     payModeLabel[(row.modeReglement ?? row.modePaiement) ?? ""] ?? row.modePaiement ?? "—"],
     ["Référence transaction",row.referenceTransaction ?? "—"],
     ...(isPieceRechange

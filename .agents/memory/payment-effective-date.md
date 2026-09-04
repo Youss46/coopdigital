@@ -8,3 +8,5 @@ Pour compter un règlement confirmé, effectué ou en cours dans une période, u
 **Why:** La page Règlements affichait des paiements effectués alors que la carte Tableau de bord affichait 0 parce que son filtre exigeait uniquement `date_validation`. À l’inverse, les chèques seulement émis gonflaient les cartes avant toute sortie bancaire réelle.
 
 **How to apply:** Dans les KPI, statistiques et exports périodiques, séparer le montant immédiat du montant des chèques. Compter chaque chèque encaissé dans la période de son encaissement, y compris pour un règlement ventilé.
+
+Tout reçu PDF marqué payé affiche obligatoirement la date effective sous « Date de règlement ». Le reçu d’une livraison payée prend le dernier règlement confirmé/effectué.

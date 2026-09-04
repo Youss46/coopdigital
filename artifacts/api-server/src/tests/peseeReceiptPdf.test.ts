@@ -197,6 +197,7 @@ function makePaiementRow(overrides: Partial<Record<string, unknown>> = {}) {
     referenceTransaction: null,
     statut: "en_attente",
     createdAt: new Date("2026-08-17T10:30:00Z"),
+    dateValidation: null,
     libelle: null,
     livraisonId: 100,
     membreNom: "KONÉ",
@@ -322,6 +323,17 @@ describe("generateRecuPaiement (real PDF generation) — receipt number in PDF o
     // PDFKit compresses page content with FlateDecode; inflate streams before searching.
     const text = extractPdfText(buf);
     expect(text).toContain(RECEIPT_NUM);
+  });
+
+  it("affiche obligatoirement la date de règlement pour un paiement effectué", async () => {
+    setupDbSelect(makePaiementRow({
+      statut: "effectue",
+      dateValidation: new Date("2026-08-18T14:45:00Z"),
+    }));
+    const buf = await generateRecuPaiement(PAIEMENT_ID, 1);
+    const text = extractPdfText(buf);
+    expect(text).toContain("Date de règlement");
+    expect(text).toContain("18/08/2026");
   });
 
   it("PAY fallback: passes PAY-{id} to drawHeader when numeroRecu is null (legacy row)", async () => {
