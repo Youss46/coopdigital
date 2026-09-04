@@ -32,11 +32,19 @@ describe("périmètre du comptable", () => {
     expect(next).not.toHaveBeenCalled();
   });
 
-  it("refuse les routes des délégués de localité", () => {
+  it("autorise la page des délégués de localités sans autoriser leur création", () => {
     const { res, next } = runAccessCheck("/delegues-localites/commissions/recap", "comptable");
 
-    expect(res.status).toHaveBeenCalledWith(403);
-    expect(next).not.toHaveBeenCalled();
+    expect(res.status).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledOnce();
+    expect(hasPermission("comptable", "membres", "lire")).toBe(true);
+    expect(hasPermission("comptable", "membres", "creer")).toBe(false);
+    expect(hasPermission("comptable", "avances", "lire")).toBe(true);
+    expect(hasPermission("comptable", "avances", "octroyer")).toBe(true);
+    expect(hasPermission("comptable", "avances", "rembourser")).toBe(true);
+    expect(hasPermission("comptable", "commissions_delegues", "lire")).toBe(true);
+    expect(hasPermission("comptable", "commissions_delegues", "gerer_taux")).toBe(true);
+    expect(hasPermission("comptable", "commissions_delegues", "payer")).toBe(true);
   });
 
   it("laisse les autres rôles accéder aux modules exclus", () => {

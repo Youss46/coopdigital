@@ -105,7 +105,7 @@ export const NAV_ITEMS: NavItemConfig[] = [
   { href: "/gouvernance",            label: "Gouvernance",               roles: ["pca","directeur","secretaire","auditeur"],                                   category: "Organisation" },
   { href: "/communication",          label: "Communication",             roles: ["pca","directeur","caissier","magasinier","responsable_tracabilite","delegue","auditeur","agent_terrain"], category: "Organisation", showMessagesBadge: true },
   { href: "/delegues",               label: "Délégués Localité",         roles: ["pca","directeur","auditeur"],                                               category: "Organisation" },
-  { href: "/delegues-localites",     label: "Délégués de localités",     roles: ["pca","directeur","auditeur"],                                               category: "Organisation" },
+  { href: "/delegues-localites",     label: "Délégués de localités",     roles: ["pca","directeur","comptable","auditeur"],                                  category: "Organisation" },
   { href: "/peseurs",                label: "Peseurs",                   roles: ["pca","directeur"],                                                          category: "Organisation" },
   { href: "/mes-peseurs",            label: "Mes peseurs",               roles: ["delegue"],                                                                   category: "Organisation" },
   { href: "/administration/comptes", label: "Administration",            roles: ["pca","directeur"],                                                           category: "Organisation" },

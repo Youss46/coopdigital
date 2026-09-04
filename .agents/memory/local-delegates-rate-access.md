@@ -7,6 +7,8 @@ description: Règle d’autorisation et de portée pour la configuration des com
 
 Les taux de commission des délégués, terrain comme localités, ne dépendent pas de la permission `delegues`. Ils utilisent la permission dédiée `commissions_delegues` : PCA, directeur, comptable et auditeur peuvent les consulter ; seuls PCA, directeur et comptable peuvent les créer, modifier ou supprimer.
 
-**Why:** les taux ont un effet direct sur les paiements futurs. Ils doivent rester accessibles aux rôles financiers légitimes sans ouvrir leur modification à tous les comptes coopératifs authentifiés. L'auditeur garde une visibilité indépendante en lecture seule.
+Le rôle comptable accède à toute la page des délégués de localités et à ses opérations financières : consultation, avances, remboursements, commissions et taux. Il ne peut pas créer un membre délégué de localités, car `membres.creer` reste exclu de son rôle.
 
-**How to apply:** protégez les listes avec `commissions_delegues.lire` et les mutations avec `commissions_delegues.gerer_taux`. Masquez aussi les boutons de modification aux rôles non autorisés ; la sécurité reste toujours imposée par les routes API.
+**Why:** les taux et opérations de cette page ont un effet direct sur les paiements futurs et relèvent du suivi financier du comptable. La création de l’identité d’un délégué reste une responsabilité organisationnelle distincte. L'auditeur garde une visibilité indépendante en lecture seule.
+
+**How to apply:** ne pas placer `/delegues-localites` dans les modules interdits au comptable. Protéger les opérations par leurs permissions financières et conserver la création via `membres.creer`. Masquer les actions opérationnelles étrangères au rôle.

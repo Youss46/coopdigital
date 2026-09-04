@@ -82,7 +82,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
   avances: {
     lire:      ["pca", "directeur", "comptable", "caissier", "delegue", "auditeur"],
     octroyer:  ["pca", "directeur", "comptable", "caissier", "delegue"],
-    rembourser:["pca", "directeur", "caissier", "delegue"],
+    rembourser:["pca", "directeur", "comptable", "caissier", "delegue"],
     supprimer: ["pca", "directeur"],
   },
 
@@ -504,7 +504,6 @@ const COMPTABLE_RESTRICTED_PATHS = [
   "/scoring",
   "/gouvernance",
   "/delegues",
-  "/delegues-localites",
   "/certifications",
   "/archives",
 ];

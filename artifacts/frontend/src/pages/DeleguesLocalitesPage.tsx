@@ -187,6 +187,7 @@ export default function DeleguesLocalitesPage() {
   const peutLireAvances = usePermission("avances", "lire");
   const peutOctroyer   = usePermission("avances", "octroyer");
   const peutRembourser = usePermission("avances", "rembourser");
+  const peutCreerBonReception = usePermission("bons_reception", "creer");
   const peutPayerCommissions = usePermission("commissions_delegues", "payer");
   const peutGererTaux = usePermission("commissions_delegues", "gerer_taux");
 
@@ -640,14 +641,16 @@ export default function DeleguesLocalitesPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        title="Créer un bon de réception"
-                        onClick={() => setLocation(`/bons-reception-membres?membre_id=${m.id}`)}
-                        className="flex items-center gap-1 text-xs font-medium text-cyan-700 bg-cyan-50 hover:bg-cyan-100 border border-cyan-200 rounded-lg px-1.5 sm:px-2 py-1 transition-colors"
-                      >
-                        <Package size={12} />
-                        <span className="hidden sm:inline">Bon de réception</span>
-                      </button>
+                      {peutCreerBonReception && (
+                        <button
+                          title="Créer un bon de réception"
+                          onClick={() => setLocation(`/bons-reception-membres?membre_id=${m.id}`)}
+                          className="flex items-center gap-1 text-xs font-medium text-cyan-700 bg-cyan-50 hover:bg-cyan-100 border border-cyan-200 rounded-lg px-1.5 sm:px-2 py-1 transition-colors"
+                        >
+                          <Package size={12} />
+                          <span className="hidden sm:inline">Bon de réception</span>
+                        </button>
+                      )}
                       <ChevronRight size={15} className="text-gray-300 cursor-pointer" onClick={() => setModalMembre(m)} />
                     </div>
                   </div>
