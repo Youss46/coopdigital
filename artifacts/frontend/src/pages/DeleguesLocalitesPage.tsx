@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
   Users, Search, Phone, MapPin, Wallet, PlusCircle, X,
-  ChevronRight, AlertCircle, CalendarDays, TrendingUp, Settings,
+  ChevronRight, ChevronDown, AlertCircle, CalendarDays, TrendingUp, Settings,
   CheckCircle2, Clock, Banknote, Trash2, ArrowDownCircle, Package,
   Download, ShoppingCart, Truck, Pencil, History,
 } from "lucide-react";
@@ -178,6 +178,146 @@ function TableauChargement({ colonnes }: { colonnes: number }) {
 
 type Onglet = "membres" | "avances" | "commissions" | "taux" | "livraisons";
 type FiltreStatutLivraison = "tous" | "EN_ATTENTE" | "PAYÉ";
+
+function normaliserRecherche(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .trim();
+}
+
+function libelleDelegue(membre: MembreDelegue): string {
+  const identite = `${membre.prenoms ?? ""} ${membre.nom}`.trim();
+  const lieu = membre.section ?? membre.village;
+  return `${identite}${lieu ? ` — ${lieu}` : ""}`;
+}
+
+function ComboboxDelegueLocalite({
+  membres,
+  value,
+  onChange,
+}: {
+  membres: MembreDelegue[];
+  value: number | null;
+  onChange: (id: number | null) => void;
+}) {
+  const [ouvert, setOuvert] = useState(false);
+  const [recherche, setRecherche] = useState("");
+  const conteneurRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const membreSelectionne = membres.find(m => m.id === value) ?? null;
+  const terme = normaliserRecherche(recherche);
+  const resultats = membres.filter(m => {
+    if (!terme) return true;
+    return normaliserRecherche([
+      m.nom,
+      m.prenoms ?? "",
+      m.telephone,
+      m.section ?? "",
+      m.village ?? "",
+      String(m.numeroMembre),
+    ].join(" ")).includes(terme);
+  });
+
+  useEffect(() => {
+    function fermerSiExterieur(event: MouseEvent) {
+      if (!conteneurRef.current?.contains(event.target as Node)) {
+        setOuvert(false);
+        setRecherche("");
+      }
+    }
+    document.addEventListener("mousedown", fermerSiExterieur);
+    return () => document.removeEventListener("mousedown", fermerSiExterieur);
+  }, []);
+
+  function ouvrir() {
+    setRecherche("");
+    setOuvert(true);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }
+
+  function selectionner(id: number | null) {
+    onChange(id);
+    setOuvert(false);
+    setRecherche("");
+  }
+
+  return (
+    <div ref={conteneurRef} className="relative flex-1">
+      <div className="relative">
+        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+        <input
+          ref={inputRef}
+          type="search"
+          role="combobox"
+          aria-expanded={ouvert}
+          aria-controls="delegues-localites-avances-options"
+          aria-autocomplete="list"
+          value={ouvert ? recherche : (membreSelectionne ? libelleDelegue(membreSelectionne) : "")}
+          onFocus={() => setOuvert(true)}
+          onClick={() => {
+            if (!ouvert) ouvrir();
+          }}
+          onChange={event => {
+            setRecherche(event.target.value);
+            setOuvert(true);
+          }}
+          onKeyDown={event => {
+            if (event.key === "Escape") {
+              setOuvert(false);
+              setRecherche("");
+            }
+          }}
+          placeholder="Rechercher un délégué (nom, prénom, téléphone…)"
+          className="w-full border border-gray-200 rounded-xl pl-9 pr-9 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1a4731]"
+        />
+        <ChevronDown
+          size={16}
+          className={`absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none transition-transform ${ouvert ? "rotate-180" : ""}`}
+        />
+      </div>
+
+      {ouvert && (
+        <div
+          id="delegues-localites-avances-options"
+          role="listbox"
+          className="absolute z-30 mt-1 w-full max-h-72 overflow-y-auto rounded-xl border border-gray-200 bg-white p-1 shadow-lg"
+        >
+          <button
+            type="button"
+            role="option"
+            aria-selected={value === null}
+            onClick={() => selectionner(null)}
+            className="w-full rounded-lg px-3 py-2 text-left text-xs text-gray-500 hover:bg-gray-50"
+          >
+            — Aucun délégué sélectionné —
+          </button>
+          {resultats.map(m => (
+            <button
+              key={m.id}
+              type="button"
+              role="option"
+              aria-selected={m.id === value}
+              onClick={() => selectionner(m.id)}
+              className={`w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-[#1a4731]/5 ${
+                m.id === value ? "bg-[#1a4731]/10 text-[#1a4731] font-semibold" : "text-gray-700"
+              }`}
+            >
+              <span className="block truncate">{libelleDelegue(m)}</span>
+              <span className="block text-xs text-gray-400 mt-0.5">
+                Tél. {m.telephone} · N° {m.numeroMembre}
+              </span>
+            </button>
+          ))}
+          {resultats.length === 0 && (
+            <p className="px-3 py-3 text-sm text-gray-500">Aucun délégué ne correspond à cette recherche.</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function DeleguesLocalitesPage() {
   const [, setLocation] = useLocation();
@@ -679,23 +819,16 @@ export default function DeleguesLocalitesPage() {
           )}
 
           <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-            <select
-              value={membreAvancesId ?? ""}
-              onChange={e => {
-                setMembreAvancesId(e.target.value ? Number(e.target.value) : null);
+            <ComboboxDelegueLocalite
+              membres={membres}
+              value={membreAvancesId}
+              onChange={id => {
+                setMembreAvancesId(id);
                 setShowOctroi(false);
                 setRembourserAvanceId(null);
                 setAvanceHistoriqueId(null);
               }}
-              className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1a4731]"
-            >
-              <option value="">— Sélectionner un délégué de localités —</option>
-              {membres.map(m => (
-                <option key={m.id} value={m.id}>
-                  {m.prenoms} {m.nom}{m.section ? ` — ${m.section}` : m.village ? ` — ${m.village}` : ""}
-                </option>
-              ))}
-            </select>
+            />
             {membreAvancesId !== null && peutOctroyer && (
               <button
                 onClick={() => { setErrOctroi(""); setShowOctroi(true); }}
