@@ -98,6 +98,7 @@
 - [Configuration des fonctionnalités coopérative](cooperative-features.md) — absence de configuration = actif; les dépendances sont désactivées en cascade et le contrôle suit licence → fonctionnalité → permission.
 - [Configuration des rôles coopérative](cooperative-roles.md) — rôles tenant-scoped, actifs par défaut; blocage immédiat des tokens et protection du dernier PCA/Directeur.
 - [Journalisation d’erreur RH](rh-error-fallback-logging.md) — les tests Express isolés peuvent ne pas injecter req.log; les erreurs RH doivent conserver un logger de secours.
+- [Accès Salaires et Paie](salaires-role-access.md) — PCA et Directeur consultent seulement; Comptable et Responsable RH consultent et réalisent toutes les actions.
 - [Readiness PostgreSQL jetable](disposable-postgres-readiness.md) — avant une migration locale, attendre une requête SQL acceptée plutôt que la seule ouverture du port.
 - [Liaison coopérative des JWT terrain](terrain-jwt-cooperative-binding.md) — ne jamais émettre de JWT terrain pour un compte sans coopérative; sinon le premier appel métier ressemble à une session expirée.
 - [Nombre de sacs obligatoire peseur](peseur-nombre-sacs-obligatoire.md) — chaque passage de pesée doit déclarer un entier strictement positif, en ligne comme hors ligne.

@@ -16,7 +16,7 @@ describe("module RH", () => {
   it("sépare les responsabilités RH de la paie", () => {
     expect(hasPermission("responsable_rh", "rh", "lire")).toBe(true);
     expect(hasPermission("responsable_rh", "rh", "gerer_contrats")).toBe(true);
-    expect(hasPermission("responsable_rh", "salaires", "generer_bulletins")).toBe(false);
+    expect(hasPermission("responsable_rh", "salaires", "generer_bulletins")).toBe(true);
     expect(hasPermission("comptable", "rh", "lire")).toBe(true);
     expect(hasPermission("comptable", "rh", "modifier_dossier")).toBe(false);
     expect(hasPermission("auditeur", "rh", "lire")).toBe(true);
