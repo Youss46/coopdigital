@@ -3561,6 +3561,7 @@ export const ListPaiementsResponseItem = zod.object({
   "commissionCollecteStatut": zod.string().nullish(),
   "commissionCollecteRetenueAvancesFcfa": zod.number().nullish(),
   "commissionCollecteMembreId": zod.number().nullish(),
+  "commissionCollecteFrequencePaiement": zod.union([zod.literal('chaque_paiement'),zod.literal('fin_campagne'),zod.literal(null)]).nullish(),
   "lignes": zod.array(zod.object({
   "id": zod.number(),
   "paiementId": zod.number(),
@@ -3650,6 +3651,7 @@ export const ValiderPaiementResponse = zod.object({
   "commissionCollecteStatut": zod.string().nullish(),
   "commissionCollecteRetenueAvancesFcfa": zod.number().nullish(),
   "commissionCollecteMembreId": zod.number().nullish(),
+  "commissionCollecteFrequencePaiement": zod.union([zod.literal('chaque_paiement'),zod.literal('fin_campagne'),zod.literal(null)]).nullish(),
   "lignes": zod.array(zod.object({
   "id": zod.number(),
   "paiementId": zod.number(),
@@ -3719,6 +3721,7 @@ export const RejeterPaiementResponse = zod.object({
   "commissionCollecteStatut": zod.string().nullish(),
   "commissionCollecteRetenueAvancesFcfa": zod.number().nullish(),
   "commissionCollecteMembreId": zod.number().nullish(),
+  "commissionCollecteFrequencePaiement": zod.union([zod.literal('chaque_paiement'),zod.literal('fin_campagne'),zod.literal(null)]).nullish(),
   "lignes": zod.array(zod.object({
   "id": zod.number(),
   "paiementId": zod.number(),

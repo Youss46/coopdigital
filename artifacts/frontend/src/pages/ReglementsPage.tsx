@@ -415,8 +415,12 @@ function ModalValidation({
     ? Math.max(0, paiement.commissionCollecteFcfa ?? 0)
     : 0;
   const commissionCollecteDisponible = !!paiement.commissionCollecteId && commissionCollecteMontant > 0;
-  const [inclureFraisCollecte, setInclureFraisCollecte] = useState(false);
-  const [montantVersementSaisi, setMontantVersementSaisi] = useState(formatMontantSaisi(montantRestant));
+  const commissionChaquePaiement = commissionCollecteDisponible
+    && paiement.commissionCollecteFrequencePaiement === "chaque_paiement";
+  const [inclureFraisCollecte, setInclureFraisCollecte] = useState(commissionChaquePaiement);
+  const [montantVersementSaisi, setMontantVersementSaisi] = useState(formatMontantSaisi(
+    commissionChaquePaiement ? montantRestant + commissionCollecteMontant : montantRestant,
+  ));
   const montantVersement = parseMontantSaisi(montantVersementSaisi);
   const montantTotalAvecCommission = montantRestant + commissionCollecteMontant;
   const montantVersementHorsCommission = inclureFraisCollecte
@@ -491,6 +495,7 @@ function ModalValidation({
   }
 
   function choisirOptionFraisCollecte(inclure: boolean) {
+    if (commissionChaquePaiement && !inclure) return;
     setInclureFraisCollecte(inclure);
     // Le champ affiche le montant total réellement décaissé. Le serveur
     // reçoit ensuite séparément le solde cacao et le flag de commission.
@@ -626,20 +631,22 @@ function ModalValidation({
           {commissionCollecteDisponible && (
             <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 space-y-2">
               <p className="text-xs font-semibold text-blue-900">Commission de collecte</p>
-              <label className="flex items-start gap-2 text-xs text-blue-900 cursor-pointer">
-                <input
-                  type="radio"
-                  name={`frais-collecte-${paiement.id}`}
-                  checked={!inclureFraisCollecte}
-                  onChange={() => choisirOptionFraisCollecte(false)}
-                  className="mt-0.5 accent-blue-700"
-                />
-                <span>
-                  <span className="font-semibold">Payer uniquement le net cacao</span>
-                  <span className="block text-blue-700">La commission reste en attente pour un paiement ultérieur.</span>
-                </span>
-              </label>
-              <label className="flex items-start gap-2 text-xs text-blue-900 cursor-pointer">
+              {!commissionChaquePaiement && (
+                <label className="flex items-start gap-2 text-xs text-blue-900 cursor-pointer">
+                  <input
+                    type="radio"
+                    name={`frais-collecte-${paiement.id}`}
+                    checked={!inclureFraisCollecte}
+                    onChange={() => choisirOptionFraisCollecte(false)}
+                    className="mt-0.5 accent-blue-700"
+                  />
+                  <span>
+                    <span className="font-semibold">Payer uniquement le net cacao</span>
+                    <span className="block text-blue-700">La commission reste en attente pour un paiement ultérieur.</span>
+                  </span>
+                </label>
+              )}
+              <label className="flex items-start gap-2 text-xs text-blue-900">
                 <input
                   type="radio"
                   name={`frais-collecte-${paiement.id}`}
@@ -648,8 +655,12 @@ function ModalValidation({
                   className="mt-0.5 accent-blue-700"
                 />
                 <span>
-                  <span className="font-semibold">Tout payer maintenant</span>
-                  <span className="block text-blue-700">Net cacao + {fmt(commissionCollecteMontant)} FCFA de frais de collecte.</span>
+                  <span className="font-semibold">
+                    {commissionChaquePaiement ? "Commission à régler avec ce paiement" : "Tout payer maintenant"}
+                  </span>
+                  <span className="block text-blue-700">
+                    Net cacao + {fmt(commissionCollecteMontant)} de frais de collecte.
+                  </span>
                 </span>
               </label>
             </div>

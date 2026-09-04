@@ -7972,6 +7972,9 @@ components:
           type: ["integer", "null"]
         commissionCollecteMembreId:
           type: ["integer", "null"]
+        commissionCollecteFrequencePaiement:
+          type: ["string", "null"]
+          enum: [chaque_paiement, fin_campagne, null]
         lignes:
           type: array
           items:

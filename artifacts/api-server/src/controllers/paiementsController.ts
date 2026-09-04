@@ -271,6 +271,7 @@ const SELECT_FIELDS = {
   commissionCollecteStatut: commissionsMembresDelaguesTable.statut,
   commissionCollecteRetenueAvancesFcfa: commissionsMembresDelaguesTable.retenueAvancesFcfa,
   commissionCollecteMembreId: commissionsMembresDelaguesTable.membreDelegueId,
+  commissionCollecteFrequencePaiement: commissionsMembresDelaguesTable.frequencePaiement,
 };
 
 async function attachPaiementLignes<T extends { id: number }>(rows: T[]) {
@@ -790,6 +791,7 @@ async function debiterMobileDansTransaction(
         commissionCollecteFcfa: sql<number | null>`round(${commissionsMembresDelaguesTable.montantFcfa})::integer`,
         commissionCollecteStatut: commissionsMembresDelaguesTable.statut,
         commissionCollecteMembreId: commissionsMembresDelaguesTable.membreDelegueId,
+         commissionCollecteFrequencePaiement: commissionsMembresDelaguesTable.frequencePaiement,
       })
       .from(paiementsTable)
       .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
@@ -837,6 +839,14 @@ async function debiterMobileDansTransaction(
     const inclureFraisCollecte = body.inclureFraisCollecte === true;
     if (inclureFraisCollecte && !commissionCollecteDisponible) {
       res.status(400).json({ erreur: "Aucun frais de collecte en attente n'est rattaché à ce règlement." });
+      return;
+    }
+    if (commissionCollecteDisponible
+      && row.commissionCollecteFrequencePaiement === "chaque_paiement"
+      && !inclureFraisCollecte) {
+      res.status(400).json({
+        erreur: "La commission de collecte configurée « au fur et à mesure » doit être réglée avec le paiement du cacao.",
+      });
       return;
     }
     if (inclureFraisCollecte && (!livraisonAvecSolde || montantDemande !== montantRestantActuel)) {

@@ -1088,6 +1088,17 @@ export const PaiementListItemStatut = {
   effectue: 'effectue',
 } as const;
 
+/**
+ * @nullable
+ */
+export type PaiementListItemCommissionCollecteFrequencePaiement = typeof PaiementListItemCommissionCollecteFrequencePaiement[keyof typeof PaiementListItemCommissionCollecteFrequencePaiement] | null;
+
+
+export const PaiementListItemCommissionCollecteFrequencePaiement = {
+  chaque_paiement: 'chaque_paiement',
+  fin_campagne: 'fin_campagne',
+} as const;
+
 export type PaiementLigneModePaiement = typeof PaiementLigneModePaiement[keyof typeof PaiementLigneModePaiement];
 
 
@@ -1200,6 +1211,8 @@ export interface PaiementListItem {
   commissionCollecteRetenueAvancesFcfa?: number | null;
   /** @nullable */
   commissionCollecteMembreId?: number | null;
+  /** @nullable */
+  commissionCollecteFrequencePaiement?: PaiementListItemCommissionCollecteFrequencePaiement;
   lignes?: PaiementLigne[];
 }
 
