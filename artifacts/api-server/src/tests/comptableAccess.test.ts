@@ -5,8 +5,8 @@ import {
   hasPermission,
 } from "../middlewares/permissions";
 
-function runAccessCheck(path: string, role: string) {
-  const req = { path, user: { role } } as Request;
+function runAccessCheck(path: string, role: string, method = "GET") {
+  const req = { path, originalUrl: path, method, user: { role } } as Request;
   const res = Object.create(null) as Response;
   res.status = vi.fn().mockReturnThis();
   res.json = vi.fn().mockReturnThis();
@@ -27,6 +27,31 @@ describe("périmètre du comptable", () => {
 
   it("refuse aussi les routes de sessions de pesée", () => {
     const { res, next } = runAccessCheck("/pesee/sessions/42", "comptable");
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("autorise la consultation des frais d'exportation à régler", () => {
+    const { res, next } = runAccessCheck("/expeditions/frais-transport-a-regler", "comptable");
+
+    expect(res.status).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledOnce();
+  });
+
+  it("autorise le règlement financier des frais de transport sans ouvrir les expéditions", () => {
+    const { res, next } = runAccessCheck(
+      "/expeditions/42/reglement-frais-transport",
+      "comptable",
+      "POST",
+    );
+
+    expect(res.status).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledOnce();
+  });
+
+  it("continue de refuser les autres routes d'expédition au comptable", () => {
+    const { res, next } = runAccessCheck("/expeditions/42", "comptable");
 
     expect(res.status).toHaveBeenCalledWith(403);
     expect(next).not.toHaveBeenCalled();

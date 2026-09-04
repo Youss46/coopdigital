@@ -508,6 +508,25 @@ const COMPTABLE_RESTRICTED_PATHS = [
   "/archives",
 ];
 
+function isComptableTransportPaymentPath(req: Request): boolean {
+  const paths = [
+    req.path,
+    req.originalUrl?.split("?")[0],
+    `${req.baseUrl}${req.path}`,
+  ].filter((path): path is string => Boolean(path));
+
+  return paths.some((path) => {
+    const normalizedPath = path.replace(/^\/api(?=\/|$)/, "");
+    if (req.method === "GET") {
+      return normalizedPath === "/expeditions/frais-transport-a-regler";
+    }
+    if (req.method === "POST") {
+      return /^\/expeditions\/[^/]+\/reglement-frais-transport$/.test(normalizedPath);
+    }
+    return false;
+  });
+}
+
 function isRestrictedRequestPath(req: Request, prefix: string): boolean {
   const paths = [
     req.path,
@@ -535,6 +554,7 @@ export function denyComptableRestrictedModules(
   if (
     req.user?.role === "comptable" &&
     COMPTABLE_RESTRICTED_PATHS.some((prefix) => isRestrictedRequestPath(req, prefix))
+    && !isComptableTransportPaymentPath(req)
   ) {
     res.status(403).json({
       erreur: "Accès refusé",
