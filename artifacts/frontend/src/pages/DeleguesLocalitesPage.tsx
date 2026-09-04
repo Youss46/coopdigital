@@ -121,6 +121,7 @@ interface TauxCommission {
   tauxFcfaParKg: number;
   dateDebut: string;
   dateFin: string | null;
+  frequencePaiement: "chaque_paiement" | "fin_campagne";
   actif: boolean;
   membreNom: string | null;
   membrePrenoms: string | null;
@@ -408,6 +409,7 @@ export default function DeleguesLocalitesPage() {
     tauxFcfaParKg: "",
     dateDebut: new Date().toISOString().split("T")[0]!,
     dateFin: "",
+    frequencePaiement: "chaque_paiement" as TauxCommission["frequencePaiement"],
     actif: true,
   });
   const [errTaux, setErrTaux] = useState("");
@@ -620,13 +622,14 @@ export default function DeleguesLocalitesPage() {
       tauxFcfaParKg: Number(formTaux.tauxFcfaParKg),
       dateDebut: formTaux.dateDebut,
       dateFin: formTaux.dateFin || null,
+      frequencePaiement: formTaux.frequencePaiement,
       actif: formTaux.actif,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["commissions-membres-delegues-taux"] });
       setShowTauxForm(false);
       setTauxEnEditionId(null);
-      setFormTaux({ campagneId: "", membreDelegueId: "", tauxFcfaParKg: "", dateDebut: new Date().toISOString().split("T")[0]!, dateFin: "", actif: true });
+      setFormTaux({ campagneId: "", membreDelegueId: "", tauxFcfaParKg: "", dateDebut: new Date().toISOString().split("T")[0]!, dateFin: "", frequencePaiement: "chaque_paiement", actif: true });
       setErrTaux("");
     },
     onError: (e: Error) => setErrTaux(e.message),
@@ -647,6 +650,7 @@ export default function DeleguesLocalitesPage() {
       tauxFcfaParKg: "",
       dateDebut: new Date().toISOString().split("T")[0]!,
       dateFin: "",
+      frequencePaiement: "chaque_paiement",
       actif: true,
     });
     setErrTaux("");
@@ -661,6 +665,7 @@ export default function DeleguesLocalitesPage() {
       tauxFcfaParKg: String(taux.tauxFcfaParKg),
       dateDebut: taux.dateDebut,
       dateFin: taux.dateFin ?? "",
+      frequencePaiement: taux.frequencePaiement ?? "chaque_paiement",
       actif: taux.actif,
     });
     setErrTaux("");
@@ -1443,6 +1448,23 @@ export default function DeleguesLocalitesPage() {
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]"
                   />
                 </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Paiement de la commission</label>
+                  <select
+                    value={formTaux.frequencePaiement}
+                    onChange={e => setFormTaux(f => ({
+                      ...f,
+                      frequencePaiement: e.target.value as TauxCommission["frequencePaiement"],
+                    }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]"
+                  >
+                    <option value="chaque_paiement">Au fur et à mesure</option>
+                    <option value="fin_campagne">En fin de campagne</option>
+                  </select>
+                  <p className="mt-1 text-[11px] text-gray-500">
+                    En fin de campagne, le règlement reste en attente jusqu’à la fermeture de la campagne.
+                  </p>
+                </div>
                 <label className="flex items-center gap-2 self-end pb-2 text-sm text-gray-700 cursor-pointer">
                   <input
                     type="checkbox"
@@ -1495,6 +1517,7 @@ export default function DeleguesLocalitesPage() {
                     <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Taux</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Campagne</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Période</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Paiement</th>
                     <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Statut</th>
                     <th className="px-4 py-3" />
                   </tr>
@@ -1520,6 +1543,15 @@ export default function DeleguesLocalitesPage() {
                       <td className="px-4 py-3 text-gray-500 text-xs">
                         À partir du {formaterDate(t.dateDebut)}
                         {t.dateFin && ` → ${formaterDate(t.dateFin)}`}
+                      </td>
+                      <td className="px-4 py-3 text-xs">
+                        <span className={`inline-flex rounded-full px-2 py-0.5 font-medium ${
+                          t.frequencePaiement === "fin_campagne"
+                            ? "bg-amber-100 text-amber-700"
+                            : "bg-blue-100 text-blue-700"
+                        }`}>
+                          {t.frequencePaiement === "fin_campagne" ? "Fin de campagne" : "Au fur et à mesure"}
+                        </span>
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${

@@ -7,6 +7,7 @@ import {
   timestamp,
   boolean,
   date,
+  pgEnum,
 } from "drizzle-orm/pg-core";
 import { membresTable } from "./membres";
 import { cooperativesTable } from "./cooperatives";
@@ -17,6 +18,11 @@ import { sessionsPeseeTable } from "./pesee";
 // - campagneId null     = valide pour toutes les campagnes (taux par défaut)
 // - membreDelegueId null = taux par défaut de la coopérative (s'applique à tous)
 // Priorité de résolution : (coop + campagne + membre) > (coop + campagne) > (coop)
+export const commissionFrequencePaiementEnum = pgEnum("commission_frequence_paiement", [
+  "chaque_paiement",
+  "fin_campagne",
+]);
+
 export const tauxCommissionsMembresDeleguesTable = pgTable("taux_commissions_membres_delegues", {
   id:               serial("id").primaryKey(),
   cooperativeId:    integer("cooperative_id").notNull().references(() => cooperativesTable.id),
@@ -25,6 +31,7 @@ export const tauxCommissionsMembresDeleguesTable = pgTable("taux_commissions_mem
   tauxFcfaParKg:    numeric("taux_fcfa_par_kg", { precision: 10, scale: 4 }).notNull(),
   dateDebut:        date("date_debut", { mode: "string" }).notNull(),
   dateFin:          date("date_fin", { mode: "string" }),
+  frequencePaiement: commissionFrequencePaiementEnum("frequence_paiement").notNull().default("chaque_paiement"),
   actif:            boolean("actif").notNull().default(true),
   createdAt:        timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt:        timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -41,6 +48,7 @@ export const commissionsMembresDelaguesTable = pgTable("commissions_membres_dele
   tauxFcfaParKg:   numeric("taux_fcfa_par_kg", { precision: 10, scale: 4 }).notNull(),
   poidsKg:         numeric("poids_kg", { precision: 10, scale: 2 }).notNull(),
   montantFcfa:     numeric("montant_fcfa", { precision: 14, scale: 2 }).notNull(),
+  frequencePaiement: commissionFrequencePaiementEnum("frequence_paiement").notNull().default("chaque_paiement"),
   // en_attente | payé | annulé
   statut:             text("statut").notNull().default("en_attente"),
   retenueAvancesFcfa: integer("retenue_avances_fcfa").notNull().default(0),

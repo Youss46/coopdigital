@@ -40,7 +40,7 @@ export async function getTauxActifMembre(
   cooperativeId: number,
   campagneId: number | null | undefined,
   membreDelegueId: number
-): Promise<{ id: number; tauxFcfaParKg: number } | null> {
+): Promise<{ id: number; tauxFcfaParKg: number; frequencePaiement: "chaque_paiement" | "fin_campagne" } | null> {
   const today = new Date().toISOString().slice(0, 10);
 
   const candidats = await db
@@ -63,20 +63,38 @@ export async function getTauxActifMembre(
     const exact = candidats.find(
       (t) => t.campagneId === campagneId && t.membreDelegueId === membreDelegueId
     );
-    if (exact) return { id: exact.id, tauxFcfaParKg: toNum(exact.tauxFcfaParKg) };
+    if (exact) {
+      return {
+        id: exact.id,
+        tauxFcfaParKg: toNum(exact.tauxFcfaParKg),
+        frequencePaiement: exact.frequencePaiement,
+      };
+    }
 
     // Priorité 2 : taux campagne par défaut (coop + campagne, membre_delegue_id NULL)
     const parCampagne = candidats.find(
       (t) => t.campagneId === campagneId && t.membreDelegueId === null
     );
-    if (parCampagne) return { id: parCampagne.id, tauxFcfaParKg: toNum(parCampagne.tauxFcfaParKg) };
+    if (parCampagne) {
+      return {
+        id: parCampagne.id,
+        tauxFcfaParKg: toNum(parCampagne.tauxFcfaParKg),
+        frequencePaiement: parCampagne.frequencePaiement,
+      };
+    }
   }
 
   // Priorité 3 : taux global coop (campagne_id NULL, membre_delegue_id NULL)
   const global = candidats.find(
     (t) => t.campagneId === null && t.membreDelegueId === null
   );
-  if (global) return { id: global.id, tauxFcfaParKg: toNum(global.tauxFcfaParKg) };
+  if (global) {
+    return {
+      id: global.id,
+      tauxFcfaParKg: toNum(global.tauxFcfaParKg),
+      frequencePaiement: global.frequencePaiement,
+    };
+  }
 
   return null;
 }
@@ -110,6 +128,7 @@ export async function creerCommissionMembreSiTaux(
         tauxFcfaParKg: String(taux.tauxFcfaParKg),
         poidsKg: String(poidsKg),
         montantFcfa: String(montant),
+        frequencePaiement: taux.frequencePaiement,
         statut: "en_attente",
       })
       .returning();
@@ -155,6 +174,7 @@ export async function upsertTauxMembre(
     tauxFcfaParKg: number;
     dateDebut: string;
     dateFin?: string | null;
+    frequencePaiement?: "chaque_paiement" | "fin_campagne";
     actif?: boolean;
   }
 ) {
@@ -167,6 +187,7 @@ export async function upsertTauxMembre(
         tauxFcfaParKg: String(data.tauxFcfaParKg),
         dateDebut: data.dateDebut,
         dateFin: data.dateFin ?? null,
+        frequencePaiement: data.frequencePaiement ?? "chaque_paiement",
         actif: data.actif ?? true,
         updatedAt: new Date(),
       })
@@ -189,6 +210,7 @@ export async function upsertTauxMembre(
       tauxFcfaParKg: String(data.tauxFcfaParKg),
       dateDebut: data.dateDebut,
       dateFin: data.dateFin ?? null,
+      frequencePaiement: data.frequencePaiement ?? "chaque_paiement",
       actif: data.actif ?? true,
     })
     .returning();
@@ -344,6 +366,31 @@ export async function payerCommissionsMembreDelegue(
 
   if (aTraiter.length === 0) {
     return { membre, aTraiter, montantTotal: 0, totalRetenu: 0, montantNet: 0 };
+  }
+
+  // Une commission configurée « fin de campagne » ne peut être réglée
+  // qu'après la fermeture de sa campagne. Le paiement reste manuel afin que
+  // le responsable choisisse le moyen de règlement au moment du solde.
+  const campagnesFinDeCampagne = aTraiter.filter(
+    (commission) => commission.frequencePaiement === "fin_campagne",
+  );
+  if (campagnesFinDeCampagne.length > 0) {
+    const campagneIds = [...new Set(campagnesFinDeCampagne.map((commission) => commission.campagneId))];
+    if (campagneIds.some((id) => id === null)) {
+      throw new Error("Une commission prévue en fin de campagne n'est rattachée à aucune campagne.");
+    }
+    const campagnes = await tx
+      .select({ id: campagnesTable.id, statut: campagnesTable.statut, libelle: campagnesTable.libelle })
+      .from(campagnesTable)
+      .where(inArray(campagnesTable.id, campagneIds as number[]));
+    const campagneNonFermee = campagnes.find(
+      (campagne) => campagne.statut !== "fermee" && campagne.statut !== "archivee",
+    );
+    if (campagneNonFermee) {
+      throw new Error(
+        `Le paiement des commissions de "${campagneNonFermee.libelle}" est prévu en fin de campagne.`,
+      );
+    }
   }
 
   // ── Déduction des avances membres ─────────────────────────────────────────

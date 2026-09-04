@@ -18,13 +18,14 @@ export async function listTauxHandler(req: Request, res: Response): Promise<void
 export async function upsertTauxHandler(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
   if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
-  const { id, campagneId, membreDelegueId, tauxFcfaParKg, dateDebut, dateFin, actif } = req.body as {
+  const { id, campagneId, membreDelegueId, tauxFcfaParKg, dateDebut, dateFin, frequencePaiement, actif } = req.body as {
     id?: number;
     campagneId?: number | null;
     membreDelegueId?: number | null;
     tauxFcfaParKg: number;
     dateDebut: string;
     dateFin?: string | null;
+    frequencePaiement?: "chaque_paiement" | "fin_campagne";
     actif?: boolean;
   };
   if (!tauxFcfaParKg || tauxFcfaParKg <= 0) {
@@ -37,7 +38,7 @@ export async function upsertTauxHandler(req: Request, res: Response): Promise<vo
   }
   try {
     const row = await svc.upsertTauxMembre(cooperativeId, {
-      id, campagneId, membreDelegueId, tauxFcfaParKg, dateDebut, dateFin, actif,
+      id, campagneId, membreDelegueId, tauxFcfaParKg, dateDebut, dateFin, frequencePaiement, actif,
     });
     res.status(id ? 200 : 201).json(row);
   } catch (err) {
@@ -113,6 +114,9 @@ export async function payerHandler(req: Request, res: Response): Promise<void> {
   } catch (err) {
     req.log.error({ err }, "payerCommissionsMembreDelegue");
     const msg = err instanceof Error ? err.message : "Erreur interne";
-    res.status(500).json({ erreur: msg });
+    const status = msg.includes("prévu en fin de campagne") || msg.includes("rattachée à aucune campagne")
+      ? 409
+      : 500;
+    res.status(status).json({ erreur: msg });
   }
 }

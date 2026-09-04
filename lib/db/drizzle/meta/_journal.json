@@ -1107,6 +1107,13 @@
       "when": 1788541200000,
       "tag": "0157_source_deduction_avances",
       "breakpoints": true
+    },
+    {
+      "idx": 158,
+      "version": "7",
+      "when": 1788541500000,
+      "tag": "0158_frequence_paiement_commissions",
+      "breakpoints": true
     }
   ]
 }
