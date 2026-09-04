@@ -468,6 +468,21 @@ export async function getDepenses(cooperativeId: number, filters: DepenseVehicul
   return { rows, total };
 }
 
+export async function getDepense(cooperativeId: number, id: number) {
+  const [row] = await db
+    .select({
+      depense: depensesVehiculeTable,
+      immatriculation: vehiculesTable.immatriculation,
+      marque: vehiculesTable.marque,
+      modele: vehiculesTable.modele,
+    })
+    .from(depensesVehiculeTable)
+    .leftJoin(vehiculesTable, eq(vehiculesTable.id, depensesVehiculeTable.vehiculeId))
+    .where(and(eq(depensesVehiculeTable.id, id), eq(depensesVehiculeTable.cooperativeId, cooperativeId)))
+    .limit(1);
+  return row ?? null;
+}
+
 export async function createDepense(
   cooperativeId: number,
   vehiculeId: number,

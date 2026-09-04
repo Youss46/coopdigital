@@ -32,6 +32,7 @@ import {
   getRapportCampagne,
   getRapportVehicule,
   getDepenses,
+  getDepense,
   createDepense,
   updateDepense,
   deleteDepense,
@@ -42,6 +43,7 @@ import {
   getStatsCarburant,
 } from "../services/transportService";
 import { generateBonCarburant } from "../services/bonCarburantPdf";
+import { generateBonAchatPiece } from "../services/bonAchatPiecePdf";
 import { db, usersTable, stationsCarburantTable, bonsCarburantTable } from "@workspace/db";
 import { eq, and, isNotNull, count } from "drizzle-orm";
 
@@ -686,6 +688,32 @@ export async function handleDeleteDepenseVehicule(req: Request, res: Response): 
     res.json({ ok: true });
   } catch (err) {
     req.log.error({ err }, "Erreur deleteDepenseVehicule");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function handleGetBonAchatPiecePdf(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
+    const id = parseInt(String(req.params["id"]));
+    if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+    const row = await getDepense(cooperativeId, id);
+    if (!row) { res.status(404).json({ erreur: "Dépense introuvable" }); return; }
+    if (row.depense.type !== "piece_rechange") {
+      res.status(400).json({ erreur: "Le bon d'achat est réservé aux pièces de rechange" }); return;
+    }
+    const pdf = await generateBonAchatPiece(cooperativeId, {
+      ...row.depense,
+      immatriculation: row.immatriculation,
+      marque: row.marque,
+      modele: row.modele,
+    });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="bon-achat-piece-BAP-${String(id).padStart(5, "0")}.pdf"`);
+    res.send(pdf);
+  } catch (err) {
+    req.log.error({ err }, "Erreur bon achat pièce PDF");
     res.status(500).json({ erreur: "Erreur interne" });
   }
 }

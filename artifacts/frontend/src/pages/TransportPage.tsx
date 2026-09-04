@@ -99,6 +99,7 @@ import {
   Ban,
   Smartphone,
   KeyRound,
+  Printer,
 } from "lucide-react";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -2168,6 +2169,24 @@ function TabDepenses() {
   const [editing, setEditing]       = useState<DepenseVehicule | null>(null);
   const [form, setForm]             = useState<DepenseForm>(EMPTY_DEPENSE_FORM);
   const [vehiculeId, setVehiculeId] = useState<string>("");
+  const [pdfLoadingId, setPdfLoadingId] = useState<number | null>(null);
+
+  async function openBonAchat(d: DepenseVehicule) {
+    try {
+      setPdfLoadingId(d.id);
+      const base = import.meta.env.VITE_API_URL ?? "";
+      const token = localStorage.getItem("coop_token") ?? "";
+      const response = await fetch(`${base}/api/transport/depenses/${d.id}/bon-achat-pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error("Impossible de générer le bon d'achat");
+      openPdfViewer(URL.createObjectURL(await response.blob()), `bon-achat-piece-BAP-${String(d.id).padStart(5, "0")}.pdf`);
+    } catch {
+      toast({ title: "Erreur", description: "Impossible de générer le bon d'achat", variant: "destructive" });
+    } finally {
+      setPdfLoadingId(null);
+    }
+  }
 
   function openCreate() {
     setEditing(null);
@@ -2327,6 +2346,18 @@ function TabDepenses() {
                   <TableCell className="text-right text-sm font-semibold whitespace-nowrap">{formatFcfa(d.montant_fcfa)}</TableCell>
                   <TableCell>
                     <div className="flex gap-1">
+                      {d.type === "piece_rechange" && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-green-700"
+                          title="Imprimer ou télécharger le bon d'achat"
+                          disabled={pdfLoadingId === d.id}
+                          onClick={() => void openBonAchat(d)}
+                        >
+                          <Printer className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                       <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(d)}>
                         <Edit2 className="h-3.5 w-3.5" />
                       </Button>
