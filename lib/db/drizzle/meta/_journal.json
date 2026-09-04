@@ -1051,6 +1051,13 @@
       "when": 1788532000000,
       "tag": "0149_paiements_bons_achat_pieces",
       "breakpoints": true
+    },
+    {
+      "idx": 150,
+      "version": "7",
+      "when": 1788533500000,
+      "tag": "0150_demandeur_bons_pieces",
+      "breakpoints": true
     }
   ]
 }

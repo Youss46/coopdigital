@@ -126,6 +126,7 @@ export const depensesVehiculeTable = pgTable("depenses_vehicule", {
   dateDepense:    date("date_depense", { mode: "string" }).notNull(),
   montantFcfa:    numeric("montant_fcfa", { precision: 14, scale: 2 }).notNull(),
   libelle:        varchar("libelle", { length: 255 }).notNull(),
+  demandeur:      varchar("demandeur", { length: 255 }),
   fournisseur:    varchar("fournisseur", { length: 255 }),
   referencePiece: varchar("reference_piece", { length: 100 }),
   quantite:       numeric("quantite", { precision: 10, scale: 3 }),

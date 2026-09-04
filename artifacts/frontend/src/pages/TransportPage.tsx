@@ -2126,6 +2126,7 @@ interface DepenseForm {
   date_depense: string;
   montant_fcfa: number | "";
   libelle: string;
+  demandeur: string;
   fournisseur: string;
   reference_piece: string;
   quantite: number | string;
@@ -2137,6 +2138,7 @@ const EMPTY_DEPENSE_FORM: DepenseForm = {
   date_depense: new Date().toISOString().split("T")[0],
   montant_fcfa: "",
   libelle: "",
+  demandeur: "",
   fournisseur: "",
   reference_piece: "",
   quantite: "",
@@ -2207,6 +2209,7 @@ function TabDepenses() {
       date_depense:   d.date_depense,
       montant_fcfa:   d.montant_fcfa,
       libelle:        d.libelle,
+      demandeur:      d.demandeur ?? "",
       fournisseur:    d.fournisseur ?? "",
       reference_piece:d.reference_piece ?? "",
       quantite:       d.quantite ?? "",
@@ -2245,6 +2248,7 @@ function TabDepenses() {
       date_depense:   form.date_depense,
       montant_fcfa:   Number(form.montant_fcfa),
       libelle:        form.libelle,
+      ...(form.type === "piece_rechange" && form.demandeur.trim() ? { demandeur: form.demandeur.trim() } : {}),
       ...(form.fournisseur     ? { fournisseur: form.fournisseur } : {}),
       ...(form.reference_piece ? { reference_piece: form.reference_piece } : {}),
       ...(form.quantite !== "" ? { quantite: Number(form.quantite), unite: form.unite || undefined } : {}),
@@ -2434,6 +2438,13 @@ function TabDepenses() {
               <Input placeholder="Nom du fournisseur ou atelier" value={form.fournisseur}
                 onChange={e => setForm(f => ({ ...f, fournisseur: e.target.value }))} />
             </div>
+            {form.type === "piece_rechange" && (
+              <div>
+                <Label>Demandeur *</Label>
+                <Input placeholder="Nom de la personne qui demande la pièce" value={form.demandeur}
+                  onChange={e => setForm(f => ({ ...f, demandeur: e.target.value }))} />
+              </div>
+            )}
             {(form.type === "piece_rechange" || form.type === "autre") && (
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -2471,7 +2482,9 @@ function TabDepenses() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDialog(false)}>Annuler</Button>
             <Button onClick={handleSubmit}
-              disabled={!vehiculeId || !form.libelle || !form.montant_fcfa || createMut.isPending || updateMut.isPending}>
+              disabled={!vehiculeId || !form.libelle || !form.montant_fcfa
+                || (form.type === "piece_rechange" && !form.demandeur.trim())
+                || createMut.isPending || updateMut.isPending}>
               {editing ? "Enregistrer" : "Ajouter"}
             </Button>
           </DialogFooter>

@@ -556,7 +556,7 @@ export async function handleTerminerMission(req: Request, res: Response): Promis
 
 // ─── DÉPENSES VÉHICULES ───────────────────────────────────────────────────────
 
-function mapDepense(d: { depense: { id: number; cooperativeId: number; vehiculeId: number; missionId: number | null; type: string; dateDepense: string; montantFcfa: string; libelle: string; fournisseur: string | null; referencePiece: string | null; quantite: string | null; unite: string | null; createdAt: Date; updatedAt: Date }; immatriculation: string | null | undefined }) {
+function mapDepense(d: { depense: { id: number; cooperativeId: number; vehiculeId: number; missionId: number | null; type: string; dateDepense: string; montantFcfa: string; libelle: string; demandeur: string | null; fournisseur: string | null; referencePiece: string | null; quantite: string | null; unite: string | null; createdAt: Date; updatedAt: Date }; immatriculation: string | null | undefined }) {
   return {
     id:               d.depense.id,
     cooperative_id:   d.depense.cooperativeId,
@@ -567,6 +567,7 @@ function mapDepense(d: { depense: { id: number; cooperativeId: number; vehiculeI
     date_depense:     d.depense.dateDepense,
     montant_fcfa:     parseFloat(d.depense.montantFcfa),
     libelle:          d.depense.libelle,
+    demandeur:        d.depense.demandeur ?? null,
     fournisseur:      d.depense.fournisseur ?? null,
     reference_piece:  d.depense.referencePiece ?? null,
     quantite:         d.depense.quantite != null ? parseFloat(d.depense.quantite) : null,
@@ -611,15 +612,19 @@ export async function handleCreateDepenseVehicule(req: Request, res: Response): 
     if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
     const vehiculeId = parseInt(String(req.params["id"]));
     if (isNaN(vehiculeId)) { res.status(400).json({ erreur: "ID invalide" }); return; }
-    const body = req.body as { type: string; date_depense: string; montant_fcfa: number; libelle: string; mission_id?: number; fournisseur?: string; reference_piece?: string; quantite?: number; unite?: string };
+    const body = req.body as { type: string; date_depense: string; montant_fcfa: number; libelle: string; demandeur?: string; mission_id?: number; fournisseur?: string; reference_piece?: string; quantite?: number; unite?: string };
     if (!body.type || !body.date_depense || body.montant_fcfa == null || !body.libelle) {
       res.status(400).json({ erreur: "Champs requis manquants" }); return;
+    }
+    if (body.type === "piece_rechange" && !body.demandeur?.trim()) {
+      res.status(400).json({ erreur: "Le demandeur est obligatoire pour une pièce de rechange" }); return;
     }
     const depense = await createDepense(cooperativeId, vehiculeId, {
       type:           body.type,
       dateDepense:    toDateStr(new Date(body.date_depense))!,
       montantFcfa:    String(body.montant_fcfa),
       libelle:        body.libelle,
+      demandeur:      body.demandeur?.trim() || null,
       missionId:      body.mission_id ?? null,
       fournisseur:    body.fournisseur ?? null,
       referencePiece: body.reference_piece ?? null,
@@ -635,7 +640,9 @@ export async function handleCreateDepenseVehicule(req: Request, res: Response): 
       autre:          "628",  // Frais divers
     };
     const compteDebit = compteDebitDepense[body.type] ?? "628";
-    if (body.montant_fcfa > 0) {
+    // Une pièce de rechange sera réglée via le bon d'achat puis la page
+    // Règlements. Ne pas créer ici une sortie de trésorerie anticipée.
+    if (body.type !== "piece_rechange" && body.montant_fcfa > 0) {
       void proposerEcriture(cooperativeId, {
         source: "transport", sourceId: depense.id,
         libelle: body.libelle,
@@ -665,6 +672,7 @@ export async function handleUpdateDepenseVehicule(req: Request, res: Response): 
     if (body["date_depense"] != null)     patch["dateDepense"]    = String(body["date_depense"]);
     if (body["montant_fcfa"] != null)     patch["montantFcfa"]    = String(body["montant_fcfa"]);
     if (body["libelle"] != null)          patch["libelle"]        = body["libelle"];
+    if (body["demandeur"] !== undefined)  patch["demandeur"]      = body["demandeur"] ? String(body["demandeur"]).trim() || null : null;
     if (body["mission_id"] !== undefined) patch["missionId"]      = body["mission_id"] ?? null;
     if (body["fournisseur"] !== undefined) patch["fournisseur"]   = body["fournisseur"] ?? null;
     if (body["reference_piece"] !== undefined) patch["referencePiece"] = body["reference_piece"] ?? null;

@@ -16,6 +16,7 @@ import {
   planComptableTable,
   paiementsTable,
   paiementLignesTable,
+  depensesVehiculeTable,
   chequesEmisTable,
   bulletinsPaieTable,
   lignesBulletinTable,
@@ -1025,6 +1026,10 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
      fournisseurPrenoms: fournisseursTable.prenoms,
      fournisseurCni: fournisseursTable.numeroCni,
      fournisseurTel: fournisseursTable.telephone,
+     depenseVehiculeId: paiementsTable.depenseVehiculeId,
+     depenseVehiculeType: depensesVehiculeTable.type,
+     depenseVehiculeLibelle: depensesVehiculeTable.libelle,
+     depenseVehiculeDemandeur: depensesVehiculeTable.demandeur,
     livraisonDate: livraisonsTable.dateLivraison,
     livraisonNumeroPesee: livraisonsTable.numeroPesee,
     livraisonRef: livraisonsTable.codeAchat,
@@ -1042,6 +1047,7 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
     .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
     .leftJoin(livraisonsTable, eq(paiementsTable.livraisonId, livraisonsTable.id))
     .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
+    .leftJoin(depensesVehiculeTable, eq(paiementsTable.depenseVehiculeId, depensesVehiculeTable.id))
     .leftJoin(validateurAlias, eq(paiementsTable.validePar, validateurAlias.id))
     .leftJoin(saisiseurPayAlias, eq(paiementsTable.agentSaisiseurId, saisiseurPayAlias.id))
     .where(eq(paiementsTable.id, paiementId));
@@ -1087,16 +1093,22 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
 
   let y = doc.y;
   doc.rect(MARGIN, y, PAGE_W - MARGIN * 2, 52).fill("#f0fdf4").stroke("#bbf7d0");
-  const isFournisseurExterne = row.fournisseurNom != null;
+  const isPieceRechange = row.depenseVehiculeType === "piece_rechange";
+  const isFournisseurExterne = !isPieceRechange && row.fournisseurNom != null;
   const beneficiaireNom = isFournisseurExterne
     ? `${row.fournisseurPrenoms ?? ""} ${row.fournisseurNom ?? ""}`.trim()
+    : isPieceRechange
+    ? row.depenseVehiculeDemandeur ?? "—"
     : `${row.membrePrenoms ?? ""} ${row.membreNom ?? "—"}`.trim();
-  doc.fontSize(8).fillColor(GRIS).font("Helvetica").text("BÉNÉFICIAIRE", MARGIN + 8, y + 5);
+  doc.fontSize(8).fillColor(GRIS).font("Helvetica")
+    .text(isPieceRechange ? "DEMANDEUR" : "BÉNÉFICIAIRE", MARGIN + 8, y + 5);
   doc.fontSize(11).fillColor(VERT).font("Helvetica-Bold")
     .text(beneficiaireNom || "—", MARGIN + 8, y + 16);
   doc.fontSize(8).fillColor(GRIS).font("Helvetica")
     .text(
-      isFournisseurExterne
+      isPieceRechange
+        ? "Bon d’achat — pièce de rechange"
+        : isFournisseurExterne
         ? `CNI : ${row.fournisseurCni ?? "—"}   |   Tél : ${row.fournisseurTel ?? "—"}`
         : `CNI : ${row.membreCni ?? "—"}   |   Tél : ${row.membreTel ?? "—"}`,
       MARGIN + 8,
@@ -1116,7 +1128,13 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
     ["Date",                 formaterDateHeure(row.createdAt)],
     ["Mode de paiement",     payModeLabel[(row.modeReglement ?? row.modePaiement) ?? ""] ?? row.modePaiement ?? "—"],
     ["Référence transaction",row.referenceTransaction ?? "—"],
-    ["Libellé",              row.libelle ?? "Paiement livraison cacao"],
+    ...(isPieceRechange
+      ? [
+          ["Nature", "PIÈCE DE RECHANGE"],
+          ["Demandeur", row.depenseVehiculeDemandeur ?? "—"],
+        ] as Array<[string, string]>
+      : []),
+    ["Libellé",              row.libelle ?? (isPieceRechange ? row.depenseVehiculeLibelle ?? "Pièce de rechange" : "Paiement livraison cacao")],
     ["Livraison associée",   formatNumeroPesee(row.livraisonNumeroPesee)
       ?? row.livraisonRef
       ?? (row.livraisonId ? `LIV-${String(row.livraisonId).padStart(5,"0")}` : "—")],
@@ -1226,7 +1244,7 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
   y = 700;
   doc.fontSize(8).fillColor(GRIS).font("Helvetica")
     .text("Caissier / Agent payeur", MARGIN, y, { width: 150, align: "center" });
-  doc.text("Bénéficiaire", PAGE_W - MARGIN - 170, y, { width: 160, align: "center" });
+  doc.text(isPieceRechange ? "Demandeur" : "Bénéficiaire", PAGE_W - MARGIN - 170, y, { width: 160, align: "center" });
   doc.rect(MARGIN, y + 12, 150, 38).stroke("#d1d5db");
   doc.rect(PAGE_W - MARGIN - 170, y + 12, 160, 38).stroke("#d1d5db");
 

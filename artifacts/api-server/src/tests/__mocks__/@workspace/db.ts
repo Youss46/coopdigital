@@ -23,6 +23,7 @@ export const lotsTable = makeTable("lots");
 export const exportateursTable = makeTable("exportateurs");
 export const usersTable = makeTable("users");
 export const paiementsTable = makeTable("paiements");
+export const depensesVehiculeTable = makeTable("depenses_vehicule");
 export const paiementLignesTable = {
   ...makeTable("paiement_lignes"),
   id: {}, paiementId: {}, modePaiement: {}, montantFcfa: {},

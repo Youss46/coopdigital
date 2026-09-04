@@ -19,6 +19,7 @@ export async function generateBonAchatPiece(cooperativeId: number, data: {
   dateDepense: string;
   montantFcfa: string;
   libelle: string;
+  demandeur: string | null;
   fournisseur: string | null;
   referencePiece: string | null;
   quantite: string | null;
@@ -51,6 +52,7 @@ export async function generateBonAchatPiece(cooperativeId: number, data: {
     ["Référence", data.referencePiece ?? "—"],
     ["Quantité", data.quantite ? `${Number(data.quantite)} ${data.unite ?? ""}`.trim() : "—"],
     ["Fournisseur", data.fournisseur ?? "—"],
+    ["Demandeur", data.demandeur ?? "—"],
     ["Montant autorisé", fcfa(data.montantFcfa)],
   ];
   for (const [index, [label, value]] of rows.entries()) {

@@ -11827,6 +11827,7 @@ components:
         date_depense:     { type: string, format: date }
         montant_fcfa:     { type: number }
         libelle:          { type: string }
+        demandeur:        { type: string, nullable: true }
         fournisseur:      { type: string, nullable: true }
         reference_piece:  { type: string, nullable: true }
         quantite:         { type: number, nullable: true }
@@ -11842,6 +11843,7 @@ components:
         date_depense:     { type: string, format: date }
         montant_fcfa:     { type: number }
         libelle:          { type: string }
+        demandeur:        { type: string }
         mission_id:       { type: integer }
         fournisseur:      { type: string }
         reference_piece:  { type: string }
@@ -11855,6 +11857,7 @@ components:
         date_depense:     { type: string, format: date }
         montant_fcfa:     { type: number }
         libelle:          { type: string }
+        demandeur:        { type: string }
         mission_id:       { type: integer }
         fournisseur:      { type: string }
         reference_piece:  { type: string }

@@ -4349,6 +4349,7 @@ export interface DepenseVehicule {
   date_depense: string;
   montant_fcfa: number;
   libelle: string;
+  demandeur?: string | null;
   fournisseur?: string | null;
   reference_piece?: string | null;
   quantite?: number | null;
@@ -4362,6 +4363,7 @@ export interface CreateDepenseVehiculeBody {
   date_depense: string;
   montant_fcfa: number;
   libelle: string;
+  demandeur?: string;
   mission_id?: number;
   fournisseur?: string;
   reference_piece?: string;
@@ -4374,6 +4376,7 @@ export interface UpdateDepenseVehiculeBody {
   date_depense?: string;
   montant_fcfa?: number;
   libelle?: string;
+  demandeur?: string;
   mission_id?: number;
   fournisseur?: string;
   reference_piece?: string;
