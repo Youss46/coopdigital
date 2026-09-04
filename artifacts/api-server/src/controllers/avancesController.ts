@@ -110,11 +110,19 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const { membreId, montantOctroyeFcfa, dateOctroi, dateEcheance, motif } = parse.data;
+  const {
+    membreId,
+    montantOctroyeFcfa,
+    dateOctroi,
+    dateEcheance,
+    motif,
+    modePaiement,
+    compteTresorerieId,
+    compteTresorerieType,
+  } = parse.data;
   const planType = body["planType"] ?? "integral";
   const montantPartielFcfa = body["montantPartielFcfa"];
   const reportDate = body["reportDate"];
-  const modePaiement = body["modePaiement"] ?? "especes";
 
   if (!Number.isInteger(montantOctroyeFcfa) || montantOctroyeFcfa <= 0) {
     res.status(400).json({ erreur: "Le montant de l'avance doit être un entier strictement positif" });
@@ -126,6 +134,23 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
   }
   if (!["especes", "mobile", "banque"].includes(String(modePaiement))) {
     res.status(400).json({ erreur: "Mode de paiement invalide" });
+    return;
+  }
+  if (!Number.isInteger(compteTresorerieId) || compteTresorerieId <= 0) {
+    res.status(400).json({ erreur: "Une trésorerie doit être sélectionnée" });
+    return;
+  }
+  if (!["caisse", "mobile_marchand", "banque"].includes(String(compteTresorerieType))) {
+    res.status(400).json({ erreur: "Type de trésorerie invalide" });
+    return;
+  }
+  const typeAttendu: Record<"especes" | "mobile" | "banque", "caisse" | "mobile_marchand" | "banque"> = {
+    especes: "caisse",
+    mobile: "mobile_marchand",
+    banque: "banque",
+  };
+  if (compteTresorerieType !== typeAttendu[modePaiement]) {
+    res.status(400).json({ erreur: "La trésorerie sélectionnée ne correspond pas au moyen de décaissement" });
     return;
   }
   if (planType === "partiel" && (!Number.isInteger(Number(montantPartielFcfa)) || Number(montantPartielFcfa) <= 0)) {
@@ -209,10 +234,12 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
           .select()
           .from(caissesTable)
           .where(and(
+            eq(caissesTable.id, compteTresorerieId),
             eq(caissesTable.cooperativeId, cooperativeId),
             eq(caissesTable.typeCaisse, "centrale"),
             eq(caissesTable.actif, true),
           ))
+          .for("update")
           .limit(1);
         if (!caisse) throw new Error("Aucune caisse centrale active n'est configurée.");
 
@@ -252,10 +279,11 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
           .select()
           .from(comptesMobilesMarchandsTable)
           .where(and(
+            eq(comptesMobilesMarchandsTable.id, compteTresorerieId),
             eq(comptesMobilesMarchandsTable.cooperativeId, cooperativeId),
             eq(comptesMobilesMarchandsTable.actif, true),
           ))
-          .orderBy(comptesMobilesMarchandsTable.id)
+          .for("update")
           .limit(1);
         if (!compte) throw new Error("Aucun compte Mobile Marchand actif n'est configuré.");
 
@@ -284,10 +312,11 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
           .select()
           .from(comptesBancairesTable)
           .where(and(
+            eq(comptesBancairesTable.id, compteTresorerieId),
             eq(comptesBancairesTable.cooperativeId, cooperativeId),
             eq(comptesBancairesTable.actif, true),
           ))
-          .orderBy(comptesBancairesTable.id)
+          .for("update")
           .limit(1);
         if (!compte) throw new Error("Aucun compte bancaire actif n'est configuré.");
 

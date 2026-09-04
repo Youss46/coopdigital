@@ -7708,7 +7708,7 @@ components:
 
     AvanceInput:
       type: object
-      required: [membreId, montantOctroyeFcfa, dateOctroi]
+      required: [membreId, montantOctroyeFcfa, dateOctroi, modePaiement, compteTresorerieId, compteTresorerieType]
       properties:
         membreId:
           type: integer
@@ -7723,6 +7723,11 @@ components:
         modePaiement:
           type: string
           enum: [especes, mobile, banque]
+        compteTresorerieId:
+          type: integer
+        compteTresorerieType:
+          type: string
+          enum: [caisse, mobile_marchand, banque]
 
     RemboursementInput:
       type: object

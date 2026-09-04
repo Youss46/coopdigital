@@ -357,7 +357,9 @@ export const CreateAvanceBody = zod.object({
   "dateOctroi": zod.string(),
   "dateEcheance": zod.string().optional(),
   "motif": zod.string().optional(),
-  "modePaiement": zod.enum(['especes', 'mobile', 'banque']).optional()
+  "modePaiement": zod.enum(['especes', 'mobile', 'banque']),
+  "compteTresorerieId": zod.number(),
+  "compteTresorerieType": zod.enum(['caisse', 'mobile_marchand', 'banque'])
 })
 
 

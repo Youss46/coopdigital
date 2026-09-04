@@ -28,6 +28,36 @@ function formaterDate(d: string) {
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 
+type ModePaiementAvance = "especes" | "mobile" | "banque";
+type TypeTresorerieAvance = "caisse" | "mobile_marchand" | "banque";
+
+interface TresorerieAvance {
+  id: number;
+  nom: string;
+  banque?: string | null;
+  operateur?: string | null;
+  numero_marchand?: string | null;
+  numero_compte?: string | null;
+  solde_actuel_fcfa: string | number;
+  type_caisse?: string;
+  session_statut?: string | null;
+}
+
+async function fetchTresorerieAvance<T>(url: string): Promise<T> {
+  const token = localStorage.getItem("coop_token") ?? "";
+  const response = await fetch(`${BASE}${url}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const payload = await response.json().catch(() => null) as { erreur?: string } | T | null;
+  if (!response.ok) {
+    const message = payload && typeof payload === "object" && "erreur" in payload
+      ? String(payload.erreur)
+      : `HTTP ${response.status}`;
+    throw new Error(message);
+  }
+  return payload as T;
+}
+
 async function downloadPdf(url: string, filename: string) {
   const token = localStorage.getItem("coop_token") ?? "";
   const res = await fetch(`${BASE}${url}`, { headers: { Authorization: `Bearer ${token}` } });
@@ -88,7 +118,8 @@ export default function Avances() {
   const [form, setForm] = useState({
     membreId: "",
     montantOctroyeFcfa: "",
-    modePaiement: "especes" as "especes" | "mobile" | "banque",
+    modePaiement: "especes" as ModePaiementAvance,
+    compteTresorerieId: "",
     dateOctroi: new Date().toISOString().split("T")[0]!,
     dateEcheance: "",
     motif: "",
@@ -100,6 +131,24 @@ export default function Avances() {
   const membreDropdownRef = useRef<HTMLDivElement>(null);
 
   const selectedMembreId = form.membreId ? parseInt(form.membreId) : 0;
+  const typeTresorerie: TypeTresorerieAvance = form.modePaiement === "especes"
+    ? "caisse"
+    : form.modePaiement === "mobile"
+      ? "mobile_marchand"
+      : "banque";
+  const cheminTresorerie: Record<TypeTresorerieAvance, string> = {
+    caisse: "/api/caisse",
+    mobile_marchand: "/api/mobile-marchand",
+    banque: "/api/banque",
+  };
+  const { data: tresoreries = [], isLoading: tresorerieLoading, isError: tresorerieError } = useQuery<TresorerieAvance[]>({
+    queryKey: ["avances-tresorerie", typeTresorerie],
+    queryFn: () => fetchTresorerieAvance<TresorerieAvance[]>(cheminTresorerie[typeTresorerie]),
+    enabled: modalOuvert,
+  });
+  const tresoreriesDisponibles = typeTresorerie === "caisse"
+    ? tresoreries.filter((tresorerie) => tresorerie.type_caisse === "centrale")
+    : tresoreries;
   const { data: scoreResume } = useGetScoringResume(selectedMembreId, {
     query: { queryKey: getGetScoringResumeQueryKey(selectedMembreId), enabled: selectedMembreId > 0 },
   });
@@ -111,7 +160,7 @@ export default function Avances() {
         queryClient.invalidateQueries({ queryKey: getGetAvancesQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetAvancesEncoursQueryKey() });
         setModalOuvert(false);
-        setForm({ membreId: "", montantOctroyeFcfa: "", modePaiement: "especes", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "" });
+         setForm({ membreId: "", montantOctroyeFcfa: "", modePaiement: "especes", compteTresorerieId: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "" });
         setMontantErreur(null);
         setMembreSearch("");
       },
@@ -152,6 +201,8 @@ export default function Avances() {
       membreId: parseInt(form.membreId),
       montantOctroyeFcfa: parseInt(form.montantOctroyeFcfa),
       modePaiement: form.modePaiement,
+       compteTresorerieId: parseInt(form.compteTresorerieId, 10),
+       compteTresorerieType: typeTresorerie,
       dateOctroi: form.dateOctroi,
       dateEcheance: form.dateEcheance || undefined,
       motif: form.motif || undefined,
@@ -159,7 +210,7 @@ export default function Avances() {
     if (!navigator.onLine) {
       void queueOp({ localId: crypto.randomUUID(), type: "avance", data: payload });
       setModalOuvert(false);
-      setForm({ membreId: "", montantOctroyeFcfa: "", modePaiement: "especes", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "" });
+       setForm({ membreId: "", montantOctroyeFcfa: "", modePaiement: "especes", compteTresorerieId: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "" });
       setMontantErreur(null);
       setMembreSearch("");
       setNotifHorsLigne("Avance enregistrée hors ligne — sera synchronisée dès le retour en ligne");
@@ -523,6 +574,7 @@ export default function Avances() {
                   onChange={(e) => setForm({
                     ...form,
                     modePaiement: e.target.value as typeof form.modePaiement,
+                     compteTresorerieId: "",
                   })}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-green-700"
                 >
@@ -534,6 +586,43 @@ export default function Avances() {
                   Le montant de l’avance sera débité de la trésorerie sélectionnée.
                 </p>
               </div>
+               <div>
+                 <label className="block text-xs font-medium text-gray-600 mb-1">
+                   {typeTresorerie === "caisse" ? "Caisse" : typeTresorerie === "mobile_marchand" ? "Compte Mobile Marchand" : "Compte bancaire"} *
+                 </label>
+                 <select
+                   required
+                   value={form.compteTresorerieId}
+                   onChange={(e) => setForm({ ...form, compteTresorerieId: e.target.value })}
+                   disabled={tresorerieLoading || tresorerieError || tresoreriesDisponibles.length === 0}
+                   className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-green-700 disabled:bg-gray-50 disabled:text-gray-400"
+                 >
+                   <option value="">
+                     {tresorerieLoading ? "Chargement…" : "Sélectionner une trésorerie"}
+                   </option>
+                   {tresoreriesDisponibles.map((tresorerie) => {
+                     const solde = Number(tresorerie.solde_actuel_fcfa ?? 0);
+                     const details = typeTresorerie === "banque"
+                       ? [tresorerie.banque, tresorerie.numero_compte].filter(Boolean).join(" — ")
+                       : typeTresorerie === "mobile_marchand"
+                         ? [tresorerie.operateur, tresorerie.numero_marchand].filter(Boolean).join(" — ")
+                         : "caisse centrale";
+                     return (
+                       <option key={tresorerie.id} value={tresorerie.id}>
+                         {tresorerie.nom}{details ? ` (${details})` : ""} — {formaterFCFA(solde)}
+                       </option>
+                     );
+                   })}
+                 </select>
+                 {tresorerieError && (
+                   <p className="mt-1 text-xs text-red-600">Impossible de charger les trésoreries disponibles.</p>
+                 )}
+                 {!tresorerieLoading && !tresorerieError && tresoreriesDisponibles.length === 0 && (
+                   <p className="mt-1 text-xs text-red-600">
+                     Aucune trésorerie active correspondante n'est disponible.
+                   </p>
+                 )}
+               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Date d'octroi *</label>
@@ -589,7 +678,7 @@ export default function Avances() {
                 </button>
                 <button
                   type="submit"
-                  disabled={mutation.isPending}
+                  disabled={mutation.isPending || tresorerieLoading || tresorerieError || !form.compteTresorerieId}
                   className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-90 flex items-center justify-center gap-2 transition-colors duration-200"
                   style={{ backgroundColor: mutation.isError ? "#b91c1c" : "#c4962a" }}
                 >

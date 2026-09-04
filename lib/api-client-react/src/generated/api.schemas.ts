@@ -903,13 +903,24 @@ export const AvanceInputModePaiement = {
   banque: 'banque',
 } as const;
 
+export type AvanceInputCompteTresorerieType = typeof AvanceInputCompteTresorerieType[keyof typeof AvanceInputCompteTresorerieType];
+
+
+export const AvanceInputCompteTresorerieType = {
+  caisse: 'caisse',
+  mobile_marchand: 'mobile_marchand',
+  banque: 'banque',
+} as const;
+
 export interface AvanceInput {
   membreId: number;
   montantOctroyeFcfa: number;
   dateOctroi: string;
   dateEcheance?: string;
   motif?: string;
-  modePaiement?: AvanceInputModePaiement;
+  modePaiement: AvanceInputModePaiement;
+  compteTresorerieId: number;
+  compteTresorerieType: AvanceInputCompteTresorerieType;
 }
 
 export interface RemboursementInput {
