@@ -155,6 +155,7 @@ describe("date effective des règlements", () => {
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
       valide_aujourd_hui: { count: 1, montant_total: 80_000 },
       effectue_ce_mois: { montant_total: 80_000 },
+      effectue_periode: { count: 2, montant_total: 130_000 },
     }));
   });
 

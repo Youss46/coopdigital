@@ -3098,6 +3098,24 @@ paths:
       tags: [paiements]
       summary: Statistiques des paiements
       security: [{ bearerAuth: [] }]
+      parameters:
+        - name: periode
+          in: query
+          schema:
+            type: string
+            enum: [today, week, month, previous_month, campaign]
+        - name: date_debut
+          in: query
+          description: Date effective minimale du paiement
+          schema:
+            type: string
+            format: date
+        - name: date_fin
+          in: query
+          description: Date effective maximale du paiement
+          schema:
+            type: string
+            format: date
       responses:
         "200":
           description: Stats paiements
@@ -7945,7 +7963,7 @@ components:
 
     PaiementsStats:
       type: object
-      required: [en_attente, valide_aujourd_hui, rejete, effectue_ce_mois]
+      required: [en_attente, valide_aujourd_hui, rejete, effectue_ce_mois, effectue_periode]
       properties:
         en_attente:
           type: object
@@ -7968,6 +7986,12 @@ components:
           type: object
           required: [montant_total]
           properties:
+            montant_total: { type: integer }
+        effectue_periode:
+          type: object
+          required: [count, montant_total]
+          properties:
+            count: { type: integer }
             montant_total: { type: integer }
 
     RejeterPaiementInput:

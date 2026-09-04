@@ -419,6 +419,59 @@ export async function statsPaiements(req: Request, res: Response): Promise<void>
     const todayStart = startOfDay(now);
     const monthStart = startOfMonth(now);
     const monthEnd = endOfMonth(now);
+    const periode = req.query["periode"] as string | undefined;
+    const dateDebut = typeof req.query["date_debut"] === "string" ? req.query["date_debut"] : undefined;
+    const dateFin = typeof req.query["date_fin"] === "string" ? req.query["date_fin"] : undefined;
+    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+    if ((dateDebut && !datePattern.test(dateDebut)) || (dateFin && !datePattern.test(dateFin))) {
+      res.status(400).json({ erreur: "Les dates doivent être au format AAAA-MM-JJ" });
+      return;
+    }
+    if (dateDebut && dateFin && dateDebut > dateFin) {
+      res.status(400).json({ erreur: "La date de début doit précéder la date de fin" });
+      return;
+    }
+
+    let periodeStart: Date | null = dateDebut
+      ? new Date(`${dateDebut}T00:00:00.000Z`)
+      : null;
+    let periodeEnd: Date | null = dateFin
+      ? new Date(`${dateFin}T23:59:59.999Z`)
+      : null;
+    if (!dateDebut && !dateFin) {
+      if (periode === "today") {
+        periodeStart = todayStart;
+        periodeEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+      } else if (periode === "week") {
+        periodeStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        periodeEnd = now;
+      } else if (periode === "month") {
+        periodeStart = monthStart;
+        periodeEnd = monthEnd;
+      } else if (periode === "previous_month") {
+        const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        periodeStart = startOfMonth(previousMonth);
+        periodeEnd = endOfMonth(previousMonth);
+      } else if (periode === "campaign") {
+        const [campagneActive] = await db
+          .select({
+            dateOuverture: campagnesTable.dateOuverture,
+            dateFermeture: campagnesTable.dateFermeture,
+          })
+          .from(campagnesTable)
+          .where(and(
+            eq(campagnesTable.cooperativeId, cooperativeId),
+            eq(campagnesTable.statut, "ouverte"),
+          ))
+          .orderBy(desc(campagnesTable.dateOuverture))
+          .limit(1);
+        if (campagneActive) {
+          periodeStart = new Date(`${campagneActive.dateOuverture}T00:00:00.000Z`);
+          const campagneFin = campagneActive.dateFermeture ?? now.toISOString().split("T")[0]!;
+          periodeEnd = new Date(`${campagneFin}T23:59:59.999Z`);
+        }
+      }
+    }
 
     const statsCoopFilter = or(
       eq(membresTable.cooperativeId, cooperativeId),
@@ -466,6 +519,7 @@ export async function statsPaiements(req: Request, res: Response): Promise<void>
     let valideAujourdhui = { count: 0, montant_total: 0 };
     let rejete = { count: 0 };
     let effectueCeMois = { montant_total: 0 };
+    let effectuePeriode = { count: 0, montant_total: 0 };
 
     for (const r of rows) {
       if (r.statut === "en_attente") {
@@ -487,6 +541,10 @@ export async function statsPaiements(req: Request, res: Response): Promise<void>
         if (dv >= monthStart && dv <= monthEnd) {
           effectueCeMois.montant_total += r.montantFcfa;
         }
+        if ((!periodeStart || dv >= periodeStart) && (!periodeEnd || dv <= periodeEnd)) {
+          effectuePeriode.count++;
+          effectuePeriode.montant_total += r.montantFcfa;
+        }
       }
     }
 
@@ -495,6 +553,7 @@ export async function statsPaiements(req: Request, res: Response): Promise<void>
       valide_aujourd_hui: valideAujourdhui,
       rejete,
       effectue_ce_mois: effectueCeMois,
+      effectue_periode: effectuePeriode,
     });
   } catch (err) {
     req.log.error({ err }, "Erreur statsPaiements");

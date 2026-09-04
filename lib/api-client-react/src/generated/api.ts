@@ -207,6 +207,7 @@ import type {
   GetMissionsParams,
   GetMouvementsStockParams,
   GetNotificationsParams,
+  GetPaiementsStatsParams,
   GetPrixAlertesParams,
   GetPrixAnalyseMargeParams,
   GetPrixHistoriqueParams,
@@ -10727,20 +10728,27 @@ export const useCreateFournisseurDepuisMembre = <TError = ErrorType<unknown>,
       return useMutation(getCreateFournisseurDepuisMembreMutationOptions(options));
     }
 
-export const getGetPaiementsStatsUrl = () => {
+export const getGetPaiementsStatsUrl = (params?: GetPaiementsStatsParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/paiements/stats`
+  return stringifiedParams.length > 0 ? `/api/paiements/stats?${stringifiedParams}` : `/api/paiements/stats`
 }
 
 /**
  * @summary Statistiques des paiements
  */
-export const getPaiementsStats = async ( options?: RequestInit): Promise<PaiementsStats> => {
+export const getPaiementsStats = async (params?: GetPaiementsStatsParams, options?: RequestInit): Promise<PaiementsStats> => {
 
-  return customFetch<PaiementsStats>(getGetPaiementsStatsUrl(),
+  return customFetch<PaiementsStats>(getGetPaiementsStatsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -10753,23 +10761,23 @@ export const getPaiementsStats = async ( options?: RequestInit): Promise<Paiemen
 
 
 
-export const getGetPaiementsStatsQueryKey = () => {
+export const getGetPaiementsStatsQueryKey = (params?: GetPaiementsStatsParams,) => {
     return [
-    `/api/paiements/stats`
+    `/api/paiements/stats`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetPaiementsStatsQueryOptions = <TData = Awaited<ReturnType<typeof getPaiementsStats>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaiementsStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetPaiementsStatsQueryOptions = <TData = Awaited<ReturnType<typeof getPaiementsStats>>, TError = ErrorType<unknown>>(params?: GetPaiementsStatsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaiementsStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetPaiementsStatsQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetPaiementsStatsQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPaiementsStats>>> = ({ signal }) => getPaiementsStats({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPaiementsStats>>> = ({ signal }) => getPaiementsStats(params, { signal, ...requestOptions });
 
 
 
@@ -10787,11 +10795,11 @@ export type GetPaiementsStatsQueryError = ErrorType<unknown>
  */
 
 export function useGetPaiementsStats<TData = Awaited<ReturnType<typeof getPaiementsStats>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaiementsStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: GetPaiementsStatsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaiementsStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetPaiementsStatsQueryOptions(options)
+  const queryOptions = getGetPaiementsStatsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

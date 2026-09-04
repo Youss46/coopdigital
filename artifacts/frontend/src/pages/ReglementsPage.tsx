@@ -12,6 +12,7 @@ import {
   useGetPaiementsStats,
   ListPaiementsStatut,
   ListPaiementsPeriode,
+  GetPaiementsStatsPeriode,
   type PaiementListItem,
   type ValiderPaiementInputModePaiement,
   type VentilationPaiementInput,
@@ -1118,11 +1119,6 @@ export default function ReglementsPage() {
     ? parseFloat(caisseCentrale.solde_actuel_fcfa)
     : null;
 
-  // Stats
-  const { data: stats } = useGetPaiementsStats({
-    query: { queryKey: getGetPaiementsStatsQueryKey(), refetchInterval: 30_000 },
-  });
-
   // Liste
   const periodePersonnalisee = filtrePeriode === "custom";
   const periodePersonnaliseeValide = !periodePersonnalisee
@@ -1136,6 +1132,20 @@ export default function ReglementsPage() {
     date_fin: periodePersonnalisee && dateFin ? dateFin : undefined,
     limit: 200,
   };
+  const statsParams = {
+    periode: filtrePeriode && !periodePersonnalisee
+      ? (filtrePeriode as GetPaiementsStatsPeriode)
+      : undefined,
+    date_debut: periodePersonnalisee && dateDebut ? dateDebut : undefined,
+    date_fin: periodePersonnalisee && dateFin ? dateFin : undefined,
+  };
+  const { data: stats } = useGetPaiementsStats(statsParams, {
+    query: {
+      queryKey: getGetPaiementsStatsQueryKey(statsParams),
+      refetchInterval: 30_000,
+      enabled: periodePersonnaliseeValide,
+    },
+  });
   const { data: paiements, isLoading } = useListPaiements(params, {
     query: {
       queryKey: getListPaiementsQueryKey(params),
@@ -1305,6 +1315,19 @@ export default function ReglementsPage() {
     { value: "campaign",       label: "Toute la campagne" },
     { value: "custom",         label: "Période personnalisée" },
   ];
+  const libellePaiementsPeriode = filtrePeriode === "today"
+    ? "Payés aujourd’hui"
+    : filtrePeriode === "week"
+      ? "Payés cette semaine"
+      : filtrePeriode === "month"
+        ? "Payés ce mois"
+        : filtrePeriode === "previous_month"
+          ? "Payés le mois précédent"
+          : filtrePeriode === "campaign"
+            ? "Payés — toute la campagne"
+            : filtrePeriode === "custom"
+              ? "Payés — période choisie"
+              : "Payés — toutes dates";
 
   // Calcul alerte solde : si le plus petit paiement en attente > solde
   const paiementsEnAttente = (paiements ?? []).filter(
@@ -1484,8 +1507,8 @@ export default function ReglementsPage() {
         <StatCard
           icon={<TrendingUp size={16} style={{ color: "#1a4731" }} />}
           bg="bg-emerald-50"
-          label="Payés ce mois"
-          value={stats ? fmt(stats.effectue_ce_mois.montant_total) : "—"}
+          label={libellePaiementsPeriode}
+          value={stats ? fmt(stats.effectue_periode.montant_total) : "—"}
           sub=""
           subCls=""
         />

@@ -1164,11 +1164,17 @@ export type PaiementsStatsEffectueCeMois = {
   montant_total: number;
 };
 
+export type PaiementsStatsEffectuePeriode = {
+  count: number;
+  montant_total: number;
+};
+
 export interface PaiementsStats {
   en_attente: PaiementsStatsEnAttente;
   valide_aujourd_hui: PaiementsStatsValideAujourdHui;
   rejete: PaiementsStatsRejete;
   effectue_ce_mois: PaiementsStatsEffectueCeMois;
+  effectue_periode: PaiementsStatsEffectuePeriode;
 }
 
 export interface RejeterPaiementInput {
@@ -5452,6 +5458,29 @@ export type UpdateAgrementBody = {
   dateAgrement?: string;
   dateExpirationAgrement?: string;
 };
+
+export type GetPaiementsStatsParams = {
+periode?: GetPaiementsStatsPeriode;
+/**
+ * Date effective minimale du paiement
+ */
+date_debut?: string;
+/**
+ * Date effective maximale du paiement
+ */
+date_fin?: string;
+};
+
+export type GetPaiementsStatsPeriode = typeof GetPaiementsStatsPeriode[keyof typeof GetPaiementsStatsPeriode];
+
+
+export const GetPaiementsStatsPeriode = {
+  today: 'today',
+  week: 'week',
+  month: 'month',
+  previous_month: 'previous_month',
+  campaign: 'campaign',
+} as const;
 
 export type ListPaiementsParams = {
 statut?: ListPaiementsStatut;

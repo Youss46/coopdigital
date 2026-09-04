@@ -3462,6 +3462,12 @@ export const CreateFournisseurDepuisMembreParams = zod.object({
 /**
  * @summary Statistiques des paiements
  */
+export const GetPaiementsStatsQueryParams = zod.object({
+  "periode": zod.enum(['today', 'week', 'month', 'previous_month', 'campaign']).optional(),
+  "date_debut": zod.date().optional().describe('Date effective minimale du paiement'),
+  "date_fin": zod.date().optional().describe('Date effective maximale du paiement')
+})
+
 export const GetPaiementsStatsResponse = zod.object({
   "en_attente": zod.object({
   "count": zod.number(),
@@ -3475,6 +3481,10 @@ export const GetPaiementsStatsResponse = zod.object({
   "count": zod.number()
 }),
   "effectue_ce_mois": zod.object({
+  "montant_total": zod.number()
+}),
+  "effectue_periode": zod.object({
+  "count": zod.number(),
   "montant_total": zod.number()
 })
 })
