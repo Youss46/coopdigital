@@ -832,6 +832,14 @@ export const AvancePlanType = {
   reporte: 'reporte',
 } as const;
 
+export type AvanceDeductionSource = typeof AvanceDeductionSource[keyof typeof AvanceDeductionSource];
+
+
+export const AvanceDeductionSource = {
+  livraison: 'livraison',
+  commission: 'commission',
+} as const;
+
 export interface Avance {
   id: number;
   membreId: number;
@@ -849,6 +857,7 @@ export interface Avance {
   montantPartielFcfa?: number | null;
   /** @nullable */
   reportDate?: string | null;
+  deductionSource: AvanceDeductionSource;
   /** @nullable */
   agentId?: number | null;
   /** @nullable */
@@ -917,6 +926,14 @@ export const AvanceInputCompteTresorerieType = {
   banque: 'banque',
 } as const;
 
+export type AvanceInputDeductionSource = typeof AvanceInputDeductionSource[keyof typeof AvanceInputDeductionSource];
+
+
+export const AvanceInputDeductionSource = {
+  livraison: 'livraison',
+  commission: 'commission',
+} as const;
+
 export interface AvanceInput {
   membreId: number;
   montantOctroyeFcfa: number;
@@ -926,6 +943,7 @@ export interface AvanceInput {
   modePaiement: AvanceInputModePaiement;
   compteTresorerieId: number;
   compteTresorerieType: AvanceInputCompteTresorerieType;
+  deductionSource?: AvanceInputDeductionSource;
 }
 
 export interface RemboursementInput {

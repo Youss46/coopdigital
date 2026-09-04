@@ -910,7 +910,7 @@ export async function deleteLigne(cooperativeId: number, sessionId: number, lign
 // ─── Déduction automatique des avances d'un membre-délégué ───────────────────
 /**
  * Itère toutes les avances en_cours / en_retard du membre-délégué (par dateOctroi ASC)
- * et déduit jusqu'à `plafondFcfa` (= commission nette − frais transport).
+ * et déduit jusqu'au montant payable de la livraison après charges.
  * Enregistre un remboursement dans remboursements_avances_membres pour chaque déduction.
  * Même pattern que deduireAvancesApresCommission pour les délégués terrain.
  */
@@ -927,6 +927,7 @@ async function deduireAvancesMembreDelegue(
         and(
           eq(avancesTable.membreId, membreId),
           inArray(avancesTable.statut, ["en_cours", "en_retard"]),
+          eq(avancesTable.deductionSource, "livraison"),
         ),
       )
       .orderBy(avancesTable.dateOctroi); // plus ancienne en premier
@@ -1139,25 +1140,19 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
           autresChargesLibelle = bon?.autresChargesLibelle ?? null;
         }
 
-        // Plafond = minimum de la commission nette et du solde réellement
-        // payable après charges. On ne rembourse jamais une avance au-delà de
-        // la dette 401 créée par la livraison.
+        // Une avance configurée « sur livraison » est plafonnée par le montant
+        // réellement payable après charges. La commission de collecte est une
+        // source de déduction distincte et ne doit pas réduire ce plafond.
         let avanceDeduiteFcfa = 0;
-        if (commission && commission.montantFcfa > 0) {
-          const commissionNette = Math.max(
-            0,
-            commission.montantFcfa - fraisCarburantDeduitsFcfa - autresChargesDeduitesFcfa,
-          );
-          const valeurProduitPrevue = prixBordChampFcfa > 0
-            ? Math.round(poidsKg * prixBordChampFcfa)
-            : 0;
-          const plafondAvance = Math.min(
-            commissionNette,
-            Math.max(0, valeurProduitPrevue - fraisCarburantDeduitsFcfa - autresChargesDeduitesFcfa),
-          );
-          if (plafondAvance > 0) {
-            avanceDeduiteFcfa = await deduireAvancesMembreDelegue(detail.membreId, plafondAvance, sessionId);
-          }
+        const valeurProduitPrevue = prixBordChampFcfa > 0
+          ? Math.round(poidsKg * prixBordChampFcfa)
+          : 0;
+        const plafondAvance = Math.max(
+          0,
+          valeurProduitPrevue - fraisCarburantDeduitsFcfa - autresChargesDeduitesFcfa,
+        );
+        if (plafondAvance > 0) {
+          avanceDeduiteFcfa = await deduireAvancesMembreDelegue(detail.membreId, plafondAvance, sessionId);
         }
 
         // ── Livraison officielle + paiement + écritures OHADA ─────────────────

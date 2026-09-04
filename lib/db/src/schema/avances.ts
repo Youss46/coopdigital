@@ -8,6 +8,7 @@ import { commissionsMembresDelaguesTable } from "./commissions_membres_delegues"
 
 export const avanceStatutEnum = pgEnum("avance_statut", ["en_cours", "rembourse", "en_retard"]);
 export const avancePlanTypeEnum = pgEnum("avance_plan_type", ["integral", "partiel", "reporte"]);
+export const avanceDeductionSourceEnum = pgEnum("avance_deduction_source", ["livraison", "commission"]);
 
 export const avancesTable = pgTable("avances", {
   id: serial("id").primaryKey(),
@@ -28,6 +29,7 @@ export const avancesTable = pgTable("avances", {
   planType: avancePlanTypeEnum("plan_type").notNull().default("integral"),
   montantPartielFcfa: integer("montant_partiel_fcfa"),
   reportDate: date("report_date"),
+  deductionSource: avanceDeductionSourceEnum("deduction_source").notNull().default("livraison"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

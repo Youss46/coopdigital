@@ -354,6 +354,7 @@ export async function payerCommissionsMembreDelegue(
     .where(and(
       eq(avancesTable.membreId, membreDelegueId),
       inArray(avancesTable.statut, ["en_cours", "en_retard"] as const),
+      eq(avancesTable.deductionSource, "commission"),
     ))
     .orderBy(avancesTable.dateOctroi);
 

@@ -78,6 +78,7 @@ export async function listAvances(req: Request, res: Response): Promise<void> {
         planType: avancesTable.planType,
         montantPartielFcfa: avancesTable.montantPartielFcfa,
         reportDate: avancesTable.reportDate,
+        deductionSource: avancesTable.deductionSource,
         agentId: avancesTable.agentId,
         agentSaisiseurId: avancesTable.agentSaisiseurId,
         agentSaisiseurNom: saisiseurAlias.nom,
@@ -128,6 +129,7 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
   const planType = body["planType"] ?? "integral";
   const montantPartielFcfa = body["montantPartielFcfa"];
   const reportDate = body["reportDate"];
+  const deductionSource = body["deductionSource"] ?? "livraison";
 
   if (!Number.isInteger(montantOctroyeFcfa) || montantOctroyeFcfa <= 0) {
     res.status(400).json({ erreur: "Le montant de l'avance doit être un entier strictement positif" });
@@ -135,6 +137,10 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
   }
   if (!["integral", "partiel", "reporte"].includes(String(planType))) {
     res.status(400).json({ erreur: "Plan de remboursement invalide" });
+    return;
+  }
+  if (!["livraison", "commission"].includes(String(deductionSource))) {
+    res.status(400).json({ erreur: "Source de déduction invalide" });
     return;
   }
   if (!["especes", "mobile", "banque"].includes(String(modePaiement))) {
@@ -236,6 +242,7 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
           planType: planType as "integral" | "partiel" | "reporte",
           montantPartielFcfa: planType === "partiel" ? Number(montantPartielFcfa) : null,
           reportDate: planType === "reporte" ? String(reportDate) : null,
+          deductionSource: deductionSource as "livraison" | "commission",
         })
         .returning();
 
@@ -585,15 +592,20 @@ export async function updatePlanAvanceMembre(req: Request, res: Response): Promi
   if (!cooperativeId) { res.status(403).json({ erreur: "Coopérative non associée" }); return; }
 
   const id = parseInt(String(req.params["id"] ?? "0"));
-  const { plan_type, montant_partiel_fcfa, report_date } = req.body as {
+  const { plan_type, montant_partiel_fcfa, report_date, deduction_source } = req.body as {
     plan_type?: string;
     montant_partiel_fcfa?: number | null;
     report_date?: string | null;
+    deduction_source?: string;
   };
 
   const validPlans = ["integral", "partiel", "reporte"];
   if (plan_type && !validPlans.includes(plan_type)) {
     res.status(400).json({ erreur: "plan_type invalide (integral | partiel | reporte)" });
+    return;
+  }
+  if (deduction_source && !["livraison", "commission"].includes(deduction_source)) {
+    res.status(400).json({ erreur: "deduction_source invalide (livraison | commission)" });
     return;
   }
 
@@ -638,6 +650,7 @@ export async function updatePlanAvanceMembre(req: Request, res: Response): Promi
         planType: finalPlan as "integral" | "partiel" | "reporte",
         montantPartielFcfa: finalPlan === "partiel" ? Number(finalMontantPartiel) : null,
         reportDate: finalPlan === "reporte" ? finalReportDate : null,
+        deductionSource: (deduction_source ?? row.avance.deductionSource ?? "livraison") as "livraison" | "commission",
       })
       .where(eq(avancesTable.id, id))
       .returning();

@@ -7668,7 +7668,7 @@ components:
 
     Avance:
       type: object
-      required: [id, membreId, montantOctroyeFcfa, montantRembourseFcfa, soldeRestantFcfa, dateOctroi, statut, planType, createdAt]
+      required: [id, membreId, montantOctroyeFcfa, montantRembourseFcfa, soldeRestantFcfa, dateOctroi, statut, planType, deductionSource, createdAt]
       properties:
         id:
           type: integer
@@ -7696,6 +7696,9 @@ components:
           type: ["integer", "null"]
         reportDate:
           type: ["string", "null"]
+        deductionSource:
+          type: string
+          enum: [livraison, commission]
         agentId:
           type: ["integer", "null"]
         agentSaisiseurId:
@@ -7731,6 +7734,10 @@ components:
         compteTresorerieType:
           type: string
           enum: [caisse, mobile_marchand, banque]
+        deductionSource:
+          type: string
+          enum: [livraison, commission]
+          default: livraison
 
     RemboursementInput:
       type: object

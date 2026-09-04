@@ -299,6 +299,7 @@ export const GetMembreHistoriqueResponse = zod.object({
   "planType": zod.enum(['integral', 'partiel', 'reporte']),
   "montantPartielFcfa": zod.number().nullish(),
   "reportDate": zod.string().nullish(),
+  "deductionSource": zod.enum(['livraison', 'commission']),
   "agentId": zod.number().nullish(),
   "agentSaisiseurId": zod.number().nullish(),
   "agentSaisiseurNom": zod.string().nullish(),
@@ -342,6 +343,7 @@ export const GetAvancesResponse = zod.object({
   "planType": zod.enum(['integral', 'partiel', 'reporte']),
   "montantPartielFcfa": zod.number().nullish(),
   "reportDate": zod.string().nullish(),
+  "deductionSource": zod.enum(['livraison', 'commission']),
   "agentId": zod.number().nullish(),
   "agentSaisiseurId": zod.number().nullish(),
   "agentSaisiseurNom": zod.string().nullish(),
@@ -356,6 +358,8 @@ export const GetAvancesResponse = zod.object({
 /**
  * @summary Octroyer une avance
  */
+export const createAvanceBodyDeductionSourceDefault = `livraison`;
+
 export const CreateAvanceBody = zod.object({
   "membreId": zod.number(),
   "montantOctroyeFcfa": zod.number(),
@@ -364,7 +368,8 @@ export const CreateAvanceBody = zod.object({
   "motif": zod.string().optional(),
   "modePaiement": zod.enum(['especes', 'mobile', 'banque']),
   "compteTresorerieId": zod.number(),
-  "compteTresorerieType": zod.enum(['caisse', 'mobile_marchand', 'banque'])
+  "compteTresorerieType": zod.enum(['caisse', 'mobile_marchand', 'banque']),
+  "deductionSource": zod.enum(['livraison', 'commission']).default(createAvanceBodyDeductionSourceDefault)
 })
 
 
@@ -389,6 +394,7 @@ export const GetAvancesEncoursResponse = zod.object({
   "planType": zod.enum(['integral', 'partiel', 'reporte']),
   "montantPartielFcfa": zod.number().nullish(),
   "reportDate": zod.string().nullish(),
+  "deductionSource": zod.enum(['livraison', 'commission']),
   "agentId": zod.number().nullish(),
   "agentSaisiseurId": zod.number().nullish(),
   "agentSaisiseurNom": zod.string().nullish(),
@@ -423,6 +429,7 @@ export const RembourserAvanceResponse = zod.object({
   "planType": zod.enum(['integral', 'partiel', 'reporte']),
   "montantPartielFcfa": zod.number().nullish(),
   "reportDate": zod.string().nullish(),
+  "deductionSource": zod.enum(['livraison', 'commission']),
   "agentId": zod.number().nullish(),
   "agentSaisiseurId": zod.number().nullish(),
   "agentSaisiseurNom": zod.string().nullish(),
@@ -564,6 +571,7 @@ export const GetDashboardAvancesRetardResponseItem = zod.object({
   "planType": zod.enum(['integral', 'partiel', 'reporte']),
   "montantPartielFcfa": zod.number().nullish(),
   "reportDate": zod.string().nullish(),
+  "deductionSource": zod.enum(['livraison', 'commission']),
   "agentId": zod.number().nullish(),
   "agentSaisiseurId": zod.number().nullish(),
   "agentSaisiseurNom": zod.string().nullish(),

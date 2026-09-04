@@ -74,6 +74,7 @@ interface Avance {
   planType: "integral" | "partiel" | "reporte";
   montantPartielFcfa: number | null;
   reportDate: string | null;
+  deductionSource: "livraison" | "commission";
 }
 
 interface RemboursementAvance {
@@ -355,6 +356,7 @@ export default function DeleguesLocalitesPage() {
     modePaiement: "especes" as "especes" | "mobile" | "banque",
     compteTresorerieId: "",
     planType: "integral" as Avance["planType"], montantPartiel: "", reportDate: "",
+    deductionSource: "livraison" as Avance["deductionSource"],
   });
   const [errOctroi, setErrOctroi] = useState("");
   const typeTresorerieOctroi: TypeTresorerieAvance = formOctroi.modePaiement === "especes"
@@ -381,7 +383,12 @@ export default function DeleguesLocalitesPage() {
   const [formRembours, setFormRembours] = useState({ montant: "", note: "" });
   const [errRembours, setErrRembours] = useState("");
   const [avancePlanEdition, setAvancePlanEdition] = useState<Avance | null>(null);
-  const [formPlan, setFormPlan] = useState({ planType: "integral" as Avance["planType"], montantPartiel: "", reportDate: "" });
+  const [formPlan, setFormPlan] = useState({
+    planType: "integral" as Avance["planType"],
+    montantPartiel: "",
+    reportDate: "",
+    deductionSource: "livraison" as Avance["deductionSource"],
+  });
   const [errPlan, setErrPlan] = useState("");
   const [avanceHistoriqueId, setAvanceHistoriqueId] = useState<number | null>(null);
 
@@ -527,6 +534,7 @@ export default function DeleguesLocalitesPage() {
       planType: formOctroi.planType,
       montantPartielFcfa: formOctroi.planType === "partiel" ? Number(formOctroi.montantPartiel) : undefined,
       reportDate: formOctroi.planType === "reporte" ? formOctroi.reportDate : undefined,
+      deductionSource: formOctroi.deductionSource,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["avances-membre", modalMembre?.id] });
@@ -534,7 +542,7 @@ export default function DeleguesLocalitesPage() {
       qc.invalidateQueries({ queryKey: ["avances-delegues-localites"] });
       qc.invalidateQueries({ queryKey: ["avances-delegues-localites-reportees"] });
       setShowOctroi(false);
-      setFormOctroi({ montant: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "", modePaiement: "especes", compteTresorerieId: "", planType: "integral", montantPartiel: "", reportDate: "" });
+      setFormOctroi({ montant: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "", modePaiement: "especes", compteTresorerieId: "", planType: "integral", montantPartiel: "", reportDate: "", deductionSource: "livraison" });
       setErrOctroi("");
     },
     onError: (e: Error) => setErrOctroi(e.message),
@@ -568,6 +576,7 @@ export default function DeleguesLocalitesPage() {
           plan_type: formPlan.planType,
           montant_partiel_fcfa: formPlan.planType === "partiel" ? Number(formPlan.montantPartiel) : null,
           report_date: formPlan.planType === "reporte" ? formPlan.reportDate : null,
+            deduction_source: formPlan.deductionSource,
         }),
       }).then(async r => {
         if (!r.ok) throw new Error((await r.json().catch(() => ({}))).erreur ?? r.statusText);
@@ -696,14 +705,16 @@ export default function DeleguesLocalitesPage() {
 
   const totalEnAttente = recapCommissions.reduce((s, r) => s + r.enAttenteFcfa, 0);
   const membreAvancesSelectionne = membres.find(m => m.id === membreAvancesId) ?? null;
-  const planLibelle = (avance: Pick<Avance, "planType" | "montantPartielFcfa" | "reportDate">) => {
+  const planLibelle = (avance: Pick<Avance, "planType" | "montantPartielFcfa" | "reportDate" | "deductionSource">) => {
+    const source = avance.deductionSource === "commission" ? "commission" : "livraison";
+    const sourceLabel = source === "commission" ? "commission" : "livraison";
     if (avance.planType === "partiel") {
-      return `Partiel — ${formaterMontant(avance.montantPartielFcfa ?? 0)} par paiement`;
+      return `Partiel — ${formaterMontant(avance.montantPartielFcfa ?? 0)} par ${sourceLabel}`;
     }
     if (avance.planType === "reporte") {
-      return `Reporté jusqu’au ${avance.reportDate ? formaterDate(avance.reportDate) : "nouvel ordre"}`;
+      return `Reporté jusqu’au ${avance.reportDate ? formaterDate(avance.reportDate) : "nouvel ordre"} — ${sourceLabel}`;
     }
-    return "Intégral au prochain paiement";
+    return `Intégral — prochaine ${source}`;
   };
 
   return (
@@ -941,6 +952,20 @@ export default function DeleguesLocalitesPage() {
                       </select>
                     </div>
                     <div className="sm:col-span-2">
+                      <label className="block text-xs text-gray-600 mb-1">Appliquer la déduction sur *</label>
+                      <select
+                        value={formOctroi.deductionSource}
+                        onChange={e => setFormOctroi(f => ({ ...f, deductionSource: e.target.value as Avance["deductionSource"] }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]"
+                      >
+                        <option value="livraison">Montant de la livraison — réduit le net versé au membre</option>
+                        <option value="commission">Commission de collecte — réduit la commission versée</option>
+                      </select>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Ce choix détermine sur quel règlement l’avance sera automatiquement retenue.
+                      </p>
+                    </div>
+                    <div className="sm:col-span-2">
                       <label className="block text-xs text-gray-600 mb-1">Plan de retenue *</label>
                       <select value={formOctroi.planType} onChange={e => setFormOctroi(f => ({ ...f, planType: e.target.value as Avance["planType"] }))}
                         className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]">
@@ -1029,7 +1054,7 @@ export default function DeleguesLocalitesPage() {
                                       <button
                                         onClick={() => {
                                           setAvancePlanEdition(a);
-                                          setFormPlan({ planType: a.planType, montantPartiel: a.montantPartielFcfa ? String(a.montantPartielFcfa) : "", reportDate: a.reportDate ?? "" });
+                                          setFormPlan({ planType: a.planType, montantPartiel: a.montantPartielFcfa ? String(a.montantPartielFcfa) : "", reportDate: a.reportDate ?? "", deductionSource: a.deductionSource ?? "livraison" });
                                           setErrPlan("");
                                         }}
                                         className="text-xs font-medium text-[#1a4731] hover:underline"
@@ -1550,6 +1575,20 @@ export default function DeleguesLocalitesPage() {
             </div>
             <div className="mt-4 space-y-3">
               <div>
+                 <label className="block text-xs text-gray-600 mb-1">Appliquer la déduction sur</label>
+                 <select
+                   value={formPlan.deductionSource}
+                   onChange={e => setFormPlan(f => ({ ...f, deductionSource: e.target.value as Avance["deductionSource"] }))}
+                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                 >
+                   <option value="livraison">Montant de la livraison — réduit le net versé</option>
+                   <option value="commission">Commission de collecte — réduit la commission versée</option>
+                 </select>
+                 <p className="text-xs text-gray-400 mt-1">
+                   Une seule source est retenue pour éviter de déduire deux fois la même avance.
+                 </p>
+               </div>
+               <div>
                 <label className="block text-xs text-gray-600 mb-1">Plan de retenue</label>
                 <select value={formPlan.planType} onChange={e => setFormPlan(f => ({ ...f, planType: e.target.value as Avance["planType"] }))}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
