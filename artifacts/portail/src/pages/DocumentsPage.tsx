@@ -105,7 +105,10 @@ export default function DocumentsPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `recu-${livraison.codeAchat ?? `LIV-${livraison.id}`}.pdf`;
+      const reference = livraison.numeroPesee != null && livraison.anneeNumeroPesee != null
+        ? `PES-S-${livraison.anneeNumeroPesee}-${String(livraison.numeroPesee).padStart(5, "0")}`
+        : livraison.codeAchat ?? "NON-NUMÉROTÉE";
+      a.download = `recu-${reference}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();

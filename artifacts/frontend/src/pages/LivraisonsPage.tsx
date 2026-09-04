@@ -295,7 +295,7 @@ function SessionsPeseeSection() {
                         </div>
                         <Link href={`/livraisons`}>
                           <a className="flex items-center gap-1 text-xs font-medium text-green-700 hover:text-green-900 bg-green-50 px-2.5 py-1.5 rounded-lg border border-green-200 transition flex-shrink-0">
-                            Livraison #{s.numeroPesee ?? s.livraisonId} <ChevronRight size={10} />
+                            {s.numeroSession} <ChevronRight size={10} />
                           </a>
                         </Link>
                       </div>

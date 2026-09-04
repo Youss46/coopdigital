@@ -38,6 +38,7 @@ export const sessionsPeseeTable = pgTable("sessions_pesee", {
   numeroSession:  varchar("numero_session", { length: 30 }).notNull(),
   /** Rang de la pesée dans la coopérative pour l'année civile. */
   numeroPesee:    integer("numero_pesee"),
+  anneeNumeroPesee: integer("annee_numero_pesee"),
   membreId:       integer("membre_id").references(() => membresTable.id),
   fournisseurId:  integer("fournisseur_id").references(() => fournisseursTable.id),
   produit:        varchar("produit", { length: 100 }).notNull().default("cacao"),

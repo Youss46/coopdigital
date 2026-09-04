@@ -207,7 +207,9 @@ export async function createLivraison(req: Request, res: Response): Promise<void
 
     // Numéro de réçu attribué avant la transaction (gap acceptable si tx rollback)
     const numeroRecu = await genererNumeroRecu(cooperativeId);
-    const { numero: numeroPesee } = await reserverNumeroPesee(cooperativeId);
+    const dateNumero = dateLivraison ?? new Date().toISOString().split("T")[0]!;
+    const { numero: numeroPesee, annee: anneeNumeroPesee } =
+      await reserverNumeroPesee(cooperativeId, dateNumero);
     // Numéro de livraison délégué — uniquement quand l'entrepôt délégué est précisé
     const numeroLivraison = entrepotDelegueId
       ? await genererNumeroLivraison(entrepotDelegueId)
@@ -262,10 +264,12 @@ export async function createLivraison(req: Request, res: Response): Promise<void
       const [livraison] = await tx
         .insert(livraisonsTable)
         .values({
+          cooperativeId,
           membreId: membreId ?? null,
           fournisseurId: fournisseurId ?? null,
           campagneId: campagneIdResolu,
           numeroPesee,
+          anneeNumeroPesee,
           poidsKg: String(poidsKg),
           prixUnitaireFcfa,
           montantBrutFcfa: montantBrut,

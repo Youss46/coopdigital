@@ -203,8 +203,9 @@ describe("creerLivraisonDepuisSession — stores REC receipt number on paiement"
 
   it("stores the cooperative-local weighing number on the generated delivery", async () => {
     await creerLivraisonDepuisSession(COOPERATIVE_ID, SESSION_ID, {});
-    expect(mockReserverNumeroPesee).toHaveBeenCalledWith(COOPERATIVE_ID);
+    expect(mockReserverNumeroPesee).toHaveBeenCalledWith(COOPERATIVE_ID, "2026-08-17");
     expect(capturedLivraisonInsert?.numeroPesee).toBe(1);
+    expect(capturedLivraisonInsert?.anneeNumeroPesee).toBe(2026);
   });
 
   it("keeps the generated delivery unpaid until its payment is validated", async () => {

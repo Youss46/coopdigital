@@ -15,6 +15,7 @@ import { alias } from "drizzle-orm/pg-core";
 import path from "path";
 import fs from "fs";
 import PDFDocument from "pdfkit";
+import { formatNumeroPesee } from "./recuService.js";
 import QRCode from "qrcode";
 import { getConfig } from "./configService";
 
@@ -170,6 +171,7 @@ export async function getLivraisonsMembre(membreId: number) {
     .select({
       id: livraisonsTable.id,
       numeroPesee: livraisonsTable.numeroPesee,
+      anneeNumeroPesee: livraisonsTable.anneeNumeroPesee,
       codeAchat: livraisonsTable.codeAchat,
       dateLivraison: livraisonsTable.dateLivraison,
       produit: livraisonsTable.produit,
@@ -344,6 +346,7 @@ export async function generateRecuLivraison(cooperativeId: number, membreId: num
     .select({
       id: livraisonsTable.id,
       numeroPesee: livraisonsTable.numeroPesee,
+      anneeNumeroPesee: livraisonsTable.anneeNumeroPesee,
       codeAchat: livraisonsTable.codeAchat,
       dateLivraison: livraisonsTable.dateLivraison,
       produit: livraisonsTable.produit,
@@ -421,7 +424,7 @@ export async function generateRecuLivraison(cooperativeId: number, membreId: num
 
   const rows: [string, string][] = [
     ["Date de livraison", fmtDate(liv.dateLivraison)],
-    ["Référence", liv.numeroPesee != null ? `PES-S-${liv.numeroPesee}` : (liv.codeAchat ?? `LIV-${liv.id}`)],
+    ["Référence", formatNumeroPesee(liv.numeroPesee, liv.anneeNumeroPesee) ?? liv.codeAchat ?? "NON-NUMÉROTÉE"],
     ["Produit", liv.produit ?? "Cacao"],
     ["Poids net (kg)", `${Number(liv.poidsKg).toLocaleString("fr-FR").replace(/[\u202F\u00A0]/g, " ")} kg`],
     ["Prix unitaire", fmtFCFA(liv.prixUnitaireFcfa) + "/kg"],

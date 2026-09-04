@@ -1079,6 +1079,20 @@
       "when": 1788536800000,
       "tag": "0153_exiger_numero_reglement",
       "breakpoints": true
+    },
+    {
+      "idx": 154,
+      "version": "7",
+      "when": 1788537500000,
+      "tag": "0154_numerotation_livraisons_canonique",
+      "breakpoints": true
+    },
+    {
+      "idx": 155,
+      "version": "7",
+      "when": 1788538000000,
+      "tag": "0155_exiger_numerotation_livraisons",
+      "breakpoints": true
     }
   ]
 }

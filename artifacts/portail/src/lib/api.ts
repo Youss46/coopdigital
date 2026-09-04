@@ -49,7 +49,8 @@ export type Profil = {
 };
 
 export type Livraison = {
-  id: number; codeAchat: string | null; dateLivraison: string;
+  id: number; numeroPesee: number | null; anneeNumeroPesee: number | null;
+  codeAchat: string | null; dateLivraison: string;
   produit: string | null; poidsKg: string; prixUnitaireFcfa: number;
   montantBrutFcfa: number; avanceDeduiteFcfa: number;
   intrantsDeduitsFcfa: number; montantNetFcfa: number;

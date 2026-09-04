@@ -1,4 +1,5 @@
-import { pgTable, serial, integer, numeric, text, date, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, numeric, text, date, timestamp, boolean, unique, check } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { membresTable } from "./membres";
@@ -6,9 +7,11 @@ import { usersTable } from "./users";
 import { campagnesTable } from "./campagnes";
 import { balancesTable } from "./pesee";
 import { fournisseursTable } from "./fournisseurs";
+import { cooperativesTable } from "./cooperatives";
 
 export const livraisonsTable = pgTable("livraisons", {
   id: serial("id").primaryKey(),
+  cooperativeId: integer("cooperative_id").notNull().references(() => cooperativesTable.id),
   membreId: integer("membre_id")
     .references(() => membresTable.id),
   fournisseurId: integer("fournisseur_id")
@@ -50,7 +53,8 @@ export const livraisonsTable = pgTable("livraisons", {
 
   // Pesée enrichie (migration 026)
   /** Rang de la pesée dans la coopérative pour l'année civile. */
-  numeroPesee:             integer("numero_pesee"),
+  numeroPesee:             integer("numero_pesee").notNull(),
+  anneeNumeroPesee:        integer("annee_numero_pesee").notNull(),
   balanceId:             integer("balance_id").references(() => balancesTable.id),
   peseurId:              integer("peseur_id").references(() => usersTable.id),
   poidsBrut1erePeseeKg:  numeric("poids_brut_1ere_pesee_kg", { precision: 10, scale: 3 }),
@@ -73,7 +77,14 @@ export const livraisonsTable = pgTable("livraisons", {
   // Plan de déduction d'avance choisi au moment de la livraison
   // "integral" (défaut) | "partiel" | "reporte"
   planAvanceType:       text("plan_avance_type"),
-});
+}, (table) => [
+  unique("livraisons_cooperative_annee_numero_pesee_unique")
+    .on(table.cooperativeId, table.anneeNumeroPesee, table.numeroPesee),
+  check(
+    "livraisons_numero_pesee_complet_check",
+    sql`${table.anneeNumeroPesee} IS NOT NULL AND ${table.numeroPesee} IS NOT NULL`,
+  ),
+]);
 
 export const insertLivraisonSchema = createInsertSchema(livraisonsTable).omit({
   id: true,

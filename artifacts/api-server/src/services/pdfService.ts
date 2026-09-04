@@ -56,6 +56,7 @@ import { computeCodeMembre } from "./portailService";
 import { getMontantAlimentationsCaisseDelegue } from "./delegueService";
 import { getTauxActif } from "./commissionService";
 import { calculerReglementMembreDelegue } from "./membreDelegueReglement";
+import { formatNumeroPesee } from "./recuService.js";
 
 const VERT = "#1a4731";
 const OR   = "#c4962a";
@@ -64,10 +65,6 @@ const PAGE_W = 595.28;
 const MARGIN  = 50;
 const COL1    = MARGIN;
 const COL2    = PAGE_W / 2;
-
-function formatNumeroPesee(numeroPesee: number | null | undefined): string | null {
-  return numeroPesee == null ? null : `PES-S-${numeroPesee}`;
-}
 
 function formaterFCFA(n: number): string {
   // Intl en Node.js utilise U+202F (espace insécable étroit) comme séparateur de milliers
@@ -827,6 +824,7 @@ export async function generateRecuLivraison(livraisonId: number, cooperativeId: 
     id: livraisonsTable.id,
     membreId: livraisonsTable.membreId,
     numeroPesee: livraisonsTable.numeroPesee,
+    anneeNumeroPesee: livraisonsTable.anneeNumeroPesee,
     codeAchat: livraisonsTable.codeAchat,
     dateLivraison: livraisonsTable.dateLivraison,
     produit: livraisonsTable.produit,
@@ -877,9 +875,9 @@ export async function generateRecuLivraison(livraisonId: number, cooperativeId: 
       : Promise.resolve("Cacao ordinaire"),
   ]);
   const { doc, endPromise } = makePdfDoc();
-  const ref = formatNumeroPesee(row.numeroPesee)
+  const ref = formatNumeroPesee(row.numeroPesee, row.anneeNumeroPesee)
     ?? row.codeAchat
-    ?? `LIV-${String(row.id).padStart(5, "0")}`;
+    ?? "NON-NUMÉROTÉE";
   await drawHeader(doc, cooperativeId, { titre_document: "Reçu de Livraison", reference: ref });
 
   let y = doc.y;
@@ -1032,6 +1030,7 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
      depenseVehiculeDemandeur: depensesVehiculeTable.demandeur,
     livraisonDate: livraisonsTable.dateLivraison,
     livraisonNumeroPesee: livraisonsTable.numeroPesee,
+    livraisonAnneeNumeroPesee: livraisonsTable.anneeNumeroPesee,
     livraisonRef: livraisonsTable.codeAchat,
     livraisonMontantNetFcfa: livraisonsTable.montantNetFcfa,
     livraisonMontantRestant: livraisonsTable.montantRestant,
@@ -1135,9 +1134,9 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
         ] as Array<[string, string]>
       : []),
     ["Libellé",              row.libelle ?? (isPieceRechange ? row.depenseVehiculeLibelle ?? "Pièce de rechange" : "Paiement livraison cacao")],
-    ["Livraison associée",   formatNumeroPesee(row.livraisonNumeroPesee)
+    ["Livraison associée",   formatNumeroPesee(row.livraisonNumeroPesee, row.livraisonAnneeNumeroPesee)
       ?? row.livraisonRef
-      ?? (row.livraisonId ? `LIV-${String(row.livraisonId).padStart(5,"0")}` : "—")],
+      ?? "NON-NUMÉROTÉE"],
     ["Date livraison",       row.livraisonDate ? formaterDate(row.livraisonDate) : "—"],
     ["Situation",            chequeEnAttente
       ? "Chèque émis — en attente d’encaissement"
@@ -1528,6 +1527,7 @@ export async function generateBordereauPesee(livraisonId: number, cooperativeId:
   const [row] = await db.select({
     id: livraisonsTable.id,
     numeroPesee: livraisonsTable.numeroPesee,
+    anneeNumeroPesee: livraisonsTable.anneeNumeroPesee,
     codeAchat: livraisonsTable.codeAchat,
     dateLivraison: livraisonsTable.dateLivraison,
     produit: livraisonsTable.produit,
@@ -1557,9 +1557,9 @@ export async function generateBordereauPesee(livraisonId: number, cooperativeId:
     getMentionCertification(row.membreId, cooperativeId),
   ]);
   const { doc, endPromise } = makePdfDoc();
-  const ref = formatNumeroPesee(row.numeroPesee)
+  const ref = formatNumeroPesee(row.numeroPesee, row.anneeNumeroPesee)
     ?? row.codeAchat
-    ?? `PES-${String(row.id).padStart(5,"0")}`;
+    ?? "NON-NUMÉROTÉE";
   await drawHeader(doc, cooperativeId, { titre_document: "Bordereau de Pesée", reference: ref });
 
   let y = doc.y;
@@ -4757,7 +4757,10 @@ export async function generateBordereauAchatSession(
   // M=40 aligne avec les marges internes de drawHeader (marginLeft=40/marginRight=40)
   const M  = 40;
   const BW = PAGE_W - M * 2;             // 515.28 pt utilisables = toute la largeur utile
-  const referencePesee = formatNumeroPesee(session.numeroPesee) ?? session.numeroSession;
+  const referencePesee = formatNumeroPesee(
+    session.numeroPesee,
+    Number(String(session.numeroSession).slice(4, 8)),
+  ) ?? session.numeroSession;
   await drawHeader(doc, cooperativeId, { titre_document: "BORDEREAU D'ACHAT", reference: referencePesee });
 
   // Bandeau Campagne / Date

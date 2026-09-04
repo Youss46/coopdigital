@@ -8,6 +8,11 @@ const fmt = (n: number | string) => Number(n).toLocaleString("fr-FR");
 const fmtDate = (d: string) => new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
 
 export default function LivraisonsPage() {
+  const referenceLivraison = (livraison: Livraison) =>
+    livraison.numeroPesee != null && livraison.anneeNumeroPesee != null
+      ? `PES-S-${livraison.anneeNumeroPesee}-${String(livraison.numeroPesee).padStart(5, "0")}`
+      : livraison.codeAchat ?? "NON-NUMÉROTÉE";
+
   const [, setLoc] = useLocation();
   const [livraisons, setLivraisons] = useState<Livraison[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,7 +44,7 @@ export default function LivraisonsPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `recu-${livraison.codeAchat ?? `LIV-${livraison.id}`}.pdf`;
+      a.download = `recu-${referenceLivraison(livraison)}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -108,7 +113,7 @@ export default function LivraisonsPage() {
                 <div className="flex justify-between items-start mb-4">
                   <div>
                     <div className="text-base font-semibold text-gray-800">{fmtDate(l.dateLivraison)}</div>
-                    <div className="text-sm text-gray-400">{l.codeAchat ?? `LIV-${l.id}`}</div>
+                    <div className="text-sm text-gray-400">{referenceLivraison(l)}</div>
                     {l.campagneLibelle && (
                       <div className="text-xs text-green-600 font-medium mt-1">{l.campagneLibelle}</div>
                     )}

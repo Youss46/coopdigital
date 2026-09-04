@@ -142,10 +142,11 @@ export async function creerSessionBatch(
 }
 
 // ─── Génération numéro de session ─────────────────────────────────────────────
-async function generateNumeroSession(cooperativeId: number): Promise<{ numeroSession: string; numeroPesee: number }> {
+async function generateNumeroSession(cooperativeId: number): Promise<{ numeroSession: string; numeroPesee: number; anneeNumeroPesee: number }> {
   const { numero, annee } = await reserverNumeroPesee(cooperativeId);
   return {
     numeroPesee: numero,
+    anneeNumeroPesee: annee,
     numeroSession: `PSE-${annee}-${String(numero).padStart(5, "0")}`,
   };
 }
@@ -213,7 +214,7 @@ export async function createExpeditionControlSession(
     throw new Error("Le type de certification du cacao est obligatoire avant de démarrer la pesée");
   }
 
-  const { numeroSession, numeroPesee } = await generateNumeroSession(cooperativeId);
+  const { numeroSession, numeroPesee, anneeNumeroPesee } = await generateNumeroSession(cooperativeId);
   try {
     return await db.transaction(async (tx: any) => {
       const [expedition] = await tx
@@ -247,6 +248,7 @@ export async function createExpeditionControlSession(
           cooperativeId,
           numeroSession,
           numeroPesee,
+          anneeNumeroPesee,
           membreId: null,
           fournisseurId: null,
           produit: "cacao",
@@ -311,7 +313,7 @@ export async function createSession(
   // ── Cas 0 : session liée à un bon de réception membre délégué ────────────
   if (data.bonReceptionId) {
     const bonId = data.bonReceptionId;
-    const { numeroSession, numeroPesee } = await generateNumeroSession(cooperativeId);
+    const { numeroSession, numeroPesee, anneeNumeroPesee } = await generateNumeroSession(cooperativeId);
     const session = await db.transaction(async (tx: any) => {
       const [bon] = await tx
         .select({
@@ -380,6 +382,7 @@ export async function createSession(
           cooperativeId,
           numeroSession,
           numeroPesee,
+          anneeNumeroPesee,
           membreId: bon.membreDelegueId,
           fournisseurId: null,
           produit: data.produit ?? "cacao",
@@ -441,7 +444,7 @@ export async function createSession(
       logger.info({ cooperativeId }, "Config pesée par défaut créée automatiquement");
     }
 
-    const { numeroSession, numeroPesee } = await generateNumeroSession(cooperativeId);
+    const { numeroSession, numeroPesee, anneeNumeroPesee } = await generateNumeroSession(cooperativeId);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const session = await db.transaction(async (tx: any) => {
@@ -465,6 +468,7 @@ export async function createSession(
           cooperativeId,
           numeroSession,
           numeroPesee,
+          anneeNumeroPesee,
           membreId: null,
           produit: data.produit ?? "cacao",
           operation: "reception_transfert",
@@ -532,7 +536,7 @@ export async function createSession(
     }
   }
 
-  const { numeroSession, numeroPesee } = await generateNumeroSession(cooperativeId);
+  const { numeroSession, numeroPesee, anneeNumeroPesee } = await generateNumeroSession(cooperativeId);
   try {
     const [session] = await db
       .insert(sessionsPeseeTable)
@@ -540,6 +544,7 @@ export async function createSession(
         cooperativeId,
         numeroSession,
         numeroPesee,
+        anneeNumeroPesee,
         membreId:      data.membreId      ?? null,
         fournisseurId: data.fournisseurId ?? null,
         produit:   data.produit   ?? "cacao",
@@ -620,6 +625,7 @@ export async function getSessions(
       peseurId: sessionsPeseeTable.peseurId,
       numeroSession: sessionsPeseeTable.numeroSession,
       numeroPesee: sessionsPeseeTable.numeroPesee,
+      anneeNumeroPesee: sessionsPeseeTable.anneeNumeroPesee,
       membreId: sessionsPeseeTable.membreId,
       membreNom: membresTable.nom,
       membrePrenoms: membresTable.prenoms,
@@ -685,8 +691,8 @@ export async function getSessions(
       peseurId: livraisonsTable.peseurId,
       numeroSession: sql<string>`CASE
         WHEN ${livraisonsTable.numeroPesee} IS NOT NULL
-          THEN concat('PES-S-', ${livraisonsTable.numeroPesee})
-        ELSE concat('PES-S-', ${livraisonsTable.id})
+          THEN concat('PES-S-', ${livraisonsTable.anneeNumeroPesee}, '-', lpad(${livraisonsTable.numeroPesee}::text, 5, '0'))
+        ELSE 'NON-NUMÉROTÉE'
       END`,
       membreId: livraisonsTable.membreId,
       membreNom: membresTable.nom,
@@ -698,6 +704,7 @@ export async function getSessions(
       operation: sql<string>`'pesee_simple'`,
       statut: sql<"terminee">`'terminee'`,
       numeroPesee: livraisonsTable.numeroPesee,
+      anneeNumeroPesee: livraisonsTable.anneeNumeroPesee,
       poidsTotalKg: sql<string>`coalesce(${livraisonsTable.poidsNetKg}, ${livraisonsTable.poidsKg})`,
       nbSacsTotal: livraisonsTable.nombreSacs,
       nbLignes: sql<number>`1`,
@@ -730,6 +737,7 @@ export async function getSessionDetail(cooperativeId: number, sessionId: number)
       peseurId: sessionsPeseeTable.peseurId,
       numeroSession: sessionsPeseeTable.numeroSession,
       numeroPesee: sessionsPeseeTable.numeroPesee,
+      anneeNumeroPesee: sessionsPeseeTable.anneeNumeroPesee,
       membreId: sessionsPeseeTable.membreId,
       membreNom: membresTable.nom,
       membrePrenoms: membresTable.prenoms,
@@ -1174,14 +1182,25 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
               .from(lignesPeseeTable)
               .where(eq(lignesPeseeTable.sessionId, sessionId));
             const poidsBrutKg = (lignesBrut?.total ?? 0) > 0 ? lignesBrut!.total : null;
-            const numeroPesee = detail.numeroPesee ?? (await reserverNumeroPesee(cooperativeId)).numero;
+            const anneeLivraison = Number(dateStr.slice(0, 4));
+            const anneeSession = detail.anneeNumeroPesee
+              ?? Number(String(detail.numeroSession).slice(4, 8));
+            const reservationPesee = detail.numeroPesee != null && anneeSession === anneeLivraison
+              ? {
+                  numero: detail.numeroPesee,
+                  annee: anneeSession,
+                }
+              : await reserverNumeroPesee(cooperativeId, dateStr);
+            const numeroPesee = reservationPesee.numero;
 
             const [livraison] = await db
               .insert(livraisonsTable)
               .values({
+                cooperativeId,
                 membreId:            detail.membreId,
                 campagneId,
                 numeroPesee,
+                anneeNumeroPesee:    reservationPesee.annee,
                 poidsKg:             String(poidsKg),
                 produitBrutKg:       poidsBrutKg != null ? String(poidsBrutKg) : undefined,
                 prixUnitaireFcfa:    prixBordChampFcfa,
@@ -1491,7 +1510,9 @@ export async function creerLivraisonDepuisSession(
         nbSacsTotal: sessionsPeseeTable.nbSacsTotal,
         produit: sessionsPeseeTable.produit,
         certificationCacao: sessionsPeseeTable.certificationCacao,
+        numeroSession: sessionsPeseeTable.numeroSession,
         numeroPesee: sessionsPeseeTable.numeroPesee,
+        anneeNumeroPesee: sessionsPeseeTable.anneeNumeroPesee,
         livraisonId: sessionsPeseeTable.livraisonId,
         dateFin: sessionsPeseeTable.dateFin,
         bonReceptionId: sessionsPeseeTable.bonReceptionId,
@@ -1541,7 +1562,16 @@ export async function creerLivraisonDepuisSession(
     const dateStr = session.dateFin
       ? (typeof session.dateFin === "string" ? session.dateFin : (session.dateFin as Date).toISOString().split("T")[0]!)
       : new Date().toISOString().split("T")[0]!;
-    const numeroPesee = session.numeroPesee ?? (await reserverNumeroPesee(cooperativeId)).numero;
+    const anneeLivraison = Number(dateStr.slice(0, 4));
+    const anneeSession = session.anneeNumeroPesee
+      ?? Number(String(session.numeroSession).slice(4, 8));
+    const reservationPesee = session.numeroPesee != null && anneeSession === anneeLivraison
+      ? {
+          numero: session.numeroPesee,
+          annee: anneeSession,
+        }
+      : await reserverNumeroPesee(cooperativeId, dateStr);
+    const numeroPesee = reservationPesee.numero;
 
     // ── Avances & intrants deductions — membres seulement (pas de déductions pour fournisseurs) ──
     let avanceEnCours: typeof avancesTable.$inferSelect | undefined;
@@ -1574,10 +1604,12 @@ export async function creerLivraisonDepuisSession(
     const [livraison] = await tx
       .insert(livraisonsTable)
       .values({
+        cooperativeId,
         membreId:           isFournisseur ? null : session.membreId,
         fournisseurId:      isFournisseur ? session.fournisseurId : null,
         campagneId,
         numeroPesee,
+        anneeNumeroPesee:   reservationPesee.annee,
         poidsKg:            String(poidsKg),
         produitBrutKg:      poidsBrutKgSession != null ? String(poidsBrutKgSession) : undefined,
         prixUnitaireFcfa:   prixBordChampFcfa,

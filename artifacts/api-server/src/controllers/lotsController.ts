@@ -1,4 +1,5 @@
 import { type Request, type Response } from "express";
+import { reserverNumeroPesee } from "../services/recuService.js";
 import {
   db,
   lotsTable,
@@ -281,15 +282,19 @@ export async function createLot(req: Request, res: Response): Promise<void> {
       // Poids nets proportionnels au brut
       const poidsNetFraction  = Math.round(originalPoidsNet * fractionPoidsKg / originalPoidsBrut * 100) / 100;
       const poidsNetReliquat  = Math.round(originalPoidsNet * reliquatBrut / originalPoidsBrut * 100) / 100;
+      const reservationPesee = await reserverNumeroPesee(cooperativeId, liv.dateLivraison);
 
       await db.transaction(async (tx) => {
         // Créer la livraison fractionnée (portion pour ce lot)
         const [nouvelleLiv] = await tx
           .insert(livraisonsTable)
           .values({
+            cooperativeId,
             membreId: liv.membreId,
             fournisseurId: liv.fournisseurId,
             campagneId: liv.campagneId,
+            numeroPesee: reservationPesee.numero,
+            anneeNumeroPesee: reservationPesee.annee,
             produit: liv.produit ?? "cacao",
             produitBrutKg: String(fractionPoidsKg),
             poidsKg: String(poidsNetFraction),

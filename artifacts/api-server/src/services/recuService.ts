@@ -5,8 +5,16 @@ import { eq, sql } from "drizzle-orm";
  * Réserve atomiquement le prochain rang de pesée pour une coopérative et une
  * année civile. Les gaps sont acceptables si la création parente est annulée.
  */
-export async function reserverNumeroPesee(cooperativeId: number): Promise<{ numero: number; annee: number }> {
-  const annee = new Date().getFullYear();
+export async function reserverNumeroPesee(
+  cooperativeId: number,
+  dateReference: string | Date | number = new Date(),
+): Promise<{ numero: number; annee: number }> {
+  const annee = typeof dateReference === "number"
+    ? dateReference
+    : Number(String(dateReference instanceof Date ? dateReference.toISOString() : dateReference).slice(0, 4));
+  if (!Number.isInteger(annee) || annee < 2000 || annee > 2200) {
+    throw new Error("Année invalide pour la génération du numéro de pesée");
+  }
   const [row] = await db
     .insert(sequencesPeseeTable)
     .values({ cooperativeId, annee, compteur: 1 })
@@ -21,6 +29,14 @@ export async function reserverNumeroPesee(cooperativeId: number): Promise<{ nume
     throw new Error("Impossible de générer un numéro de pesée");
   }
   return { numero, annee };
+}
+
+export function formatNumeroPesee(
+  numeroPesee: number | null | undefined,
+  annee: number | null | undefined,
+): string | null {
+  if (numeroPesee == null || annee == null) return null;
+  return `PES-S-${annee}-${String(numeroPesee).padStart(5, "0")}`;
 }
 
 /**
