@@ -107,11 +107,20 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
             eq(bonsCarburantTable.cooperativeId, cooperativeId),
           ),
           sql`${paiementsTable.statut} IN ('confirme','effectue','en_cours')`,
-          // Certains règlements historiques déjà « effectués » n'ont pas de
-          // date_validation. Ils restent néanmoins visibles dans Règlements;
-          // leur date de création sert alors de date effective.
-          gte(sql`coalesce(${paiementsTable.dateValidation}, ${paiementsTable.createdAt})`, debutPaiements),
-          lte(sql`coalesce(${paiementsTable.dateValidation}, ${paiementsTable.createdAt})`, finPaiements),
+          // Éviter COALESCE sur les timestamps : certaines bases historiques
+          // échouent sur cette expression. La logique reste identique :
+          // date_validation en priorité, puis created_at si elle est absente.
+          or(
+            and(
+              gte(paiementsTable.dateValidation, debutPaiements),
+              lte(paiementsTable.dateValidation, finPaiements),
+            ),
+            and(
+              isNull(paiementsTable.dateValidation),
+              gte(paiementsTable.createdAt, debutPaiements),
+              lte(paiementsTable.createdAt, finPaiements),
+            ),
+          ),
           // Même périmètre que la carte « Payés ce mois » de Règlements :
           // les paiements espèces des délégués sont suivis dans leur caisse.
           or(

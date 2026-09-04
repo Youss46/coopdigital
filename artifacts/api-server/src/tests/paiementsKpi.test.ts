@@ -203,7 +203,11 @@ describe("date effective des règlements", () => {
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
       paiementsMois: 105_000,
     }));
-    expect(JSON.stringify(paymentChain.where.mock.calls[0]?.[0])).toContain("coalesce");
+    const condition = JSON.stringify(paymentChain.where.mock.calls[0]?.[0]);
+    expect(condition).toContain("paiements.dateValidation");
+    expect(condition).toContain("paiements.createdAt");
+    expect(condition).toContain("isNull");
+    expect(condition).not.toContain("coalesce");
   });
 
   it("filtre la liste par la même date effective que les KPI", async () => {
