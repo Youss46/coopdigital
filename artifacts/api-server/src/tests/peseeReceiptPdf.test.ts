@@ -22,6 +22,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import zlib from "zlib";
 import { db } from "@workspace/db";
 import { drawHeader } from "../services/pdfHeaderService.js";
+import { generateBonAchatPiece } from "../services/bonAchatPiecePdf.js";
 
 // ─── Mock drizzle-orm/pg-core (alias()) ───────────────────────────────────────
 // alias() receives our stub table objects { _: { name } } which don't satisfy
@@ -100,6 +101,7 @@ function makeUpdateChain(data: unknown[]) {
  */
 function extractPdfText(buf: Buffer): string {
   const parts: string[] = [];
+  const decodePdfWinAnsi = (value: string): string => value.replace(/\u0097/g, "—");
 
   // Also include raw bytes decoded as latin1 (catches uncompressed metadata)
   parts.push(buf.toString("latin1"));
@@ -137,7 +139,7 @@ function extractPdfText(buf: Buffer): string {
           try { return Buffer.from(hex, "hex").toString("latin1"); } catch { return _m; }
         },
       );
-      parts.push(decoded);
+      parts.push(decodePdfWinAnsi(decoded));
 
       // Kerning-aware decode: PDFKit inserts kerning adjustments inside TJ arrays,
       // splitting a string like "PAY-00099" across multiple hex chunks:
@@ -156,7 +158,7 @@ function extractPdfText(buf: Buffer): string {
           return texts.join("");
         },
       );
-      parts.push(tjDecoded);
+      parts.push(decodePdfWinAnsi(tjDecoded));
     } catch {
       // Stream is not FlateDecode (e.g. embedded image data) — skip
     }
@@ -199,6 +201,10 @@ function makePaiementRow(overrides: Partial<Record<string, unknown>> = {}) {
     validateurNom: null,
     validateurPrenoms: null,
     validateurRole: null,
+    depenseVehiculeId: null,
+    depenseVehiculeType: null,
+    depenseVehiculeLibelle: null,
+    depenseVehiculeDemandeur: null,
     ...overrides,
   };
 }
@@ -361,6 +367,40 @@ describe("generateRecuPaiement (real PDF generation) — receipt number in PDF o
     expect(text).toContain("+22507080910");
   });
 
+  it("displays the requester and the spare-part nature on a payment receipt", async () => {
+    setupDbSelect(makePaiementRow({
+      depenseVehiculeId: 12,
+      depenseVehiculeType: "piece_rechange",
+      depenseVehiculeLibelle: "Alternateur",
+      depenseVehiculeDemandeur: "KOUASSI Aïcha",
+    }));
+
+    const buf = await generateRecuPaiement(PAIEMENT_ID, 1);
+    const text = extractPdfText(buf);
+    const textSansAccents = text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toUpperCase();
+
+    expect(text).toContain("KOUASSI Aïcha");
+    expect(textSansAccents).toContain("PIECE DE RECHANGE");
+    expect(textSansAccents).toContain("DEMANDEUR");
+  });
+
+  it("keeps generating a legacy spare-part receipt when its requester is absent", async () => {
+    setupDbSelect(makePaiementRow({
+      depenseVehiculeId: 13,
+      depenseVehiculeType: "piece_rechange",
+      depenseVehiculeLibelle: "Pompe à eau",
+      depenseVehiculeDemandeur: null,
+    }));
+
+    const buf = await generateRecuPaiement(PAIEMENT_ID, 1);
+    const text = extractPdfText(buf);
+
+    expect(text).toContain("Demandeur");
+    expect(text).toContain("—");
+    expect(text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toUpperCase())
+      .toContain("PIECE DE RECHANGE");
+  });
+
   it("displays the current installment and remaining balance for a partial delivery", async () => {
     setupDbSelect(makePaiementRow({
       montantFcfa: 190000,
@@ -421,5 +461,49 @@ describe("generateRecuPaiement (real PDF generation) — receipt number in PDF o
     expect(textSansAccents).toContain("ENCAISSEMENT");
     expect(textSansAccents).toContain("MONTANT ENCAISSE");
     expect(text).toContain("0 FCFA");
+  });
+});
+
+describe("generateBonAchatPiece (real PDF generation) — requester rendering", () => {
+  it("emits a PDF containing the requester name", async () => {
+    const buf = await generateBonAchatPiece(1, {
+      id: 73,
+      dateDepense: "2026-08-17",
+      montantFcfa: "125000",
+      libelle: "Alternateur",
+      demandeur: "KOUASSI Aïcha",
+      fournisseur: "Fournisseur test",
+      referencePiece: "ALT-2026",
+      quantite: "1",
+      unite: "pièce",
+      immatriculation: "AB-123-CD",
+      marque: "Test",
+      modele: "Camion",
+    });
+
+    expect(buf).toBeInstanceOf(Buffer);
+    expect(buf.slice(0, 4).toString()).toBe("%PDF");
+    expect(extractPdfText(buf)).toContain("KOUASSI Aïcha");
+  });
+
+  it("keeps generating a legacy purchase order when its requester is absent", async () => {
+    const buf = await generateBonAchatPiece(1, {
+      id: 74,
+      dateDepense: "2026-08-17",
+      montantFcfa: "125000",
+      libelle: "Pompe à eau",
+      demandeur: null,
+      fournisseur: null,
+      referencePiece: null,
+      quantite: null,
+      unite: null,
+      immatriculation: null,
+      marque: null,
+      modele: null,
+    });
+
+    const text = extractPdfText(buf);
+    expect(text).toContain("Demandeur");
+    expect(text).toContain("—");
   });
 });
