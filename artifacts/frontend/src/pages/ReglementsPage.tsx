@@ -418,6 +418,10 @@ function ModalValidation({
   const [inclureFraisCollecte, setInclureFraisCollecte] = useState(false);
   const [montantVersementSaisi, setMontantVersementSaisi] = useState(formatMontantSaisi(montantRestant));
   const montantVersement = parseMontantSaisi(montantVersementSaisi);
+  const montantTotalAvecCommission = montantRestant + commissionCollecteMontant;
+  const montantVersementHorsCommission = inclureFraisCollecte
+    ? montantVersement - commissionCollecteMontant
+    : montantVersement;
   const montantTotalAttendu = montantVersement;
   const [multiMoyens, setMultiMoyens] = useState(false);
   const [numeroCheque, setNumeroCheque] = useState("");
@@ -488,15 +492,15 @@ function ModalValidation({
 
   function choisirOptionFraisCollecte(inclure: boolean) {
     setInclureFraisCollecte(inclure);
-    // Le versement producteur reste toujours le solde net cacao
-    // (déjà diminué des avances, du carburant et des autres charges).
-    // La commission est ajoutée séparément au total décaissé.
-    setMontantVersementSaisi(formatMontantSaisi(montantRestant));
+    // Le champ affiche le montant total réellement décaissé. Le serveur
+    // reçoit ensuite séparément le solde cacao et le flag de commission.
+    const montantAffiche = inclure ? montantTotalAvecCommission : montantRestant;
+    setMontantVersementSaisi(formatMontantSaisi(montantAffiche));
     setVentilations((old) => old.length === 2
       ? old.map((item, index) => ({
           ...item,
           montantFcfa: formatMontantSaisi(index === 0
-            ? montantRestant
+            ? montantAffiche
             : 0),
         }))
       : old);
@@ -504,13 +508,13 @@ function ModalValidation({
   }
 
   function handleConfirm() {
-    const montantBase = inclureFraisCollecte ? montantRestant : montantVersement;
-    const montantAControler = inclureFraisCollecte ? montantRestant : montantVersement;
+    const montantBase = inclureFraisCollecte ? montantVersementHorsCommission : montantVersement;
+    const montantAControler = montantBase;
     if (!Number.isSafeInteger(montantAControler) || montantAControler <= 0 || montantAControler > montantRestant) {
       setTouched(true);
       return;
     }
-    if (inclureFraisCollecte && montantVersement !== montantRestant) {
+    if (inclureFraisCollecte && montantBase !== montantRestant) {
       setTouched(true);
       return;
     }
@@ -530,7 +534,7 @@ function ModalValidation({
           banque: ligne.banque || null,
           dateEcheance: ligne.dateEcheance || null,
         } : {}),
-      })));
+      })), undefined, inclureFraisCollecte);
       return;
     }
     if (modeManquant) { setTouched(true); return; }
@@ -612,7 +616,7 @@ function ModalValidation({
                 {inclureFraisCollecte && (
                   <div className="border-t pt-2 flex justify-between font-bold text-blue-800">
                     <span>Total à décaisser</span>
-                    <span>{fmt(montantVersement + commissionCollecteMontant)}</span>
+                    <span>{fmt(montantVersement)}</span>
                   </div>
                 )}
               </>
@@ -663,18 +667,18 @@ function ModalValidation({
                 onChange={(e) => updateMontantVersement(e.target.value)}
                 disabled={inclureFraisCollecte}
                 className={`w-full border rounded-lg px-3 py-2 text-sm text-right focus:outline-none focus:ring-1 ${
-                  touched && (montantVersement <= 0 || montantVersement > montantRestant)
+                  touched && (montantVersementHorsCommission <= 0 || montantVersementHorsCommission > montantRestant)
                     ? "border-red-400 bg-red-50 focus:ring-red-400"
                     : "border-gray-200 focus:ring-green-400"
                 }`}
               />
               <p className="text-xs text-gray-400 mt-1">
                 {inclureFraisCollecte
-                  ? `Le net cacao est réglé intégralement, avec ${fmt(commissionCollecteMontant)} FCFA de frais de collecte.`
+                  ? `Montant total : ${fmt(montantRestant)} de net cacao + ${fmt(commissionCollecteMontant)} de frais de collecte.`
                   : `Entre 1 et ${fmt(montantRestant)}. Le reliquat sera conservé pour un prochain versement.`}
               </p>
-              {touched && (montantVersement <= 0 || montantVersement > montantRestant) && (
-                <p className="text-xs text-red-500 mt-1">Le montant doit être positif et ne pas dépasser le solde restant.</p>
+              {touched && (montantVersementHorsCommission <= 0 || montantVersementHorsCommission > montantRestant) && (
+                <p className="text-xs text-red-500 mt-1">Le montant net cacao doit être positif et ne pas dépasser le solde restant.</p>
               )}
             </div>
           )}
