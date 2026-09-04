@@ -517,6 +517,7 @@ interface DashboardKpi {
   paiementsMois: number;
   creancesExportateurs: number;
   degradedMetrics?: string[];
+  degradedMetricErrors?: Record<string, string>;
 }
 
 function getPeriodeParams(preset: Preset, persoDebut: string, persoFin: string): { dateDebut?: string; dateFin?: string; label: string } {
@@ -747,8 +748,21 @@ export default function Dashboard() {
 
       {kpi?.degradedMetrics && kpi.degradedMetrics.length > 0 && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Certaines données du tableau de bord n’ont pas pu être actualisées :
-          {" "}{kpi.degradedMetrics.join(", ")}. Les autres indicateurs restent affichés.
+          <p>
+            Certaines données du tableau de bord n’ont pas pu être actualisées :
+            {" "}{kpi.degradedMetrics.join(", ")}. Les autres indicateurs restent affichés.
+          </p>
+          {kpi.degradedMetricErrors && (
+            <div className="mt-2 space-y-1 border-t border-amber-200 pt-2 text-xs">
+              {kpi.degradedMetrics.map((metric) => (
+                kpi.degradedMetricErrors?.[metric] ? (
+                  <p key={metric} className="break-words">
+                    <strong>{metric} :</strong> {kpi.degradedMetricErrors[metric]}
+                  </p>
+                ) : null
+              ))}
+            </div>
+          )}
         </div>
       )}
 

@@ -5,6 +5,32 @@ import { alias } from "drizzle-orm/pg-core";
 
 const dashboardAgentUserAlias = alias(usersTable, "dashboard_agent_user");
 
+function dashboardMetricErrorMessage(reason: unknown): string {
+  let source = reason;
+  for (let depth = 0; depth < 3; depth++) {
+    if (
+      typeof source === "object"
+      && source !== null
+      && "cause" in source
+      && (source as { cause?: unknown }).cause
+    ) {
+      source = (source as { cause: unknown }).cause;
+      continue;
+    }
+    break;
+  }
+
+  const error = typeof source === "object" && source !== null
+    ? source as { message?: unknown; code?: unknown }
+    : null;
+  const message = error?.message != null ? String(error.message) : String(source);
+  const code = error?.code != null ? String(error.code) : "";
+  const redacted = message
+    .replace(/postgres(?:ql)?:\/\/[^\s]+/gi, "[connexion PostgreSQL masquée]")
+    .slice(0, 500);
+  return `${code ? `[${code}] ` : ""}${redacted}`;
+}
+
 export async function getDashboard(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
   if (!cooperativeId) {
@@ -150,11 +176,13 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
     ]);
 
     const degradedMetrics: string[] = [];
+    const degradedMetricErrors: Record<string, string> = {};
     const readRow = <T>(index: number, metric: string): T | undefined => {
       const result = metricResults[index];
       if (!result || result.status === "rejected") {
         if (result?.status === "rejected") {
           degradedMetrics.push(metric);
+          degradedMetricErrors[metric] = dashboardMetricErrorMessage(result.reason);
           req.log.error({ err: result.reason, metric }, "Erreur KPI dashboard");
         }
         return undefined;
@@ -184,6 +212,7 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
       paiementsMois: paiementsRow?.total ?? 0,
       creancesExportateurs: creancesRow?.total ?? 0,
       degradedMetrics,
+      degradedMetricErrors,
     });
   } catch (err) {
     req.log.error({ err }, "Erreur getDashboard");
