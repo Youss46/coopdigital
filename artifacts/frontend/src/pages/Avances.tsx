@@ -273,7 +273,7 @@ export default function Avances() {
       {/* En-tête */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Avances</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Avances Membres</h1>
           <p className="text-gray-500 text-sm mt-0.5">{avancesData?.total ?? 0} avances enregistrées</p>
         </div>
         {peutOctroyer && (

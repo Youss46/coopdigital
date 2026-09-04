@@ -301,7 +301,7 @@ export default function GlobalSearch() {
                       { icon: <Users size={12} className="text-green-700" />, bg: "bg-green-100", label: "Membres", sub: "nom, prénoms" },
                       { icon: <Phone size={12} className="text-blue-700" />, bg: "bg-blue-100", label: "Téléphone", sub: "ex. 0701020304" },
                       { icon: <MapPin size={12} className="text-amber-700" />, bg: "bg-amber-100", label: "Village", sub: "ex. Méagui, Gueyo" },
-                      { icon: <TrendingDown size={12} className="text-orange-700" />, bg: "bg-orange-100", label: "Avances", sub: "par nom du membre" },
+                      { icon: <TrendingDown size={12} className="text-orange-700" />, bg: "bg-orange-100", label: "Avances Membres", sub: "par nom du membre" },
                       { icon: <Wheat size={12} className="text-amber-700" />, bg: "bg-amber-100", label: "Livraisons", sub: "par nom du membre" },
                     ].map(({ icon, bg, label, sub }) => (
                       <div key={label} className="flex items-start gap-2.5 rounded-xl bg-gray-50 px-3 py-2.5">

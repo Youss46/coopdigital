@@ -28,7 +28,7 @@ function detectModule(path: string): string {
 const MODULE_LABELS: Record<string, string> = {
   membres:         "Membres",
   livraisons:      "Livraisons",
-  avances:         "Avances",
+  avances:         "Avances Membres",
   comptabilite:    "Comptabilité",
   caisse:          "Caisse",
   emprunts:        "Emprunts",
