@@ -103,3 +103,4 @@
 - [Responsabilité Sacherie par coopérative](cooperative-sacherie-responsibility.md) — choisir Magasinier, Responsable Sacherie ou les deux sans désactiver le rôle Magasinier global.
 - [Parité tonnage PCA et tableau de bord](dashboard-pca-tonnage-parity.md) — le total campagne inclut livraisons et transferts confirmés; la modale certification détaille les seules livraisons.
 - [Date effective des règlements](payment-effective-date.md) — utiliser date_validation, sinon created_at, pour compter les paiements effectués dans une période.
+- [Cohérence paiement-livraison](payment-delivery-reconciliation.md) — recalculer statut_paiement et montant_restant depuis les paiements confirmés/effectués liés.

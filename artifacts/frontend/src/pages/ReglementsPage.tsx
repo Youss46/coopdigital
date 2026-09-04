@@ -169,10 +169,21 @@ function StatutBadge({ statut }: { statut: string }) {
   );
 }
 
-function ModeBadge({ mode }: { mode: string | null | undefined }) {
+function ModeBadge({
+  mode,
+  statut,
+}: {
+  mode: string | null | undefined;
+  statut?: string | null;
+}) {
   if (!mode) return (
-    <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium bg-amber-100 text-amber-700 border border-amber-200">
-      <AlertCircle size={11} />À régler
+    <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium border ${
+      statut === "confirme" || statut === "effectue"
+        ? "bg-gray-100 text-gray-600 border-gray-200"
+        : "bg-amber-100 text-amber-700 border-amber-200"
+    }`}>
+      <AlertCircle size={11} />
+      {statut === "confirme" || statut === "effectue" ? "Mode non renseigné" : "À régler"}
     </span>
   );
   const cfg = MODE_CONFIG[mode] ?? { label: mode, cls: "bg-gray-100 text-gray-500", icon: null };
@@ -975,7 +986,12 @@ function ModalRecu({ paiement, onClose }: { paiement: PaiementListItem; onClose:
                     <span key={ligne.id} className="text-xs text-gray-700">{MODE_CONFIG[ligne.modePaiement]?.label ?? ligne.modePaiement} : {fmt(ligne.montantFcfa)}</span>
                   ))}
                 </div>
-              ) : <ModeBadge mode={paiement.modePaiement} />}
+              ) : (
+                <ModeBadge
+                  mode={paiement.modePaiement ?? (paiement.lignes?.length === 1 ? paiement.lignes[0]?.modePaiement : null)}
+                  statut={paiement.statut}
+                />
+              )}
             </div>
             {paiement.referenceTransaction && (
               <div className="px-4 py-2.5 flex justify-between">
@@ -1720,7 +1736,10 @@ function PaiementRow({
               {nomProducteur(p)}
             </p>
             <StatutBadge statut={p.statut} />
-            <ModeBadge mode={p.modePaiement} />
+            <ModeBadge
+              mode={p.modePaiement ?? (p.lignes?.length === 1 ? p.lignes[0]?.modePaiement : null)}
+              statut={p.statut}
+            />
           </div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-500">
             {!isCarburant && telProducteur(p) && <span>{telProducteur(p)}</span>}
