@@ -1,10 +1,10 @@
 import { type Request, type Response } from "express";
-import { db, paiementsTable, paiementLignesTable, membresTable, livraisonsTable, fournisseursTable, usersTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable, caissesTable, sessionsCaisseTable, mouvementsCaisseTable, chequesEmisTable, bonsCarburantTable } from "@workspace/db";
+import { db, paiementsTable, paiementLignesTable, membresTable, livraisonsTable, fournisseursTable, usersTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable, caissesTable, chequesEmisTable, bonsCarburantTable } from "@workspace/db";
 import { eq, desc, and, or, sql, gte, lt, lte, inArray, isNull, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { envoyerPushGroupePortail, envoyerPushGroupe } from "../services/pushService";
 import { proposerEcrituresDansTransaction, resolveCompteDetteProducteur } from "../services/comptabiliteService.js";
-import { verifierCaisseEspeces, debiterCaisseParResponsable, enregistrerMouvement, getSessionActive } from "../services/caisseService.js";
+import { verifierCaisseEspeces, debiterCaisseParResponsable, getSessionActive, enregistrerMouvement } from "../services/caisseService.js";
 import { notifierParRole } from "../services/notificationService.js";
 import { logger } from "../lib/logger.js";
 import type { ComptabiliteTransaction } from "../services/comptabiliteService.js";
@@ -211,58 +211,6 @@ async function notifierCaisseCentraleSousSeuil(
     }
   } catch (err) {
     logger.warn({ err, cooperativeId, caisseId }, "Notification solde Caisse Centrale non envoyée");
-  }
-}
-
-// ─── Helper : débit automatique Caisse Centrale ─────────────────────────────
-
-async function debiterCaisseCentralePaiement(
-  cooperativeId: number,
-  montantFcfa: number,
-  paiementId: number,
-  userId: number | null | undefined,
-  opts?: { compteDebitOverride?: string; libelle?: string; skipAccounting?: boolean },
-): Promise<void> {
-  try {
-    const [caisse] = await db
-      .select()
-      .from(caissesTable)
-      .where(
-        and(
-          eq(caissesTable.cooperativeId, cooperativeId),
-          eq(caissesTable.typeCaisse, "centrale"),
-          eq(caissesTable.actif, true),
-        ),
-      )
-      .limit(1);
-
-    if (!caisse) {
-      logger.warn({ cooperativeId, paiementId }, "Aucune caisse centrale active trouvée pour débit automatique");
-      return;
-    }
-
-    const result = await enregistrerMouvement(caisse.id, {
-      type: "sortie",
-      motif: opts?.compteDebitOverride === "6042" ? "carburant" : "paiement_producteur",
-      montantFcfa,
-      libelle: opts?.libelle ?? `Paiement producteur — règlement #${paiementId}`,
-      userId: userId ?? undefined,
-      compteDebitOverride: opts?.compteDebitOverride,
-      skipAccounting: opts?.skipAccounting,
-    });
-
-    // Notifier si le solde passe sous le fond minimum configuré
-    if (result.alerte) {
-      void notifierCaisseCentraleSousSeuil(
-        cooperativeId,
-        caisse.id,
-        caisse.nom,
-        result.soldeActuel,
-        paiementId,
-      );
-    }
-  } catch (err) {
-    logger.warn({ err, paiementId }, "Débit automatique caisse centrale non effectué — session peut-être fermée");
   }
 }
 
@@ -561,52 +509,19 @@ async function debiterCaisseDansTransaction(
       : "Aucune caisse centrale n'est configurée pour cette coopérative.");
   }
 
-  // Verrouiller les deux lignes pendant le versement évite qu'une validation
-  // concurrente calcule son mouvement à partir d'un solde obsolète.
-  const [caisseVerrouillee] = await tx
-    .select()
-    .from(caissesTable)
-    .where(eq(caissesTable.id, caisse.id))
-    .for("update")
-    .limit(1);
-  if (!caisseVerrouillee) throw new Error("Caisse introuvable.");
-
-  const [session] = await tx
-    .select()
-    .from(sessionsCaisseTable)
-    .where(and(
-      eq(sessionsCaisseTable.caisseId, caisse.id),
-      eq(sessionsCaisseTable.statut, "ouverte"),
-            sql`${sessionsCaisseTable.dateSession} = CURRENT_DATE`,
-    ))
-          .orderBy(desc(sessionsCaisseTable.id))
-    .for("update")
-    .limit(1);
-  if (!session) {
-    throw new Error("Aucune session de caisse ouverte. Ouvrez une session dans la page Caisse avant de valider des paiements en espèces.");
-  }
-
-  const solde = parseFloat(String(caisseVerrouillee.soldeActuelFcfa));
-  const montant = Math.round(montantFcfa);
-  if (solde < montant) {
-    throw new Error(`Solde caisse insuffisant. Disponible : ${solde.toLocaleString("fr-FR")} FCFA, requis : ${montant.toLocaleString("fr-FR")} FCFA`);
-  }
-  const nouveauSolde = solde - montant;
-  await tx.insert(mouvementsCaisseTable).values({
-    caisseId: caisse.id,
-    sessionId: session.id,
-    cooperativeId,
+  // Utiliser le même service que les autres sorties de caisse garantit que le
+  // mouvement, la session et le solde sont écrits ensemble. Le paiement crée
+  // déjà sa propre écriture OHADA plus bas : on ne la duplique pas ici.
+  await enregistrerMouvement(caisse.id, {
     type: "sortie",
     motif: "paiement_producteur",
-    montantFcfa: montant.toString(),
+    montantFcfa,
     libelle: `Paiement producteur — règlement #${paiementId}`,
     referenceOperation: `PAI-${paiementId}`,
-    soldeApresFcfa: nouveauSolde.toString(),
-    enregistrePar: userId ?? null,
-  });
-  await tx.update(caissesTable)
-    .set({ soldeActuelFcfa: nouveauSolde.toString() })
-    .where(eq(caissesTable.id, caisse.id));
+    userId,
+    cooperativeId,
+    skipAccounting: true,
+  }, tx);
 }
 
 async function debiterMobileDansTransaction(

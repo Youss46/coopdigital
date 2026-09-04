@@ -283,7 +283,7 @@ export default function DashboardCaissier() {
   const premiereCaisseId = caisses[0]?.id ?? null;
   const { data: journal, isLoading: loadingJournal } = useQuery<Journal>({
     queryKey: ["dash-caissier-journal", premiereCaisseId, today],
-    queryFn: () => apiFetch(`/api/caisse/${premiereCaisseId}/journal?dateDebut=${today}&dateFin=${today}`),
+    queryFn: () => apiFetch(`/api/caisse/${premiereCaisseId}/journal?date_debut=${today}&date_fin=${today}`),
     enabled: premiereCaisseId !== null,
     refetchInterval: 60_000,
   });

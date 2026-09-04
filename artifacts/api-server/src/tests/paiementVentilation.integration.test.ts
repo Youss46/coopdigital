@@ -326,6 +326,10 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
 
   it("expose uniquement la part espèces d'une ventilation espèces et chèque", async () => {
     const paymentId = await createPayment(200_000);
+    const caisseAvant = await client.query(
+      `SELECT solde_actuel_fcfa FROM caisses WHERE id = $1`,
+      [caisseId],
+    );
 
     const result = await validate(paymentId, {
       ventilations: [
@@ -335,6 +339,26 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
     });
 
     expect(result.statusCode).toBe(200);
+    expect(await client.query(
+      `SELECT solde_actuel_fcfa FROM caisses WHERE id = $1`,
+      [caisseId],
+    )).toMatchObject({
+      rows: [{ solde_actuel_fcfa: String(Number(caisseAvant.rows[0].solde_actuel_fcfa) - 75_000) }],
+    });
+    const mouvements = await client.query(
+      `SELECT caisse_id, session_id, type, motif, montant_fcfa, reference_operation
+       FROM mouvements_caisse
+       WHERE caisse_id = $1 AND reference_operation = $2`,
+      [caisseId, `PAI-${paymentId}`],
+    );
+    expect(mouvements.rows).toEqual([{
+      caisse_id: caisseId,
+      session_id: sessionId,
+      type: "sortie",
+      motif: "paiement_producteur",
+      montant_fcfa: "75000",
+      reference_operation: `PAI-${paymentId}`,
+    }]);
     await expect(journalMovementsFor([paymentId])).resolves.toEqual([
       expect.objectContaining({
         montant_fcfa: "75000",
