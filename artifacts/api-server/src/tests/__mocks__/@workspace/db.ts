@@ -28,6 +28,11 @@ export const paiementLignesTable = {
   id: {}, paiementId: {}, modePaiement: {}, montantFcfa: {},
   referenceTransaction: {}, telephone: {}, numeroCheque: {}, banque: {}, dateEcheance: {},
 };
+export const chequesEmisTable = {
+  ...makeTable("cheques_emis"),
+  id: {}, paiementId: {}, paiementLigneId: {}, montantFcfa: {},
+  statut: {}, dateEncaissement: {},
+};
 export const intrantsTable = makeTable("intrants");
 export const distributionsIntrantsTable = makeTable("distributions_intrants");
 export const remboursementsIntrantsTable = makeTable("remboursements_intrants");

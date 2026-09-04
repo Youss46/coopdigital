@@ -260,16 +260,22 @@ describe("generateRecuPaiement (real PDF generation) — receipt number in PDF o
   });
 
   /**
-   * Configure db.select for three consecutive calls:
+   * Configure db.select for five consecutive calls:
    *  call 1 → main paiement join query  (returns [row])
    *  call 2 → paiement lignes query     (returns [] — legacy payment)
-   *  call 3 → linked delivery's validated payments query (returns [] — no history)
-   *  call 4 → getCampagneEnCours query  (returns [] — no campaign)
+   *  call 3 → linked cheques query
+   *  call 4 → linked delivery's validated payments query (returns [] — no history)
+   *  call 5 → getCampagneEnCours query  (returns [] — no campaign)
    */
-  function setupDbSelect(row: Record<string, unknown>, history: Array<{ id: number }> = []) {
+  function setupDbSelect(
+    row: Record<string, unknown>,
+    history: Array<{ id: number }> = [],
+    cheques: Array<Record<string, unknown>> = [],
+  ) {
     vi.mocked(db.select)
       .mockReturnValueOnce(makeSelectChain([row]) as unknown as ReturnType<typeof db.select>)
       .mockReturnValueOnce(makeSelectChain([])  as unknown as ReturnType<typeof db.select>)
+      .mockReturnValueOnce(makeSelectChain(cheques)  as unknown as ReturnType<typeof db.select>)
       .mockReturnValueOnce(makeSelectChain(history)  as unknown as ReturnType<typeof db.select>)
       .mockReturnValueOnce(makeSelectChain([])  as unknown as ReturnType<typeof db.select>);
   }
@@ -388,5 +394,32 @@ describe("generateRecuPaiement (real PDF generation) — receipt number in PDF o
     expect(text).toContain("150 000 FCFA");
     expect(text).toContain("0 FCFA");
     expect(textSansAccents).toContain("REGLEE");
+  });
+
+  it("affiche zéro encaissé tant que le chèque reste émis", async () => {
+    setupDbSelect(
+      makePaiementRow({
+        montantFcfa: 150000,
+        modePaiement: "cheque",
+        modeReglement: "cheque",
+        statut: "effectue",
+      }),
+      [{ id: PAIEMENT_ID }],
+      [{
+        paiementLigneId: null,
+        montantFcfa: 150000,
+        statut: "emis",
+        dateEncaissement: null,
+      }],
+    );
+
+    const buf = await generateRecuPaiement(PAIEMENT_ID, 1);
+    const text = extractPdfText(buf);
+    const textSansAccents = text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toUpperCase();
+
+    expect(textSansAccents).toContain("EN ATTENTE");
+    expect(textSansAccents).toContain("ENCAISSEMENT");
+    expect(textSansAccents).toContain("MONTANT ENCAISSE");
+    expect(text).toContain("0 FCFA");
   });
 });

@@ -859,16 +859,36 @@ export async function getBilanJour(agentId: number, cooperativeId: number) {
     .orderBy(desc(sessionsPeseeTable.dateFin))
     .limit(4);
 
+  const montantEncaisseAujourdhui = sql<number>`
+    greatest(
+      case when DATE(coalesce(${paiementsTable.dateValidation}, ${paiementsTable.createdAt})) = ${todayStr}::date
+        then ${paiementsTable.montantFcfa} - coalesce((
+          select sum(cheque_total.montant_fcfa)
+          from cheques_emis cheque_total
+          where cheque_total.paiement_id = ${paiementsTable.id}
+        ), 0)
+        else 0
+      end,
+      0
+    )
+    + coalesce((
+      select sum(cheque_encaisse.montant_fcfa)
+      from cheques_emis cheque_encaisse
+      where cheque_encaisse.paiement_id = ${paiementsTable.id}
+        and cheque_encaisse.statut = 'encaisse'
+        and cheque_encaisse.date_encaissement = ${todayStr}::date
+    ), 0)
+  `;
   const [paiementsStats] = await db
     .select({
-      nb: sql<number>`COUNT(*)`,
-      total: sql<string>`COALESCE(SUM(${paiementsTable.montantFcfa}), 0)`,
+      nb: sql<number>`COUNT(*) FILTER (WHERE (${montantEncaisseAujourdhui}) > 0)::int`,
+      total: sql<string>`COALESCE(SUM(${montantEncaisseAujourdhui}), 0)`,
     })
     .from(paiementsTable)
     .innerJoin(membresTable, eq(membresTable.id, paiementsTable.membreId))
     .where(and(
       eq(membresTable.cooperativeId, cooperativeId),
-      sql`DATE(${paiementsTable.createdAt}) = ${todayStr}::date`,
+      sql`${paiementsTable.statut} IN ('confirme', 'effectue', 'en_cours')`,
     ));
 
   const [avancesStats] = await db

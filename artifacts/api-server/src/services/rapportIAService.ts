@@ -140,12 +140,46 @@ export async function getKPIs(
   // ── Finances — Paiements ──────────────────────────────────────────────────────
   const [paiementsRow] = await db
     .select({
-      total: sql<number>`coalesce(sum(${paiementsTable.montantFcfa}), 0)::bigint`,
-      nb: sql<number>`count(*)::int`,
+      total: sql<number>`coalesce(sum(
+        greatest(
+          ${paiementsTable.montantFcfa} - coalesce((
+            select sum(cheque_total.montant_fcfa)
+            from cheques_emis cheque_total
+            where cheque_total.paiement_id = ${paiementsTable.id}
+          ), 0),
+          0
+        )
+        + coalesce((
+          select sum(cheque_encaisse.montant_fcfa)
+          from cheques_emis cheque_encaisse
+          where cheque_encaisse.paiement_id = ${paiementsTable.id}
+            and cheque_encaisse.statut = 'encaisse'
+        ), 0)
+      ), 0)::bigint`,
+      nb: sql<number>`count(*) filter (where (
+        greatest(
+          ${paiementsTable.montantFcfa} - coalesce((
+            select sum(cheque_total.montant_fcfa)
+            from cheques_emis cheque_total
+            where cheque_total.paiement_id = ${paiementsTable.id}
+          ), 0),
+          0
+        )
+        + coalesce((
+          select sum(cheque_encaisse.montant_fcfa)
+          from cheques_emis cheque_encaisse
+          where cheque_encaisse.paiement_id = ${paiementsTable.id}
+            and cheque_encaisse.statut = 'encaisse'
+        ), 0)
+      ) > 0)::int`,
     })
     .from(paiementsTable)
     .innerJoin(membresTable, eq(membresTable.id, paiementsTable.membreId))
-    .where(and(eq(membresTable.cooperativeId, cooperativeId), isNotNull(paiementsTable.membreId)));
+    .where(and(
+      eq(membresTable.cooperativeId, cooperativeId),
+      isNotNull(paiementsTable.membreId),
+      sql`${paiementsTable.statut} IN ('confirme', 'effectue', 'en_cours')`,
+    ));
 
   // ── Finances — Primes ─────────────────────────────────────────────────────────
   const [primesRow] = await db

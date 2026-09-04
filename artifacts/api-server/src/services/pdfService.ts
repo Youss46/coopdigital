@@ -16,6 +16,7 @@ import {
   planComptableTable,
   paiementsTable,
   paiementLignesTable,
+  chequesEmisTable,
   bulletinsPaieTable,
   lignesBulletinTable,
   personnelTable,
@@ -1049,6 +1050,22 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
     .select()
     .from(paiementLignesTable)
     .where(eq(paiementLignesTable.paiementId, paiementId));
+  const chequesPaiement = await db
+    .select({
+      paiementLigneId: chequesEmisTable.paiementLigneId,
+      montantFcfa: chequesEmisTable.montantFcfa,
+      statut: chequesEmisTable.statut,
+      dateEncaissement: chequesEmisTable.dateEncaissement,
+    })
+    .from(chequesEmisTable)
+    .where(eq(chequesEmisTable.paiementId, paiementId));
+  const montantTotalCheques = chequesPaiement.reduce((total, cheque) => total + cheque.montantFcfa, 0);
+  const montantChequesEncaisses = chequesPaiement
+    .filter((cheque) => cheque.statut === "encaisse")
+    .reduce((total, cheque) => total + cheque.montantFcfa, 0);
+  const montantImmediat = Math.max(0, row.montantFcfa - montantTotalCheques);
+  const montantEffectivementEncaisse = montantImmediat + montantChequesEncaisses;
+  const chequeEnAttente = chequesPaiement.some((cheque) => cheque.statut === "emis");
   const versementsLivraison = row.livraisonId
     ? await db
       .select({ id: paiementsTable.id })
@@ -1104,6 +1121,9 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
       ?? row.livraisonRef
       ?? (row.livraisonId ? `LIV-${String(row.livraisonId).padStart(5,"0")}` : "—")],
     ["Date livraison",       row.livraisonDate ? formaterDate(row.livraisonDate) : "—"],
+    ["Situation",            chequeEnAttente
+      ? "Chèque émis — en attente d’encaissement"
+      : "Montant encaissé"],
   ];
   for (const [i, [label, val]] of payDetails.entries()) {
     if (i % 2 === 0) doc.rect(MARGIN, y, 370, 16).fill("#f9fafb");
@@ -1118,7 +1138,11 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
     for (const ligne of paiementLignes) {
       const mode = payModeLabel[ligne.modePaiement] ?? ligne.modePaiement;
       const details = ligne.modePaiement === "cheque" && ligne.numeroCheque
-        ? ` — N° ${ligne.numeroCheque}${ligne.banque ? ` (${ligne.banque})` : ""}`
+        ? ` — N° ${ligne.numeroCheque}${ligne.banque ? ` (${ligne.banque})` : ""} — ${
+          chequesPaiement.find((cheque) => cheque.paiementLigneId === ligne.id)?.statut === "encaisse"
+            ? "encaissé"
+            : "en attente d’encaissement"
+        }`
         : "";
       doc.fontSize(8).fillColor(GRIS).font("Helvetica").text(`${mode}${details}`, MARGIN + 6, y + 4, { width: 230, lineBreak: false });
       doc.fontSize(9).fillColor("black").font("Helvetica-Bold").text(formaterFCFA(ligne.montantFcfa), MARGIN + 265, y + 4, { width: 100, align: "right", lineBreak: false });
@@ -1137,7 +1161,7 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
   if (row.livraisonId && row.livraisonMontantNetFcfa != null && montantRestantLivraison != null) {
     const statutLivraison = livraisonEstReglee ? "RÉGLÉE" : "PARTIELLE";
     const payMontants: Array<[string, string, string]> = [
-      [`Règlement${numeroVersement > 0 ? ` ${numeroVersement}` : ""}`, formaterFCFA(Number(row.montantFcfa)), "#f0fdf4"],
+      [`Montant encaissé${numeroVersement > 0 ? ` — règlement ${numeroVersement}` : ""}`, formaterFCFA(montantEffectivementEncaisse), "#f0fdf4"],
       ["Reste dû", formaterFCFA(Math.max(0, montantRestantLivraison)), livraisonEstReglee ? "#f0fdf4" : "#fff7ed"],
     ];
     for (const [label, val, bg] of payMontants) {
@@ -1165,12 +1189,13 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
   }
   doc.rect(MARGIN, y, 370, 26).fill(VERT);
   doc.fontSize(11).fillColor("white").font("Helvetica-Bold")
-    .text(row.livraisonId ? "MONTANT DU RÈGLEMENT" : "MONTANT PAYÉ", MARGIN + 8, y + 8, { width: 200, lineBreak: false });
-  doc.text(formaterFCFA(row.montantFcfa), MARGIN + 218, y + 8, { width: 145, align: "right", lineBreak: false });
+    .text("MONTANT ENCAISSÉ", MARGIN + 8, y + 8, { width: 200, lineBreak: false });
+  doc.text(formaterFCFA(montantEffectivementEncaisse), MARGIN + 218, y + 8, { width: 145, align: "right", lineBreak: false });
   y += 34;
   const payStatutColor: Record<string, string> = { effectue: "#16a34a", confirme: "#16a34a", en_attente: "#f59e0b", echec: "#ef4444", rejete: "#ef4444" };
-  doc.fontSize(9).font("Helvetica-Bold").fillColor(payStatutColor[row.statut] ?? GRIS)
-    .text(`Statut : ${row.statut.replace(/_/g, " ").toUpperCase()}`, MARGIN, y);
+  const statutAffiche = chequeEnAttente ? "EN ATTENTE D’ENCAISSEMENT" : row.statut.replace(/_/g, " ").toUpperCase();
+  doc.fontSize(9).font("Helvetica-Bold").fillColor(chequeEnAttente ? "#f59e0b" : (payStatutColor[row.statut] ?? GRIS))
+    .text(`Statut : ${statutAffiche}`, MARGIN, y);
 
   // — Ligne "Validé par" si l'agent validateur est connu
   if (row.validateurNom || row.validateurPrenoms) {
