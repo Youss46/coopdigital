@@ -354,7 +354,10 @@ export async function drawHeader(
 
   // ── Repositionne le curseur ───────────────────────────────────────────────────
   doc.x = marginLeft;
-  doc.y = options.hauteur_reservee ?? (hasBankLine ? 110 : 96);
+  doc.y = options.hauteur_reservee ?? Math.max(
+    separatorY + 14,
+    hasBankLine ? 110 : 96,
+  );
 }
 
 // ── Pied de page ──────────────────────────────────────────────────────────────
