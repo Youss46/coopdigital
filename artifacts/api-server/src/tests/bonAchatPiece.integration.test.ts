@@ -2,7 +2,11 @@ import express from "express";
 import type { Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { pool } from "@workspace/db";
-import { handleEmettreBonAchatPiece } from "../controllers/transportController.js";
+import {
+  handleDeleteDepenseVehicule,
+  handleEmettreBonAchatPiece,
+  handleUpdateDepenseVehicule,
+} from "../controllers/transportController.js";
 import { listPaiements, rejeterPaiement, validerPaiement } from "../controllers/paiementsController.js";
 
 const enabled =
@@ -133,6 +137,8 @@ describe.skipIf(!enabled)("bons d'achat pièces idempotents sur PostgreSQL", () 
       next();
     });
     app.post("/transport/depenses/:id/emettre-bon-achat", handleEmettreBonAchatPiece);
+    app.put("/transport/depenses/:id", handleUpdateDepenseVehicule);
+    app.delete("/transport/depenses/:id", handleDeleteDepenseVehicule);
     app.get("/paiements", listPaiements);
     app.patch("/paiements/:id/valider", validerPaiement);
     app.post("/paiements/:id/rejeter", rejeterPaiement);
@@ -346,6 +352,57 @@ describe.skipIf(!enabled)("bons d'achat pièces idempotents sur PostgreSQL", () 
       [depenseId],
     );
     expect(count.rows[0].count).toBe(1);
+  });
+
+  it.each([
+    ["montant", { montant_fcfa: 2000 }],
+    ["libellé", { libelle: "Libellé modifié" }],
+  ])("refuse la modification du %s après émission du bon sans modifier la dépense", async (_field, patch) => {
+    const depenseId = await createDepense("Dépense verrouillée");
+    const { response: emitResponse, body } = await emitJson(depenseId);
+    paymentIds.push(body.paiementId);
+    expect(emitResponse.status).toBe(201);
+
+    const before = await client.query(
+      `SELECT montant_fcfa, libelle FROM depenses_vehicule WHERE id = $1`,
+      [depenseId],
+    );
+    const response = await fetch(`${baseUrl}/transport/depenses/${depenseId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    const responseBody = await response.json() as { erreur: string };
+
+    expect(response.status).toBe(409);
+    expect(responseBody.erreur).toMatch(/déjà liée à un règlement/i);
+
+    const after = await client.query(
+      `SELECT montant_fcfa, libelle FROM depenses_vehicule WHERE id = $1`,
+      [depenseId],
+    );
+    expect(after.rows).toEqual(before.rows);
+  });
+
+  it("refuse la suppression d'une dépense après émission du bon sans supprimer la dépense", async () => {
+    const depenseId = await createDepense("Dépense non supprimable");
+    const { response: emitResponse, body } = await emitJson(depenseId);
+    paymentIds.push(body.paiementId);
+    expect(emitResponse.status).toBe(201);
+
+    const response = await fetch(`${baseUrl}/transport/depenses/${depenseId}`, {
+      method: "DELETE",
+    });
+    const responseBody = await response.json() as { erreur: string };
+
+    expect(response.status).toBe(409);
+    expect(responseBody.erreur).toMatch(/déjà liée à un règlement/i);
+
+    const remaining = await client.query(
+      `SELECT id FROM depenses_vehicule WHERE id = $1`,
+      [depenseId],
+    );
+    expect(remaining.rows).toHaveLength(1);
   });
 
   it.each([

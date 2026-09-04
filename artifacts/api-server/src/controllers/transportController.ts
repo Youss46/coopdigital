@@ -37,6 +37,7 @@ import {
   createDepense,
   updateDepense,
   deleteDepense,
+  DepenseRegleeError,
   getBonsCarburant,
   getBonCarburant,
   createBonCarburant,
@@ -673,6 +674,10 @@ export async function handleUpdateDepenseVehicule(req: Request, res: Response): 
     if (!updated) { res.status(404).json({ erreur: "Dépense introuvable" }); return; }
     res.json(mapDepense({ depense: updated, immatriculation: null }));
   } catch (err) {
+    if (err instanceof DepenseRegleeError) {
+      res.status(409).json({ erreur: err.message });
+      return;
+    }
     req.log.error({ err }, "Erreur updateDepenseVehicule");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -688,6 +693,10 @@ export async function handleDeleteDepenseVehicule(req: Request, res: Response): 
     if (!ok) { res.status(404).json({ erreur: "Dépense introuvable" }); return; }
     res.json({ ok: true });
   } catch (err) {
+    if (err instanceof DepenseRegleeError) {
+      res.status(409).json({ erreur: err.message });
+      return;
+    }
     req.log.error({ err }, "Erreur deleteDepenseVehicule");
     res.status(500).json({ erreur: "Erreur interne" });
   }

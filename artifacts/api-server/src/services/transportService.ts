@@ -531,25 +531,79 @@ export async function createDepense(
   return row;
 }
 
+export class DepenseRegleeError extends Error {
+  readonly code = "DEPENSE_REGLEE";
+
+  constructor(action: "modification du montant ou du libellé" | "suppression") {
+    super(`Cette dépense est déjà liée à un règlement : ${action} interdite`);
+    this.name = "DepenseRegleeError";
+  }
+}
+
 export async function updateDepense(
   cooperativeId: number,
   id: number,
   data: Partial<typeof depensesVehiculeTable.$inferInsert>,
 ) {
-  const [row] = await db
-    .update(depensesVehiculeTable)
-    .set({ ...data, updatedAt: new Date() })
-    .where(and(eq(depensesVehiculeTable.id, id), eq(depensesVehiculeTable.cooperativeId, cooperativeId)))
-    .returning();
-  return row ?? null;
+  const modifiesReglementData = data.montantFcfa !== undefined || data.libelle !== undefined;
+
+  if (!modifiesReglementData) {
+    const [row] = await db
+      .update(depensesVehiculeTable)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(depensesVehiculeTable.id, id), eq(depensesVehiculeTable.cooperativeId, cooperativeId)))
+      .returning();
+    return row ?? null;
+  }
+
+  return db.transaction(async (tx) => {
+    const [depense] = await tx
+      .select({ id: depensesVehiculeTable.id })
+      .from(depensesVehiculeTable)
+      .where(and(eq(depensesVehiculeTable.id, id), eq(depensesVehiculeTable.cooperativeId, cooperativeId)))
+      .for("update")
+      .limit(1);
+    if (!depense) return null;
+
+    const [paiement] = await tx
+      .select({ id: paiementsTable.id })
+      .from(paiementsTable)
+      .where(eq(paiementsTable.depenseVehiculeId, id))
+      .limit(1);
+    if (paiement) throw new DepenseRegleeError("modification du montant ou du libellé");
+
+    const [row] = await tx
+      .update(depensesVehiculeTable)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(depensesVehiculeTable.id, id), eq(depensesVehiculeTable.cooperativeId, cooperativeId)))
+      .returning();
+    return row ?? null;
+  });
 }
 
 export async function deleteDepense(cooperativeId: number, id: number) {
-  const [deleted] = await db
-    .delete(depensesVehiculeTable)
-    .where(and(eq(depensesVehiculeTable.id, id), eq(depensesVehiculeTable.cooperativeId, cooperativeId)))
-    .returning({ id: depensesVehiculeTable.id });
-  return deleted != null;
+  return db.transaction(async (tx) => {
+    const [depense] = await tx
+      .select({ id: depensesVehiculeTable.id })
+      .from(depensesVehiculeTable)
+      .where(and(eq(depensesVehiculeTable.id, id), eq(depensesVehiculeTable.cooperativeId, cooperativeId)))
+      .for("update")
+      .limit(1);
+    if (!depense) return false;
+
+    const [paiement] = await tx
+      .select({ id: paiementsTable.id })
+      .from(paiementsTable)
+      .where(eq(paiementsTable.depenseVehiculeId, id))
+      .limit(1);
+    if (paiement) throw new DepenseRegleeError("suppression");
+
+    const [deleted] = await tx
+      .delete(depensesVehiculeTable)
+      .where(and(eq(depensesVehiculeTable.id, id), eq(depensesVehiculeTable.cooperativeId, cooperativeId)))
+      .returning({ id: depensesVehiculeTable.id });
+    return deleted != null;
+  });
 }
 
 // ─── BONS DE CARBURANT ────────────────────────────────────────────────────────
