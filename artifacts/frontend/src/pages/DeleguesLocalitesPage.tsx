@@ -1334,19 +1334,11 @@ export default function DeleguesLocalitesPage() {
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Délégué spécifique (laisser vide pour taux global)</label>
-                  <select
-                    value={formTaux.membreDelegueId}
-                    onChange={e => setFormTaux(f => ({ ...f, membreDelegueId: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]"
-                  >
-                    <option value="">— Tous les délégués (taux global) —</option>
-                    {membres.map(m => (
-                      <option key={m.id} value={m.id}>
-                        {m.prenoms} {m.nom}
-                        {m.section ? ` (${m.section})` : m.village ? ` — ${m.village}` : ""}
-                      </option>
-                    ))}
-                  </select>
+                  <ComboboxDelegueLocalite
+                    membres={membres}
+                    value={formTaux.membreDelegueId ? Number(formTaux.membreDelegueId) : null}
+                    onChange={id => setFormTaux(f => ({ ...f, membreDelegueId: id === null ? "" : String(id) }))}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Taux (FCFA / kg) *</label>
