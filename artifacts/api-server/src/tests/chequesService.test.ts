@@ -39,7 +39,12 @@ vi.mock("drizzle-orm", () => ({
   inArray: vi.fn(() => ({})),
 }));
 
-const { encaisserCheque, resolveBeneficiaireCheque } = await import("../services/chequesService.js");
+const {
+  annulerCheque,
+  encaisserCheque,
+  rejeterCheque,
+  resolveBeneficiaireCheque,
+} = await import("../services/chequesService.js");
 
 function selectChain<T>(rows: T[]) {
   const chain = {
@@ -144,6 +149,84 @@ describe("encaissement d'un chèque", () => {
       expect.anything(),
       tx,
     );
+  });
+});
+
+describe("retour en attente du règlement", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("remet le règlement et la livraison en attente quand le chèque est rejeté", async () => {
+    const chequeLie = { ...cheque, livraisonId: 91 };
+    const chequeUpdate = updateChain([{ ...chequeLie, statut: "rejete" }]);
+    const paiementUpdate = updateChain();
+    const livraisonUpdate = updateChain();
+    const tx = {
+      select: vi.fn().mockReturnValue(selectChain([chequeLie])),
+      update: vi.fn()
+        .mockReturnValueOnce(chequeUpdate)
+        .mockReturnValueOnce(paiementUpdate)
+        .mockReturnValueOnce(livraisonUpdate),
+    };
+    mockDb.transaction.mockImplementationOnce(async (callback: (tx: unknown) => unknown) => callback(tx));
+
+    await rejeterCheque(41, 7, {
+      motifRejet: "Provision insuffisante",
+      dateRejet: "2026-09-04",
+    }, 55);
+
+    expect(tx.select.mock.results[0].value.for).toHaveBeenCalledWith("update");
+    expect(paiementUpdate.set).toHaveBeenCalledWith(expect.objectContaining({
+      statut: "en_attente",
+      dateValidation: null,
+      validePar: null,
+      motifRejet: "Chèque rejeté : Provision insuffisante",
+    }));
+    expect(livraisonUpdate.set).toHaveBeenCalledWith({ statutPaiement: "EN_ATTENTE" });
+  });
+
+  it("remet le règlement et la livraison en attente quand le chèque est annulé", async () => {
+    const chequeLie = { ...cheque, livraisonId: 91 };
+    const chequeUpdate = updateChain([{ ...chequeLie, statut: "annule" }]);
+    const paiementUpdate = updateChain();
+    const livraisonUpdate = updateChain();
+    const tx = {
+      select: vi.fn().mockReturnValue(selectChain([chequeLie])),
+      update: vi.fn()
+        .mockReturnValueOnce(chequeUpdate)
+        .mockReturnValueOnce(paiementUpdate)
+        .mockReturnValueOnce(livraisonUpdate),
+    };
+    mockDb.transaction.mockImplementationOnce(async (callback: (tx: unknown) => unknown) => callback(tx));
+
+    await annulerCheque(41, 7, { motifAnnulation: "Chèque remplacé" });
+
+    expect(tx.select.mock.results[0].value.for).toHaveBeenCalledWith("update");
+    expect(paiementUpdate.set).toHaveBeenCalledWith(expect.objectContaining({
+      statut: "en_attente",
+      dateValidation: null,
+      validePar: null,
+      motifRejet: "Chèque annulé : Chèque remplacé",
+    }));
+    expect(livraisonUpdate.set).toHaveBeenCalledWith({ statutPaiement: "EN_ATTENTE" });
+  });
+
+  it("annule toute la transaction si le règlement ne peut pas être remis en attente", async () => {
+    const chequeLie = { ...cheque, livraisonId: 91 };
+    const chequeUpdate = updateChain([{ ...chequeLie, statut: "rejete" }]);
+    const paiementUpdate = updateChain();
+    paiementUpdate.where.mockRejectedValueOnce(new Error("règlement indisponible"));
+    const tx = {
+      select: vi.fn().mockReturnValue(selectChain([chequeLie])),
+      update: vi.fn()
+        .mockReturnValueOnce(chequeUpdate)
+        .mockReturnValueOnce(paiementUpdate),
+    };
+    mockDb.transaction.mockImplementationOnce(async (callback: (tx: unknown) => unknown) => callback(tx));
+
+    await expect(rejeterCheque(41, 7, { motifRejet: "Rejet banque" }, 55))
+      .rejects.toThrow("règlement indisponible");
   });
 });
 

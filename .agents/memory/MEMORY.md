@@ -85,6 +85,7 @@
 - [Idempotence des règlements](payment-validation-idempotency.md) — la transition conditionnelle en transaction empêche les écritures comptables dupliquées lors de requêtes concurrentes.
 - [Idempotence sous verrou](sacherie-idempotency-lock.md) — après verrouillage de la ressource métier, relire la référence avant insertion pour rendre les retries concurrents réellement idempotents.
 - [Concurrence des chèques reçus](cheques-recus-terminal-concurrency.md) — encaissement, rejet et annulation doivent verrouiller le chèque et échouer avant tout effet financier concurrent.
+- [Chèque émis rejeté ou annulé](cheque-emis-reglement-attente.md) — une transition terminale invalide le règlement lié et remet paiement et livraison en attente atomiquement.
 - [Atomicité des règlements ventilés](paiement-ventilation-atomicity.md) — paiement, lignes, trésorerie, chèques et comptabilité doivent rester dans une transaction et totaliser le montant parent.
 - [Versements partiels livraison](paiement-versements-partiels.md) — le solde livraison est verrouillé; chaque versement est un paiement distinct et le reliquat redevient actionnable.
 - [Fixtures PostgreSQL typées](postgres-fixture-parameter-types.md) — dans un INSERT de test, caster séparément les paramètres réutilisés entre colonnes integer et numeric.

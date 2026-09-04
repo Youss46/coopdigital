@@ -254,36 +254,52 @@ export async function rejeterCheque(
   data: { motifRejet: string; dateRejet?: string },
   userId: number,
 ) {
-  const cheque = await getCheque(id, cooperativeId);
-  if (!cheque) throw new Error("Chèque introuvable");
-  if (cheque.statut !== "emis") throw new Error("Seul un chèque émis peut être rejeté");
+  return db.transaction(async (tx) => {
+    const [cheque] = await tx
+      .select()
+      .from(chequesEmisTable)
+      .where(and(
+        eq(chequesEmisTable.id, id),
+        eq(chequesEmisTable.cooperativeId, cooperativeId),
+      ))
+      .for("update")
+      .limit(1);
 
-  const dateRej = data.dateRejet ?? today();
+    if (!cheque) throw new Error("Chèque introuvable");
+    if (cheque.statut !== "emis") throw new Error("Seul un chèque émis peut être rejeté");
 
-  await db
-    .update(chequesEmisTable)
-    .set({
-      statut:     "rejete",
-      dateRejet:  dateRej,
-      motifRejet: data.motifRejet,
-    })
-    .where(and(eq(chequesEmisTable.id, id), eq(chequesEmisTable.cooperativeId, cooperativeId)));
+    const dateRej = data.dateRejet ?? today();
+    const [updated] = await tx
+      .update(chequesEmisTable)
+      .set({
+        statut:     "rejete",
+        dateRejet:  dateRej,
+        motifRejet: data.motifRejet,
+      })
+      .where(and(eq(chequesEmisTable.id, id), eq(chequesEmisTable.cooperativeId, cooperativeId)))
+      .returning();
 
-  if (cheque.paiementId) {
-    await db
-      .update(paiementsTable)
-      .set({ statut: "rejete", motifRejet: data.motifRejet, validePar: userId })
-      .where(eq(paiementsTable.id, cheque.paiementId));
-  }
+    if (cheque.paiementId) {
+      await tx
+        .update(paiementsTable)
+        .set({
+          statut: "en_attente",
+          motifRejet: `Chèque rejeté : ${data.motifRejet}`,
+          validePar: null,
+          dateValidation: null,
+        })
+        .where(eq(paiementsTable.id, cheque.paiementId));
+    }
 
-  if (cheque.livraisonId) {
-    await db
-      .update(livraisonsTable)
-      .set({ statutPaiement: "EN_ATTENTE" })
-      .where(eq(livraisonsTable.id, cheque.livraisonId));
-  }
+    if (cheque.livraisonId) {
+      await tx
+        .update(livraisonsTable)
+        .set({ statutPaiement: "EN_ATTENTE" })
+        .where(eq(livraisonsTable.id, cheque.livraisonId));
+    }
 
-  return { ...cheque, statut: "rejete" as const, motifRejet: data.motifRejet };
+    return updated ?? { ...cheque, statut: "rejete" as const, dateRejet: dateRej, motifRejet: data.motifRejet };
+  });
 }
 
 // ─── Annulation ───────────────────────────────────────────────────────────────
@@ -293,14 +309,45 @@ export async function annulerCheque(
   cooperativeId: number,
   data: { motifAnnulation: string },
 ) {
-  const cheque = await getCheque(id, cooperativeId);
-  if (!cheque) throw new Error("Chèque introuvable");
-  if (cheque.statut !== "emis") throw new Error("Seul un chèque émis peut être annulé");
+  return db.transaction(async (tx) => {
+    const [cheque] = await tx
+      .select()
+      .from(chequesEmisTable)
+      .where(and(
+        eq(chequesEmisTable.id, id),
+        eq(chequesEmisTable.cooperativeId, cooperativeId),
+      ))
+      .for("update")
+      .limit(1);
 
-  await db
-    .update(chequesEmisTable)
-    .set({ statut: "annule", motifAnnulation: data.motifAnnulation })
-    .where(and(eq(chequesEmisTable.id, id), eq(chequesEmisTable.cooperativeId, cooperativeId)));
+    if (!cheque) throw new Error("Chèque introuvable");
+    if (cheque.statut !== "emis") throw new Error("Seul un chèque émis peut être annulé");
 
-  return { ...cheque, statut: "annule" as const };
+    const [updated] = await tx
+      .update(chequesEmisTable)
+      .set({ statut: "annule", motifAnnulation: data.motifAnnulation })
+      .where(and(eq(chequesEmisTable.id, id), eq(chequesEmisTable.cooperativeId, cooperativeId)))
+      .returning();
+
+    if (cheque.paiementId) {
+      await tx
+        .update(paiementsTable)
+        .set({
+          statut: "en_attente",
+          motifRejet: `Chèque annulé : ${data.motifAnnulation}`,
+          validePar: null,
+          dateValidation: null,
+        })
+        .where(eq(paiementsTable.id, cheque.paiementId));
+    }
+
+    if (cheque.livraisonId) {
+      await tx
+        .update(livraisonsTable)
+        .set({ statutPaiement: "EN_ATTENTE" })
+        .where(eq(livraisonsTable.id, cheque.livraisonId));
+    }
+
+    return updated ?? { ...cheque, statut: "annule" as const, motifAnnulation: data.motifAnnulation };
+  });
 }
