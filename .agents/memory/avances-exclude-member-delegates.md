@@ -7,4 +7,4 @@ La page Avances est réservée aux avances des producteurs/membres ordinaires. L
 
 **Why:** Les membres délégués sont suivis et rémunérés par le module dédié aux commissions et avances des délégués; les mélanger aux avances producteurs fausse les soldes et les responsabilités de remboursement.
 
-**How to apply:** Filtrer par `categorieMembre` côté serveur avant toute réponse ou création, puis conserver le même filtre côté frontend pour éviter qu’un bénéficiaire interdit soit proposé dans le formulaire.
+**How to apply:** Filtrer par `categorieMembre` côté serveur avant toute réponse ou création, puis conserver le même filtre côté frontend. En SQL, l’exclusion doit être `categorie IS NULL OR categorie <> 'délégué de localités'` : un simple `<>` masque aussi les membres ordinaires dont la catégorie vaut `NULL`.

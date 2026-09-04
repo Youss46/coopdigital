@@ -50,7 +50,10 @@ export async function listAvances(req: Request, res: Response): Promise<void> {
 
     const conditions: ReturnType<typeof eq>[] = [
       eq(membresTable.cooperativeId, cooperativeId),
-      ne(membresTable.categorieMembre, CATEGORIE_DELEGUE_LOCALITE),
+      or(
+        isNull(membresTable.categorieMembre),
+        ne(membresTable.categorieMembre, CATEGORIE_DELEGUE_LOCALITE),
+      )!,
     ];
     if (statut) conditions.push(eq(avancesTable.statut, statut as "en_cours" | "rembourse" | "en_retard"));
     if (membreId) conditions.push(eq(avancesTable.membreId, membreId));
@@ -395,7 +398,10 @@ export async function getAvancesEncours(req: Request, res: Response): Promise<vo
       .leftJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
       .where(and(
         eq(membresTable.cooperativeId, cooperativeId),
-        ne(membresTable.categorieMembre, CATEGORIE_DELEGUE_LOCALITE),
+        or(
+          isNull(membresTable.categorieMembre),
+          ne(membresTable.categorieMembre, CATEGORIE_DELEGUE_LOCALITE),
+        ),
         eq(avancesTable.statut, "en_cours"),
       ))
       .orderBy(desc(avancesTable.createdAt));
@@ -642,7 +648,10 @@ export async function getAvancesReportees(req: Request, res: Response): Promise<
 
     const conditions: ReturnType<typeof eq>[] = [
       eq(membresTable.cooperativeId, cooperativeId),
-      ne(membresTable.categorieMembre, CATEGORIE_DELEGUE_LOCALITE),
+      or(
+        isNull(membresTable.categorieMembre),
+        ne(membresTable.categorieMembre, CATEGORIE_DELEGUE_LOCALITE),
+      )!,
       eq(avancesTable.planType, "reporte"),
       ne(avancesTable.statut, "rembourse"),
       or(isNull(avancesTable.reportDate), lt(avancesTable.reportDate, today))!,
