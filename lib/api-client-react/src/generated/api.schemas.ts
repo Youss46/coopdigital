@@ -5457,6 +5457,14 @@ export type ListPaiementsParams = {
 statut?: ListPaiementsStatut;
 membre_id?: number;
 periode?: ListPaiementsPeriode;
+/**
+ * Date effective minimale du paiement
+ */
+date_debut?: string;
+/**
+ * Date effective maximale du paiement
+ */
+date_fin?: string;
 limit?: number;
 };
 
@@ -5479,6 +5487,8 @@ export const ListPaiementsPeriode = {
   today: 'today',
   week: 'week',
   month: 'month',
+  previous_month: 'previous_month',
+  campaign: 'campaign',
 } as const;
 
 export type GetEncoursIntrantsMembre200 = {

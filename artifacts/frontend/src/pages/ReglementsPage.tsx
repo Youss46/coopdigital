@@ -1071,6 +1071,8 @@ export default function ReglementsPage() {
 
   const [filtreStatut, setFiltreStatut] = useState<string>("en_attente");
   const [filtrePeriode, setFiltrePeriode] = useState<string>("");
+  const [dateDebut, setDateDebut] = useState("");
+  const [dateFin, setDateFin] = useState("");
   const [filtreSansMode, setFiltreSansMode] = useState(false);
   const [filtreProxy, setFiltreProxy] = useState(false);
   const [recherche, setRecherche] = useState("");
@@ -1122,13 +1124,23 @@ export default function ReglementsPage() {
   });
 
   // Liste
+  const periodePersonnalisee = filtrePeriode === "custom";
+  const periodePersonnaliseeValide = !periodePersonnalisee
+    || (!!dateDebut && !!dateFin && dateDebut <= dateFin);
   const params = {
     statut: filtreStatut ? (filtreStatut as ListPaiementsStatut) : undefined,
-    periode: filtrePeriode ? (filtrePeriode as ListPaiementsPeriode) : undefined,
+    periode: filtrePeriode && !periodePersonnalisee
+      ? (filtrePeriode as ListPaiementsPeriode)
+      : undefined,
+    date_debut: periodePersonnalisee && dateDebut ? dateDebut : undefined,
+    date_fin: periodePersonnalisee && dateFin ? dateFin : undefined,
     limit: 200,
   };
   const { data: paiements, isLoading } = useListPaiements(params, {
-    query: { queryKey: getListPaiementsQueryKey(params) },
+    query: {
+      queryKey: getListPaiementsQueryKey(params),
+      enabled: periodePersonnaliseeValide,
+    },
   });
 
   const {
@@ -1285,10 +1297,13 @@ export default function ReglementsPage() {
   ];
 
   const FILTRES_PERIODE = [
-    { value: "",       label: "Toutes dates" },
-    { value: "today",  label: "Aujourd'hui" },
-    { value: "week",   label: "Cette semaine" },
-    { value: "month",  label: "Ce mois" },
+    { value: "",               label: "Toutes dates" },
+    { value: "today",          label: "Aujourd'hui" },
+    { value: "week",           label: "Cette semaine" },
+    { value: "month",          label: "Ce mois" },
+    { value: "previous_month", label: "Mois précédent" },
+    { value: "campaign",       label: "Toute la campagne" },
+    { value: "custom",         label: "Période personnalisée" },
   ];
 
   // Calcul alerte solde : si le plus petit paiement en attente > solde
@@ -1564,6 +1579,35 @@ export default function ReglementsPage() {
           </select>
           <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
         </div>
+        {periodePersonnalisee && (
+          <div className="basis-full grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-lg border border-green-100 bg-green-50/50 p-3">
+            <label className="text-xs font-medium text-gray-600">
+              Du
+              <input
+                type="date"
+                value={dateDebut}
+                max={dateFin || undefined}
+                onChange={(e) => setDateDebut(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-green-400"
+              />
+            </label>
+            <label className="text-xs font-medium text-gray-600">
+              Au
+              <input
+                type="date"
+                value={dateFin}
+                min={dateDebut || undefined}
+                onChange={(e) => setDateFin(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-green-400"
+              />
+            </label>
+            {!periodePersonnaliseeValide && (
+              <p className="sm:col-span-2 text-xs text-amber-700">
+                Sélectionnez une date de début et une date de fin valides.
+              </p>
+            )}
+          </div>
+        )}
         <button
           onClick={() => setFiltreSansMode((v) => !v)}
           className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium transition-colors whitespace-nowrap ${

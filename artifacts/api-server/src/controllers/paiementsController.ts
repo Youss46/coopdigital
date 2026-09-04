@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { db, paiementsTable, paiementLignesTable, membresTable, livraisonsTable, fournisseursTable, usersTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable, caissesTable, chequesEmisTable, bonsCarburantTable } from "@workspace/db";
+import { db, paiementsTable, paiementLignesTable, membresTable, livraisonsTable, fournisseursTable, usersTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable, caissesTable, chequesEmisTable, bonsCarburantTable, campagnesTable } from "@workspace/db";
 import { eq, desc, and, or, sql, gte, lt, lte, inArray, isNull, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { envoyerPushGroupePortail, envoyerPushGroupe } from "../services/pushService";
@@ -302,7 +302,18 @@ export async function listPaiements(req: Request, res: Response): Promise<void> 
     const statut = req.query["statut"] as string | undefined;
     const membreId = req.query["membre_id"] ? parseInt(String(req.query["membre_id"])) : undefined;
     const periode = req.query["periode"] as string | undefined;
+    const dateDebut = typeof req.query["date_debut"] === "string" ? req.query["date_debut"] : undefined;
+    const dateFin = typeof req.query["date_fin"] === "string" ? req.query["date_fin"] : undefined;
     const limit = Math.min(200, parseInt(String(req.query["limit"] ?? "100")));
+    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+    if ((dateDebut && !datePattern.test(dateDebut)) || (dateFin && !datePattern.test(dateFin))) {
+      res.status(400).json({ erreur: "Les dates doivent être au format AAAA-MM-JJ" });
+      return;
+    }
+    if (dateDebut && dateFin && dateDebut > dateFin) {
+      res.status(400).json({ erreur: "La date de début doit précéder la date de fin" });
+      return;
+    }
 
     const coopFilter = or(
       eq(membresTable.cooperativeId, cooperativeId),
@@ -336,13 +347,42 @@ export async function listPaiements(req: Request, res: Response): Promise<void> 
 
     const now = new Date();
     const dateEffective = dateEffectivePaiementSql();
-    if (periode === "today") {
+    if (dateDebut || dateFin) {
+      if (dateDebut) {
+        conditions.push(gte(dateEffective, new Date(`${dateDebut}T00:00:00.000Z`)));
+      }
+      if (dateFin) {
+        conditions.push(lte(dateEffective, new Date(`${dateFin}T23:59:59.999Z`)));
+      }
+    } else if (periode === "today") {
       conditions.push(gte(dateEffective, startOfDay(now)));
     } else if (periode === "week") {
       const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
       conditions.push(gte(dateEffective, weekAgo));
     } else if (periode === "month") {
       conditions.push(gte(dateEffective, startOfMonth(now)));
+    } else if (periode === "previous_month") {
+      const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      conditions.push(gte(dateEffective, startOfMonth(previousMonth)));
+      conditions.push(lte(dateEffective, endOfMonth(previousMonth)));
+    } else if (periode === "campaign") {
+      const [campagneActive] = await db
+        .select({
+          dateOuverture: campagnesTable.dateOuverture,
+          dateFermeture: campagnesTable.dateFermeture,
+        })
+        .from(campagnesTable)
+        .where(and(
+          eq(campagnesTable.cooperativeId, cooperativeId),
+          eq(campagnesTable.statut, "ouverte"),
+        ))
+        .orderBy(desc(campagnesTable.dateOuverture))
+        .limit(1);
+      if (campagneActive) {
+        conditions.push(gte(dateEffective, new Date(`${campagneActive.dateOuverture}T00:00:00.000Z`)));
+        const campagneFin = campagneActive.dateFermeture ?? now.toISOString().split("T")[0]!;
+        conditions.push(lte(dateEffective, new Date(`${campagneFin}T23:59:59.999Z`)));
+      }
     }
 
     const paiements = await db

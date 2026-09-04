@@ -21,7 +21,7 @@ vi.mock("@workspace/db", () => ({
   ]),
   paiementLignesTable: table("paiement_lignes", ["paiementId"]),
   avancesTable: table("avances", []),
-  campagnesTable: table("campagnes", []),
+  campagnesTable: table("campagnes", ["cooperativeId", "statut", "dateOuverture", "dateFermeture"]),
   membresTable: table("membres", ["id", "cooperativeId", "delegueId"]),
   livraisonsTable: table("livraisons", ["id", "agentId", "fournisseurId"]),
   fournisseursTable: table("fournisseurs", ["id", "cooperativeId", "creeParDelegueId"]),
@@ -230,5 +230,56 @@ describe("date effective des règlements", () => {
     const whereCondition = listeChain.where.mock.calls[0]?.[0];
     expect(JSON.stringify(whereCondition)).toContain("coalesce");
     expect(res.json).toHaveBeenCalledWith([{ ...paiement, lignes: [] }]);
+  });
+
+  it("filtre la liste sur une période personnalisée inclusive", async () => {
+    const listeChain = selectChain([]);
+    mocks.select
+      .mockReturnValueOnce(listeChain)
+      .mockReturnValueOnce(selectChain([]));
+    const res = response();
+
+    await listPaiements(request({
+      date_debut: "2026-08-01",
+      date_fin: "2026-08-31",
+    }), res);
+
+    const condition = JSON.stringify(listeChain.where.mock.calls[0]?.[0]);
+    expect(condition).toContain("2026-08-01T00:00:00.000Z");
+    expect(condition).toContain("2026-08-31T23:59:59.999Z");
+  });
+
+  it("rejette une période personnalisée inversée", async () => {
+    const res = response();
+
+    await listPaiements(request({
+      date_debut: "2026-09-10",
+      date_fin: "2026-09-01",
+    }), res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      erreur: "La date de début doit précéder la date de fin",
+    });
+    expect(mocks.select).not.toHaveBeenCalled();
+  });
+
+  it("filtre la liste sur les dates de la campagne active", async () => {
+    const campagneChain = selectChain([{
+      dateOuverture: "2026-04-01",
+      dateFermeture: null,
+    }]);
+    const listeChain = selectChain([]);
+    mocks.select
+      .mockReturnValueOnce(campagneChain)
+      .mockReturnValueOnce(listeChain)
+      .mockReturnValueOnce(selectChain([]));
+    const res = response();
+
+    await listPaiements(request({ periode: "campaign" }), res);
+
+    const condition = JSON.stringify(listeChain.where.mock.calls[0]?.[0]);
+    expect(condition).toContain("2026-04-01T00:00:00.000Z");
+    expect(condition).toContain("2026-09-04T23:59:59.999Z");
   });
 });

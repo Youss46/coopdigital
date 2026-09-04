@@ -3488,7 +3488,9 @@ export const listPaiementsQueryLimitDefault = 100;
 export const ListPaiementsQueryParams = zod.object({
   "statut": zod.enum(['en_attente', 'confirme', 'echec', 'rejete', 'en_cours', 'effectue']).optional(),
   "membre_id": zod.coerce.number().optional(),
-  "periode": zod.enum(['today', 'week', 'month']).optional(),
+  "periode": zod.enum(['today', 'week', 'month', 'previous_month', 'campaign']).optional(),
+  "date_debut": zod.date().optional().describe('Date effective minimale du paiement'),
+  "date_fin": zod.date().optional().describe('Date effective maximale du paiement'),
   "limit": zod.coerce.number().default(listPaiementsQueryLimitDefault)
 })
 
