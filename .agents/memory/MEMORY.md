@@ -104,3 +104,4 @@
 - [Parité tonnage PCA et tableau de bord](dashboard-pca-tonnage-parity.md) — le total campagne inclut livraisons et transferts confirmés; la modale certification détaille les seules livraisons.
 - [Date effective des règlements](payment-effective-date.md) — utiliser date_validation, sinon created_at, pour compter les paiements effectués dans une période.
 - [Cohérence paiement-livraison](payment-delivery-reconciliation.md) — recalculer statut_paiement et montant_restant depuis les paiements confirmés/effectués liés.
+- [Diagnostic des KPI](dashboard-kpi-diagnostics.md) — afficher la cause réelle des métriques dégradées et qualifier les agrégats SQL après jointures.
