@@ -3562,6 +3562,7 @@ export const ListPaiementsResponseItem = zod.object({
   "commissionCollecteRetenueAvancesFcfa": zod.number().nullish(),
   "commissionCollecteMembreId": zod.number().nullish(),
   "commissionCollecteFrequencePaiement": zod.union([zod.literal('chaque_paiement'),zod.literal('fin_campagne'),zod.literal(null)]).nullish(),
+  "commissionCollecteAvanceDisponibleFcfa": zod.number().nullish().describe('Montant d\'avance pouvant être retenu sur la commission en attente.'),
   "lignes": zod.array(zod.object({
   "id": zod.number(),
   "paiementId": zod.number(),
@@ -3652,6 +3653,7 @@ export const ValiderPaiementResponse = zod.object({
   "commissionCollecteRetenueAvancesFcfa": zod.number().nullish(),
   "commissionCollecteMembreId": zod.number().nullish(),
   "commissionCollecteFrequencePaiement": zod.union([zod.literal('chaque_paiement'),zod.literal('fin_campagne'),zod.literal(null)]).nullish(),
+  "commissionCollecteAvanceDisponibleFcfa": zod.number().nullish().describe('Montant d\'avance pouvant être retenu sur la commission en attente.'),
   "lignes": zod.array(zod.object({
   "id": zod.number(),
   "paiementId": zod.number(),
@@ -3722,6 +3724,7 @@ export const RejeterPaiementResponse = zod.object({
   "commissionCollecteRetenueAvancesFcfa": zod.number().nullish(),
   "commissionCollecteMembreId": zod.number().nullish(),
   "commissionCollecteFrequencePaiement": zod.union([zod.literal('chaque_paiement'),zod.literal('fin_campagne'),zod.literal(null)]).nullish(),
+  "commissionCollecteAvanceDisponibleFcfa": zod.number().nullish().describe('Montant d\'avance pouvant être retenu sur la commission en attente.'),
   "lignes": zod.array(zod.object({
   "id": zod.number(),
   "paiementId": zod.number(),

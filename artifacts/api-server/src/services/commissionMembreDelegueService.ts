@@ -26,6 +26,7 @@ import { logger } from "../lib/logger.js";
 import {
   generateEcrituresCommissionDansTransaction,
   proposerEcrituresDansTransaction,
+  type ComptabiliteTransaction,
 } from "./comptabiliteService.js";
 
 function toNum(v: unknown): number {
@@ -320,6 +321,158 @@ export async function getCommissionsMembreDelegue(
 
 // ─── Paiement des commissions ─────────────────────────────────────────────
 
+function montantRetenableAvance(
+  avance: {
+    planType: "integral" | "partiel" | "reporte";
+    montantPartielFcfa: number | null;
+    soldeRestantFcfa: number;
+    reportDate: string | null;
+  },
+  datePaiement: string,
+): number {
+  if (avance.planType === "integral") {
+    return avance.soldeRestantFcfa;
+  }
+  if (avance.planType === "partiel" && avance.montantPartielFcfa) {
+    return Math.min(avance.montantPartielFcfa, avance.soldeRestantFcfa);
+  }
+  if (avance.planType === "reporte" && avance.reportDate && datePaiement >= String(avance.reportDate)) {
+    return avance.soldeRestantFcfa;
+  }
+  return 0;
+}
+
+/**
+ * Calcule, sans verrouillage, le montant d'avance qui pourrait être retenu
+ * sur une commission encore en attente. Cette valeur sert uniquement à
+ * pré-remplir les écrans; la valeur définitive est recalculée dans la
+ * transaction de paiement.
+ */
+export async function getRetenueAvanceCommissionPreview(
+  commissionId: number,
+  membreDelegueId: number,
+  datePaiement = new Date().toISOString().slice(0, 10),
+): Promise<number> {
+  const [commission] = await db
+    .select({
+      montantFcfa: commissionsMembresDelaguesTable.montantFcfa,
+      statut: commissionsMembresDelaguesTable.statut,
+    })
+    .from(commissionsMembresDelaguesTable)
+    .where(and(
+      eq(commissionsMembresDelaguesTable.id, commissionId),
+      eq(commissionsMembresDelaguesTable.membreDelegueId, membreDelegueId),
+      eq(commissionsMembresDelaguesTable.statut, "en_attente"),
+    ))
+    .limit(1);
+  if (!commission) return 0;
+
+  const avances = await db
+    .select()
+    .from(avancesTable)
+    .where(and(
+      eq(avancesTable.membreId, membreDelegueId),
+      inArray(avancesTable.statut, ["en_cours", "en_retard"] as const),
+      eq(avancesTable.deductionSource, "commission"),
+    ))
+    .orderBy(avancesTable.dateOctroi);
+
+  let restantCommission = toNum(commission.montantFcfa);
+  let retenue = 0;
+  for (const avance of avances) {
+    if (restantCommission <= 0) break;
+    const montantDisponible = Math.max(
+      0,
+      Math.min(montantRetenableAvance(avance, datePaiement), avance.soldeRestantFcfa),
+    );
+    const prise = Math.min(restantCommission, montantDisponible);
+    retenue += prise;
+    restantCommission -= prise;
+  }
+  return retenue;
+}
+
+/**
+ * Retient une avance sur une commission dans la transaction du règlement.
+ * La commission doit ensuite être marquée payée par l'appelant avec la
+ * retenue retournée. La fonction verrouille le membre par advisory lock afin
+ * de sérialiser ce parcours avec le paiement manuel des commissions.
+ */
+export async function appliquerRetenueAvanceSurCommissionDansTransaction(
+  tx: ComptabiliteTransaction,
+  commissionId: number,
+  membreDelegueId: number,
+  datePaiement = new Date().toISOString().slice(0, 10),
+): Promise<{ montantCommissionFcfa: number; retenueFcfa: number; montantNetFcfa: number }> {
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(${membreDelegueId})`);
+
+  const [commission] = await tx
+    .select({
+      id: commissionsMembresDelaguesTable.id,
+      montantFcfa: commissionsMembresDelaguesTable.montantFcfa,
+    })
+    .from(commissionsMembresDelaguesTable)
+    .where(and(
+      eq(commissionsMembresDelaguesTable.id, commissionId),
+      eq(commissionsMembresDelaguesTable.membreDelegueId, membreDelegueId),
+      eq(commissionsMembresDelaguesTable.statut, "en_attente"),
+    ))
+    .for("update")
+    .limit(1);
+  if (!commission) {
+    throw new Error("La commission de collecte est introuvable ou déjà réglée.");
+  }
+
+  const avances = await tx
+    .select()
+    .from(avancesTable)
+    .where(and(
+      eq(avancesTable.membreId, membreDelegueId),
+      inArray(avancesTable.statut, ["en_cours", "en_retard"] as const),
+      eq(avancesTable.deductionSource, "commission"),
+    ))
+    .orderBy(avancesTable.dateOctroi);
+
+  const montantCommissionFcfa = Math.max(0, Math.round(toNum(commission.montantFcfa)));
+  let restantCommission = montantCommissionFcfa;
+  let retenueFcfa = 0;
+
+  for (const avance of avances) {
+    if (restantCommission <= 0) break;
+    const montantDisponible = Math.max(
+      0,
+      Math.min(montantRetenableAvance(avance, datePaiement), avance.soldeRestantFcfa),
+    );
+    const prise = Math.min(restantCommission, montantDisponible);
+    if (prise <= 0) continue;
+
+    const nouveauSolde = avance.soldeRestantFcfa - prise;
+    await tx.update(avancesTable)
+      .set({
+        montantRembourse_fcfa: avance.montantRembourse_fcfa + prise,
+        soldeRestantFcfa: nouveauSolde,
+        statut: nouveauSolde === 0 ? "rembourse" : avance.statut,
+      })
+      .where(eq(avancesTable.id, avance.id));
+
+    await tx.insert(remboursementsAvancesMembresTable).values({
+      avanceId: avance.id,
+      commissionMembreDelegueId: commission.id,
+      montantFcfa: prise,
+      note: "Retenue automatique — commission de délégué de localités",
+    });
+
+    retenueFcfa += prise;
+    restantCommission -= prise;
+  }
+
+  return {
+    montantCommissionFcfa,
+    retenueFcfa,
+    montantNetFcfa: montantCommissionFcfa - retenueFcfa,
+  };
+}
+
 export async function payerCommissionsMembreDelegue(
   membreDelegueId: number,
   cooperativeId: number,
@@ -387,17 +540,7 @@ export async function payerCommissionsMembreDelegue(
   // Itérer avances, déduire séquentiellement des commissions
   let idxCommission = 0;
   for (const avance of avancesEnCours) {
-    let retenueTotale: number;
-    if (avance.planType === "integral") {
-      retenueTotale = avance.soldeRestantFcfa;
-    } else if (avance.planType === "partiel" && avance.montantPartielFcfa) {
-      retenueTotale = Math.min(avance.montantPartielFcfa, avance.soldeRestantFcfa);
-    } else if (avance.planType === "reporte") {
-      if (!avance.reportDate || datePaiement < String(avance.reportDate)) continue;
-      retenueTotale = avance.soldeRestantFcfa;
-    } else {
-      continue;
-    }
+    const retenueTotale = montantRetenableAvance(avance, datePaiement);
     if (retenueTotale <= 0) continue;
 
     let resteAvance = retenueTotale;

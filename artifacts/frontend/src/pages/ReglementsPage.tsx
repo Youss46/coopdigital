@@ -415,16 +415,20 @@ function ModalValidation({
     ? Math.max(0, paiement.commissionCollecteFcfa ?? 0)
     : 0;
   const commissionCollecteDisponible = !!paiement.commissionCollecteId && commissionCollecteMontant > 0;
+  const commissionRetenueAvance = commissionCollecteDisponible
+    ? Math.min(commissionCollecteMontant, Math.max(0, paiement.commissionCollecteAvanceDisponibleFcfa ?? 0))
+    : 0;
+  const commissionNette = commissionCollecteMontant - commissionRetenueAvance;
   const commissionChaquePaiement = commissionCollecteDisponible
     && paiement.commissionCollecteFrequencePaiement === "chaque_paiement";
   const [inclureFraisCollecte, setInclureFraisCollecte] = useState(commissionChaquePaiement);
   const [montantVersementSaisi, setMontantVersementSaisi] = useState(formatMontantSaisi(
-    commissionChaquePaiement ? montantRestant + commissionCollecteMontant : montantRestant,
+    commissionChaquePaiement ? montantRestant + commissionNette : montantRestant,
   ));
   const montantVersement = parseMontantSaisi(montantVersementSaisi);
-  const montantTotalAvecCommission = montantRestant + commissionCollecteMontant;
+  const montantTotalAvecCommission = montantRestant + commissionNette;
   const montantVersementHorsCommission = inclureFraisCollecte
-    ? montantVersement - commissionCollecteMontant
+    ? montantVersement - commissionNette
     : montantVersement;
   const montantTotalAttendu = montantVersement;
   const [multiMoyens, setMultiMoyens] = useState(false);
@@ -618,6 +622,12 @@ function ModalValidation({
                   <span>Frais de collecte en attente</span>
                   <span className="font-semibold">+ {fmt(commissionCollecteMontant)}</span>
                 </div>
+                {commissionRetenueAvance > 0 && (
+                  <div className="flex justify-between text-amber-700">
+                    <span>Retenue sur avance</span>
+                    <span className="font-semibold">− {fmt(commissionRetenueAvance)}</span>
+                  </div>
+                )}
                 {inclureFraisCollecte && (
                   <div className="border-t pt-2 flex justify-between font-bold text-blue-800">
                     <span>Total à décaisser</span>
@@ -659,7 +669,9 @@ function ModalValidation({
                     {commissionChaquePaiement ? "Commission à régler avec ce paiement" : "Tout payer maintenant"}
                   </span>
                   <span className="block text-blue-700">
-                    Net cacao + {fmt(commissionCollecteMontant)} de frais de collecte.
+                    {commissionNette > 0
+                      ? `Net cacao + ${fmt(commissionNette)} de frais de collecte.`
+                      : "La commission est entièrement couverte par la retenue sur avance."}
                   </span>
                 </span>
               </label>

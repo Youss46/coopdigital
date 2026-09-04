@@ -1213,6 +1213,11 @@ export interface PaiementListItem {
   commissionCollecteMembreId?: number | null;
   /** @nullable */
   commissionCollecteFrequencePaiement?: PaiementListItemCommissionCollecteFrequencePaiement;
+  /**
+     * Montant d'avance pouvant être retenu sur la commission en attente.
+     * @nullable
+     */
+  commissionCollecteAvanceDisponibleFcfa?: number | null;
   lignes?: PaiementLigne[];
 }
 

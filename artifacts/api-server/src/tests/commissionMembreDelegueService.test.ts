@@ -22,7 +22,10 @@ vi.mock("../lib/logger.js", () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn() },
 }));
 
-const { payerCommissionsMembreDelegue } = await import(
+const {
+  appliquerRetenueAvanceSurCommissionDansTransaction,
+  payerCommissionsMembreDelegue,
+} = await import(
   "../services/commissionMembreDelegueService.js"
 );
 
@@ -46,6 +49,16 @@ function updateChain() {
   return {
     set: vi.fn().mockReturnThis(),
     where: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
+function selectChain<T>(rows: T[]) {
+  return {
+    from: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
+    for: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockResolvedValue(rows),
+    orderBy: vi.fn().mockResolvedValue(rows),
   };
 }
 
@@ -296,5 +309,58 @@ describe("payerCommissionsMembreDelegue", () => {
     expect(state).toEqual(initialState);
     expect(generateEcrituresCommissionDansTransaction).toHaveBeenCalledOnce();
     expect(proposerEcrituresDansTransaction).toHaveBeenCalledOnce();
+  });
+});
+
+describe("appliquerRetenueAvanceSurCommissionDansTransaction", () => {
+  it("plafonne la retenue au montant de la commission et conserve le solde de l'avance", async () => {
+    const tx = {
+      execute: vi.fn().mockResolvedValue(undefined),
+      select: vi.fn()
+        .mockImplementationOnce(() => selectChain([
+          { id: 92, montantFcfa: "45000" },
+        ]))
+        .mockImplementationOnce(() => selectChain([
+          {
+            id: 4,
+            planType: "integral",
+            montantPartielFcfa: null,
+            soldeRestantFcfa: 200_000,
+            montantRembourse_fcfa: 0,
+            reportDate: null,
+            statut: "en_cours",
+          },
+        ])),
+      update: vi.fn().mockImplementation(() => updateChain()),
+      insert: vi.fn().mockImplementation(() => ({
+        values: vi.fn().mockResolvedValue(undefined),
+      })),
+    };
+
+    const result = await appliquerRetenueAvanceSurCommissionDansTransaction(
+      tx as never,
+      92,
+      17,
+      "2026-09-04",
+    );
+
+    expect(result).toEqual({
+      montantCommissionFcfa: 45_000,
+      retenueFcfa: 45_000,
+      montantNetFcfa: 0,
+    });
+    expect(tx.update).toHaveBeenCalledOnce();
+    expect(tx.update.mock.results[0]?.value.set).toHaveBeenCalledWith({
+      montantRembourse_fcfa: 45_000,
+      soldeRestantFcfa: 155_000,
+      statut: "en_cours",
+    });
+    expect(tx.insert).toHaveBeenCalledOnce();
+    expect(tx.insert.mock.results[0]?.value.values).toHaveBeenCalledWith({
+      avanceId: 4,
+      commissionMembreDelegueId: 92,
+      montantFcfa: 45_000,
+      note: "Retenue automatique — commission de délégué de localités",
+    });
   });
 });

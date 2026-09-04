@@ -49,7 +49,7 @@ import {
   vehiculesTable,
   chauffeursTable,
 } from "@workspace/db";
-import { eq, desc, asc, gte, lte, lt, and, sql, inArray } from "drizzle-orm";
+import { eq, desc, asc, gte, lte, lt, and, or, sql, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { drawHeader, drawFooter } from "./pdfHeaderService";
 import { computeCodeMembre } from "./portailService";
@@ -4556,6 +4556,7 @@ export async function generateBordereauAchatSession(
       // Commission pour ce membre délégué (créée à terminerSession)
       const [commMembre] = await db
         .select({
+          id:                  commissionsMembresDelaguesTable.id,
           montantFcfa:        commissionsMembresDelaguesTable.montantFcfa,
           tauxFcfaParKg:      commissionsMembresDelaguesTable.tauxFcfaParKg,
           retenueAvancesFcfa: commissionsMembresDelaguesTable.retenueAvancesFcfa,
@@ -4583,15 +4584,26 @@ export async function generateBordereauAchatSession(
         .where(
           and(
             eq(avancesTable.membreId, session.membreId!),
-            inArray(remboursementsAvancesMembresTable.note, [
-              `Retenue automatique — ${formatNumeroPesee(
-                session.numeroPesee,
-                Number(String(session.numeroSession).slice(4, 8)),
-              ) ?? session.numeroSession}`,
-              // Compatibilité avec les remboursements enregistrés avant
-              // l'utilisation de la référence métier de la pesée.
-              `Retenue automatique — pesée #${session.id}`,
-            ]),
+            commMembre
+              ? or(
+                  eq(remboursementsAvancesMembresTable.commissionMembreDelegueId, commMembre.id),
+                  inArray(remboursementsAvancesMembresTable.note, [
+                    `Retenue automatique — ${formatNumeroPesee(
+                      session.numeroPesee,
+                      Number(String(session.numeroSession).slice(4, 8)),
+                    ) ?? session.numeroSession}`,
+                    // Compatibilité avec les remboursements enregistrés avant
+                    // l'utilisation de la référence métier de la pesée.
+                    `Retenue automatique — pesée #${session.id}`,
+                  ]),
+                )
+              : inArray(remboursementsAvancesMembresTable.note, [
+                  `Retenue automatique — ${formatNumeroPesee(
+                    session.numeroPesee,
+                    Number(String(session.numeroSession).slice(4, 8)),
+                  ) ?? session.numeroSession}`,
+                  `Retenue automatique — pesée #${session.id}`,
+                ]),
           ),
         );
       retenueAvancesFcfa = Number(remboursementReel?.totalFcfa ?? 0);

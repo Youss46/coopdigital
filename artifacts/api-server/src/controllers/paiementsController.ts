@@ -9,6 +9,10 @@ import { notifierParRole } from "../services/notificationService.js";
 import { logger } from "../lib/logger.js";
 import type { ComptabiliteTransaction } from "../services/comptabiliteService.js";
 import { genererNumeroRecu } from "../services/recuService.js";
+import {
+  appliquerRetenueAvanceSurCommissionDansTransaction,
+  getRetenueAvanceCommissionPreview,
+} from "../services/commissionMembreDelegueService.js";
 
 // ─── Helper ─────────────────────────────────────────────────────────────────
 
@@ -272,6 +276,28 @@ const SELECT_FIELDS = {
   commissionCollecteRetenueAvancesFcfa: commissionsMembresDelaguesTable.retenueAvancesFcfa,
   commissionCollecteMembreId: commissionsMembresDelaguesTable.membreDelegueId,
   commissionCollecteFrequencePaiement: commissionsMembresDelaguesTable.frequencePaiement,
+  commissionCollecteAvanceDisponibleFcfa: sql<number | null>`
+    CASE WHEN ${commissionsMembresDelaguesTable.id} IS NULL THEN NULL
+    ELSE LEAST(
+      round(${commissionsMembresDelaguesTable.montantFcfa})::integer,
+      COALESCE((
+        SELECT SUM(
+          CASE
+            WHEN a.plan_type = 'partiel' AND a.montant_partiel_fcfa IS NOT NULL
+              THEN LEAST(a.montant_partiel_fcfa, a.solde_restant_fcfa)
+            ELSE a.solde_restant_fcfa
+          END
+        )
+        FROM avances a
+        WHERE a.membre_id = ${commissionsMembresDelaguesTable.membreDelegueId}
+          AND a.statut IN ('en_cours', 'en_retard')
+          AND a.deduction_source = 'commission'
+          AND (
+            a.plan_type <> 'reporte'
+            OR (a.report_date IS NOT NULL AND a.report_date <= CURRENT_DATE)
+          )
+      ), 0)
+    )::integer END`,
 };
 
 async function attachPaiementLignes<T extends { id: number }>(rows: T[]) {
@@ -855,7 +881,19 @@ async function debiterMobileDansTransaction(
       });
       return;
     }
-    const montantTotalPaiement = montantDemande + (inclureFraisCollecte ? commissionCollecteMontant : 0);
+    const retenueAvancePreview = inclureFraisCollecte
+      && row.commissionCollecteId != null
+      && row.commissionCollecteMembreId != null
+      ? await getRetenueAvanceCommissionPreview(
+          row.commissionCollecteId,
+          row.commissionCollecteMembreId,
+        )
+      : 0;
+    let montantTotalPaiement = montantDemande + (
+      inclureFraisCollecte
+        ? Math.max(0, commissionCollecteMontant - retenueAvancePreview)
+        : 0
+    );
 
     if (body.montantReglementFcfa != null) {
       if (!Number.isSafeInteger(montantDemande) || montantDemande <= 0) {
@@ -956,6 +994,28 @@ async function debiterMobileDansTransaction(
       let soldeApresLivraison: number | null = null;
       try {
         await db.transaction(async (tx) => {
+           const retenueAvance = inclureFraisCollecte
+             && row.commissionCollecteId != null
+             && row.commissionCollecteMembreId != null
+             ? await appliquerRetenueAvanceSurCommissionDansTransaction(
+                 tx,
+                 row.commissionCollecteId,
+                 row.commissionCollecteMembreId,
+               )
+             : {
+                 montantCommissionFcfa: commissionCollecteMontant,
+                 retenueFcfa: 0,
+                 montantNetFcfa: commissionCollecteMontant,
+               };
+           montantTotalPaiement = montantDemande + (
+             inclureFraisCollecte ? retenueAvance.montantNetFcfa : 0
+           );
+           if (totalVentile !== montantTotalPaiement) {
+             throw new PaiementMontantInvalideError(
+               `Le total ventilé (${totalVentile.toLocaleString("fr-FR")} FCFA) ne correspond plus au montant à décaisser (${montantTotalPaiement.toLocaleString("fr-FR")} FCFA).`,
+             );
+           }
+
           if (livraisonAvecSolde && row.paiement.livraisonId) {
             const [livraisonVerrouillee] = await tx
               .select({
@@ -1013,6 +1073,7 @@ async function debiterMobileDansTransaction(
                 datePaiement: new Date(),
                 modePaiement: lignes.length === 1 ? lignes[0]!.modePaiement : "mixte",
                 referencePaiement: lignes.length === 1 ? lignes[0]!.referenceTransaction ?? null : null,
+                 retenueAvancesFcfa: retenueAvance.retenueFcfa,
               })
               .where(and(
                 eq(commissionsMembresDelaguesTable.id, row.commissionCollecteId),
@@ -1066,11 +1127,14 @@ async function debiterMobileDansTransaction(
           }
 
           const ecrituresVentilation: Parameters<typeof proposerEcrituresDansTransaction>[2] = [];
-          const compteDebitCommission = inclureFraisCollecte
+           const montantCommissionNet = inclureFraisCollecte
+             ? retenueAvance.montantNetFcfa
+             : 0;
+           const compteDebitCommission = montantCommissionNet > 0
             ? await resolveCompteDebit(cooperativeId, "commissions_delegues", "paiement_commission", "6322")
             : null;
           let producteurRestant = montantDemande;
-          let commissionRestante = inclureFraisCollecte ? commissionCollecteMontant : 0;
+           let commissionRestante = montantCommissionNet;
           for (let index = 0; index < lignes.length; index += 1) {
             const ligne = lignes[index]!;
             const ligneInseree = lignesInserees[index]!;
@@ -1136,6 +1200,20 @@ async function debiterMobileDansTransaction(
             producteurRestant -= montantProducteur;
             commissionRestante -= montantCommission;
           }
+           if (retenueAvance.retenueFcfa > 0 && row.commissionCollecteMembreId != null) {
+             ecrituresVentilation.push({
+               source: "avance",
+               sourceId: row.commissionCollecteMembreId,
+               libelle: `Retenue avance sur commission – ${beneficiairePaiement}`,
+               compteDebit: "401",
+               compteCredit: "4091",
+               montantFcfa: retenueAvance.retenueFcfa,
+               date: new Date().toISOString().slice(0, 10),
+               numeroPiece: `AV-${row.commissionCollecteMembreId}-${new Date().toISOString().slice(0, 10)}`,
+               tiersId: row.commissionCollecteMembreId,
+               tiersType: "membre",
+             });
+           }
           await proposerEcrituresDansTransaction(tx, cooperativeId, ecrituresVentilation);
         });
       } catch (err) {
@@ -1296,6 +1374,23 @@ async function debiterMobileDansTransaction(
 
     let soldeApresLivraison: number | null = null;
     await db.transaction(async (tx) => {
+      const retenueAvance = inclureFraisCollecte
+        && row.commissionCollecteId != null
+        && row.commissionCollecteMembreId != null
+        ? await appliquerRetenueAvanceSurCommissionDansTransaction(
+            tx,
+            row.commissionCollecteId,
+            row.commissionCollecteMembreId,
+          )
+        : {
+            montantCommissionFcfa: commissionCollecteMontant,
+            retenueFcfa: 0,
+            montantNetFcfa: commissionCollecteMontant,
+          };
+      montantTotalPaiement = montantDemande + (
+        inclureFraisCollecte ? retenueAvance.montantNetFcfa : 0
+      );
+
       if (livraisonAvecSolde && row.paiement.livraisonId) {
         const [livraisonVerrouillee] = await tx
           .select({
@@ -1360,6 +1455,7 @@ async function debiterMobileDansTransaction(
             datePaiement: new Date(),
             modePaiement: mode,
             referencePaiement: body.referenceTransaction ?? null,
+            retenueAvancesFcfa: retenueAvance.retenueFcfa,
           })
           .where(and(
             eq(commissionsMembresDelaguesTable.id, row.commissionCollecteId),
@@ -1454,7 +1550,7 @@ async function debiterMobileDansTransaction(
         tiersId: isBonCarburant || isDepenseVehicule ? undefined : (row.paiement.membreId ?? undefined),
         tiersType: isBonCarburant || isDepenseVehicule ? undefined : "membre",
       }];
-      if (inclureFraisCollecte && row.commissionCollecteMembreId != null) {
+      if (inclureFraisCollecte && row.commissionCollecteMembreId != null && retenueAvance.montantNetFcfa > 0) {
         const compteDebitCommission = await resolveCompteDebit(
           cooperativeId,
           "commissions_delegues",
@@ -1467,11 +1563,25 @@ async function debiterMobileDansTransaction(
           libelle: `Frais de collecte – ${beneficiairePaiement}`,
           compteDebit: compteDebitCommission,
           compteCredit: isMobile ? "552" : mode === "especes" ? "571" : "521",
-          montantFcfa: commissionCollecteMontant,
+          montantFcfa: retenueAvance.montantNetFcfa,
           date: new Date().toISOString().slice(0, 10),
           numeroPiece: `COM-${row.commissionCollecteMembreId}-${new Date().toISOString().slice(0, 10)}`,
           tiersId: row.commissionCollecteMembreId,
           tiersType: "delegue",
+        });
+      }
+      if (inclureFraisCollecte && row.commissionCollecteMembreId != null && retenueAvance.retenueFcfa > 0) {
+        ecrituresPaiement.push({
+          source: "avance",
+          sourceId: row.commissionCollecteMembreId,
+          libelle: `Retenue avance sur commission – ${beneficiairePaiement}`,
+          compteDebit: "401",
+          compteCredit: "4091",
+          montantFcfa: retenueAvance.retenueFcfa,
+          date: new Date().toISOString().slice(0, 10),
+          numeroPiece: `AV-${row.commissionCollecteMembreId}-${new Date().toISOString().slice(0, 10)}`,
+          tiersId: row.commissionCollecteMembreId,
+          tiersType: "membre",
         });
       }
       await proposerEcrituresDansTransaction(tx, cooperativeId, ecrituresPaiement);

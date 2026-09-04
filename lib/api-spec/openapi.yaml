@@ -7975,6 +7975,9 @@ components:
         commissionCollecteFrequencePaiement:
           type: ["string", "null"]
           enum: [chaque_paiement, fin_campagne, null]
+        commissionCollecteAvanceDisponibleFcfa:
+          type: ["integer", "null"]
+          description: Montant d'avance pouvant être retenu sur la commission en attente.
         lignes:
           type: array
           items:
