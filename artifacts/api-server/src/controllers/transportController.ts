@@ -45,7 +45,7 @@ import {
 } from "../services/transportService";
 import { generateBonCarburant } from "../services/bonCarburantPdf";
 import { generateBonAchatPiece } from "../services/bonAchatPiecePdf";
-import { db, usersTable, stationsCarburantTable, bonsCarburantTable } from "@workspace/db";
+import { db, usersTable, stationsCarburantTable, bonsCarburantTable, paiementsTable } from "@workspace/db";
 import { eq, and, isNotNull, count } from "drizzle-orm";
 
 function toDateStr(d: Date | null | undefined): string | null | undefined {
@@ -1007,14 +1007,13 @@ export async function handleUtiliserBonCarburant(req: Request, res: Response): P
         ...(body.quantite_livree != null ? { quantite: String(body.quantite_livree), unite: "L" } : {}),
         missionId:      null,
       });
-      // Écriture OHADA : 6042 Carburant / 521 Caisse
-      void proposerEcriture(cooperativeId, {
-        source: "transport", sourceId: depense.id,
-        libelle: `Carburant — Bon ${row.bon.numero} (${body.quantite_livree} L)`,
-        compteDebit: "6042", compteCredit: "521",
+      // Le règlement suit le circuit standard de la page Règlements.
+      // Le mode reste volontairement null : il sera choisi au moment de la validation.
+      await db.insert(paiementsTable).values({
+        bonCarburantId: row.bon.id,
         montantFcfa: montantArrondi,
-        date: body.date_utilisation,
-        numeroPiece: row.bon.numero,
+        modePaiement: null,
+        statut: "en_attente",
       });
     }
 
