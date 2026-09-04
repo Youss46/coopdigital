@@ -1,7 +1,9 @@
 import { type Request, type Response } from "express";
-import { db, usersTable, membresTable, avancesTable, livraisonsTable, paiementsTable, ventesExportateursTable, exportateursTable, parcellesTable, missionsTerrainTable, campagnesTable, fournisseursTable } from "@workspace/db";
+import { db, usersTable, membresTable, avancesTable, livraisonsTable, paiementsTable, ventesExportateursTable, exportateursTable, parcellesTable, missionsTerrainTable, campagnesTable, fournisseursTable, bonsCarburantTable } from "@workspace/db";
 import { eq, sql, desc, gte, lte, and, isNull, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
+
+const dashboardAgentUserAlias = alias(usersTable, "dashboard_agent_user");
 
 export async function getDashboard(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
@@ -93,11 +95,27 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
         .select({ total: sql<number>`coalesce(sum(montant_fcfa),0)::int` })
         .from(paiementsTable)
         .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
+        .leftJoin(livraisonsTable, eq(paiementsTable.livraisonId, livraisonsTable.id))
+        .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
+        .leftJoin(dashboardAgentUserAlias, eq(livraisonsTable.agentId, dashboardAgentUserAlias.id))
+        .leftJoin(bonsCarburantTable, eq(paiementsTable.bonCarburantId, bonsCarburantTable.id))
         .where(and(
-          eq(membresTable.cooperativeId, cooperativeId),
+          or(
+            eq(membresTable.cooperativeId, cooperativeId),
+            eq(fournisseursTable.cooperativeId, cooperativeId),
+            eq(bonsCarburantTable.cooperativeId, cooperativeId),
+          ),
           sql`${paiementsTable.statut} IN ('confirme','effectue','en_cours')`,
-          gte(paiementsTable.createdAt, debutPaiements),
-          lte(paiementsTable.createdAt, finPaiements),
+          gte(paiementsTable.dateValidation, debutPaiements),
+          lte(paiementsTable.dateValidation, finPaiements),
+          // Même périmètre que la carte « Payés ce mois » de Règlements :
+          // les paiements espèces des délégués sont suivis dans leur caisse.
+          or(
+            isNull(paiementsTable.modePaiement),
+            sql`${paiementsTable.modePaiement} != 'especes'`,
+            isNull(livraisonsTable.agentId),
+            sql`${dashboardAgentUserAlias.role} != 'delegue'`,
+          ),
         )),
       db
         .select({ total: sql<number>`coalesce(sum(solde_du_fcfa),0)::int` })
