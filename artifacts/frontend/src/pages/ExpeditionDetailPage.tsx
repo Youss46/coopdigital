@@ -275,7 +275,7 @@ export default function ExpeditionDetailPage() {
   if (isLoading) return <div className="p-8 text-center text-gray-500">Chargement…</div>;
   if (!exp) return <div className="p-8 text-center text-gray-500">Expédition introuvable</div>;
 
-  const canManageControl = ["pca", "directeur", "responsable_tracabilite", "peseur"].includes(utilisateur?.role ?? "");
+  const canManageControl = utilisateur?.role === "peseur";
   const statut = String(exp.statut ?? "");
   const cfg = STATUT_CONFIG[statut] ?? { label: statut, color: "text-gray-600", step: 0 };
   const transition = TRANSITIONS[statut];
@@ -495,20 +495,26 @@ export default function ExpeditionDetailPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <div>
-                    <Label className="text-xs">Nombre de sacs *</Label>
-                    <NumericInput decimal={false} min="1" value={controlSacs} onChange={setControlSacs} placeholder="Ex : 25" />
+                {canManageControl ? (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div>
+                      <Label className="text-xs">Nombre de sacs *</Label>
+                      <NumericInput decimal={false} min="1" value={controlSacs} onChange={setControlSacs} placeholder="Ex : 25" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Poids brut (kg) *</Label>
+                      <NumericInput min="0" value={controlBrut} onChange={setControlBrut} placeholder="Ex : 1 250" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Tare (kg)</Label>
+                      <NumericInput min="0" value={controlTare} onChange={setControlTare} placeholder="0" />
+                    </div>
                   </div>
-                  <div>
-                    <Label className="text-xs">Poids brut (kg) *</Label>
-                    <NumericInput min="0" value={controlBrut} onChange={setControlBrut} placeholder="Ex : 1 250" />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Tare (kg)</Label>
-                    <NumericInput min="0" value={controlTare} onChange={setControlTare} placeholder="0" />
-                  </div>
-                </div>
+                ) : (
+                  <p className="rounded-md bg-white/70 p-3 text-xs text-indigo-800">
+                    Contrôle en cours : la saisie des passages est réservée au Peseur central.
+                  </p>
+                )}
 
                 {activeControlDetail?.lignes && activeControlDetail.lignes.length > 0 && (
                   <div className="overflow-x-auto rounded border bg-white">
@@ -540,34 +546,36 @@ export default function ExpeditionDetailPage() {
                   </div>
                 )}
 
-                <div className="flex flex-wrap justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={cancelControlMutation.isPending}
-                    onClick={() => cancelControlMutation.mutate()}
-                  >
-                    Annuler la session
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="bg-indigo-700 hover:bg-indigo-800"
-                    disabled={addControlLineMutation.isPending || !controlSacs || !controlBrut}
-                    onClick={() => addControlLineMutation.mutate()}
-                  >
-                    <Plus className="mr-1 h-3 w-3" />
-                    {addControlLineMutation.isPending ? "Enregistrement…" : "Ajouter le passage"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="bg-green-700 hover:bg-green-800"
-                    disabled={finishControlMutation.isPending || !(activeControlDetail?.lignes?.length)}
-                    onClick={() => finishControlMutation.mutate()}
-                  >
-                    <CheckCircle2 className="mr-1 h-3 w-3" />
-                    {finishControlMutation.isPending ? "Clôture…" : "Clôturer le contrôle"}
-                  </Button>
-                </div>
+                {canManageControl && (
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={cancelControlMutation.isPending}
+                      onClick={() => cancelControlMutation.mutate()}
+                    >
+                      Annuler la session
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="bg-indigo-700 hover:bg-indigo-800"
+                      disabled={addControlLineMutation.isPending || !controlSacs || !controlBrut}
+                      onClick={() => addControlLineMutation.mutate()}
+                    >
+                      <Plus className="mr-1 h-3 w-3" />
+                      {addControlLineMutation.isPending ? "Enregistrement…" : "Ajouter le passage"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="bg-green-700 hover:bg-green-800"
+                      disabled={finishControlMutation.isPending || !(activeControlDetail?.lignes?.length)}
+                      onClick={() => finishControlMutation.mutate()}
+                    >
+                      <CheckCircle2 className="mr-1 h-3 w-3" />
+                      {finishControlMutation.isPending ? "Clôture…" : "Clôturer le contrôle"}
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
 

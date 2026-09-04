@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { checkPermission } from "../middlewares/permissions";
+import { peseurCentralOnly } from "../middlewares/peseurCentralOnly";
 import {
   handleListExpeditions,
   handleListFraisTransportARegler,
@@ -94,6 +95,7 @@ router.get(
 router.post(
   "/expeditions/:id/pesee-controle",
   checkPermission("expeditions", "modifier"),
+  peseurCentralOnly,
   handleStartExpeditionControl,
 );
 
@@ -106,24 +108,28 @@ router.get(
 router.post(
   "/expeditions/:id/pesee-controle/:sessionId/lignes",
   checkPermission("expeditions", "modifier"),
+  peseurCentralOnly,
   handleAddExpeditionControlLine,
 );
 
 router.delete(
   "/expeditions/:id/pesee-controle/:sessionId/lignes/:ligneId",
   checkPermission("expeditions", "modifier"),
+  peseurCentralOnly,
   handleDeleteExpeditionControlLine,
 );
 
 router.put(
   "/expeditions/:id/pesee-controle/:sessionId/terminer",
   checkPermission("expeditions", "modifier"),
+  peseurCentralOnly,
   handleFinishExpeditionControl,
 );
 
 router.put(
   "/expeditions/:id/pesee-controle/:sessionId/annuler",
   checkPermission("expeditions", "modifier"),
+  peseurCentralOnly,
   handleCancelExpeditionControl,
 );
 
