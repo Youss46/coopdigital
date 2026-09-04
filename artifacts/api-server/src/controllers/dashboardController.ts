@@ -66,15 +66,15 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
       db
         .select({ count: sql<number>`count(*)::int` })
         .from(membresTable)
-        .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.statutMembre, "actif"))),
+        .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.statut, "actif"))),
       db
         .select({ count: sql<number>`count(*)::int` })
         .from(membresTable)
-        .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.statutMembre, "actif"), eq(membresTable.sexe, "M"))),
+        .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.statut, "actif"), eq(membresTable.sexe, "M"))),
       db
         .select({ count: sql<number>`count(*)::int` })
         .from(membresTable)
-        .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.statutMembre, "actif"), eq(membresTable.sexe, "F"))),
+        .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.statut, "actif"), eq(membresTable.sexe, "F"))),
       db
         .select({ total: sql<number>`coalesce(sum(solde_restant_fcfa),0)::int` })
         .from(avancesTable)
