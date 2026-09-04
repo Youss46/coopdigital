@@ -101,3 +101,4 @@
 - [Liaison coopérative des JWT terrain](terrain-jwt-cooperative-binding.md) — ne jamais émettre de JWT terrain pour un compte sans coopérative; sinon le premier appel métier ressemble à une session expirée.
 - [Nombre de sacs obligatoire peseur](peseur-nombre-sacs-obligatoire.md) — chaque passage de pesée doit déclarer un entier strictement positif, en ligne comme hors ligne.
 - [Responsabilité Sacherie par coopérative](cooperative-sacherie-responsibility.md) — choisir Magasinier, Responsable Sacherie ou les deux sans désactiver le rôle Magasinier global.
+- [Parité tonnage PCA et tableau de bord](dashboard-pca-tonnage-parity.md) — le total campagne inclut livraisons et transferts confirmés; la modale certification détaille les seules livraisons.
