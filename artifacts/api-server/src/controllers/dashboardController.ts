@@ -52,17 +52,7 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
 
     const debutPaiements = new Date(periodeDebut + "T00:00:00.000Z");
 
-    const [
-      [membresActifsRow],
-      [membresHommesRow],
-      [membresFemmesRow],
-      [avancesRow],
-      [tonnageRow],
-      [tonnageTransfertsRow],
-      [paiementsRow],
-      [creancesRow],
-      [sacsRow],
-    ] = await Promise.all([
+    const metricResults = await Promise.allSettled([
       db
         .select({ count: sql<number>`count(*)::int` })
         .from(membresTable)
@@ -147,6 +137,29 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
         )),
     ]);
 
+    const degradedMetrics: string[] = [];
+    const readRow = <T>(index: number, metric: string): T | undefined => {
+      const result = metricResults[index];
+      if (!result || result.status === "rejected") {
+        if (result?.status === "rejected") {
+          degradedMetrics.push(metric);
+          req.log.error({ err: result.reason, metric }, "Erreur KPI dashboard");
+        }
+        return undefined;
+      }
+      return result.value[0] as T | undefined;
+    };
+
+    const membresActifsRow = readRow<{ count: number }>(0, "membres actifs");
+    const membresHommesRow = readRow<{ count: number }>(1, "membres hommes");
+    const membresFemmesRow = readRow<{ count: number }>(2, "membres femmes");
+    const avancesRow = readRow<{ total: number }>(3, "avances");
+    const tonnageRow = readRow<{ tonnage: number }>(4, "livraisons");
+    const tonnageTransfertsRow = readRow<{ tonnage: number }>(5, "transferts");
+    const paiementsRow = readRow<{ total: number }>(6, "paiements");
+    const creancesRow = readRow<{ total: number }>(7, "créances");
+    const sacsRow = readRow<{ sacs: number }>(8, "sacs");
+
     res.json({
       membresActifs: membresActifsRow?.count ?? 0,
       membresHommes: membresHommesRow?.count ?? 0,
@@ -158,6 +171,7 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
       nombreSacsMois: sacsRow?.sacs ?? 0,
       paiementsMois: paiementsRow?.total ?? 0,
       creancesExportateurs: creancesRow?.total ?? 0,
+      degradedMetrics,
     });
   } catch (err) {
     req.log.error({ err }, "Erreur getDashboard");
