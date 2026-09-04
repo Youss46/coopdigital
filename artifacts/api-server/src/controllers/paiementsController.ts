@@ -222,6 +222,9 @@ const agentUserAlias = alias(usersTable, "agent_user");
 // Alias SQL pour joindre la table users sur paiements.agent_saisiseur_id (mode proxy gérant)
 const saisiseurUserAlias = alias(usersTable, "saisiseur_user");
 
+function dateEffectivePaiementSql() {
+  return sql`coalesce(${paiementsTable.dateValidation}, ${paiementsTable.createdAt})`;
+}
 const SELECT_FIELDS = {
   id: paiementsTable.id,
   livraisonId: paiementsTable.livraisonId,
@@ -332,13 +335,14 @@ export async function listPaiements(req: Request, res: Response): Promise<void> 
     }
 
     const now = new Date();
+    const dateEffective = dateEffectivePaiementSql();
     if (periode === "today") {
-      conditions.push(gte(paiementsTable.createdAt, startOfDay(now)));
+      conditions.push(gte(dateEffective, startOfDay(now)));
     } else if (periode === "week") {
       const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      conditions.push(gte(paiementsTable.createdAt, weekAgo));
+      conditions.push(gte(dateEffective, weekAgo));
     } else if (periode === "month") {
-      conditions.push(gte(paiementsTable.createdAt, startOfMonth(now)));
+      conditions.push(gte(dateEffective, startOfMonth(now)));
     }
 
     const paiements = await db
