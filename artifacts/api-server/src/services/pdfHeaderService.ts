@@ -194,22 +194,52 @@ export async function drawHeader(
   const infoX     = logoX + logoSize + 12;
   const infoWidth = contentWidth - logoSize - 12 - (hasTitre ? titreBoxW + 16 : 0);
 
-  doc
-    .font("Helvetica-Bold")
-    .fontSize(12.5)
-    .fillColor(couleur)
-    .text(config?.nomComplet || "CoopDigital", infoX, 16, { width: infoWidth, lineBreak: false });
+  // Toutes les lignes de l'identité sont contraintes à la largeur disponible.
+  // Un nom ou un IBAN long ne doit jamais déborder dans la boîte du document
+  // ni revenir à la marge gauche (comportement PDFKit lorsque la ligne est
+  // trop longue et que le curseur n'est pas repositionné).
+  const infoTextWidth = Math.max(130, infoWidth);
+  const lineHeight = (fontSize: number): number => fontSize * 1.15;
+  const drawInfoBlock = (
+    text: string,
+    y: number,
+    font: string,
+    fontSize: number,
+    color: string,
+  ): number => {
+    doc
+      .font(font)
+      .fontSize(fontSize)
+      .fillColor(color)
+      .text(text, infoX, y, {
+        width: infoTextWidth,
+        lineBreak: true,
+        lineGap: 0,
+      });
+    return doc.heightOfString(text, { width: infoTextWidth, lineGap: 0 });
+  };
+
+  const nomComplet = config?.nomComplet || "CoopDigital";
+  // Deux lignes maximum dans la plupart des cas, en réduisant légèrement la
+  // taille pour préserver une entête compacte lorsque la boîte titre est là.
+  let nomFontSize = 12.5;
+  while (
+    nomFontSize > 9 &&
+    (doc.font("Helvetica-Bold").fontSize(nomFontSize).heightOfString(nomComplet, {
+      width: infoTextWidth,
+      lineGap: 0,
+    }) > lineHeight(nomFontSize) * 2.15)
+  ) {
+    nomFontSize -= 0.5;
+  }
+
+  let currentY = 16;
+  currentY += drawInfoBlock(nomComplet, currentY, "Helvetica-Bold", nomFontSize, couleur) + 2;
 
   // ── Slogan (optionnel, italique, sous le nom) ─────────────────────────────────
   if (config?.slogan) {
-    doc
-      .font("Helvetica-Oblique")
-      .fontSize(7.5)
-      .fillColor("#555555")
-      .text(config.slogan, infoX, 31, { width: infoWidth, lineBreak: false });
+    currentY += drawInfoBlock(config.slogan, currentY, "Helvetica-Oblique", 7.5, "#555555") + 2;
   }
-
-  doc.font("Helvetica").fontSize(8).fillColor("#444444");
 
   // Ligne 1 : localisation (adresse · ville)
   const locParts: string[] = [];
@@ -223,28 +253,21 @@ export async function drawHeader(
   if (config?.email)     contactParts.push(config.email);
   const contactLine = contactParts.join(" · ");
 
-  // Si slogan présent, les infos démarrent 11pt plus bas
-  let currentY = config?.slogan ? 42 : 31;
   if (locLine) {
-    doc.text(locLine, infoX, currentY, { width: infoWidth, lineBreak: false });
-    currentY += 11;
+    currentY += drawInfoBlock(locLine, currentY, "Helvetica", 8, "#444444") + 1;
   }
   if (contactLine) {
-    doc.text(contactLine, infoX, currentY, { width: infoWidth, lineBreak: false });
-    currentY += 11;
+    currentY += drawInfoBlock(contactLine, currentY, "Helvetica", 8, "#444444") + 1;
   }
 
   if (config?.numeroAgrement && options.show_agrement !== false) {
-    doc
-      .font("Helvetica-Oblique")
-      .fontSize(7.5)
-      .fillColor("#777777")
-      .text(
-        `Agrément N° ${config.numeroAgrement}`,
-        infoX,
-        currentY + 1,
-        { width: infoWidth, lineBreak: false },
-      );
+    currentY += drawInfoBlock(
+      `Agrément N° ${config.numeroAgrement}`,
+      currentY,
+      "Helvetica-Oblique",
+      7.5,
+      "#777777",
+    ) + 1;
   }
 
   // ── Coordonnées bancaires (optionnel) ────────────────────────────────────────
@@ -252,20 +275,16 @@ export async function drawHeader(
   if (config?.banquePrincipale)     bankParts.push(`Banque : ${config.banquePrincipale}`);
   if (config?.numeroCompteBancaire) bankParts.push(`Cpte N° ${config.numeroCompteBancaire}`);
   if (config?.iban)                 bankParts.push(`IBAN : ${config.iban}`);
-  const bankLine   = bankParts.join("  ·  ");
+  const bankLine = bankParts.join("  ·  ");
   const hasBankLine = bankLine.length > 0;
-  // Décale le séparateur vers le bas quand les coordonnées bancaires sont présentes
-  const separatorY = hasBankLine ? 90 : 76;
 
   if (hasBankLine) {
-    const hasAgrement = Boolean(config?.numeroAgrement && options.show_agrement !== false);
-    const bankY = currentY + (hasAgrement ? 12 : 2);
-    doc
-      .font("Helvetica")
-      .fontSize(7)
-      .fillColor("#666666")
-      .text(bankLine, infoX, bankY, { width: infoWidth, lineBreak: false });
+    currentY += drawInfoBlock(bankLine, currentY, "Helvetica", 7, "#666666");
   }
+
+  // Le séparateur et le curseur suivent la hauteur réellement utilisée. Cela
+  // évite que les coordonnées bancaires recouvrent la ligne ou le contenu.
+  const separatorY = Math.max(76, Math.ceil(currentY + 6));
 
   // ── Boîte titre document (droite) ────────────────────────────────────────────
   if (hasTitre) {
