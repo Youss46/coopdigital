@@ -289,6 +289,7 @@ export async function createLivraison(req: Request, res: Response): Promise<void
       const [paiement] = await tx
         .insert(paiementsTable)
         .values({
+          cooperativeId,
           livraisonId: livraison!.id,
           membreId: membreId ?? null,
           montantFcfa: montantNet,

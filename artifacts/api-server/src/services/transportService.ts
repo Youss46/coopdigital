@@ -10,6 +10,7 @@ import {
 } from "@workspace/db";
 import { eq, and, sql, desc, lte, gte } from "drizzle-orm";
 import { logger } from "../lib/logger";
+import { genererNumeroRecu } from "./recuService.js";
 
 
 
@@ -502,15 +503,18 @@ export async function emettreBonAchatPiece(cooperativeId: number, id: number, us
       .limit(1);
     if (existant) return { paiementId: existant.id, dejaEmis: true };
 
+    const numeroRecu = await genererNumeroRecu(cooperativeId);
     const [paiement] = await tx
       .insert(paiementsTable)
       .values({
+        cooperativeId,
         depenseVehiculeId: id,
         montantFcfa: Math.round(Number(depense.montantFcfa)),
         montantAPayerFcfa: depense.montantFcfa,
         montantVerseFcfa: "0",
         resteAPayerFcfa: depense.montantFcfa,
         libelle: `Achat pièce de rechange — ${depense.libelle}`,
+        numeroRecu,
         statut: "en_attente",
         initialisePar: userId,
       })

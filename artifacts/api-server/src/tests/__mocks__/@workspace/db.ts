@@ -63,6 +63,7 @@ export const bilansCampagneTable = makeTable("bilans_campagne");
 export const IndicateurRse = makeTable("indicateurs_rse");
 export const sessionsPeseeTable = makeTable("sessions_pesee");
 export const lignesPeseeTable = makeTable("lignes_pesee");
+export const sequencesRecusTable = makeTable("sequences_recus");
 export const configPeseeTable = makeTable("config_pesee");
 export const configCooperativeTable = makeTable("config_cooperative");
 export const transfertsStockTable = makeTable("transferts_stock");

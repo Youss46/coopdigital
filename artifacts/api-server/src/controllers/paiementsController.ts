@@ -1014,6 +1014,7 @@ async function debiterMobileDansTransaction(
 
           if (livraisonAvecSolde && row.paiement.livraisonId && (soldeApresLivraison ?? 0) > 0) {
             await tx.insert(paiementsTable).values({
+              cooperativeId,
               livraisonId: row.paiement.livraisonId,
               membreId: row.paiement.membreId,
               campagneId: row.paiement.campagneId,
@@ -1360,6 +1361,7 @@ async function debiterMobileDansTransaction(
 
       if (livraisonAvecSolde && row.paiement.livraisonId && (soldeApresLivraison ?? 0) > 0) {
         await tx.insert(paiementsTable).values({
+          cooperativeId,
           livraisonId: row.paiement.livraisonId,
           membreId: row.paiement.membreId,
           campagneId: row.paiement.campagneId,
@@ -1595,6 +1597,7 @@ export async function rejeterPaiement(req: Request, res: Response): Promise<void
 
         if (livraisonAvecSolde && reste > 0) {
           await tx.insert(paiementsTable).values({
+            cooperativeId,
             livraisonId: row.paiement.livraisonId,
             membreId: row.paiement.membreId,
             campagneId: row.paiement.campagneId,

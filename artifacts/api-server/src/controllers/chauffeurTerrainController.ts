@@ -227,6 +227,7 @@ export async function utiliserBonChauffeur(req: Request, res: Response): Promise
       });
       // Créer un règlement en attente — sera validé depuis ReglementsPage
       await db.insert(paiementsTable).values({
+        cooperativeId: coopId,
         bonCarburantId: bon.id,
         montantFcfa:    montantArrondi,
         modePaiement:   modePaiement,

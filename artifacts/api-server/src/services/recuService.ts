@@ -1,4 +1,4 @@
-import { db, entrepotsDeleguesTable, sequencesPeseeTable } from "@workspace/db";
+import { db, entrepotsDeleguesTable, sequencesPeseeTable, sequencesRecusTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 
 /**
@@ -24,25 +24,29 @@ export async function reserverNumeroPesee(cooperativeId: number): Promise<{ nume
 }
 
 /**
- * Génère un numéro de reçu séquentiel global, format REC-YYYY-NNNNN.
- *
- * `paiements.numero_recu` possède une contrainte UNIQUE globale, alors que les
- * coopératives sont des tenants distincts. Un compteur par coopérative pouvait
- * donc générer le même numéro dans deux coopératives. La séquence PostgreSQL
- * garantit une attribution atomique et sans collision entre tous les tenants.
+ * Génère un numéro de reçu séquentiel par coopérative et année civile,
+ * format REC-YYYY-NNNNN.
  *
  * Les gaps sont acceptables (rollback d'une transaction parente, etc.).
  */
-export async function genererNumeroRecu(_cooperativeId: number): Promise<string> {
-  const result = await db.execute<{ n: string | number }>(
-    sql`SELECT nextval('numero_recu_global_seq') AS n`,
-  );
-  const n = Number(result.rows[0]?.n);
+export async function genererNumeroRecu(cooperativeId: number): Promise<string> {
+  if (!Number.isInteger(cooperativeId) || cooperativeId < 1) {
+    throw new Error("Coopérative invalide pour la génération du numéro de reçu");
+  }
+  const annee = new Date().getFullYear();
+  const [row] = await db
+    .insert(sequencesRecusTable)
+    .values({ cooperativeId, annee, compteur: 1 })
+    .onConflictDoUpdate({
+      target: [sequencesRecusTable.cooperativeId, sequencesRecusTable.annee],
+      set: { compteur: sql`${sequencesRecusTable.compteur} + 1` },
+    })
+    .returning({ numero: sequencesRecusTable.compteur });
+  const n = row?.numero;
   if (!Number.isInteger(n) || n < 1) {
     throw new Error("Impossible de générer un numéro de reçu");
   }
-  const year = new Date().getFullYear();
-  return `REC-${year}-${String(n).padStart(5, "0")}`;
+  return `REC-${annee}-${String(n).padStart(5, "0")}`;
 }
 
 /**

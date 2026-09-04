@@ -593,6 +593,7 @@ export async function enregistrerCollecte(
 
   // Créer le paiement en_attente — le mode sera choisi lors du règlement
   await db.insert(paiementsTable).values({
+    cooperativeId,
     livraisonId: livraison.id,
     membreId: membreId ?? null,
     campagneId: prix.campagneId ?? undefined,
@@ -708,6 +709,7 @@ export async function enregistrerPaiement(
   const numeroRecu = await genererNumeroRecu(cooperativeId);
 
   const [paiement] = await db.insert(paiementsTable).values({
+    cooperativeId,
     livraisonId: data.livraisonId,
     membreId: data.membreId,
     campagneId: livraison.campagneId ?? undefined,

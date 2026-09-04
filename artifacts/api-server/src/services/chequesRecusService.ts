@@ -136,6 +136,7 @@ export async function creerChequeRecu(
     if (duplicate) throw new Error("Ce numéro de chèque existe déjà pour cette coopérative");
 
     const [paiement] = await tx.insert(paiementsTable).values({
+      cooperativeId,
       libelle: `Encaissement vente exportateur #${vente.id}`,
       modeReglement: "cheque",
       montantAPayerFcfa: String(data.montantFcfa),

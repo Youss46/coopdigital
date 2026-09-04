@@ -3,7 +3,7 @@
  *
  * Covered scenarios:
  *  A. genererNumeroRecu (real implementation)
- *     — controlled db.update mock returning a fixed counter value
+ *     — controlled db.insert mock returning a fixed counter value
  *     — asserts output is REC-YYYY-NNNNN (not a mocked hard-coded value)
  *
  *  B. generateRecuPaiement (real PDF generation, mocked DB)
@@ -80,6 +80,16 @@ function makeUpdateChain(data: unknown[]) {
   const self = () => chain;
   for (const m of ["set", "where"]) {
     chain[m] = vi.fn(self);
+  }
+  chain["returning"] = vi.fn((_sel: unknown) => Promise.resolve(data));
+  return chain;
+}
+
+function makeReceiptSequenceInsert(data: unknown[]) {
+  const chain: Record<string, unknown> = {};
+  const self = () => chain;
+  for (const method of ["values", "onConflictDoUpdate"]) {
+    chain[method] = vi.fn(self);
   }
   chain["returning"] = vi.fn((_sel: unknown) => Promise.resolve(data));
   return chain;
@@ -215,11 +225,11 @@ function makePaiementRow(overrides: Partial<Record<string, unknown>> = {}) {
 
 describe("genererNumeroRecu (real implementation) — REC-YYYY-NNNNN format", () => {
   beforeEach(() => {
-    vi.mocked(db.execute).mockReset();
+    vi.mocked(db.insert).mockReset();
   });
 
   it("returns REC-<currentYear>-00042 when the DB counter returns n=42", async () => {
-    vi.mocked(db.execute).mockResolvedValueOnce({ rows: [{ n: 42 }] } as never);
+    vi.mocked(db.insert).mockReturnValueOnce(makeReceiptSequenceInsert([{ numero: 42 }]) as never);
 
     const result = await genererNumeroRecu(1);
     const year = new Date().getFullYear();
@@ -229,7 +239,7 @@ describe("genererNumeroRecu (real implementation) — REC-YYYY-NNNNN format", ()
   });
 
   it("returns REC-<year>-00001 when the DB counter returns n=1 (first ever reçu)", async () => {
-    vi.mocked(db.execute).mockResolvedValueOnce({ rows: [{ n: 1 }] } as never);
+    vi.mocked(db.insert).mockReturnValueOnce(makeReceiptSequenceInsert([{ numero: 1 }]) as never);
 
     const result = await genererNumeroRecu(1);
     const year = new Date().getFullYear();
@@ -239,19 +249,19 @@ describe("genererNumeroRecu (real implementation) — REC-YYYY-NNNNN format", ()
   });
 
   it("fails explicitly when the sequence returns no value", async () => {
-    vi.mocked(db.execute).mockResolvedValueOnce({ rows: [] } as never);
+    vi.mocked(db.insert).mockReturnValueOnce(makeReceiptSequenceInsert([]) as never);
 
     await expect(genererNumeroRecu(1)).rejects.toThrow(
       "Impossible de générer un numéro de reçu",
     );
   });
 
-  it("calls the global sequence exactly once per invocation", async () => {
-    vi.mocked(db.execute).mockResolvedValueOnce({ rows: [{ n: 7 }] } as never);
+  it("increments the cooperative-local sequence exactly once per invocation", async () => {
+    vi.mocked(db.insert).mockReturnValueOnce(makeReceiptSequenceInsert([{ numero: 7 }]) as never);
 
     await genererNumeroRecu(99);
 
-    expect(vi.mocked(db.execute)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(db.insert)).toHaveBeenCalledTimes(1);
   });
 });
 

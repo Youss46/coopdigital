@@ -1027,6 +1027,7 @@ export async function handleUtiliserBonCarburant(req: Request, res: Response): P
       // Le règlement suit le circuit standard de la page Règlements.
       // Le mode reste volontairement null : il sera choisi au moment de la validation.
       await db.insert(paiementsTable).values({
+        cooperativeId,
         bonCarburantId: row.bon.id,
         montantFcfa: montantArrondi,
         modePaiement: null,

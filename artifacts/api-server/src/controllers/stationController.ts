@@ -274,6 +274,7 @@ export async function handleLivrerBonStation(
         );
         // Créer un règlement en attente — sera validé depuis ReglementsPage
         await db.insert(paiementsTable).values({
+          cooperativeId: row.bon.cooperativeId,
           bonCarburantId: row.bon.id,
           montantFcfa: montantArrondi,
           modePaiement: modePaiement,

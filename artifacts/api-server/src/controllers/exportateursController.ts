@@ -515,6 +515,7 @@ export async function encaisserVente(req: Request, res: Response): Promise<void>
       if (!modeLegacy) {
         const modeUnique = lignes.length === 1 ? lignes[0]?.modePaiement : null;
         const [paiement] = await tx.insert(paiementsTable).values({
+          cooperativeId,
           libelle: `Encaissement vente exportateur #${id}`,
           modeReglement: modeUnique ?? "mixte",
           montantAPayerFcfa: String(body.montantFcfa),

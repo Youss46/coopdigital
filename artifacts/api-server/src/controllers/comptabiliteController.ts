@@ -2213,8 +2213,8 @@ export async function declencherRistournes(req: Request, res: Response): Promise
     await db.transaction(async (tx) => {
       for (const p of parts) {
         await tx.execute(sql`
-          INSERT INTO paiements (membre_id, campagne_id, libelle, montant_fcfa, mode_paiement, statut, initialise_par)
-          VALUES (${p.membreId}, ${campagneId}, ${`Ristournes exercice ${annee}`}, ${p.montantFcfa},
+          INSERT INTO paiements (cooperative_id, membre_id, campagne_id, libelle, montant_fcfa, mode_paiement, statut, initialise_par)
+          VALUES (${coop}, ${p.membreId}, ${campagneId}, ${`Ristournes exercice ${annee}`}, ${p.montantFcfa},
                   ${mode ?? null}, 'en_attente', ${req.user?.id ?? null})
         `);
       }

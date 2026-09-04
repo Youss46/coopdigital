@@ -1239,6 +1239,7 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
               // Paiement en attente
               const numeroRecu = await genererNumeroRecu(cooperativeId);
               await db.insert(paiementsTable).values({
+                cooperativeId,
                 livraisonId: livraison.id,
                 membreId:    detail.membreId,
                 montantFcfa: reglement.montantNetFcfa,
@@ -1601,6 +1602,7 @@ export async function creerLivraisonDepuisSession(
     const [paiement] = await tx
       .insert(paiementsTable)
       .values({
+        cooperativeId,
         livraisonId: livraison!.id,
         membreId: isFournisseur ? null : session.membreId,
         montantFcfa: montantNet,

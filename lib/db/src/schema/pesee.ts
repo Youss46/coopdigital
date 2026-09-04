@@ -22,6 +22,16 @@ export const sequencesPeseeTable = pgTable("sequences_pesee", {
   unique("sequences_pesee_cooperative_annee_unique").on(table.cooperativeId, table.annee),
 ]);
 
+/** Compteur des numéros de reçu par coopérative et année civile. */
+export const sequencesRecusTable = pgTable("sequences_recus", {
+  id:            serial("id").primaryKey(),
+  cooperativeId: integer("cooperative_id").notNull().references(() => cooperativesTable.id, { onDelete: "cascade" }),
+  annee:         integer("annee").notNull(),
+  compteur:      integer("compteur").notNull().default(0),
+}, (table) => [
+  unique("sequences_recus_cooperative_annee_unique").on(table.cooperativeId, table.annee),
+]);
+
 export const sessionsPeseeTable = pgTable("sessions_pesee", {
   id:             serial("id").primaryKey(),
   cooperativeId:  integer("cooperative_id").notNull().references(() => cooperativesTable.id),

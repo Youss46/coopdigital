@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, boolean, numeric, timestamp, pgEnum, check } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, boolean, numeric, timestamp, pgEnum, check, unique } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -8,6 +8,7 @@ import { campagnesTable } from "./campagnes";
 import { usersTable } from "./users";
 import { bonsCarburantTable } from "./transport";
 import { depensesVehiculeTable } from "./transport";
+import { cooperativesTable } from "./cooperatives";
 
 export const modePaiementEnum = pgEnum("mode_paiement", [
   "orange_money",
@@ -29,6 +30,8 @@ export const paiementStatutEnum = pgEnum("paiement_statut", [
 
 export const paiementsTable = pgTable("paiements", {
   id: serial("id").primaryKey(),
+  /** Coopérative propriétaire, utilisée pour la numérotation locale des reçus. */
+  cooperativeId: integer("cooperative_id").references(() => cooperativesTable.id),
   livraisonId: integer("livraison_id")
     .references(() => livraisonsTable.id, { onDelete: "cascade" }),
   bonCarburantId: integer("bon_carburant_id")
@@ -41,7 +44,7 @@ export const paiementsTable = pgTable("paiements", {
   campagneId: integer("campagne_id").references(() => campagnesTable.id),
 
   // Enrichissements règlement achat
-  numeroRecu: text("numero_recu").unique(),
+  numeroRecu: text("numero_recu"),
   libelle: text("libelle"),
   modeReglement: text("mode_reglement"),
   montantAPayerFcfa: numeric("montant_a_payer_fcfa", { precision: 12, scale: 2 }),
@@ -64,6 +67,7 @@ export const paiementsTable = pgTable("paiements", {
   /** Utilisateur réellement connecté ayant saisi l'opération (mode proxy gérant) */
   agentSaisiseurId: integer("agent_saisiseur_id").references(() => usersTable.id),
 }, (table) => [
+  unique("paiements_cooperative_numero_recu_unique").on(table.cooperativeId, table.numeroRecu),
   check(
     "paiements_confirmes_date_validation_check",
     sql`${table.statut} NOT IN ('confirme', 'effectue') OR ${table.dateValidation} IS NOT NULL`,
