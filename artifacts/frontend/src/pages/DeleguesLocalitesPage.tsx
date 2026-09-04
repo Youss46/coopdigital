@@ -17,6 +17,18 @@ const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok = () => localStorage.getItem("coop_token") ?? "";
 const hdr = () => ({ Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" });
 
+type TypeTresorerieAvance = "caisse" | "mobile_marchand" | "banque";
+interface TresorerieAvance {
+  id: number;
+  nom: string;
+  banque?: string | null;
+  operateur?: string | null;
+  numero_marchand?: string | null;
+  numero_compte?: string | null;
+  solde_actuel_fcfa: string | number;
+  type_caisse?: string;
+}
+
 async function apiFetch<T>(path: string): Promise<T> {
   const r = await fetch(`${BASE}${path}`, { headers: { Authorization: `Bearer ${tok()}` } });
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).erreur ?? r.statusText);
@@ -341,9 +353,28 @@ export default function DeleguesLocalitesPage() {
   const [formOctroi, setFormOctroi] = useState({
     montant: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "",
     modePaiement: "especes" as "especes" | "mobile" | "banque",
+    compteTresorerieId: "",
     planType: "integral" as Avance["planType"], montantPartiel: "", reportDate: "",
   });
   const [errOctroi, setErrOctroi] = useState("");
+  const typeTresorerieOctroi: TypeTresorerieAvance = formOctroi.modePaiement === "especes"
+    ? "caisse"
+    : formOctroi.modePaiement === "mobile"
+      ? "mobile_marchand"
+      : "banque";
+  const cheminTresorerieOctroi: Record<TypeTresorerieAvance, string> = {
+    caisse: "/api/caisse",
+    mobile_marchand: "/api/mobile-marchand",
+    banque: "/api/banque",
+  };
+  const { data: tresoreriesOctroi = [], isLoading: loadingTresoreriesOctroi } = useQuery<TresorerieAvance[]>({
+    queryKey: ["delegues-localites-avance-tresorerie", typeTresorerieOctroi],
+    queryFn: () => apiFetch<TresorerieAvance[]>(cheminTresorerieOctroi[typeTresorerieOctroi]),
+    enabled: showOctroi,
+  });
+  const tresoreriesOctroiDisponibles = typeTresorerieOctroi === "caisse"
+    ? tresoreriesOctroi.filter(t => t.type_caisse === "centrale")
+    : tresoreriesOctroi;
 
   // Remboursement manuel d'une avance
   const [rembourserAvanceId, setRembourserAvanceId] = useState<number | null>(null);
@@ -491,6 +522,8 @@ export default function DeleguesLocalitesPage() {
       dateEcheance: formOctroi.dateEcheance || undefined,
       motif: formOctroi.motif || undefined,
       modePaiement: formOctroi.modePaiement,
+      compteTresorerieId: Number(formOctroi.compteTresorerieId),
+      compteTresorerieType: typeTresorerieOctroi,
       planType: formOctroi.planType,
       montantPartielFcfa: formOctroi.planType === "partiel" ? Number(formOctroi.montantPartiel) : undefined,
       reportDate: formOctroi.planType === "reporte" ? formOctroi.reportDate : undefined,
@@ -501,7 +534,7 @@ export default function DeleguesLocalitesPage() {
       qc.invalidateQueries({ queryKey: ["avances-delegues-localites"] });
       qc.invalidateQueries({ queryKey: ["avances-delegues-localites-reportees"] });
       setShowOctroi(false);
-      setFormOctroi({ montant: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "", modePaiement: "especes", planType: "integral", montantPartiel: "", reportDate: "" });
+      setFormOctroi({ montant: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "", modePaiement: "especes", compteTresorerieId: "", planType: "integral", montantPartiel: "", reportDate: "" });
       setErrOctroi("");
     },
     onError: (e: Error) => setErrOctroi(e.message),
@@ -883,12 +916,28 @@ export default function DeleguesLocalitesPage() {
                       <label className="block text-xs text-gray-600 mb-1">Mode de décaissement *</label>
                       <select
                         value={formOctroi.modePaiement}
-                        onChange={e => setFormOctroi(f => ({ ...f, modePaiement: e.target.value as typeof f.modePaiement }))}
+                        onChange={e => setFormOctroi(f => ({ ...f, modePaiement: e.target.value as typeof f.modePaiement, compteTresorerieId: "" }))}
                         className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]"
                       >
                         <option value="especes">Espèces — caisse (571)</option>
                         <option value="mobile">Mobile Marchand (552)</option>
                         <option value="banque">Banque (521)</option>
+                      </select>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs text-gray-600 mb-1">Trésorerie à débiter *</label>
+                      <select
+                        value={formOctroi.compteTresorerieId}
+                        onChange={e => setFormOctroi(f => ({ ...f, compteTresorerieId: e.target.value }))}
+                        disabled={loadingTresoreriesOctroi}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]"
+                      >
+                        <option value="">{loadingTresoreriesOctroi ? "Chargement…" : "Sélectionner une trésorerie"}</option>
+                        {tresoreriesOctroiDisponibles.map(t => (
+                          <option key={t.id} value={t.id}>
+                            {t.nom} — {Number(t.solde_actuel_fcfa ?? 0).toLocaleString("fr-FR")} FCFA
+                          </option>
+                        ))}
                       </select>
                     </div>
                     <div className="sm:col-span-2">
@@ -919,7 +968,7 @@ export default function DeleguesLocalitesPage() {
                   <div className="flex gap-2">
                     <button
                       onClick={() => mutOctroyer.mutate()}
-                      disabled={!formOctroi.montant || (formOctroi.planType === "partiel" && !formOctroi.montantPartiel) || (formOctroi.planType === "reporte" && !formOctroi.reportDate) || mutOctroyer.isPending}
+                      disabled={!formOctroi.montant || !formOctroi.compteTresorerieId || (formOctroi.planType === "partiel" && !formOctroi.montantPartiel) || (formOctroi.planType === "reporte" && !formOctroi.reportDate) || mutOctroyer.isPending}
                       className="bg-[#1a4731] text-white text-sm font-medium px-4 py-2 rounded-lg disabled:opacity-50"
                     >
                       {mutOctroyer.isPending ? "Enregistrement…" : "Enregistrer l’avance"}
@@ -1645,12 +1694,28 @@ export default function DeleguesLocalitesPage() {
                     <label className="block text-xs text-gray-600 mb-1">Mode de décaissement *</label>
                     <select
                       value={formOctroi.modePaiement}
-                      onChange={e => setFormOctroi(f => ({ ...f, modePaiement: e.target.value as typeof f.modePaiement }))}
+                      onChange={e => setFormOctroi(f => ({ ...f, modePaiement: e.target.value as typeof f.modePaiement, compteTresorerieId: "" }))}
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]"
                     >
                       <option value="especes">Espèces — caisse (571)</option>
                       <option value="mobile">Mobile Marchand (552)</option>
                       <option value="banque">Banque (521)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Trésorerie à débiter *</label>
+                    <select
+                      value={formOctroi.compteTresorerieId}
+                      onChange={e => setFormOctroi(f => ({ ...f, compteTresorerieId: e.target.value }))}
+                      disabled={loadingTresoreriesOctroi}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]"
+                    >
+                      <option value="">{loadingTresoreriesOctroi ? "Chargement…" : "Sélectionner une trésorerie"}</option>
+                      {tresoreriesOctroiDisponibles.map(t => (
+                        <option key={t.id} value={t.id}>
+                          {t.nom} — {Number(t.solde_actuel_fcfa ?? 0).toLocaleString("fr-FR")} FCFA
+                        </option>
+                      ))}
                     </select>
                   </div>
                   {errOctroi && (
@@ -1661,7 +1726,7 @@ export default function DeleguesLocalitesPage() {
                   <div className="flex gap-2 pt-1">
                     <button
                       onClick={() => mutOctroyer.mutate()}
-                      disabled={!formOctroi.montant || mutOctroyer.isPending}
+                      disabled={!formOctroi.montant || !formOctroi.compteTresorerieId || mutOctroyer.isPending}
                       className="flex-1 bg-[#1a4731] text-white text-sm font-medium py-2 rounded-lg disabled:opacity-50"
                     >
                       {mutOctroyer.isPending ? "Enregistrement…" : "Confirmer"}
