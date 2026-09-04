@@ -1166,7 +1166,7 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
         ] as Array<[string, string]>
       : []),
     ["Libellé",              row.libelle ?? (isPieceRechange ? row.depenseVehiculeLibelle ?? "Pièce de rechange" : "Paiement livraison cacao")],
-    ["Livraison associée",   formatNumeroPesee(row.livraisonNumeroPesee, row.livraisonAnneeNumeroPesee)
+    ["N° de pesée",          formatNumeroPesee(row.livraisonNumeroPesee, row.livraisonAnneeNumeroPesee)
       ?? row.livraisonRef
       ?? "NON-NUMÉROTÉE"],
     ["Date livraison",       row.livraisonDate ? formaterDate(row.livraisonDate) : "—"],

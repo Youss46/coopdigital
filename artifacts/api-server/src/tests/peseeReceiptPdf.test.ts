@@ -205,6 +205,8 @@ function makePaiementRow(overrides: Partial<Record<string, unknown>> = {}) {
     membreCni: "CI12345",
     membreTel: "+22501234567",
     livraisonDate: "2026-08-17",
+    livraisonNumeroPesee: 42,
+    livraisonAnneeNumeroPesee: 2026,
     livraisonMontantNetFcfa: 590000,
     livraisonMontantRestant: 400000,
     livraisonStatutPaiement: "PARTIEL",
@@ -334,6 +336,14 @@ describe("generateRecuPaiement (real PDF generation) — receipt number in PDF o
     const text = extractPdfText(buf);
     expect(text).toContain("Date et heure de règlement");
     expect(text).toContain("18/08/2026");
+  });
+
+  it("affiche le numéro canonique de la pesée liée au paiement", async () => {
+    setupDbSelect(makePaiementRow());
+    const buf = await generateRecuPaiement(PAIEMENT_ID, 1);
+    const text = extractPdfText(buf);
+    expect(text).toContain("N° de pesée");
+    expect(text).toContain("PES-S-2026-00042");
   });
 
   it("PAY fallback: passes PAY-{id} to drawHeader when numeroRecu is null (legacy row)", async () => {
