@@ -696,6 +696,8 @@ async function debiterMobileDansTransaction(
         telephone: membresTable.telephone,
         nom: membresTable.nom,
         prenoms: membresTable.prenoms,
+        fournisseurNom: fournisseursTable.nom,
+        fournisseurPrenoms: fournisseursTable.prenoms,
         membreDelegueId: membresTable.delegueId,
         fournisseurCoopId: fournisseursTable.cooperativeId,
         bonCarburantCoopId: bonsCarburantTable.cooperativeId,
@@ -724,6 +726,11 @@ async function debiterMobileDansTransaction(
       res.status(409).json({ erreur: `Statut actuel : ${row.paiement.statut}. Seuls les paiements en_attente peuvent être validés.` });
       return;
     }
+    const beneficiairePaiement = (
+      `${row.nom ?? ""} ${row.prenoms ?? ""}`.trim()
+      || `${row.fournisseurNom ?? ""} ${row.fournisseurPrenoms ?? ""}`.trim()
+      || `PAI-${id}`
+    );
 
     const livraisonAvecSolde = !!row.paiement.livraisonId && estLivraisonAvecSolde(row.livraisonStatutPaiement);
     const montantRestantActuel = livraisonAvecSolde
@@ -928,7 +935,7 @@ async function debiterMobileDansTransaction(
               await tx.insert(chequesEmisTable).values({
                 cooperativeId,
                 numeroCheque: ligne.numeroCheque ?? null,
-                beneficiaire: `${row.nom ?? ""} ${row.prenoms ?? ""}`.trim() || `PAI-${id}`,
+                beneficiaire: beneficiairePaiement,
                 montantFcfa: ligne.montantFcfa,
                 paiementId: id,
                 paiementLigneId: ligneInseree.id,
@@ -951,7 +958,7 @@ async function debiterMobileDansTransaction(
               sourceId: id,
               libelle: isBonCarburant
                 ? `Carburant – Bon PAI-${id} (${ligne.modePaiement})`
-                : `Paiement producteur – ${`${row.nom ?? ""} ${row.prenoms ?? ""}`.trim() || `PAI-${id}`} (${ligne.modePaiement})`,
+                : `Paiement producteur – ${beneficiairePaiement} (${ligne.modePaiement})`,
               compteDebit: compteDebitPaiement,
               compteCredit,
               montantFcfa: ligne.montantFcfa,
@@ -1229,7 +1236,7 @@ async function debiterMobileDansTransaction(
         await tx.insert(chequesEmisTable).values({
           cooperativeId,
           numeroCheque: body.numeroCheque ?? null,
-          beneficiaire: `${row.nom ?? ""} ${row.prenoms ?? ""}`.trim() || `PAI-${id}`,
+          beneficiaire: beneficiairePaiement,
           montantFcfa: montantDemande,
           paiementId: id,
           paiementLigneId: ligneInseree!.id,
@@ -1247,7 +1254,7 @@ async function debiterMobileDansTransaction(
         sourceId: id,
         libelle: isBonCarburant
           ? `Carburant – Bon PAI-${id}`
-          : `Paiement producteur – ${`${row.nom ?? ""} ${row.prenoms ?? ""}`.trim() || `PAI-${id}`}`,
+          : `Paiement producteur – ${beneficiairePaiement}`,
         compteDebit: compteDebitPaiement,
         compteCredit: isMobile ? "552" : mode === "especes" ? "571" : "521",
         montantFcfa: montantDemande,

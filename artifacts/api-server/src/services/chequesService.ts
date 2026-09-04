@@ -5,11 +5,24 @@ import {
   paiementsTable,
   livraisonsTable,
   membresTable,
+  fournisseursTable,
 } from "@workspace/db";
 import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { enregistrerMouvement } from "./banqueService.js";
 
 function today(): string { return new Date().toISOString().slice(0, 10); }
+
+export function resolveBeneficiaireCheque(row: {
+  beneficiaire: string;
+  nomMembre: string | null;
+  prenomsMembre: string | null;
+  nomFournisseur: string | null;
+  prenomsFournisseur: string | null;
+}): string {
+  const nomMembre = `${row.nomMembre ?? ""} ${row.prenomsMembre ?? ""}`.trim();
+  const nomFournisseur = `${row.nomFournisseur ?? ""} ${row.prenomsFournisseur ?? ""}`.trim();
+  return nomMembre || nomFournisseur || row.beneficiaire;
+}
 
 // ─── Lecture ──────────────────────────────────────────────────────────────────
 
@@ -35,10 +48,17 @@ export async function listCheques(cooperativeId: number, statut?: string) {
       nomBanque:        comptesBancairesTable.nom,
       nomMembre:        membresTable.nom,
       prenomsMembre:    membresTable.prenoms,
+      nomFournisseur:   fournisseursTable.nom,
+      prenomsFournisseur: fournisseursTable.prenoms,
     })
     .from(chequesEmisTable)
     .leftJoin(comptesBancairesTable, eq(chequesEmisTable.compteBancaireId, comptesBancairesTable.id))
-    .leftJoin(membresTable, eq(chequesEmisTable.membreId, membresTable.id))
+    .leftJoin(livraisonsTable, eq(chequesEmisTable.livraisonId, livraisonsTable.id))
+    .leftJoin(
+      membresTable,
+      sql`${membresTable.id} = coalesce(${chequesEmisTable.membreId}, ${livraisonsTable.membreId})`,
+    )
+    .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
     .where(
       statut
         ? and(
@@ -59,7 +79,10 @@ export async function listCheques(cooperativeId: number, statut?: string) {
       desc(chequesEmisTable.createdAt),
     );
 
-  return rows;
+  return rows.map((row) => ({
+    ...row,
+    beneficiaire: resolveBeneficiaireCheque(row),
+  }));
 }
 
 export async function getCheque(id: number, cooperativeId: number) {

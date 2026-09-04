@@ -24,6 +24,7 @@ vi.mock("@workspace/db", () => {
     paiementsTable: table("paiements"),
     livraisonsTable: table("livraisons"),
     membresTable: table("membres"),
+    fournisseursTable: table("fournisseurs"),
   };
 });
 
@@ -38,7 +39,7 @@ vi.mock("drizzle-orm", () => ({
   inArray: vi.fn(() => ({})),
 }));
 
-const { encaisserCheque } = await import("../services/chequesService.js");
+const { encaisserCheque, resolveBeneficiaireCheque } = await import("../services/chequesService.js");
 
 function selectChain<T>(rows: T[]) {
   const chain = {
@@ -143,5 +144,34 @@ describe("encaissement d'un chèque", () => {
       expect.anything(),
       tx,
     );
+  });
+});
+
+describe("bénéficiaires des chèques émis", () => {
+  it("conserve deux bénéficiaires distincts lorsque le numéro de chèque est identique", () => {
+    const numeroCheque = "2849398";
+    const rows = [
+      {
+        numeroCheque,
+        beneficiaire: "PAI-139",
+        nomMembre: null,
+        prenomsMembre: null,
+        nomFournisseur: "KOFFI",
+        prenomsFournisseur: "Aya",
+      },
+      {
+        numeroCheque,
+        beneficiaire: "PAI-140",
+        nomMembre: "TRAORE",
+        prenomsMembre: "Abdoulaye",
+        nomFournisseur: null,
+        prenomsFournisseur: null,
+      },
+    ];
+
+    expect(rows.map(resolveBeneficiaireCheque)).toEqual([
+      "KOFFI Aya",
+      "TRAORE Abdoulaye",
+    ]);
   });
 });
