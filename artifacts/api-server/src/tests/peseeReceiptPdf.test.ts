@@ -332,7 +332,7 @@ describe("generateRecuPaiement (real PDF generation) — receipt number in PDF o
     }));
     const buf = await generateRecuPaiement(PAIEMENT_ID, 1);
     const text = extractPdfText(buf);
-    expect(text).toContain("Date de règlement");
+    expect(text).toContain("Date et heure de règlement");
     expect(text).toContain("18/08/2026");
   });
 

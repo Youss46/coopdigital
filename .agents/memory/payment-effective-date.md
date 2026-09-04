@@ -9,4 +9,4 @@ Pour compter un règlement confirmé, effectué ou en cours dans une période, u
 
 **How to apply:** Dans les KPI, statistiques et exports périodiques, séparer le montant immédiat du montant des chèques. Compter chaque chèque encaissé dans la période de son encaissement, y compris pour un règlement ventilé.
 
-Tout reçu PDF marqué payé affiche obligatoirement la date effective sous « Date de règlement ». Le reçu d’une livraison payée prend le dernier règlement confirmé/effectué.
+Tout reçu PDF marqué payé affiche obligatoirement la date et l’heure effectives sous « Date et heure de règlement ». Le reçu d’une livraison payée prend le dernier règlement confirmé/effectué.

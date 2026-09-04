@@ -925,7 +925,7 @@ export async function generateRecuLivraison(livraisonId: number, cooperativeId: 
     ["Campagne",           campagne ?? "—"],
     ["Date de livraison",  formaterDate(row.dateLivraison)],
     ...(dateReglementLivraison
-      ? [["Date de règlement", formaterDateHeure(dateReglementLivraison)] as [string, string]]
+      ? [["Date et heure de règlement", formaterDateHeure(dateReglementLivraison)] as [string, string]]
       : []),
     ["Heure de pesée",     row.createdAt
       ? new Date(row.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Africa/Abidjan" })
@@ -1155,7 +1155,7 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
     ["Campagne",             campagne ?? "—"],
     ["Date",                 formaterDateHeure(row.createdAt)],
     ...(dateReglement
-      ? [["Date de règlement", formaterDateHeure(dateReglement)] as [string, string]]
+      ? [["Date et heure de règlement", formaterDateHeure(dateReglement)] as [string, string]]
       : []),
     ["Mode de paiement",     payModeLabel[(row.modeReglement ?? row.modePaiement) ?? ""] ?? row.modePaiement ?? "—"],
     ["Référence transaction",row.referenceTransaction ?? "—"],
