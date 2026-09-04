@@ -119,7 +119,7 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
             ))
         : Promise.resolve([{ tonnage: 0 }]),
       db
-        .select({ total: sql<number>`coalesce(sum(montant_fcfa),0)::int` })
+        .select({ total: sql<number>`coalesce(sum(${paiementsTable.montantFcfa}),0)::int` })
         .from(paiementsTable)
         .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
         .leftJoin(livraisonsTable, eq(paiementsTable.livraisonId, livraisonsTable.id))
