@@ -1030,6 +1030,13 @@
       "when": 1788484200000,
       "tag": "0146_controle_chargement_obligatoire",
       "breakpoints": true
+    },
+    {
+      "idx": 147,
+      "version": "7",
+      "when": 1788519000000,
+      "tag": "0147_paiements_date_validation_obligatoire",
+      "breakpoints": true
     }
   ]
 }

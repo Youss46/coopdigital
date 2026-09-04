@@ -714,6 +714,7 @@ export async function enregistrerPaiement(
     montantFcfa: livraison.montantNetFcfa,
     modePaiement: data.modePaiement as "orange_money" | "mtn_momo" | "especes",
     statut: "confirme",
+    dateValidation: new Date(),
     initialisePar: agentId,
     agentSaisiseurId: proxyMode ? agentSaisiseurId : null,
     numeroRecu,

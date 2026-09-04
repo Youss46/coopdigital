@@ -1,4 +1,5 @@
-import { pgTable, serial, integer, text, boolean, numeric, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, boolean, numeric, timestamp, pgEnum, check } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { livraisonsTable } from "./livraisons";
@@ -58,7 +59,12 @@ export const paiementsTable = pgTable("paiements", {
   initialisePar: integer("initialise_par").references(() => usersTable.id),
   /** Utilisateur réellement connecté ayant saisi l'opération (mode proxy gérant) */
   agentSaisiseurId: integer("agent_saisiseur_id").references(() => usersTable.id),
-});
+}, (table) => [
+  check(
+    "paiements_confirmes_date_validation_check",
+    sql`${table.statut} NOT IN ('confirme', 'effectue') OR ${table.dateValidation} IS NOT NULL`,
+  ),
+]);
 
 export const insertPaiementSchema = createInsertSchema(paiementsTable).omit({
   id: true,
