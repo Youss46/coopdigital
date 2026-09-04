@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { db, paiementsTable, paiementLignesTable, membresTable, livraisonsTable, fournisseursTable, usersTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable, caissesTable, chequesEmisTable, bonsCarburantTable, campagnesTable } from "@workspace/db";
+import { db, paiementsTable, paiementLignesTable, membresTable, livraisonsTable, fournisseursTable, usersTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable, caissesTable, chequesEmisTable, bonsCarburantTable, campagnesTable, sessionsPeseeTable, commissionsMembresDelaguesTable } from "@workspace/db";
 import { eq, desc, and, or, sql, gte, lt, lte, inArray, isNull, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { envoyerPushGroupePortail, envoyerPushGroupe } from "../services/pushService";
@@ -253,6 +253,8 @@ const SELECT_FIELDS = {
   montantBrutFcfa: livraisonsTable.montantBrutFcfa,
   avanceDeduiteFcfa: livraisonsTable.avanceDeduiteFcfa,
   intrantsDeduitsFcfa: livraisonsTable.intrantsDeduitsFcfa,
+  fraisCarburantDeduitsFcfa: livraisonsTable.fraisCarburantDeduitsFcfa,
+  autresChargesDeduitesFcfa: livraisonsTable.autresChargesDeduitesFcfa,
   montantNetFcfa: livraisonsTable.montantNetFcfa,
   livraisonStatutPaiement: livraisonsTable.statutPaiement,
   livraisonMontantRestant: sql<number>`coalesce(${livraisonsTable.montantRestant}, '0')::integer`,
@@ -261,6 +263,11 @@ const SELECT_FIELDS = {
   // Attribution proxy gérant
   agentSaisiseurId: paiementsTable.agentSaisiseurId,
   agentSaisiseurNom: saisiseurUserAlias.nom,
+  commissionCollecteId: commissionsMembresDelaguesTable.id,
+  commissionCollecteFcfa: sql<number | null>`round(${commissionsMembresDelaguesTable.montantFcfa})::integer`,
+  commissionCollecteStatut: commissionsMembresDelaguesTable.statut,
+  commissionCollecteRetenueAvancesFcfa: commissionsMembresDelaguesTable.retenueAvancesFcfa,
+  commissionCollecteMembreId: commissionsMembresDelaguesTable.membreDelegueId,
 };
 
 async function attachPaiementLignes<T extends { id: number }>(rows: T[]) {
@@ -282,6 +289,8 @@ async function fetchEnrichedPaiement(id: number) {
     .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
     .leftJoin(livraisonsTable, eq(paiementsTable.livraisonId, livraisonsTable.id))
     .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
+    .leftJoin(sessionsPeseeTable, eq(sessionsPeseeTable.livraisonId, livraisonsTable.id))
+    .leftJoin(commissionsMembresDelaguesTable, eq(commissionsMembresDelaguesTable.sessionPeseeId, sessionsPeseeTable.id))
     .leftJoin(bonsCarburantTable, eq(paiementsTable.bonCarburantId, bonsCarburantTable.id))
     .leftJoin(saisiseurUserAlias, eq(paiementsTable.agentSaisiseurId, saisiseurUserAlias.id))
     .where(eq(paiementsTable.id, id))
@@ -391,6 +400,8 @@ export async function listPaiements(req: Request, res: Response): Promise<void> 
       .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
       .leftJoin(livraisonsTable, eq(paiementsTable.livraisonId, livraisonsTable.id))
       .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
+      .leftJoin(sessionsPeseeTable, eq(sessionsPeseeTable.livraisonId, livraisonsTable.id))
+      .leftJoin(commissionsMembresDelaguesTable, eq(commissionsMembresDelaguesTable.sessionPeseeId, sessionsPeseeTable.id))
       .leftJoin(agentUserAlias, eq(livraisonsTable.agentId, agentUserAlias.id))
       .leftJoin(bonsCarburantTable, eq(paiementsTable.bonCarburantId, bonsCarburantTable.id))
       .leftJoin(saisiseurUserAlias, eq(paiementsTable.agentSaisiseurId, saisiseurUserAlias.id))
