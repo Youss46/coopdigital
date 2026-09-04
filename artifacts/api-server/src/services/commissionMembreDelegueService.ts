@@ -368,31 +368,6 @@ export async function payerCommissionsMembreDelegue(
     return { membre, aTraiter, montantTotal: 0, totalRetenu: 0, montantNet: 0 };
   }
 
-  // Une commission configurée « fin de campagne » ne peut être réglée
-  // qu'après la fermeture de sa campagne. Le paiement reste manuel afin que
-  // le responsable choisisse le moyen de règlement au moment du solde.
-  const campagnesFinDeCampagne = aTraiter.filter(
-    (commission) => commission.frequencePaiement === "fin_campagne",
-  );
-  if (campagnesFinDeCampagne.length > 0) {
-    const campagneIds = [...new Set(campagnesFinDeCampagne.map((commission) => commission.campagneId))];
-    if (campagneIds.some((id) => id === null)) {
-      throw new Error("Une commission prévue en fin de campagne n'est rattachée à aucune campagne.");
-    }
-    const campagnes = await tx
-      .select({ id: campagnesTable.id, statut: campagnesTable.statut, libelle: campagnesTable.libelle })
-      .from(campagnesTable)
-      .where(inArray(campagnesTable.id, campagneIds as number[]));
-    const campagneNonFermee = campagnes.find(
-      (campagne) => campagne.statut !== "fermee" && campagne.statut !== "archivee",
-    );
-    if (campagneNonFermee) {
-      throw new Error(
-        `Le paiement des commissions de "${campagneNonFermee.libelle}" est prévu en fin de campagne.`,
-      );
-    }
-  }
-
   // ── Déduction des avances membres ─────────────────────────────────────────
   // Les avances sont déduites des commissions (oldest first) en appliquant planType.
   const avancesEnCours = await tx

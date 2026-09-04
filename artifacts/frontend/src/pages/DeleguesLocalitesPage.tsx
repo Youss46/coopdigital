@@ -1462,7 +1462,7 @@ export default function DeleguesLocalitesPage() {
                     <option value="fin_campagne">En fin de campagne</option>
                   </select>
                   <p className="mt-1 text-[11px] text-gray-500">
-                    En fin de campagne, le règlement reste en attente jusqu’à la fermeture de la campagne.
+                    À régler lors du solde de fin de campagne, avant la clôture définitive.
                   </p>
                 </div>
                 <label className="flex items-center gap-2 self-end pb-2 text-sm text-gray-700 cursor-pointer">

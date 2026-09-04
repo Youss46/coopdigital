@@ -701,7 +701,7 @@ export default function CampagnesPage() {
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h2 className="font-semibold text-gray-900">Étape 1 — Vérifications pré-clôture</h2>
-                    <p className="text-xs text-gray-500 mt-0.5">10 contrôles automatiques avant de clôturer</p>
+                    <p className="text-xs text-gray-500 mt-0.5">11 contrôles automatiques avant de clôturer</p>
                   </div>
                   {peutVerifier && (
                     <button onClick={handleLancerVerifs} disabled={verifsLoading}

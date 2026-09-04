@@ -114,9 +114,6 @@ export async function payerHandler(req: Request, res: Response): Promise<void> {
   } catch (err) {
     req.log.error({ err }, "payerCommissionsMembreDelegue");
     const msg = err instanceof Error ? err.message : "Erreur interne";
-    const status = msg.includes("prévu en fin de campagne") || msg.includes("rattachée à aucune campagne")
-      ? 409
-      : 500;
-    res.status(status).json({ erreur: msg });
+    res.status(500).json({ erreur: msg });
   }
 }

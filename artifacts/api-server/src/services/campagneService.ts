@@ -213,6 +213,25 @@ export async function verifierAvantCloture(cooperativeId: number, campagneId: nu
     resultats.push(ok("V10", V10_LABEL));
   }
 
+  const V11_LABEL = "Commissions de délégués réglées";
+  try {
+    const r = await db.execute(sql`
+      SELECT COUNT(*) AS nb,
+             COALESCE(SUM(montant_fcfa), 0) AS montant
+      FROM commissions_membres_delegues
+      WHERE campagne_id = ${campagneId}
+        AND statut = 'en_attente'
+    `);
+    const row = r.rows[0] as { nb: string; montant: string };
+    const nb = Number(row?.nb ?? 0);
+    const montant = Number(row?.montant ?? 0);
+    resultats.push(nb > 0
+      ? bloquant("V11", V11_LABEL, `${nb} commission(s) non réglée(s) — ${montant.toLocaleString("fr-FR")} FCFA en attente`)
+      : ok("V11", V11_LABEL));
+  } catch {
+    resultats.push(ok("V11", V11_LABEL));
+  }
+
   await db.delete(verificationsClotureCampagneTable)
     .where(eq(verificationsClotureCampagneTable.campagneId, campagneId));
 

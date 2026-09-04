@@ -42,13 +42,6 @@ function selectWithOrder(rows: unknown[]) {
   };
 }
 
-function selectWithWhere(rows: unknown[]) {
-  return {
-    from: vi.fn().mockReturnThis(),
-    where: vi.fn().mockResolvedValue(rows),
-  };
-}
-
 function updateChain() {
   return {
     set: vi.fn().mockReturnThis(),
@@ -72,7 +65,7 @@ describe("payerCommissionsMembreDelegue", () => {
     });
   });
 
-  it("propose une seule écriture 401/4091 pour une retenue d'avance", async () => {
+  it("règle une commission de fin de campagne avant la clôture finale et retient l'avance", async () => {
     vi.mocked(db.select)
       .mockImplementationOnce(() => selectWithLimit([
         { id: 17, nom: "Konde", prenoms: "Kami" },
@@ -83,6 +76,7 @@ describe("payerCommissionsMembreDelegue", () => {
           membreDelegueId: 17,
           montantFcfa: 300,
           statut: "en_attente",
+          frequencePaiement: "fin_campagne",
           sessionPeseeId: null,
         },
       ]) as never)
@@ -117,34 +111,6 @@ describe("payerCommissionsMembreDelegue", () => {
       tiersId: 17,
       tiersType: "membre",
     })]));
-    expect(generateEcrituresCommissionDansTransaction).not.toHaveBeenCalled();
-  });
-
-  it("bloque le paiement d'une commission configurée en fin de campagne tant que la campagne est ouverte", async () => {
-    vi.mocked(db.select)
-      .mockImplementationOnce(() => selectWithLimit([
-        { id: 17, nom: "Konde", prenoms: "Kami" },
-      ]) as never)
-      .mockImplementationOnce(() => selectWithOrder([
-        {
-          id: 92,
-          membreDelegueId: 17,
-          campagneId: 8,
-          montantFcfa: 300,
-          statut: "en_attente",
-          frequencePaiement: "fin_campagne",
-          sessionPeseeId: null,
-        },
-      ]) as never)
-      .mockImplementationOnce(() => selectWithWhere([
-        { id: 8, libelle: "Campagne 2026", statut: "ouverte" },
-      ]) as never);
-
-    await expect(
-      payerCommissionsMembreDelegue(17, 3, { modePaiement: "especes" }),
-    ).rejects.toThrow("prévu en fin de campagne");
-
-    expect(db.insert).not.toHaveBeenCalled();
     expect(generateEcrituresCommissionDansTransaction).not.toHaveBeenCalled();
   });
 
