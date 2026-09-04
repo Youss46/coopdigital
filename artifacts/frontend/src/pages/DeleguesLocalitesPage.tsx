@@ -1372,7 +1372,7 @@ export default function DeleguesLocalitesPage() {
         <>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <p className="text-sm text-gray-600">
-              Taux de commission FCFA/kg appliqués aux délégués de localités lors de la pesée.
+              Taux de commission FCFA/kg appliqués aux délégués de localités lors de la pesée. Les paramètres restent modifiables à tout moment ; les commissions déjà générées ne sont pas recalculées.
             </p>
             {!showTauxForm && peutGererTaux && (
               <button

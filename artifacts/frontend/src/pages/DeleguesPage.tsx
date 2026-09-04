@@ -560,7 +560,9 @@ export default function DeleguesPage() {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: "1rem" }}>Taux de commission (FCFA/kg)</div>
-                    <div style={{ fontSize: ".82rem", color: "#6b7280" }}>Les taux s'appliquent au poids net collecté par le délégué responsable du membre.</div>
+                    <div style={{ fontSize: ".82rem", color: "#6b7280" }}>
+                      Les taux s'appliquent au poids net collecté par le délégué responsable du membre. Ils restent modifiables à tout moment ; les commissions déjà générées ne sont pas recalculées.
+                    </div>
                   </div>
                   {peutGererTaux && (
                     <button

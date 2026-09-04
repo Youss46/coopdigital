@@ -110,3 +110,4 @@
 - [Diagnostic des KPI](dashboard-kpi-diagnostics.md) — afficher la cause réelle des métriques dégradées et qualifier les agrégats SQL après jointures.
 - [Assertions de texte PDF](pdf-text-assertions.md) — tester les mots métier séparément; l’extraction PDF peut supprimer ou transformer les apostrophes typographiques.
 - [Règlement avec commission de collecte](reglement-commission-collecte.md) — le net cacao et la commission liée sont ventilés séparément; seul le choix « tout payer » clôture la commission.
+- [Configuration historique des commissions](commission-config-history.md) — les paramètres restent modifiables; les commissions déjà générées gardent leur taux, montant et historique.
