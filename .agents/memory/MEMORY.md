@@ -60,6 +60,7 @@
 - [Contrôle de licence](licence-guard-dev-testing.md) — seuls PCA, directeur et comptable sont soumis à tenantGuard; une licence valide prime sur l’historique expiré.
 - [Période campagne du tableau de bord](dashboard-campaign-filter.md) — « Toute la campagne » doit être un mode API explicite, pas une absence de dates.
 - [Avances membres — plan déduction flexible](avances-membres-plan.md) — planType/montantPartielFcfa/reportDate sur avancesTable; remboursementsAvancesMembresTable pour historique; livraisonsController itère TOUTES les avances en_cours par dateOctroi ASC (pas limit 1).
+- [Avances excluent les membres délégués](avances-exclude-member-delegates.md) — la page Avances concerne les producteurs ordinaires; les membres « délégué de localités » sont exclus de la liste et de la création.
 - [Avances délégués — architecture](avances-delegues-arch.md) — table dédiée avances_delegues; retenue automatique dans payerCommissions (même transaction); planType integral/partiel/reporte; UI onglet 4 dans DeleguesPage.
 - [Bons réception membres délégués — architecture](bons-reception-membres-delegues-arch.md) — frais avancés = créance membre 409x, récupérée sans produit; le compte de dette est figé à la livraison.
 - [Accès aux taux des délégués de localités](local-delegates-rate-access.md) — l’administration des taux suit le modèle des délégués terrain, sans dépendre de la permission `delegues`.
