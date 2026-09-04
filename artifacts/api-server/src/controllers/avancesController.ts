@@ -48,12 +48,12 @@ export async function listAvances(req: Request, res: Response): Promise<void> {
       ?? (req.params["membreId"] ? parseInt(String(req.params["membreId"])) : undefined)
       ?? (req.query["membre_id"] ? parseInt(String(req.query["membre_id"])) : undefined);
 
-    const conditions: ReturnType<typeof eq>[] = [eq(membresTable.cooperativeId, cooperativeId)];
+    const conditions: ReturnType<typeof eq>[] = [
+      eq(membresTable.cooperativeId, cooperativeId),
+      ne(membresTable.categorieMembre, CATEGORIE_DELEGUE_LOCALITE),
+    ];
     if (statut) conditions.push(eq(avancesTable.statut, statut as "en_cours" | "rembourse" | "en_retard"));
     if (membreId) conditions.push(eq(avancesTable.membreId, membreId));
-    if (estPorteeDelegueLocalite(res)) {
-      conditions.push(eq(membresTable.categorieMembre, CATEGORIE_DELEGUE_LOCALITE));
-    }
     // Un délégué ne voit que les avances des membres qui lui sont rattachés
     if (req.user?.role === "delegue" && req.user?.id) {
       conditions.push(eq(membresTable.delegueId, req.user.id));
@@ -172,8 +172,8 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
       res.status(403).json({ erreur: "Ce membre n'appartient pas à votre coopérative" });
       return;
     }
-    if (estPorteeDelegueLocalite(res) && membre.categorieMembre !== CATEGORIE_DELEGUE_LOCALITE) {
-      res.status(404).json({ erreur: "Délégué de localités introuvable" });
+    if (membre.categorieMembre === CATEGORIE_DELEGUE_LOCALITE) {
+      res.status(400).json({ erreur: "Les membres délégués ne sont pas éligibles aux avances de cette page." });
       return;
     }
 
@@ -393,7 +393,11 @@ export async function getAvancesEncours(req: Request, res: Response): Promise<vo
       })
       .from(avancesTable)
       .leftJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
-      .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(avancesTable.statut, "en_cours")))
+      .where(and(
+        eq(membresTable.cooperativeId, cooperativeId),
+        ne(membresTable.categorieMembre, CATEGORIE_DELEGUE_LOCALITE),
+        eq(avancesTable.statut, "en_cours"),
+      ))
       .orderBy(desc(avancesTable.createdAt));
 
     const totaux = avances.reduce(
@@ -638,6 +642,7 @@ export async function getAvancesReportees(req: Request, res: Response): Promise<
 
     const conditions: ReturnType<typeof eq>[] = [
       eq(membresTable.cooperativeId, cooperativeId),
+      ne(membresTable.categorieMembre, CATEGORIE_DELEGUE_LOCALITE),
       eq(avancesTable.planType, "reporte"),
       ne(avancesTable.statut, "rembourse"),
       or(isNull(avancesTable.reportDate), lt(avancesTable.reportDate, today))!,
@@ -647,10 +652,6 @@ export async function getAvancesReportees(req: Request, res: Response): Promise<
     if (req.user?.role === "delegue" && req.user?.id) {
       conditions.push(eq(membresTable.delegueId, req.user.id));
     }
-    if (estPorteeDelegueLocalite(res)) {
-      conditions.push(eq(membresTable.categorieMembre, CATEGORIE_DELEGUE_LOCALITE));
-    }
-
     const avances = await db
       .select({
         id:                 avancesTable.id,

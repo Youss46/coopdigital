@@ -105,7 +105,9 @@ export default function Avances() {
   // (reportDate dépassée ou nulle) — not all planType=reporte regardless of date
   const reporteeIds = new Set((reporteesData?.avances ?? []).map((a) => (a as { id: number }).id));
   const avances = filtreReportees ? avancesFiltrees.filter((a: Avance) => reporteeIds.has(a.id)) : avancesFiltrees;
-  const membres = membresData?.membres ?? [];
+  const membres = (membresData?.membres ?? []).filter(
+    (membre) => membre.categorieMembre !== "délégué de localités",
+  );
   const totaux = avances.reduce(
     (acc, avance) => ({
       totalOctroye: acc.totalOctroye + Number(avance.montantOctroyeFcfa ?? 0),
