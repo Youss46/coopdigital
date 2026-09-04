@@ -200,7 +200,9 @@ export async function drawHeader(
   // Un nom ou un IBAN long ne doit jamais déborder dans la boîte du document
   // ni revenir à la marge gauche (comportement PDFKit lorsque la ligne est
   // trop longue et que le curseur n'est pas repositionné).
-  const infoTextWidth = Math.max(130, infoWidth);
+  // Ne jamais élargir artificiellement cette zone : elle doit rester avant la
+  // boîte de titre, y compris sur un format de page plus étroit que l'A4.
+  const infoTextWidth = Math.max(1, infoWidth);
   const lineHeight = (fontSize: number): number => fontSize * 1.15;
   const drawInfoBlock = (
     text: string,
@@ -356,10 +358,14 @@ export async function drawHeader(
 
   // ── Repositionne le curseur ───────────────────────────────────────────────────
   doc.x = marginLeft;
-  doc.y = options.hauteur_reservee ?? Math.max(
+  const minimumBodyY = Math.max(
     separatorY + 14,
     hasBankLine ? 110 : 96,
   );
+  // Certains documents indiquent une hauteur réservée fixe. Elle ne doit pas
+  // pouvoir faire commencer le contenu avant la fin d'un en-tête qui a dû
+  // revenir à la ligne.
+  doc.y = Math.max(options.hauteur_reservee ?? 0, minimumBodyY);
 }
 
 // ── Pied de page ──────────────────────────────────────────────────────────────
