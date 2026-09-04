@@ -47,11 +47,11 @@ describe("pdfHeaderService", () => {
       [string, number?, number?, { width?: number; lineBreak?: boolean }?]
     >;
     const nameCall = calls.find(([text]) => text === config.nomComplet);
-    const infoCalls = calls.filter(([, x]) => x === 107);
+    const infoCalls = calls.filter(([, x]) => x === 124);
 
     expect(nameCall).toBeDefined();
     expect(nameCall?.[3]?.lineBreak).toBe(true);
-    expect(nameCall?.[3]?.width).toBeLessThan(310);
+    expect(nameCall?.[3]?.width).toBeLessThan(293);
     expect(infoCalls.length).toBeGreaterThanOrEqual(6);
     expect(doc.y).toBeGreaterThan(110);
 

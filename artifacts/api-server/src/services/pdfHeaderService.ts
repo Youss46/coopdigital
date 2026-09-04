@@ -164,10 +164,12 @@ export async function drawHeader(
   // ── Barre colorée en haut (4px) ─────────────────────────────────────────────
   doc.save().rect(0, 0, pageWidth, 4).fill(couleur).restore();
 
-  // ── Logo gauche (55×55) ──────────────────────────────────────────────────────
-  const logoSize = 55;
+  // ── Logo gauche (72×72) ──────────────────────────────────────────────────────
+  // Le logo doit rester lisible sur les reçus imprimés, sans empiéter sur la
+  // zone de texte qui est recalculée à partir de cette largeur.
+  const logoSize = 72;
   const logoX    = marginLeft;
-  const logoY    = 12;
+  const logoY    = 8;
   if (logoBuffer.length > 0) {
     try {
       doc.image(logoBuffer, logoX, logoY, {
@@ -284,7 +286,7 @@ export async function drawHeader(
 
   // Le séparateur et le curseur suivent la hauteur réellement utilisée. Cela
   // évite que les coordonnées bancaires recouvrent la ligne ou le contenu.
-  const separatorY = Math.max(76, Math.ceil(currentY + 6));
+  const separatorY = Math.max(88, Math.ceil(currentY + 6));
 
   // ── Boîte titre document (droite) ────────────────────────────────────────────
   if (hasTitre) {
