@@ -1375,6 +1375,8 @@ async function debiterMobileDansTransaction(
       const isMobile = mode === "orange_money" || mode === "mtn_momo" || mode === "wave";
       const compteDebitPaiement = isBonCarburant
         ? "6042"
+        : isDepenseVehicule
+        ? "624"
         : await resolveCompteDetteProducteur(cooperativeId, row.compteDetteProducteur);
 
       if (mode === "especes" && cooperativeId) {
