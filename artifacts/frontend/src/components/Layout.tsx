@@ -216,7 +216,7 @@ function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout:
   const estDelegue = utilisateur?.role === "delegue";
   const REGLEMENTS_ROLES = ["pca", "directeur", "comptable", "caissier", "delegue"];
   const peutVoirReglements = REGLEMENTS_ROLES.includes(utilisateur?.role ?? "");
-  const { data: paiementsStats } = useGetPaiementsStats({
+  const { data: paiementsStats } = useGetPaiementsStats(undefined, {
     query: {
       queryKey: getGetPaiementsStatsQueryKey(),
       enabled: peutVoirReglements,

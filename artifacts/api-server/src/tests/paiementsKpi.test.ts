@@ -38,6 +38,10 @@ vi.mock("@workspace/db", () => ({
   chequesEmisTable: table("cheques_emis", [
     "id", "paiementId", "montantFcfa", "statut", "dateEncaissement",
   ]),
+  sessionsPeseeTable: table("sessions_pesee", ["id", "livraisonId"]),
+  commissionsMembresDelaguesTable: table("commissions_membres_delegues", [
+    "id", "sessionPeseeId", "montantFcfa", "statut", "membreDelegueId", "retenueAvancesFcfa",
+  ]),
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -66,6 +70,7 @@ vi.mock("../services/pushService.js", () => ({
 vi.mock("../services/comptabiliteService.js", () => ({
   proposerEcrituresDansTransaction: vi.fn(),
   resolveCompteDetteProducteur: vi.fn(),
+  resolveCompteDebit: vi.fn(),
 }));
 vi.mock("../services/caisseService.js", () => ({
   verifierCaisseEspeces: vi.fn(),

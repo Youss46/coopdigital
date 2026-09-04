@@ -254,7 +254,7 @@ export async function resolveCompteDetteProducteur(
 }
 
 // Variante : ne résoudre que le compte débit (crédit déterminé par le mode de paiement).
-async function resolveCompteDebit(
+export async function resolveCompteDebit(
   cooperativeId: number,
   module: string,
   operation: string,

@@ -1014,6 +1014,9 @@ export interface ValiderPaiementInput {
      * @minimum 1
      */
   montantReglementFcfa?: number | null;
+  /** Pour un règlement d'un membre délégué de localités, indique si la commission de collecte liée doit être payée avec le net du cacao.
+   */
+  inclureFraisCollecte?: boolean;
   /** Permet de corriger le mode de règlement au moment de la validation. Accepté pour les paiements liés à un bon carburant, sans mode prédéfini, ou pour un versement d'une livraison différée.
    */
   modePaiement?: ValiderPaiementInputModePaiement;
@@ -1126,6 +1129,10 @@ export interface PaiementListItem {
   /** @nullable */
   intrantsDeduitsFcfa?: number | null;
   /** @nullable */
+  fraisCarburantDeduitsFcfa?: number | null;
+  /** @nullable */
+  autresChargesDeduitesFcfa?: number | null;
+  /** @nullable */
   montantNetFcfa?: number | null;
   /**
      * Statut global de règlement de la livraison liée.
@@ -1143,6 +1150,16 @@ export interface PaiementListItem {
   agentSaisiseurId?: number | null;
   /** @nullable */
   agentSaisiseurNom?: string | null;
+  /** @nullable */
+  commissionCollecteId?: number | null;
+  /** @nullable */
+  commissionCollecteFcfa?: number | null;
+  /** @nullable */
+  commissionCollecteStatut?: string | null;
+  /** @nullable */
+  commissionCollecteRetenueAvancesFcfa?: number | null;
+  /** @nullable */
+  commissionCollecteMembreId?: number | null;
   lignes?: PaiementLigne[];
 }
 

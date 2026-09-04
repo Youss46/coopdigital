@@ -7828,6 +7828,11 @@ components:
           description: >
             Montant de ce versement. Pour une livraison différée, il doit être
             strictement positif et ne pas dépasser le solde restant.
+        inclureFraisCollecte:
+          type: boolean
+          description: >
+            Pour un règlement d'un membre délégué de localités, indique si la
+            commission de collecte liée doit être payée avec le net du cacao.
         modePaiement:
           type: string
           nullable: true
@@ -7918,6 +7923,10 @@ components:
           type: ["integer", "null"]
         intrantsDeduitsFcfa:
           type: ["integer", "null"]
+        fraisCarburantDeduitsFcfa:
+          type: ["integer", "null"]
+        autresChargesDeduitesFcfa:
+          type: ["integer", "null"]
         montantNetFcfa:
           type: ["integer", "null"]
         livraisonStatutPaiement:
@@ -7932,6 +7941,16 @@ components:
           type: ["integer", "null"]
         agentSaisiseurNom:
           type: ["string", "null"]
+        commissionCollecteId:
+          type: ["integer", "null"]
+        commissionCollecteFcfa:
+          type: ["integer", "null"]
+        commissionCollecteStatut:
+          type: ["string", "null"]
+        commissionCollecteRetenueAvancesFcfa:
+          type: ["integer", "null"]
+        commissionCollecteMembreId:
+          type: ["integer", "null"]
         lignes:
           type: array
           items:

@@ -3,7 +3,7 @@ import { db, paiementsTable, paiementLignesTable, membresTable, livraisonsTable,
 import { eq, desc, and, or, sql, gte, lt, lte, inArray, isNull, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { envoyerPushGroupePortail, envoyerPushGroupe } from "../services/pushService";
-import { proposerEcrituresDansTransaction, resolveCompteDetteProducteur } from "../services/comptabiliteService.js";
+import { proposerEcrituresDansTransaction, resolveCompteDetteProducteur, resolveCompteDebit } from "../services/comptabiliteService.js";
 import { verifierCaisseEspeces, debiterCaisseParResponsable, getSessionActive, enregistrerMouvement } from "../services/caisseService.js";
 import { notifierParRole } from "../services/notificationService.js";
 import { logger } from "../lib/logger.js";
@@ -741,6 +741,7 @@ async function debiterMobileDansTransaction(
     referenceTransaction?: string | null;
     telephone?: string | null;
     montantReglementFcfa?: number | null;
+    inclureFraisCollecte?: boolean;
     numeroCheque?: string | null;
     banque?: string | null;
     dateEcheance?: string | null;
@@ -774,11 +775,17 @@ async function debiterMobileDansTransaction(
         livraisonMontantNetFcfa: livraisonsTable.montantNetFcfa,
         livraisonMontantRestant: sql<number>`coalesce(${livraisonsTable.montantRestant}, '0')::integer`,
         compteDetteProducteur: livraisonsTable.compteDetteProducteur,
+        commissionCollecteId: commissionsMembresDelaguesTable.id,
+        commissionCollecteFcfa: sql<number | null>`round(${commissionsMembresDelaguesTable.montantFcfa})::integer`,
+        commissionCollecteStatut: commissionsMembresDelaguesTable.statut,
+        commissionCollecteMembreId: commissionsMembresDelaguesTable.membreDelegueId,
       })
       .from(paiementsTable)
       .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
       .leftJoin(livraisonsTable, eq(paiementsTable.livraisonId, livraisonsTable.id))
       .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
+      .leftJoin(sessionsPeseeTable, eq(sessionsPeseeTable.livraisonId, livraisonsTable.id))
+      .leftJoin(commissionsMembresDelaguesTable, eq(commissionsMembresDelaguesTable.sessionPeseeId, sessionsPeseeTable.id))
       .leftJoin(bonsCarburantTable, eq(paiementsTable.bonCarburantId, bonsCarburantTable.id))
       .where(eq(paiementsTable.id, id))
       .limit(1);
@@ -808,6 +815,23 @@ async function debiterMobileDansTransaction(
     const montantDemande = body.montantReglementFcfa == null
       ? row.paiement.montantFcfa
       : Number(body.montantReglementFcfa);
+    const commissionCollecteMontant = Math.max(0, Math.round(Number(row.commissionCollecteFcfa ?? 0)));
+    const commissionCollecteDisponible = row.commissionCollecteId != null
+      && row.commissionCollecteStatut === "en_attente"
+      && row.commissionCollecteMembreId === row.paiement.membreId
+      && commissionCollecteMontant > 0;
+    const inclureFraisCollecte = body.inclureFraisCollecte === true;
+    if (inclureFraisCollecte && !commissionCollecteDisponible) {
+      res.status(400).json({ erreur: "Aucun frais de collecte en attente n'est rattaché à ce règlement." });
+      return;
+    }
+    if (inclureFraisCollecte && (!livraisonAvecSolde || montantDemande !== montantRestantActuel)) {
+      res.status(400).json({
+        erreur: "Pour payer les frais de collecte, le montant net du règlement doit être payé intégralement.",
+      });
+      return;
+    }
+    const montantTotalPaiement = montantDemande + (inclureFraisCollecte ? commissionCollecteMontant : 0);
 
     if (body.montantReglementFcfa != null) {
       if (!Number.isSafeInteger(montantDemande) || montantDemande <= 0) {
@@ -878,9 +902,9 @@ async function debiterMobileDansTransaction(
       }
 
       const totalVentile = lignes.reduce((total, ligne) => total + ligne.montantFcfa, 0);
-      if (totalVentile !== montantDemande) {
+      if (totalVentile !== montantTotalPaiement) {
         res.status(400).json({
-          erreur: `Le total ventilé (${totalVentile.toLocaleString("fr-FR")} FCFA) doit être égal au montant du versement (${montantDemande.toLocaleString("fr-FR")} FCFA).`,
+          erreur: `Le total ventilé (${totalVentile.toLocaleString("fr-FR")} FCFA) doit être égal au montant à décaisser (${montantTotalPaiement.toLocaleString("fr-FR")} FCFA).`,
         });
         return;
       }
@@ -932,7 +956,7 @@ async function debiterMobileDansTransaction(
           const [paiementMisAJour] = await tx
             .update(paiementsTable)
             .set({
-              montantFcfa: montantDemande,
+              montantFcfa: montantTotalPaiement,
               statut: nouveauStatut,
               validePar: userId ?? null,
               dateValidation: new Date(),
@@ -952,6 +976,23 @@ async function debiterMobileDansTransaction(
                   }
                 : { statutPaiement: "PAYÉ" })
               .where(eq(livraisonsTable.id, row.paiement.livraisonId));
+          }
+
+          if (inclureFraisCollecte && row.commissionCollecteId != null) {
+            const [commissionPayee] = await tx
+              .update(commissionsMembresDelaguesTable)
+              .set({
+                statut: "payé",
+                datePaiement: new Date(),
+                modePaiement: lignes.length === 1 ? lignes[0]!.modePaiement : "mixte",
+                referencePaiement: lignes.length === 1 ? lignes[0]!.referenceTransaction ?? null : null,
+              })
+              .where(and(
+                eq(commissionsMembresDelaguesTable.id, row.commissionCollecteId),
+                eq(commissionsMembresDelaguesTable.statut, "en_attente"),
+              ))
+              .returning({ id: commissionsMembresDelaguesTable.id });
+            if (!commissionPayee) throw new PaiementDejaTraiteError();
           }
 
           if (livraisonAvecSolde && row.paiement.livraisonId && (soldeApresLivraison ?? 0) > 0) {
@@ -997,6 +1038,11 @@ async function debiterMobileDansTransaction(
           }
 
           const ecrituresVentilation: Parameters<typeof proposerEcrituresDansTransaction>[2] = [];
+          const compteDebitCommission = inclureFraisCollecte
+            ? await resolveCompteDebit(cooperativeId, "commissions_delegues", "paiement_commission", "6322")
+            : null;
+          let producteurRestant = montantDemande;
+          let commissionRestante = inclureFraisCollecte ? commissionCollecteMontant : 0;
           for (let index = 0; index < lignes.length; index += 1) {
             const ligne = lignes[index]!;
             const ligneInseree = lignesInserees[index]!;
@@ -1022,20 +1068,43 @@ async function debiterMobileDansTransaction(
               : ligne.modePaiement === "orange_money" || ligne.modePaiement === "mtn_momo" || ligne.modePaiement === "wave"
               ? "552"
               : "521";
-            ecrituresVentilation.push({
-              source: "paiement",
-              sourceId: id,
-              libelle: isBonCarburant
-                ? `Carburant – Bon PAI-${id} (${ligne.modePaiement})`
-                : `Paiement producteur – ${beneficiairePaiement} (${ligne.modePaiement})`,
-              compteDebit: compteDebitPaiement,
-              compteCredit,
-              montantFcfa: ligne.montantFcfa,
-              date: new Date().toISOString().slice(0, 10),
-              numeroPiece: `PAI-${id}`,
-              tiersId: isBonCarburant ? undefined : (row.paiement.membreId ?? undefined),
-              tiersType: isBonCarburant ? undefined : "membre",
-            });
+            const montantProducteur = Math.min(producteurRestant, ligne.montantFcfa);
+            const montantCommission = Math.min(
+              commissionRestante,
+              Math.max(0, ligne.montantFcfa - montantProducteur),
+            );
+            if (montantProducteur > 0) {
+              ecrituresVentilation.push({
+                source: "paiement",
+                sourceId: id,
+                libelle: isBonCarburant
+                  ? `Carburant – Bon PAI-${id} (${ligne.modePaiement})`
+                  : `Paiement producteur – ${beneficiairePaiement} (${ligne.modePaiement})`,
+                compteDebit: compteDebitPaiement,
+                compteCredit,
+                montantFcfa: montantProducteur,
+                date: new Date().toISOString().slice(0, 10),
+                numeroPiece: `PAI-${id}`,
+                tiersId: isBonCarburant ? undefined : (row.paiement.membreId ?? undefined),
+                tiersType: isBonCarburant ? undefined : "membre",
+              });
+            }
+            if (montantCommission > 0 && row.commissionCollecteMembreId != null) {
+              ecrituresVentilation.push({
+                source: "commission_delegue",
+                sourceId: row.commissionCollecteMembreId,
+                libelle: `Frais de collecte – ${beneficiairePaiement} (${ligne.modePaiement})`,
+                compteDebit: compteDebitCommission!,
+                compteCredit,
+                montantFcfa: montantCommission,
+                date: new Date().toISOString().slice(0, 10),
+                numeroPiece: `COM-${row.commissionCollecteMembreId}-${new Date().toISOString().slice(0, 10)}`,
+                tiersId: row.commissionCollecteMembreId,
+                tiersType: "delegue",
+              });
+            }
+            producteurRestant -= montantProducteur;
+            commissionRestante -= montantCommission;
           }
           await proposerEcrituresDansTransaction(tx, cooperativeId, ecrituresVentilation);
         });
@@ -1058,7 +1127,7 @@ async function debiterMobileDansTransaction(
 
       if (row.paiement.membreId) void envoyerPushGroupePortail([row.paiement.membreId], {
         title: "✅ Paiement validé",
-        body: `${new Intl.NumberFormat("fr-FR").format(row.paiement.montantFcfa)} FCFA — règlement ventilé`,
+        body: `${new Intl.NumberFormat("fr-FR").format(montantTotalPaiement)} FCFA — règlement ventilé`,
         url: "/paiements",
       });
       const updated = await fetchEnrichedPaiement(id);
@@ -1109,7 +1178,7 @@ async function debiterMobileDansTransaction(
     //    (paiement marqué effectue mais caisse non débitée)
     if (isDelegueEspeces && userId && cooperativeId) {
       try {
-        await verifierCaisseEspeces(userId, cooperativeId, montantDemande);
+        await verifierCaisseEspeces(userId, cooperativeId, montantTotalPaiement);
       } catch (err) {
         res.status(422).json({ erreur: (err as Error).message });
         return;
@@ -1149,9 +1218,9 @@ async function debiterMobileDansTransaction(
       }
 
       const soldeMobile = parseFloat(String(compteMobile.soldeActuelFcfa));
-      if (soldeMobile < montantDemande) {
+      if (soldeMobile < montantTotalPaiement) {
         res.status(422).json({
-          erreur: `Solde ${label} insuffisant (compte « ${compteMobile.nom} »). Disponible : ${soldeMobile.toLocaleString("fr-FR")} FCFA, requis : ${montantDemande.toLocaleString("fr-FR")} FCFA.`,
+          erreur: `Solde ${label} insuffisant (compte « ${compteMobile.nom} »). Disponible : ${soldeMobile.toLocaleString("fr-FR")} FCFA, requis : ${montantTotalPaiement.toLocaleString("fr-FR")} FCFA.`,
         });
         return;
       }
@@ -1189,7 +1258,7 @@ async function debiterMobileDansTransaction(
         return;
       }
 
-      if (parseFloat(String(caisseCentrale.soldeActuelFcfa)) < montantDemande) {
+      if (parseFloat(String(caisseCentrale.soldeActuelFcfa)) < montantTotalPaiement) {
         res.status(422).json({ erreur: "Fonds insuffisants sur le compte pour effectuer ce paiement." });
         return;
       }
@@ -1224,7 +1293,7 @@ async function debiterMobileDansTransaction(
       const [paiementMisAJour] = await tx
         .update(paiementsTable)
         .set({
-          montantFcfa: montantDemande,
+          montantFcfa: montantTotalPaiement,
           statut: nouveauStatut as "effectue" | "confirme",
           validePar: userId ?? null,
           dateValidation: new Date(),
@@ -1253,6 +1322,23 @@ async function debiterMobileDansTransaction(
           .where(eq(livraisonsTable.id, row.paiement.livraisonId));
       }
 
+      if (inclureFraisCollecte && row.commissionCollecteId != null) {
+        const [commissionPayee] = await tx
+          .update(commissionsMembresDelaguesTable)
+          .set({
+            statut: "payé",
+            datePaiement: new Date(),
+            modePaiement: mode,
+            referencePaiement: body.referenceTransaction ?? null,
+          })
+          .where(and(
+            eq(commissionsMembresDelaguesTable.id, row.commissionCollecteId),
+            eq(commissionsMembresDelaguesTable.statut, "en_attente"),
+          ))
+          .returning({ id: commissionsMembresDelaguesTable.id });
+        if (!commissionPayee) throw new PaiementDejaTraiteError();
+      }
+
       if (livraisonAvecSolde && row.paiement.livraisonId && (soldeApresLivraison ?? 0) > 0) {
         await tx.insert(paiementsTable).values({
           livraisonId: row.paiement.livraisonId,
@@ -1273,9 +1359,9 @@ async function debiterMobileDansTransaction(
 
       if (mode === "especes" && cooperativeId) {
         if (isDelegueEspeces) {
-          await debiterCaisseDansTransaction(tx, cooperativeId, userId, montantDemande, id);
+          await debiterCaisseDansTransaction(tx, cooperativeId, userId, montantTotalPaiement, id);
         } else {
-          await debiterCaisseDansTransaction(tx, cooperativeId, userId, montantDemande, id);
+          await debiterCaisseDansTransaction(tx, cooperativeId, userId, montantTotalPaiement, id);
         }
       }
 
@@ -1284,7 +1370,7 @@ async function debiterMobileDansTransaction(
           tx,
           cooperativeId,
           mode,
-          montantDemande,
+          montantTotalPaiement,
           id,
           userId,
           body.referenceTransaction ?? row.paiement.referenceTransaction,
@@ -1294,7 +1380,7 @@ async function debiterMobileDansTransaction(
       const [ligneInseree] = await tx.insert(paiementLignesTable).values({
         paiementId: id,
         modePaiement: mode as "especes" | "cheque" | "virement" | "orange_money" | "mtn_momo" | "wave",
-        montantFcfa: montantDemande,
+        montantFcfa: montantTotalPaiement,
         referenceTransaction: body.referenceTransaction ?? null,
         numeroCheque: mode === "cheque" ? body.numeroCheque ?? null : null,
         banque: mode === "cheque" ? body.banque ?? null : null,
@@ -1306,7 +1392,7 @@ async function debiterMobileDansTransaction(
           cooperativeId,
           numeroCheque: body.numeroCheque ?? null,
           beneficiaire: beneficiairePaiement,
-          montantFcfa: montantDemande,
+          montantFcfa: montantTotalPaiement,
           paiementId: id,
           paiementLigneId: ligneInseree!.id,
           membreId: row.paiement.membreId ?? null,
@@ -1318,7 +1404,7 @@ async function debiterMobileDansTransaction(
         });
       }
 
-      await proposerEcrituresDansTransaction(tx, cooperativeId, [{
+      const ecrituresPaiement: Parameters<typeof proposerEcrituresDansTransaction>[2] = [{
         source: "paiement",
         sourceId: id,
         libelle: isBonCarburant
@@ -1331,13 +1417,34 @@ async function debiterMobileDansTransaction(
         numeroPiece: `PAI-${id}`,
         tiersId: isBonCarburant ? undefined : (row.paiement.membreId ?? undefined),
         tiersType: isBonCarburant ? undefined : "membre",
-      }]);
+      }];
+      if (inclureFraisCollecte && row.commissionCollecteMembreId != null) {
+        const compteDebitCommission = await resolveCompteDebit(
+          cooperativeId,
+          "commissions_delegues",
+          "paiement_commission",
+          "6322",
+        );
+        ecrituresPaiement.push({
+          source: "commission_delegue",
+          sourceId: row.commissionCollecteMembreId,
+          libelle: `Frais de collecte – ${beneficiairePaiement}`,
+          compteDebit: compteDebitCommission,
+          compteCredit: isMobile ? "552" : mode === "especes" ? "571" : "521",
+          montantFcfa: commissionCollecteMontant,
+          date: new Date().toISOString().slice(0, 10),
+          numeroPiece: `COM-${row.commissionCollecteMembreId}-${new Date().toISOString().slice(0, 10)}`,
+          tiersId: row.commissionCollecteMembreId,
+          tiersType: "delegue",
+        });
+      }
+      await proposerEcrituresDansTransaction(tx, cooperativeId, ecrituresPaiement);
     });
 
     // Notifier le producteur (best-effort)
     if (row.paiement.membreId) void envoyerPushGroupePortail([row.paiement.membreId], {
       title: "✅ Paiement validé",
-      body: `${new Intl.NumberFormat("fr-FR").format(montantDemande)} FCFA — ${mode === "orange_money" ? "Orange Money" : mode === "mtn_momo" ? "MTN MoMo" : mode === "wave" ? "Wave" : mode === "cheque" ? "Chèque" : "Espèces"}`,
+      body: `${new Intl.NumberFormat("fr-FR").format(montantTotalPaiement)} FCFA — ${mode === "orange_money" ? "Orange Money" : mode === "mtn_momo" ? "MTN MoMo" : mode === "wave" ? "Wave" : mode === "cheque" ? "Chèque" : "Espèces"}`,
       url: "/paiements",
     });
 
