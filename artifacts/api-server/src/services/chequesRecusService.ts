@@ -12,6 +12,7 @@ import {
   proposerEcrituresDansTransaction,
   type ComptabiliteTransaction,
 } from "./comptabiliteService.js";
+import { genererNumeroRecu } from "./recuService.js";
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -135,6 +136,7 @@ export async function creerChequeRecu(
       .limit(1);
     if (duplicate) throw new Error("Ce numéro de chèque existe déjà pour cette coopérative");
 
+    const numeroRecu = await genererNumeroRecu(cooperativeId);
     const [paiement] = await tx.insert(paiementsTable).values({
       cooperativeId,
       libelle: `Encaissement vente exportateur #${vente.id}`,
@@ -148,6 +150,7 @@ export async function creerChequeRecu(
       validePar: data.createdBy,
       dateValidation: new Date(),
       agentSaisiseurId: data.createdBy,
+      numeroRecu,
     }).returning({ id: paiementsTable.id });
     if (!paiement) throw new Error("Le règlement de la vente n'a pas pu être créé");
 

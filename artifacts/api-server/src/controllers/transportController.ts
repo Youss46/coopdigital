@@ -48,6 +48,7 @@ import { generateBonCarburant } from "../services/bonCarburantPdf";
 import { generateBonAchatPiece } from "../services/bonAchatPiecePdf";
 import { db, usersTable, stationsCarburantTable, bonsCarburantTable, paiementsTable } from "@workspace/db";
 import { eq, and, isNotNull, count } from "drizzle-orm";
+import { genererNumeroRecu } from "../services/recuService.js";
 
 function toDateStr(d: Date | null | undefined): string | null | undefined {
   if (d == null) return d;
@@ -1026,12 +1027,14 @@ export async function handleUtiliserBonCarburant(req: Request, res: Response): P
       });
       // Le règlement suit le circuit standard de la page Règlements.
       // Le mode reste volontairement null : il sera choisi au moment de la validation.
+      const numeroRecu = await genererNumeroRecu(cooperativeId);
       await db.insert(paiementsTable).values({
         cooperativeId,
         bonCarburantId: row.bon.id,
         montantFcfa: montantArrondi,
         modePaiement: null,
         statut: "en_attente",
+        numeroRecu,
       });
     }
 

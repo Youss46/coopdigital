@@ -79,7 +79,7 @@
 - [Port de prévisualisation Terrain](terrain-preview-port.md) — lire le port réellement ouvert par le workflow avant toute capture locale.
 - [Tests React du terrain](terrain-react-tests.md) — les tests de rendu utilisent jsdom uniquement au niveau du fichier et le plugin React dans la config Vitest.
 - [Assets Vite du terrain](terrain-vite-base-assets.md) — les assets publics doivent utiliser BASE_URL, car Terrain est servi sous le préfixe /terrain/.
-- [Numérotation locale des reçus](receipt-sequence-global-uniqueness.md) — les reçus sont séquentiels par coopérative et par année, avec unicité composée coopérative + numéro.
+- [Numérotation locale des règlements](receipt-sequence-global-uniqueness.md) — tout règlement tenant-scoped reçoit un REC séquentiel par coopérative et année.
 - [Numérotation locale des pesées](local-weighing-sequence.md) — le rang métier est atomique par coopérative et année; `livraisons.id` reste un identifiant SQL global.
 - [Périmètre fournisseur du dashboard](dashboard-supplier-scope.md) — les agrégats de livraisons filtrent par coopérative via membre OU fournisseur externe.
 - [Idempotence des règlements](payment-validation-idempotency.md) — la transition conditionnelle en transaction empêche les écritures comptables dupliquées lors de requêtes concurrentes.

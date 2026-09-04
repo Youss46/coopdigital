@@ -16,6 +16,7 @@ import {
 import { and, eq, desc, inArray, isNotNull } from "drizzle-orm";
 import { createDemandeBon, getVehicules } from "../services/transportService.js";
 import { notifDemandeCarburant } from "../services/notificationService.js";
+import { genererNumeroRecu } from "../services/recuService.js";
 
 function cooperativeId(req: Request): number | null {
   return req.agent?.cooperativeId ?? null;
@@ -226,12 +227,14 @@ export async function utiliserBonChauffeur(req: Request, res: Response): Promise
         ...(body.quantite_livree != null ? { quantite: String(body.quantite_livree), unite: "L" } : {}),
       });
       // Créer un règlement en attente — sera validé depuis ReglementsPage
+      const numeroRecu = await genererNumeroRecu(coopId);
       await db.insert(paiementsTable).values({
         cooperativeId: coopId,
         bonCarburantId: bon.id,
         montantFcfa:    montantArrondi,
         modePaiement:   modePaiement,
         statut:         "en_attente",
+        numeroRecu,
       });
     }
 

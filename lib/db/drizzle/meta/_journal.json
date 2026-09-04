@@ -1065,6 +1065,20 @@
       "when": 1788536000000,
       "tag": "0151_numeros_recus_par_cooperative",
       "breakpoints": true
+    },
+    {
+      "idx": 152,
+      "version": "7",
+      "when": 1788536500000,
+      "tag": "0152_numeroter_tous_reglements",
+      "breakpoints": true
+    },
+    {
+      "idx": 153,
+      "version": "7",
+      "when": 1788536800000,
+      "tag": "0153_exiger_numero_reglement",
+      "breakpoints": true
     }
   ]
 }

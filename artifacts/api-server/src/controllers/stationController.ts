@@ -16,6 +16,7 @@ import {
   createDepense,
 } from "../services/transportService";
 import { db, paiementsTable } from "@workspace/db";
+import { genererNumeroRecu } from "../services/recuService.js";
 
 // ── GET /station/carburant/public-key ─────────────────────────────────────────
 // Retourne la clé publique Ed25519 en SPKI base64 pour vérification offline.
@@ -273,12 +274,14 @@ export async function handleLivrerBonStation(
           },
         );
         // Créer un règlement en attente — sera validé depuis ReglementsPage
+        const numeroRecu = await genererNumeroRecu(row.bon.cooperativeId);
         await db.insert(paiementsTable).values({
           cooperativeId: row.bon.cooperativeId,
           bonCarburantId: row.bon.id,
           montantFcfa: montantArrondi,
           modePaiement: modePaiement,
           statut: "en_attente",
+          numeroRecu,
         });
       } catch (err) {
         req.log.warn({ err }, "Paiement carburant station création échouée");

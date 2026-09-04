@@ -6,6 +6,7 @@ import { CreateEcritureManuelleBody } from "@workspace/api-zod";
 import { assignerNumeroPiece, assignerNumerosPieces } from "../lib/numeroPiece";
 import ExcelJS from "exceljs";
 import Anthropic from "@anthropic-ai/sdk";
+import { genererNumeroRecu } from "../services/recuService.js";
 
 class TenantError extends Error {
   readonly status = 401;
@@ -2212,10 +2213,11 @@ export async function declencherRistournes(req: Request, res: Response): Promise
 
     await db.transaction(async (tx) => {
       for (const p of parts) {
+        const numeroRecu = await genererNumeroRecu(coop);
         await tx.execute(sql`
-          INSERT INTO paiements (cooperative_id, membre_id, campagne_id, libelle, montant_fcfa, mode_paiement, statut, initialise_par)
-          VALUES (${coop}, ${p.membreId}, ${campagneId}, ${`Ristournes exercice ${annee}`}, ${p.montantFcfa},
-                  ${mode ?? null}, 'en_attente', ${req.user?.id ?? null})
+          INSERT INTO paiements (cooperative_id, membre_id, campagne_id, numero_recu, libelle, montant_fcfa, mode_paiement, statut, initialise_par)
+          VALUES (${coop}, ${p.membreId}, ${campagneId}, ${numeroRecu}, ${`Ristournes exercice ${annee}`},
+                  ${p.montantFcfa}, ${mode ?? null}, 'en_attente', ${req.user?.id ?? null})
         `);
       }
       await tx.insert(ecrituresComptablesTable).values({

@@ -5,6 +5,7 @@ import { CreateExportateurBody, CreateVenteBody, EncaisserVenteBody } from "@wor
 import { generateEcrituresVente, generateEcrituresEncaissement, generateEcrituresEncaissementDansTransaction } from "../services/comptabiliteService";
 import { calculerPoidsDisponibleVente } from "../services/venteReceptionService";
 import { creerChequeRecuDansTransaction } from "../services/chequesRecusService.js";
+import { genererNumeroRecu } from "../services/recuService.js";
 
 const venteSelect = {
   id: ventesExportateursTable.id,
@@ -514,6 +515,7 @@ export async function encaisserVente(req: Request, res: Response): Promise<void>
       let paiementLigneIds: number[] = [];
       if (!modeLegacy) {
         const modeUnique = lignes.length === 1 ? lignes[0]?.modePaiement : null;
+        const numeroRecu = await genererNumeroRecu(cooperativeId);
         const [paiement] = await tx.insert(paiementsTable).values({
           cooperativeId,
           libelle: `Encaissement vente exportateur #${id}`,
@@ -527,6 +529,7 @@ export async function encaisserVente(req: Request, res: Response): Promise<void>
           validePar: userId,
           dateValidation: new Date(),
           agentSaisiseurId: userId,
+          numeroRecu,
         }).returning({ id: paiementsTable.id });
         paiementId = paiement?.id ?? null;
         if (!paiementId) throw new Error("Le règlement de la vente n'a pas pu être créé");

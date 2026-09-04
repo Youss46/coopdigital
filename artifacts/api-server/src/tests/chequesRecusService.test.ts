@@ -4,6 +4,7 @@ const mockDb = {
   transaction: vi.fn(),
 };
 const proposerEcrituresDansTransaction = vi.fn();
+const genererNumeroRecu = vi.fn().mockResolvedValue("REC-2026-00001");
 
 vi.mock("@workspace/db", () => {
   const table = (name: string) => ({
@@ -57,6 +58,10 @@ vi.mock("drizzle-orm", () => ({
 
 vi.mock("../services/comptabiliteService.js", () => ({
   proposerEcrituresDansTransaction,
+}));
+
+vi.mock("../services/recuService.js", () => ({
+  genererNumeroRecu,
 }));
 
 const { creerChequeRecu } = await import("../services/chequesRecusService.js");
@@ -147,6 +152,7 @@ describe("création d'un chèque reçu", () => {
     expect(tx.insert.mock.results[0].value.values).toHaveBeenCalledWith(expect.objectContaining({
       modePaiement: "cheque",
       montantFcfa: 125000,
+      numeroRecu: "REC-2026-00001",
       statut: "confirme",
     }));
     expect(proposerEcrituresDansTransaction).toHaveBeenCalledWith(

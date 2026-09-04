@@ -69,6 +69,10 @@ export const paiementsTable = pgTable("paiements", {
 }, (table) => [
   unique("paiements_cooperative_numero_recu_unique").on(table.cooperativeId, table.numeroRecu),
   check(
+    "paiements_cooperative_numero_recu_check",
+    sql`${table.cooperativeId} IS NULL OR ${table.numeroRecu} IS NOT NULL`,
+  ),
+  check(
     "paiements_confirmes_date_validation_check",
     sql`${table.statut} NOT IN ('confirme', 'effectue') OR ${table.dateValidation} IS NOT NULL`,
   ),
