@@ -405,7 +405,7 @@ export async function getSynthesePca(req: Request, res: Response): Promise<void>
     ] = await Promise.all([
       db.select({ count: sql<number>`count(*)::int` })
         .from(membresTable)
-        .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.statut, "actif"))),
+        .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.statutMembre, "actif"))),
 
       campagne
         ? db.select({ count: sql<number>`count(*)::int` })
@@ -765,7 +765,7 @@ export async function getComparaisonCampagnesPca(req: Request, res: Response): P
             .where(eq(membresTable.cooperativeId, cooperativeId)),
           db.select({ count: sql<number>`count(*)::int` })
             .from(membresTable)
-            .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.statut, "actif"))),
+            .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.statutMembre, "actif"))),
           db.select({ ca: sql<number>`coalesce(sum(montant_total_fcfa),0)::bigint` })
             .from(ventesExportateursTable)
             .leftJoin(exportateursTable, eq(ventesExportateursTable.exportateurId, exportateursTable.id))

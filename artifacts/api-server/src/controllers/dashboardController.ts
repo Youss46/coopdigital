@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { db, usersTable, membresTable, avancesTable, livraisonsTable, paiementsTable, ventesExportateursTable, exportateursTable, parcellesTable, missionsTerrainTable, campagnesTable, fournisseursTable, bonsCarburantTable } from "@workspace/db";
+import { db, usersTable, membresTable, avancesTable, livraisonsTable, paiementsTable, ventesExportateursTable, exportateursTable, parcellesTable, missionsTerrainTable, campagnesTable, fournisseursTable, bonsCarburantTable, transfertsStockTable } from "@workspace/db";
 import { eq, sql, desc, gte, lte, and, isNull, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
@@ -58,6 +58,7 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
       [membresFemmesRow],
       [avancesRow],
       [tonnageRow],
+      [tonnageTransfertsRow],
       [paiementsRow],
       [creancesRow],
       [sacsRow],
@@ -65,15 +66,15 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
       db
         .select({ count: sql<number>`count(*)::int` })
         .from(membresTable)
-        .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.statut, "actif"))),
+        .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.statutMembre, "actif"))),
       db
         .select({ count: sql<number>`count(*)::int` })
         .from(membresTable)
-        .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.statut, "actif"), eq(membresTable.sexe, "M"))),
+        .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.statutMembre, "actif"), eq(membresTable.sexe, "M"))),
       db
         .select({ count: sql<number>`count(*)::int` })
         .from(membresTable)
-        .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.statut, "actif"), eq(membresTable.sexe, "F"))),
+        .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.statutMembre, "actif"), eq(membresTable.sexe, "F"))),
       db
         .select({ total: sql<number>`coalesce(sum(solde_restant_fcfa),0)::int` })
         .from(avancesTable)
@@ -91,6 +92,16 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
           ),
           filtreLivraisonsPeriode,
         )),
+      campagneActive
+        ? db
+            .select({ tonnage: sql<number>`coalesce(sum(poids_arrivee_kg::numeric),0)::float` })
+            .from(transfertsStockTable)
+            .where(and(
+              eq(transfertsStockTable.campagneId, campagneActive.id),
+              eq(transfertsStockTable.cooperativeId, cooperativeId),
+              eq(transfertsStockTable.statut, "confirme"),
+            ))
+        : Promise.resolve([{ tonnage: 0 }]),
       db
         .select({ total: sql<number>`coalesce(sum(montant_fcfa),0)::int` })
         .from(paiementsTable)
@@ -141,7 +152,9 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
       membresHommes: membresHommesRow?.count ?? 0,
       membresFemmes: membresFemmesRow?.count ?? 0,
       avancesEnCoursMontant: avancesRow?.total ?? 0,
-      tonnageMois: tonnageRow?.tonnage ?? 0,
+      // Même définition que la vue PCA pour « Toute la campagne » :
+      // livraisons réceptionnées + transferts de stock confirmés.
+      tonnageMois: (tonnageRow?.tonnage ?? 0) + (tonnageTransfertsRow?.tonnage ?? 0),
       nombreSacsMois: sacsRow?.sacs ?? 0,
       paiementsMois: paiementsRow?.total ?? 0,
       creancesExportateurs: creancesRow?.total ?? 0,
