@@ -488,12 +488,15 @@ function ModalValidation({
 
   function choisirOptionFraisCollecte(inclure: boolean) {
     setInclureFraisCollecte(inclure);
-    setMontantVersementSaisi(formatMontantSaisi(inclure ? montantRestant + commissionCollecteMontant : montantRestant));
+    // Le versement producteur reste toujours le solde net cacao
+    // (déjà diminué des avances, du carburant et des autres charges).
+    // La commission est ajoutée séparément au total décaissé.
+    setMontantVersementSaisi(formatMontantSaisi(montantRestant));
     setVentilations((old) => old.length === 2
       ? old.map((item, index) => ({
           ...item,
           montantFcfa: formatMontantSaisi(index === 0
-            ? (inclure ? montantRestant + commissionCollecteMontant : montantRestant)
+            ? montantRestant
             : 0),
         }))
       : old);
@@ -507,7 +510,7 @@ function ModalValidation({
       setTouched(true);
       return;
     }
-    if (inclureFraisCollecte && montantVersement !== montantRestant + commissionCollecteMontant) {
+    if (inclureFraisCollecte && montantVersement !== montantRestant) {
       setTouched(true);
       return;
     }
@@ -609,7 +612,7 @@ function ModalValidation({
                 {inclureFraisCollecte && (
                   <div className="border-t pt-2 flex justify-between font-bold text-blue-800">
                     <span>Total à décaisser</span>
-                    <span>{fmt(montantVersement)}</span>
+                    <span>{fmt(montantVersement + commissionCollecteMontant)}</span>
                   </div>
                 )}
               </>
