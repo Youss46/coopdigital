@@ -171,15 +171,15 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
 
   // MODULE M08 — SALAIRES
   salaires: {
-    lire:                ["pca", "directeur", "comptable", "auditeur"],
-    creer_personnel:     ["pca", "directeur", "comptable"],
-    modifier_personnel:  ["pca", "directeur", "comptable"],
-    supprimer_personnel: ["pca", "directeur", "comptable"],
-    generer_bulletins:   ["pca", "directeur", "comptable"],
-    valider_bulletins:   ["pca", "directeur", "comptable"],
-    payer_bulletins:     ["pca", "directeur", "comptable"],
-    supprimer_bulletin:  ["pca", "directeur", "comptable"],
-    gerer_avances:       ["pca", "directeur", "comptable"],
+    lire:                ["pca", "directeur", "comptable", "responsable_rh"],
+    creer_personnel:     ["comptable", "responsable_rh"],
+    modifier_personnel:  ["comptable", "responsable_rh"],
+    supprimer_personnel: ["comptable", "responsable_rh"],
+    generer_bulletins:   ["comptable", "responsable_rh"],
+    valider_bulletins:   ["comptable", "responsable_rh"],
+    payer_bulletins:     ["comptable", "responsable_rh"],
+    supprimer_bulletin:  ["comptable", "responsable_rh"],
+    gerer_avances:       ["comptable", "responsable_rh"],
   },
 
   // MODULE RH — séparé des responsabilités de paie

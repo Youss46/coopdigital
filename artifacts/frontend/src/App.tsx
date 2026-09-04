@@ -219,7 +219,7 @@ function AppRoutes() {
         <ProtectedRoute component={CreancesPage} />
       </Route>
       <Route path="/salaires">
-        <ProtectedRoute component={SalairesPage} />
+        <ProtectedRoute component={SalairesPage} roles={["pca", "directeur", "comptable", "responsable_rh"]} />
       </Route>
       <Route path="/rh">
         <ProtectedRoute component={RessourcesHumainesPage} roles={["pca", "directeur", "comptable", "responsable_rh", "auditeur"]} />

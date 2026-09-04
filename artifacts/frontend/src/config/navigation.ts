@@ -83,7 +83,7 @@ export const NAV_ITEMS: NavItemConfig[] = [
   { href: "/investissements",        label: "Investissements",           roles: ["pca","directeur","comptable","auditeur"],                                    category: "Finances" },
   { href: "/charges-diverses",       label: "Charges diverses",          roles: ["pca","directeur","comptable","caissier","auditeur"],                         category: "Finances" },
   { href: "/comptabilite",           label: "Comptabilité",              roles: ["pca","directeur","comptable","auditeur"],                                    category: "Finances", showBadge: true },
-  { href: "/salaires",               label: "Salaires",                  roles: ["pca","directeur","comptable","auditeur"],                                    category: "Finances" },
+  { href: "/salaires",               label: "Salaires",                  roles: ["pca","directeur","comptable","responsable_rh"],                         category: "Finances" },
 
   // ── RH & Social ──────────────────────────────────────────────────────────────
   { href: "/rh",                     label: "Ressources humaines",         roles: ["pca","directeur","comptable","responsable_rh","auditeur"],                    category: "RH & Social" },
