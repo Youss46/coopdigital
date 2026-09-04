@@ -23,6 +23,34 @@ describe("module RH", () => {
     expect(hasPermission("auditeur", "rh", "gerer_documents")).toBe(false);
   });
 
+  it("limite la visibilité et les actions du module Salaires", () => {
+    const actions = [
+      "creer_personnel",
+      "modifier_personnel",
+      "supprimer_personnel",
+      "generer_bulletins",
+      "valider_bulletins",
+      "payer_bulletins",
+      "supprimer_bulletin",
+      "gerer_avances",
+    ];
+
+    for (const role of ["pca", "directeur", "comptable", "responsable_rh"]) {
+      expect(hasPermission(role, "salaires", "lire")).toBe(true);
+    }
+    for (const role of ["comptable", "responsable_rh"]) {
+      for (const action of actions) {
+        expect(hasPermission(role, "salaires", action)).toBe(true);
+      }
+    }
+    for (const role of ["pca", "directeur", "auditeur"]) {
+      expect(hasPermission(role, "salaires", "lire")).toBe(role !== "auditeur");
+      for (const action of actions) {
+        expect(hasPermission(role, "salaires", action)).toBe(false);
+      }
+    }
+  });
+
   it("contrôle le format, le type MIME, la taille et la signature des pièces RH", () => {
     expect(validateRhDocumentFile({
       originalname: "attestation.pdf",
