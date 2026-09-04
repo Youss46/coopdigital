@@ -35,6 +35,8 @@ import {
   getGetRapportCampagneTransportQueryKey,
   getGetDepensesTransportQueryKey,
   getGetBonsCarburantQueryKey,
+  getListPaiementsQueryKey,
+  getGetPaiementsStatsQueryKey,
   getBonCarburantPdf,
 } from "@workspace/api-client-react";
 import type { DepenseVehicule, BonCarburant } from "@workspace/api-client-react";
@@ -2183,6 +2185,12 @@ function TabDepenses() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!emission.ok) throw new Error("Impossible d'émettre le bon d'achat");
+      // L'émission crée le règlement en attente. Invalider les requêtes
+      // partagées pour que la page Règlements déjà ouverte le voie aussitôt.
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: getListPaiementsQueryKey() }),
+        qc.invalidateQueries({ queryKey: getGetPaiementsStatsQueryKey() }),
+      ]);
       const response = await fetch(`${base}/api/transport/depenses/${d.id}/bon-achat-pdf`, {
         headers: { Authorization: `Bearer ${token}` },
       });
