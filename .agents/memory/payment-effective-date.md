@@ -3,8 +3,8 @@ name: Date effective des règlements
 description: Référence temporelle commune pour les règlements effectués et les statistiques.
 ---
 
-Pour compter un règlement confirmé, effectué ou en cours dans une période, utiliser `date_validation` lorsqu’elle existe, sinon `created_at`. Les anciens règlements effectués peuvent ne pas avoir de date de validation.
+Pour compter un règlement confirmé, effectué ou en cours dans une période, utiliser `date_validation` lorsqu’elle existe, sinon `created_at`, pour la part réglée immédiatement. Une part payée par chèque ne compte qu’au statut `encaisse`, à sa `date_encaissement`; un chèque `emis` compte pour zéro.
 
-**Why:** La page Règlements affichait des paiements effectués alors que la carte Tableau de bord affichait 0 parce que son filtre exigeait uniquement `date_validation`.
+**Why:** La page Règlements affichait des paiements effectués alors que la carte Tableau de bord affichait 0 parce que son filtre exigeait uniquement `date_validation`. À l’inverse, les chèques seulement émis gonflaient les cartes avant toute sortie bancaire réelle.
 
-**How to apply:** Réutiliser cette date effective dans les KPI, les statistiques de règlements et tout export périodique; conserver le statut comme condition d’inclusion.
+**How to apply:** Dans les KPI, statistiques et exports périodiques, séparer le montant immédiat du montant des chèques. Compter chaque chèque encaissé dans la période de son encaissement, y compris pour un règlement ventilé.

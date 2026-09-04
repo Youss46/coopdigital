@@ -119,7 +119,29 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
             ))
         : Promise.resolve([{ tonnage: 0 }]),
       db
-        .select({ total: sql<number>`coalesce(sum(${paiementsTable.montantFcfa}),0)::int` })
+        .select({
+          total: sql<number>`coalesce(sum(
+            greatest(
+              case when (
+                (${paiementsTable.dateValidation} >= ${debutPaiements} and ${paiementsTable.dateValidation} <= ${finPaiements})
+                or (${paiementsTable.dateValidation} is null and ${paiementsTable.createdAt} >= ${debutPaiements} and ${paiementsTable.createdAt} <= ${finPaiements})
+              ) then ${paiementsTable.montantFcfa} - coalesce((
+                select sum(cheque_total.montant_fcfa)
+                from cheques_emis cheque_total
+                where cheque_total.paiement_id = ${paiementsTable.id}
+              ), 0) else 0 end,
+              0
+            )
+            + coalesce((
+              select sum(cheque_encaisse.montant_fcfa)
+              from cheques_emis cheque_encaisse
+              where cheque_encaisse.paiement_id = ${paiementsTable.id}
+                and cheque_encaisse.statut = 'encaisse'
+                and cheque_encaisse.date_encaissement >= ${periodeDebut}
+                and cheque_encaisse.date_encaissement <= ${periodeFin}
+            ), 0)
+          ), 0)::int`,
+        })
         .from(paiementsTable)
         .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
         .leftJoin(livraisonsTable, eq(paiementsTable.livraisonId, livraisonsTable.id))
@@ -133,20 +155,6 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
             eq(bonsCarburantTable.cooperativeId, cooperativeId),
           ),
           sql`${paiementsTable.statut} IN ('confirme','effectue','en_cours')`,
-          // Éviter COALESCE sur les timestamps : certaines bases historiques
-          // échouent sur cette expression. La logique reste identique :
-          // date_validation en priorité, puis created_at si elle est absente.
-          or(
-            and(
-              gte(paiementsTable.dateValidation, debutPaiements),
-              lte(paiementsTable.dateValidation, finPaiements),
-            ),
-            and(
-              isNull(paiementsTable.dateValidation),
-              gte(paiementsTable.createdAt, debutPaiements),
-              lte(paiementsTable.createdAt, finPaiements),
-            ),
-          ),
           // Même périmètre que la carte « Payés ce mois » de Règlements :
           // les paiements espèces des délégués sont suivis dans leur caisse.
           or(

@@ -35,7 +35,9 @@ vi.mock("@workspace/db", () => ({
   comptesMobilesMarchandsTable: table("comptes_mobiles_marchands", []),
   mouvementsMobileMarchandTable: table("mouvements_mobile_marchand", []),
   caissesTable: table("caisses", []),
-  chequesEmisTable: table("cheques_emis", []),
+  chequesEmisTable: table("cheques_emis", [
+    "id", "paiementId", "montantFcfa", "statut", "dateEncaissement",
+  ]),
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -135,6 +137,7 @@ describe("date effective des règlements", () => {
     mocks.select.mockReturnValue(selectChain([
       // Date de création hors période, validation dans le mois : inclus.
       {
+        id: 1,
         statut: "effectue",
         montantFcfa: 80_000,
         createdAt: new Date("2026-08-31T10:00:00.000Z"),
@@ -142,6 +145,7 @@ describe("date effective des règlements", () => {
       },
       // Date de création dans le mois, validation hors période : exclu.
       {
+        id: 2,
         statut: "effectue",
         montantFcfa: 50_000,
         createdAt: new Date("2026-09-03T10:00:00.000Z"),
@@ -163,6 +167,7 @@ describe("date effective des règlements", () => {
     mocks.select.mockReturnValue(selectChain([
       // Règlement historique sans date_validation : repli sur created_at.
       {
+        id: 3,
         statut: "effectue",
         montantFcfa: 25_000,
         createdAt: new Date("2026-09-03T10:00:00.000Z"),
@@ -176,6 +181,67 @@ describe("date effective des règlements", () => {
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
       valide_aujourd_hui: { count: 0, montant_total: 0 },
       effectue_ce_mois: { montant_total: 25_000 },
+    }));
+  });
+
+  it("ne compte un règlement par chèque qu'après son encaissement", async () => {
+    mocks.select.mockReturnValue(selectChain([
+      {
+        id: 10,
+        statut: "effectue",
+        montantFcfa: 120_000,
+        createdAt: new Date("2026-09-04T08:00:00.000Z"),
+        dateValidation: new Date("2026-09-04T08:00:00.000Z"),
+        chequeId: 91,
+        chequeMontantFcfa: 120_000,
+        chequeStatut: "emis",
+        chequeDateEncaissement: null,
+      },
+      {
+        id: 11,
+        statut: "effectue",
+        montantFcfa: 90_000,
+        createdAt: new Date("2026-09-03T08:00:00.000Z"),
+        dateValidation: new Date("2026-09-03T08:00:00.000Z"),
+        chequeId: 92,
+        chequeMontantFcfa: 90_000,
+        chequeStatut: "encaisse",
+        chequeDateEncaissement: "2026-09-04",
+      },
+    ]));
+    const res = response();
+
+    await statsPaiements(request({ periode: "month" }), res);
+
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      valide_aujourd_hui: { count: 1, montant_total: 90_000 },
+      effectue_ce_mois: { montant_total: 90_000 },
+      effectue_periode: { count: 1, montant_total: 90_000 },
+    }));
+  });
+
+  it("compte seulement la part immédiatement réglée d'un paiement ventilé", async () => {
+    mocks.select.mockReturnValue(selectChain([
+      {
+        id: 12,
+        statut: "effectue",
+        montantFcfa: 150_000,
+        createdAt: new Date("2026-09-04T08:00:00.000Z"),
+        dateValidation: new Date("2026-09-04T08:00:00.000Z"),
+        chequeId: 93,
+        chequeMontantFcfa: 100_000,
+        chequeStatut: "emis",
+        chequeDateEncaissement: null,
+      },
+    ]));
+    const res = response();
+
+    await statsPaiements(request({ periode: "month" }), res);
+
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      valide_aujourd_hui: { count: 1, montant_total: 50_000 },
+      effectue_ce_mois: { montant_total: 50_000 },
+      effectue_periode: { count: 1, montant_total: 50_000 },
     }));
   });
 
@@ -205,11 +271,11 @@ describe("date effective des règlements", () => {
       paiementsMois: 105_000,
     }));
     const condition = JSON.stringify(paymentChain.where.mock.calls[0]?.[0]);
-    expect(condition).toContain("paiements.dateValidation");
-    expect(condition).toContain("paiements.createdAt");
-    expect(condition).toContain("isNull");
-    expect(condition).not.toContain("coalesce");
-    expect(JSON.stringify(mocks.select.mock.calls[5])).toContain("paiements.montantFcfa");
+    expect(condition).not.toContain("paiements.dateValidation");
+    const selectedTotal = JSON.stringify(mocks.select.mock.calls[5]);
+    expect(selectedTotal).toContain("paiements.montantFcfa");
+    expect(selectedTotal).toContain("cheques_emis");
+    expect(selectedTotal).toContain("encaisse");
   });
 
   it("filtre la liste par la même date effective que les KPI", async () => {

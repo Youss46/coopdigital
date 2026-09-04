@@ -502,10 +502,15 @@ export async function statsPaiements(req: Request, res: Response): Promise<void>
 
     const rows = await db
       .select({
+        id: paiementsTable.id,
         statut: paiementsTable.statut,
         montantFcfa: paiementsTable.montantFcfa,
         dateValidation: paiementsTable.dateValidation,
         createdAt: paiementsTable.createdAt,
+        chequeId: chequesEmisTable.id,
+        chequeMontantFcfa: chequesEmisTable.montantFcfa,
+        chequeStatut: chequesEmisTable.statut,
+        chequeDateEncaissement: chequesEmisTable.dateEncaissement,
       })
       .from(paiementsTable)
       .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
@@ -513,6 +518,7 @@ export async function statsPaiements(req: Request, res: Response): Promise<void>
       .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
       .leftJoin(agentUserAlias, eq(livraisonsTable.agentId, agentUserAlias.id))
       .leftJoin(bonsCarburantTable, eq(paiementsTable.bonCarburantId, bonsCarburantTable.id))
+      .leftJoin(chequesEmisTable, eq(chequesEmisTable.paiementId, paiementsTable.id))
       .where(and(...statsConditions));
 
     let enAttente = { count: 0, montant_total: 0 };
@@ -521,29 +527,81 @@ export async function statsPaiements(req: Request, res: Response): Promise<void>
     let effectueCeMois = { montant_total: 0 };
     let effectuePeriode = { count: 0, montant_total: 0 };
 
-    for (const r of rows) {
+    const paiements = new Map<number, {
+      id: number;
+      statut: typeof paiementsTable.$inferSelect.statut;
+      montantFcfa: number;
+      dateValidation: Date | null;
+      createdAt: Date;
+      cheques: Map<number, {
+        montantFcfa: number;
+        statut: typeof chequesEmisTable.$inferSelect.statut;
+        dateEncaissement: string | null;
+      }>;
+    }>();
+    for (const row of rows) {
+      let paiement = paiements.get(row.id);
+      if (!paiement) {
+        paiement = {
+          id: row.id,
+          statut: row.statut,
+          montantFcfa: row.montantFcfa,
+          dateValidation: row.dateValidation,
+          createdAt: row.createdAt,
+          cheques: new Map(),
+        };
+        paiements.set(row.id, paiement);
+      }
+      if (row.chequeId != null) {
+        paiement.cheques.set(row.chequeId, {
+          montantFcfa: row.chequeMontantFcfa ?? 0,
+          statut: row.chequeStatut ?? "emis",
+          dateEncaissement: row.chequeDateEncaissement,
+        });
+      }
+    }
+
+    const montantRegleDansPeriode = (
+      paiement: (typeof paiements extends Map<number, infer P> ? P : never),
+      debut: Date | null,
+      fin: Date | null,
+    ) => {
+      const dansPeriode = (date: Date) => (!debut || date >= debut) && (!fin || date <= fin);
+      const datePaiement = new Date(paiement.dateValidation ?? paiement.createdAt);
+      const totalCheques = [...paiement.cheques.values()]
+        .reduce((total, cheque) => total + cheque.montantFcfa, 0);
+      let montant = dansPeriode(datePaiement)
+        ? Math.max(0, paiement.montantFcfa - totalCheques)
+        : 0;
+      for (const cheque of paiement.cheques.values()) {
+        if (cheque.statut !== "encaisse" || !cheque.dateEncaissement) continue;
+        const dateEncaissement = new Date(`${cheque.dateEncaissement}T12:00:00.000Z`);
+        if (dansPeriode(dateEncaissement)) montant += cheque.montantFcfa;
+      }
+      return montant;
+    };
+
+    for (const r of paiements.values()) {
       if (r.statut === "en_attente") {
         enAttente.count++;
         enAttente.montant_total += r.montantFcfa;
       }
       if (r.statut === "confirme" || r.statut === "effectue" || r.statut === "en_cours") {
-        const dv = new Date(r.dateValidation ?? r.createdAt);
-        if (dv >= todayStart) {
+        const montantAujourdhui = montantRegleDansPeriode(r, todayStart, now);
+        if (montantAujourdhui > 0) {
           valideAujourdhui.count++;
-          valideAujourdhui.montant_total += r.montantFcfa;
+          valideAujourdhui.montant_total += montantAujourdhui;
         }
       }
       if (r.statut === "rejete") {
         rejete.count++;
       }
       if (r.statut === "effectue" || r.statut === "confirme" || r.statut === "en_cours") {
-        const dv = new Date(r.dateValidation ?? r.createdAt);
-        if (dv >= monthStart && dv <= monthEnd) {
-          effectueCeMois.montant_total += r.montantFcfa;
-        }
-        if ((!periodeStart || dv >= periodeStart) && (!periodeEnd || dv <= periodeEnd)) {
+        effectueCeMois.montant_total += montantRegleDansPeriode(r, monthStart, monthEnd);
+        const montantPeriode = montantRegleDansPeriode(r, periodeStart, periodeEnd);
+        if (montantPeriode > 0) {
           effectuePeriode.count++;
-          effectuePeriode.montant_total += r.montantFcfa;
+          effectuePeriode.montant_total += montantPeriode;
         }
       }
     }
