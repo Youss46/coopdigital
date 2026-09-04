@@ -940,9 +940,10 @@ export async function generateRecuLivraison(livraisonId: number, cooperativeId: 
     ["Prix unitaire",      `${formaterFCFA(row.prixUnitaireFcfa)} / kg`],
   ];
   for (const [i, [label, val]] of recuLivDetails.entries()) {
+    const estDateReglement = label === "Date et heure de règlement";
     if (i % 2 === 0) doc.rect(MARGIN, y, 370, 16).fill("#f9fafb");
-    doc.fontSize(8).fillColor(GRIS).font("Helvetica").text(label, MARGIN + 6, y + 4, { width: 160, lineBreak: false });
-    doc.fontSize(9).fillColor("black").font("Helvetica-Bold").text(val, MARGIN + 170, y + 4, { width: 190, lineBreak: false });
+    doc.fontSize(8).fillColor(estDateReglement ? "#16a34a" : GRIS).font("Helvetica").text(label, MARGIN + 6, y + 4, { width: 160, lineBreak: false });
+    doc.fontSize(9).fillColor(estDateReglement ? "#16a34a" : "black").font("Helvetica-Bold").text(val, MARGIN + 170, y + 4, { width: 190, lineBreak: false });
     y += 16;
   }
   y += 8;
@@ -1153,7 +1154,9 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
   const payDetails: Array<[string, string]> = [
     ["N° Reçu",              ref],
     ["Campagne",             campagne ?? "—"],
-    ["Date",                 formaterDateHeure(row.createdAt)],
+    [row.livraisonId ? "Date de pesée" : "Date", row.livraisonDate
+      ? formaterDate(row.livraisonDate)
+      : formaterDateHeure(row.createdAt)],
     ...(dateReglement
       ? [["Date et heure de règlement", formaterDateHeure(dateReglement)] as [string, string]]
       : []),
@@ -1169,15 +1172,15 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
     ["N° de pesée",          formatNumeroPesee(row.livraisonNumeroPesee, row.livraisonAnneeNumeroPesee)
       ?? row.livraisonRef
       ?? "NON-NUMÉROTÉE"],
-    ["Date livraison",       row.livraisonDate ? formaterDate(row.livraisonDate) : "—"],
     ["Situation",            chequeEnAttente
       ? "Chèque émis — en attente d’encaissement"
       : "Montant encaissé"],
   ];
   for (const [i, [label, val]] of payDetails.entries()) {
+    const estDateReglement = label === "Date et heure de règlement";
     if (i % 2 === 0) doc.rect(MARGIN, y, 370, 16).fill("#f9fafb");
-    doc.fontSize(8).fillColor(GRIS).font("Helvetica").text(label, MARGIN + 6, y + 4, { width: 160, lineBreak: false });
-    doc.fontSize(9).fillColor("black").font("Helvetica-Bold").text(val, MARGIN + 170, y + 4, { width: 190, lineBreak: false });
+    doc.fontSize(8).fillColor(estDateReglement ? "#16a34a" : GRIS).font("Helvetica").text(label, MARGIN + 6, y + 4, { width: 160, lineBreak: false });
+    doc.fontSize(9).fillColor(estDateReglement ? "#16a34a" : "black").font("Helvetica-Bold").text(val, MARGIN + 170, y + 4, { width: 190, lineBreak: false });
     y += 16;
   }
   if (paiementLignes.length > 1) {

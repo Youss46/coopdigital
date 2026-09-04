@@ -346,6 +346,14 @@ describe("generateRecuPaiement (real PDF generation) — receipt number in PDF o
     expect(text).toContain("PES-S-2026-00042");
   });
 
+  it("nomme explicitement la date de pesée sur un paiement de livraison", async () => {
+    setupDbSelect(makePaiementRow());
+    const buf = await generateRecuPaiement(PAIEMENT_ID, 1);
+    const text = extractPdfText(buf);
+    expect(text).toContain("Date de pesée");
+    expect(text).not.toContain("Date livraison");
+  });
+
   it("PAY fallback: passes PAY-{id} to drawHeader when numeroRecu is null (legacy row)", async () => {
     const legacyId = 99;
     setupDbSelect(makePaiementRow({ id: legacyId, numeroRecu: null }));
