@@ -23,7 +23,7 @@ import { generateEcrituresLivraison } from "./comptabiliteService.js";
 import { getMontantAlimentationsCaisseDelegue } from "./delegueService.js";
 import { getEncoursMembreTx, enregistrerRemboursementParLivraison } from "./intrantsService.js";
 import { creerNotification, notifierParRole } from "./notificationService.js";
-import { genererNumeroRecu, reserverNumeroPesee } from "./recuService.js";
+import { formatNumeroPesee, genererNumeroRecu, reserverNumeroPesee } from "./recuService.js";
 import { creerCommissionTransfert, deduireAvancesApresCommission } from "./commissionService.js";
 import { creerCommissionMembreSiTaux } from "./commissionMembreDelegueService.js";
 import { entrerStockSiDelegue } from "./entrepotDelegueService.js";
@@ -918,6 +918,7 @@ async function deduireAvancesMembreDelegue(
   membreId: number,
   plafondFcfa: number,
   sessionId: number,
+  referencePesee: string,
 ): Promise<number> {
   try {
     const avances = await db
@@ -961,7 +962,7 @@ async function deduireAvancesMembreDelegue(
       await db.insert(remboursementsAvancesMembresTable).values({
         avanceId:    avance.id,
         montantFcfa: retenue,
-        note:        `Retenue automatique — pesée #${sessionId}`,
+        note:        `Retenue automatique — ${referencePesee}`,
       });
 
       restant      -= retenue;
@@ -1152,7 +1153,16 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
           valeurProduitPrevue - fraisCarburantDeduitsFcfa - autresChargesDeduitesFcfa,
         );
         if (plafondAvance > 0) {
-          avanceDeduiteFcfa = await deduireAvancesMembreDelegue(detail.membreId, plafondAvance, sessionId);
+          const referencePesee = formatNumeroPesee(
+            detail.numeroPesee,
+            detail.anneeNumeroPesee ?? Number(String(detail.numeroSession).slice(4, 8)),
+          ) ?? detail.numeroSession;
+          avanceDeduiteFcfa = await deduireAvancesMembreDelegue(
+            detail.membreId,
+            plafondAvance,
+            sessionId,
+            referencePesee,
+          );
         }
 
         // ── Livraison officielle + paiement + écritures OHADA ─────────────────

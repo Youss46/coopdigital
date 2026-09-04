@@ -4583,10 +4583,15 @@ export async function generateBordereauAchatSession(
         .where(
           and(
             eq(avancesTable.membreId, session.membreId!),
-            eq(
-              remboursementsAvancesMembresTable.note,
+            inArray(remboursementsAvancesMembresTable.note, [
+              `Retenue automatique — ${formatNumeroPesee(
+                session.numeroPesee,
+                Number(String(session.numeroSession).slice(4, 8)),
+              ) ?? session.numeroSession}`,
+              // Compatibilité avec les remboursements enregistrés avant
+              // l'utilisation de la référence métier de la pesée.
               `Retenue automatique — pesée #${session.id}`,
-            ),
+            ]),
           ),
         );
       retenueAvancesFcfa = Number(remboursementReel?.totalFcfa ?? 0);

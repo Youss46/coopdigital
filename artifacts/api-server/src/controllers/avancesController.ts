@@ -6,6 +6,7 @@ import {
   membresTable,
   campagnesTable,
   remboursementsAvancesMembresTable,
+  sessionsPeseeTable,
   usersTable,
   caissesTable,
   sessionsCaisseTable,
@@ -15,8 +16,9 @@ import {
   comptesBancairesTable,
   mouvementsBanqueTable,
 } from "@workspace/db";
-import { eq, and, sql, desc, ne, isNull, or, lt } from "drizzle-orm";
+import { eq, and, sql, desc, ne, isNull, or, lt, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
+import { formatNumeroPesee } from "../services/recuService";
 
 const saisiseurAlias = alias(usersTable, "saisiseur_user");
 import { CampagneFermeeError, assertCampagneActiveExiste } from "../lib/campagneGuard";
@@ -745,7 +747,49 @@ export async function getRemboursementsAvanceMembre(req: Request, res: Response)
       .where(eq(remboursementsAvancesMembresTable.avanceId, id))
       .orderBy(desc(remboursementsAvancesMembresTable.createdAt));
 
-    res.json(rows);
+    // Les anciennes retenues stockaient l'ID technique de session dans le
+    // libellé. Résoudre cette référence à la volée permet d'afficher le même
+    // numéro métier que le bordereau sans réécrire l'historique financier.
+    const legacySessionIds = rows
+      .map((remboursement) => {
+        const match = /^Retenue automatique — pesée #(\d+)$/.exec(remboursement.note ?? "");
+        return match ? Number(match[1]) : null;
+      })
+      .filter((sessionId): sessionId is number => sessionId !== null);
+
+    const sessions = legacySessionIds.length > 0
+      ? await db
+          .select({
+            id: sessionsPeseeTable.id,
+            numeroSession: sessionsPeseeTable.numeroSession,
+            numeroPesee: sessionsPeseeTable.numeroPesee,
+            anneeNumeroPesee: sessionsPeseeTable.anneeNumeroPesee,
+          })
+          .from(sessionsPeseeTable)
+          .where(and(
+            eq(sessionsPeseeTable.cooperativeId, cooperativeId),
+            eq(sessionsPeseeTable.membreId, row.avance.membreId!),
+            inArray(sessionsPeseeTable.id, legacySessionIds),
+          ))
+      : [];
+    const sessionsById = new Map(sessions.map((session) => [session.id, session]));
+
+    const normalizedRows = rows.map((remboursement) => {
+      const match = /^Retenue automatique — pesée #(\d+)$/.exec(remboursement.note ?? "");
+      const session = match ? sessionsById.get(Number(match[1])) : undefined;
+      if (!session) return remboursement;
+
+      const referencePesee = formatNumeroPesee(
+        session.numeroPesee,
+        session.anneeNumeroPesee ?? Number(String(session.numeroSession).slice(4, 8)),
+      ) ?? session.numeroSession;
+      return {
+        ...remboursement,
+        note: `Retenue automatique — ${referencePesee}`,
+      };
+    });
+
+    res.json(normalizedRows);
   } catch (err) {
     req.log.error({ err }, "getRemboursementsAvanceMembre");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
