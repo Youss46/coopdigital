@@ -672,6 +672,11 @@ export interface Membre {
   village?: string | null;
   /** @nullable */
   groupement?: string | null;
+  /**
+     * Catégorie métier du membre, notamment membre délégué de localités.
+     * @nullable
+     */
+  categorieMembre?: string | null;
   superficieHa: string;
   statut: MembreStatut;
   qrCodeToken: string;

@@ -7518,6 +7518,9 @@ components:
           type: ["string", "null"]
         groupement:
           type: ["string", "null"]
+        categorieMembre:
+          type: ["string", "null"]
+          description: "Catégorie métier du membre, notamment membre délégué de localités."
         superficieHa:
           type: string
         statut:
