@@ -33,6 +33,7 @@ describe.skipIf(!enabled)(
     let campaignId: number;
     let expeditionId: number;
     let concurrentExpeditionId: number;
+    let testUserId: number;
     let sessionId: number;
     let transitionExpeditionSequence = 0;
 
@@ -130,6 +131,15 @@ describe.skipIf(!enabled)(
       );
       cooperativeId = cooperative.rows[0].id;
 
+      const user = await client.query(
+        `INSERT INTO users
+          (cooperative_id, nom, prenoms, email, password_hash, role)
+         VALUES ($1, 'Test', 'Chargement', $2, 'integration-test-hash', 'magasinier')
+         RETURNING id`,
+        [cooperativeId, `controle-chargement-${suffix}@example.test`],
+      );
+      testUserId = user.rows[0].id;
+
       const campaign = await client.query(
         `INSERT INTO campagnes
           (cooperative_id, libelle, annee_debut, annee_fin,
@@ -141,6 +151,13 @@ describe.skipIf(!enabled)(
       );
       campaignId = campaign.rows[0].id;
 
+      // Certaines bases de test sont provisionnées à partir d'une baseline
+      // antérieure à la migration du contrôle de chargement.
+      await client.query(
+        `ALTER TABLE config_cooperative
+           ADD COLUMN IF NOT EXISTS controle_chargement_obligatoire
+           boolean NOT NULL DEFAULT false`,
+      );
       await client.query(
         `INSERT INTO config_cooperative
           (cooperative_id, controle_chargement_obligatoire)
@@ -196,6 +213,11 @@ describe.skipIf(!enabled)(
             [cooperativeId],
           );
           await client.query(
+            `DELETE FROM config_comptable
+              WHERE cooperative_id = $1`,
+            [cooperativeId],
+          );
+          await client.query(
             `DELETE FROM commissions_delegues
               WHERE livraison_id IN (
                 SELECT id FROM livraisons WHERE campagne_id = $1
@@ -236,14 +258,41 @@ describe.skipIf(!enabled)(
           );
           await client.query(
             `DELETE FROM ventes_exportateurs
-              WHERE expedition_id = $1`,
-            [expeditionId],
+              WHERE expedition_id IN (
+                SELECT id FROM expeditions WHERE cooperative_id = $1
+              )
+                OR exportateur_id IN (
+                SELECT id FROM exportateurs WHERE cooperative_id = $1
+              )`,
+            [cooperativeId],
+          );
+          await client.query(
+            `DELETE FROM exportateurs
+              WHERE cooperative_id = $1`,
+            [cooperativeId],
           );
           await client.query(
             `DELETE FROM mouvements_stock
               WHERE entrepot_id IN (
                 SELECT id FROM entrepots WHERE cooperative_id = $1
               )`,
+            [cooperativeId],
+          );
+          await client.query(
+            `DELETE FROM expedition_lots
+              WHERE expedition_id IN (
+                SELECT id FROM expeditions WHERE cooperative_id = $1
+              )`,
+            [cooperativeId],
+          );
+          await client.query(
+            `DELETE FROM lots
+              WHERE cooperative_id = $1`,
+            [cooperativeId],
+          );
+          await client.query(
+            `DELETE FROM entrepots
+              WHERE cooperative_id = $1`,
             [cooperativeId],
           );
           await client.query(
@@ -270,6 +319,11 @@ describe.skipIf(!enabled)(
             `DELETE FROM campagnes
               WHERE id = $1`,
             [campaignId],
+          );
+          await client.query(
+            `DELETE FROM users
+              WHERE id = $1`,
+            [testUserId],
           );
           await client.query(
             `DELETE FROM cooperatives
@@ -332,6 +386,123 @@ describe.skipIf(!enabled)(
         [id],
       );
       expect(persisted.rows[0].statut).toBe("charge");
+    });
+
+    it("n'accepte qu'une confirmation concurrente et ne duplique pas ses effets", async () => {
+      await setControleChargementObligatoire(false);
+
+      const id = await createTransitionExpedition(1000);
+      const expedition = await client.query(
+        `SELECT numero_expedition FROM expeditions WHERE id = $1`,
+        [id],
+      );
+      const numeroExpedition = expedition.rows[0].numero_expedition;
+
+      const entrepot = await client.query(
+        `INSERT INTO entrepots
+          (cooperative_id, nom, ville, capacite_kg)
+         VALUES ($1, $2, 'Test', 5000)
+         RETURNING id`,
+        [cooperativeId, `Entrepôt concurrence ${id}`],
+      );
+      const lot = await client.query(
+        `INSERT INTO lots
+          (cooperative_id, campagne_id, poids_total_kg, entrepot, nombre_sacs)
+         VALUES ($1, $2, 1000, $3, 20)
+         RETURNING id`,
+        [cooperativeId, campaignId, `Entrepôt concurrence ${id}`],
+      );
+      await client.query(
+        `INSERT INTO expedition_lots
+          (expedition_id, lot_id, poids_kg, nombre_sacs)
+         VALUES ($1, $2, 1000, 20)`,
+        [id, lot.rows[0].id],
+      );
+      const exportateur = await client.query(
+        `INSERT INTO exportateurs
+          (cooperative_id, nom)
+         VALUES ($1, 'Exportateur concurrence')
+         RETURNING id`,
+        [cooperativeId],
+      );
+      await client.query(
+        `INSERT INTO ventes_exportateurs
+          (exportateur_id, lot_id, expedition_id, campagne_id,
+           poids_kg, prix_unitaire_fcfa, montant_total_fcfa,
+           date_vente, solde_du_fcfa)
+         VALUES ($1, $2, $3, $4, 1000, 500, 500000, CURRENT_DATE, 500000)`,
+        [exportateur.rows[0].id, lot.rows[0].id, id, campaignId],
+      );
+      await client.query(
+        `UPDATE config_comptable
+            SET auto_stocks = true
+          WHERE cooperative_id = $1`,
+        [cooperativeId],
+      );
+
+      const results = await Promise.allSettled([
+        changerStatut(cooperativeId, id, testUserId, "charge"),
+        changerStatut(cooperativeId, id, testUserId, "charge"),
+      ]);
+
+      const successes = results.filter(
+        (result): result is PromiseFulfilledResult<{ ok: boolean; statut: string }> =>
+          result.status === "fulfilled",
+      );
+      const failures = results.filter(
+        (result): result is PromiseRejectedResult => result.status === "rejected",
+      );
+
+      expect(successes).toHaveLength(1);
+      expect(successes[0].value).toEqual({ ok: true, statut: "charge" });
+      expect(failures).toHaveLength(1);
+      expect(failures[0].reason).toBeInstanceOf(Error);
+      expect(failures[0].reason.message).toBe(
+        "Transition charge → charge non autorisée",
+      );
+
+      const persisted = await client.query(
+        `SELECT statut FROM expeditions WHERE id = $1`,
+        [id],
+      );
+      expect(persisted.rows[0].statut).toBe("charge");
+
+      const history = await client.query(
+        `SELECT count(*)::int AS count
+           FROM expedition_historique
+          WHERE expedition_id = $1
+            AND statut_precedent = 'en_preparation'
+            AND statut_nouveau = 'charge'`,
+        [id],
+      );
+      expect(history.rows[0].count).toBe(1);
+
+      const movements = await client.query(
+        `SELECT count(*)::int AS count
+           FROM mouvements_stock
+          WHERE entrepot_id = $1
+            AND motif = $2`,
+        [entrepot.rows[0].id, `Chargement expédition ${numeroExpedition}`],
+      );
+      expect(movements.rows[0].count).toBe(1);
+
+      const accounting = await client.query(
+        `SELECT (
+           (SELECT count(*)
+              FROM ecritures_comptables
+             WHERE cooperative_id = $1
+               AND source = 'stock'
+               AND source_id = $2)
+           +
+           (SELECT count(*)
+              FROM ecritures_en_attente
+             WHERE cooperative_id = $1
+               AND source = 'stock'
+               AND source_id = $2)
+         )::int AS count`,
+        [cooperativeId, id],
+      );
+      expect(accounting.rows[0].count).toBe(1);
     });
 
     it("préserve le comportement historique quand le contrôle obligatoire est désactivé", async () => {

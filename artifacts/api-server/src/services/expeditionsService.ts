@@ -773,57 +773,67 @@ export async function changerStatut(
   notes?: string,
   positionGps?: unknown
 ) {
-  const rows = await db
-    .select()
-    .from(expeditionsTable)
-    .where(and(eq(expeditionsTable.id, expeditionId), eq(expeditionsTable.cooperativeId, cooperativeId)))
-    .limit(1);
+  // La lecture doit être sérialisée avec la transition. Sans verrou, deux
+  // requêtes peuvent toutes deux lire "en_preparation", puis chacune créer
+  // un historique et déclencher les effets du chargement.
+  const exp = await db.transaction(async (tx) => {
+    const rows = await tx
+      .select()
+      .from(expeditionsTable)
+      .where(and(eq(expeditionsTable.id, expeditionId), eq(expeditionsTable.cooperativeId, cooperativeId)))
+      .for("update")
+      .limit(1);
 
-  if (rows.length === 0) throw new Error("Expédition introuvable");
-  const exp = rows[0]!;
+    if (rows.length === 0) throw new Error("Expédition introuvable");
+    const lockedExpedition = rows[0]!;
 
-  const trans = TRANSITIONS_VALIDES[exp.statut] ?? [];
-  if (!trans.includes(nouveauStatut)) {
-    throw new Error(`Transition ${exp.statut} → ${nouveauStatut} non autorisée`);
-  }
+    // Relire le statut après acquisition du verrou : une requête concurrente
+    // attend ici, puis voit la transition déjà validée par la première.
+    const trans = TRANSITIONS_VALIDES[lockedExpedition.statut] ?? [];
+    if (!trans.includes(nouveauStatut)) {
+      throw new Error(`Transition ${lockedExpedition.statut} → ${nouveauStatut} non autorisée`);
+    }
 
-  if (
-    nouveauStatut === "charge" &&
-    !(await controleChargementAutorise(cooperativeId, expeditionId, exp.poidsChargeKg))
-  ) {
-    throw new Error(
-      "Le contrôle de chargement doit être clôturé avec un écart acceptable ou à justifier avant de confirmer le chargement",
-    );
-  }
+    if (
+      nouveauStatut === "charge" &&
+      !(await controleChargementAutorise(cooperativeId, expeditionId, lockedExpedition.poidsChargeKg))
+    ) {
+      throw new Error(
+        "Le contrôle de chargement doit être clôturé avec un écart acceptable ou à justifier avant de confirmer le chargement",
+      );
+    }
 
-  const updateValues: Partial<typeof expeditionsTable.$inferInsert> = {
-    statut: nouveauStatut as typeof expeditionsTable.$inferSelect["statut"],
-    updatedAt: new Date(),
-  };
+    const updateValues: Partial<typeof expeditionsTable.$inferInsert> = {
+      statut: nouveauStatut as typeof expeditionsTable.$inferSelect["statut"],
+      updatedAt: new Date(),
+    };
 
-  if (nouveauStatut === "en_transit") {
-    updateValues.dateDepart = updateValues.dateDepart ?? new Date();
-  }
-  if (nouveauStatut === "arrive_port") {
-    updateValues.dateArriveePort = new Date();
-    // Notification arrivée port (fire-and-forget)
-    void notifExpeditionArriveePort(
-      cooperativeId,
-      exp.numeroExpedition,
-      exp.port,
+    if (nouveauStatut === "en_transit") {
+      updateValues.dateDepart = updateValues.dateDepart ?? new Date();
+    }
+    if (nouveauStatut === "arrive_port") {
+      updateValues.dateArriveePort = new Date();
+      // Notification arrivée port (fire-and-forget)
+      void notifExpeditionArriveePort(
+        cooperativeId,
+        lockedExpedition.numeroExpedition,
+        lockedExpedition.port,
+        expeditionId,
+      );
+    }
+
+    await tx.update(expeditionsTable).set(updateValues).where(eq(expeditionsTable.id, expeditionId));
+
+    await tx.insert(expeditionHistoriqueTable).values({
       expeditionId,
-    );
-  }
+      statutPrecedent: lockedExpedition.statut,
+      statutNouveau:   nouveauStatut,
+      faitPar:         userId,
+      notes:           notes ?? null,
+      positionGps:     positionGps ?? null,
+    });
 
-  await db.update(expeditionsTable).set(updateValues).where(eq(expeditionsTable.id, expeditionId));
-
-  await db.insert(expeditionHistoriqueTable).values({
-    expeditionId,
-    statutPrecedent: exp.statut,
-    statutNouveau:   nouveauStatut,
-    faitPar:         userId,
-    notes:           notes ?? null,
-    positionGps:     positionGps ?? null,
+    return lockedExpedition;
   });
 
   // Déduction stock + écriture comptable au chargement (en_preparation → charge)
