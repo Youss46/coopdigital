@@ -160,4 +160,18 @@ describe("listes des avances ordinaires", () => {
     const payload = vi.mocked(res.json).mock.calls[0]![0] as { avances: Array<{ membreId: number }> };
     expect(payload.avances.map((avance) => avance.membreId).sort()).toEqual([11, 12]);
   });
+
+  it.each([
+    ["générale", listAvances],
+    ["reportée", getAvancesReportees],
+  ])("affiche uniquement les membres délégués dans la portée dédiée — liste %s", async (_label, handler) => {
+    const res = response();
+    res.locals.membreDelegueLocalite = true;
+
+    await handler(request(), res);
+
+    expect(res.status).not.toHaveBeenCalledWith(500);
+    const payload = vi.mocked(res.json).mock.calls[0]![0] as { avances: Array<{ membreId: number }> };
+    expect(payload.avances.map((avance) => avance.membreId)).toEqual([13]);
+  });
 });

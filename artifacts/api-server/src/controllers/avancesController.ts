@@ -50,10 +50,12 @@ export async function listAvances(req: Request, res: Response): Promise<void> {
 
     const conditions: ReturnType<typeof eq>[] = [
       eq(membresTable.cooperativeId, cooperativeId),
-      or(
-        isNull(membresTable.categorieMembre),
-        ne(membresTable.categorieMembre, CATEGORIE_DELEGUE_LOCALITE),
-      )!,
+      estPorteeDelegueLocalite(res)
+        ? eq(membresTable.categorieMembre, CATEGORIE_DELEGUE_LOCALITE)
+        : or(
+            isNull(membresTable.categorieMembre),
+            ne(membresTable.categorieMembre, CATEGORIE_DELEGUE_LOCALITE),
+          )!,
     ];
     if (statut) conditions.push(eq(avancesTable.statut, statut as "en_cours" | "rembourse" | "en_retard"));
     if (membreId) conditions.push(eq(avancesTable.membreId, membreId));
@@ -175,7 +177,17 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
       res.status(403).json({ erreur: "Ce membre n'appartient pas à votre coopérative" });
       return;
     }
-    if (membre.categorieMembre === CATEGORIE_DELEGUE_LOCALITE) {
+    if (
+      estPorteeDelegueLocalite(res)
+      && membre.categorieMembre !== CATEGORIE_DELEGUE_LOCALITE
+    ) {
+      res.status(404).json({ erreur: "Délégué de localités introuvable" });
+      return;
+    }
+    if (
+      !estPorteeDelegueLocalite(res)
+      && membre.categorieMembre === CATEGORIE_DELEGUE_LOCALITE
+    ) {
       res.status(400).json({ erreur: "Les membres délégués ne sont pas éligibles aux avances de cette page." });
       return;
     }
@@ -648,10 +660,12 @@ export async function getAvancesReportees(req: Request, res: Response): Promise<
 
     const conditions: ReturnType<typeof eq>[] = [
       eq(membresTable.cooperativeId, cooperativeId),
-      or(
-        isNull(membresTable.categorieMembre),
-        ne(membresTable.categorieMembre, CATEGORIE_DELEGUE_LOCALITE),
-      )!,
+      estPorteeDelegueLocalite(res)
+        ? eq(membresTable.categorieMembre, CATEGORIE_DELEGUE_LOCALITE)
+        : or(
+            isNull(membresTable.categorieMembre),
+            ne(membresTable.categorieMembre, CATEGORIE_DELEGUE_LOCALITE),
+          )!,
       eq(avancesTable.planType, "reporte"),
       ne(avancesTable.statut, "rembourse"),
       or(isNull(avancesTable.reportDate), lt(avancesTable.reportDate, today))!,
