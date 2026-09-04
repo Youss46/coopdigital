@@ -697,7 +697,9 @@ function ModalValidation({
               />
               <p className="text-xs text-gray-400 mt-1">
                 {inclureFraisCollecte
-                  ? `Montant total : ${fmt(montantRestant)} de net cacao + ${fmt(commissionCollecteMontant)} de frais de collecte.`
+                  ? commissionNette > 0
+                    ? `Montant total : ${fmt(montantRestant)} de net cacao + ${fmt(commissionNette)} de frais de collecte nets.`
+                    : `Montant total : ${fmt(montantRestant)} de net cacao. La commission de ${fmt(commissionCollecteMontant)} est entièrement retenue sur l’avance.`
                   : `Entre 1 et ${fmt(montantRestant)}. Le reliquat sera conservé pour un prochain versement.`}
               </p>
               {touched && (montantVersementHorsCommission <= 0 || montantVersementHorsCommission > montantRestant) && (
