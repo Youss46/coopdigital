@@ -1093,6 +1093,13 @@
       "when": 1788538000000,
       "tag": "0155_exiger_numerotation_livraisons",
       "breakpoints": true
+    },
+    {
+      "idx": 156,
+      "version": "7",
+      "when": 1788540900000,
+      "tag": "0156_reparer_frais_transport_expeditions",
+      "breakpoints": true
     }
   ]
 }

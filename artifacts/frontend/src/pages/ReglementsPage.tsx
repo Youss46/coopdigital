@@ -1246,6 +1246,8 @@ export default function ReglementsPage() {
     data: fraisTransport = [],
     isLoading: fraisTransportLoading,
     isError: fraisTransportError,
+    error: fraisTransportErreur,
+    refetch: rechargerFraisTransport,
   } = useQuery<FraisTransportARegler[]>({
     queryKey: ["frais-transport-a-regler"],
     queryFn: () => apiFetchChecked<FraisTransportARegler[]>("/api/expeditions/frais-transport-a-regler"),
@@ -1634,9 +1636,22 @@ export default function ReglementsPage() {
               <Loader2 className="animate-spin text-blue-300" size={24} />
             </div>
           ) : fraisTransportError ? (
-            <div className="flex items-center gap-2 px-5 py-6 text-sm text-red-700">
-              <AlertCircle size={16} />
-              Impossible de charger les frais d’exportation à régler.
+            <div className="flex items-center justify-between gap-3 px-5 py-6 text-sm text-red-700">
+              <div className="flex items-center gap-2">
+                <AlertCircle size={16} />
+                <span>
+                  {fraisTransportErreur instanceof Error
+                    ? fraisTransportErreur.message
+                    : "Impossible de charger les frais d’exportation à régler."}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => void rechargerFraisTransport()}
+                className="rounded-md border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"
+              >
+                Réessayer
+              </button>
             </div>
           ) : fraisTransport.length === 0 ? (
             <div className="px-5 py-7 text-center text-sm text-gray-500">
