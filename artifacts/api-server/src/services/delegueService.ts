@@ -223,7 +223,11 @@ export async function regulariserPaiement(
     .where(eq(livraisonsTable.id, livraisonId));
 
   await db.update(paiementsTable)
-    .set({ statut: "confirme", modePaiement: modePaiement as "especes" | "orange_money" | "mtn_momo" })
+    .set({
+      statut: "confirme",
+      modePaiement: modePaiement as "especes" | "orange_money" | "mtn_momo",
+      dateValidation: new Date(),
+    })
     .where(and(
       eq(paiementsTable.livraisonId, livraisonId),
       eq(paiementsTable.statut, "en_attente"),
