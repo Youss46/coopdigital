@@ -4424,6 +4424,7 @@ export async function generateBordereauAchatSession(
         prenoms:         membresTable.prenoms,
         telephone:       membresTable.telephone,
         section:         membresTable.section,
+        groupement:      membresTable.groupement,
         categorieMembre: membresTable.categorieMembre,
       })
       .from(membresTable)
@@ -4435,7 +4436,10 @@ export async function generateBordereauAchatSession(
       delegueNom       = membreDelegue.nom       ?? "—";
       deleguePrenoms   = membreDelegue.prenoms   ?? "";
       delegueTel       = membreDelegue.telephone ?? "—";
-      delegueZone      = membreDelegue.section   ?? "—";
+      // Avant la séparation des champs, le formulaire enregistrait la
+      // « Section / Zone » dans groupement. Garder ce repli rend les anciens
+      // bordereaux lisibles tout en utilisant section pour les nouveaux.
+      delegueZone      = membreDelegue.section ?? membreDelegue.groupement ?? "—";
 
       // Frais de transport depuis le bon de réception (si créé par le magasinier)
       if (session.bonReceptionId) {
