@@ -88,6 +88,7 @@ export default function Avances() {
   const [form, setForm] = useState({
     membreId: "",
     montantOctroyeFcfa: "",
+    modePaiement: "especes" as "especes" | "mobile" | "banque",
     dateOctroi: new Date().toISOString().split("T")[0]!,
     dateEcheance: "",
     motif: "",
@@ -110,7 +111,7 @@ export default function Avances() {
         queryClient.invalidateQueries({ queryKey: getGetAvancesQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetAvancesEncoursQueryKey() });
         setModalOuvert(false);
-        setForm({ membreId: "", montantOctroyeFcfa: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "" });
+        setForm({ membreId: "", montantOctroyeFcfa: "", modePaiement: "especes", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "" });
         setMontantErreur(null);
         setMembreSearch("");
       },
@@ -150,6 +151,7 @@ export default function Avances() {
     const payload = {
       membreId: parseInt(form.membreId),
       montantOctroyeFcfa: parseInt(form.montantOctroyeFcfa),
+      modePaiement: form.modePaiement,
       dateOctroi: form.dateOctroi,
       dateEcheance: form.dateEcheance || undefined,
       motif: form.motif || undefined,
@@ -157,7 +159,7 @@ export default function Avances() {
     if (!navigator.onLine) {
       void queueOp({ localId: crypto.randomUUID(), type: "avance", data: payload });
       setModalOuvert(false);
-      setForm({ membreId: "", montantOctroyeFcfa: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "" });
+      setForm({ membreId: "", montantOctroyeFcfa: "", modePaiement: "especes", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "" });
       setMontantErreur(null);
       setMembreSearch("");
       setNotifHorsLigne("Avance enregistrée hors ligne — sera synchronisée dès le retour en ligne");
@@ -512,6 +514,25 @@ export default function Avances() {
                 {montantErreur && (
                   <p className="mt-1 text-xs text-red-600">{montantErreur}</p>
                 )}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Moyen de décaissement *</label>
+                <select
+                  required
+                  value={form.modePaiement}
+                  onChange={(e) => setForm({
+                    ...form,
+                    modePaiement: e.target.value as typeof form.modePaiement,
+                  })}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-green-700"
+                >
+                  <option value="especes">Espèces — caisse centrale (571)</option>
+                  <option value="mobile">Mobile Marchand (552)</option>
+                  <option value="banque">Banque — compte bancaire (521)</option>
+                </select>
+                <p className="mt-1 text-xs text-gray-400">
+                  Le montant de l’avance sera débité de la trésorerie sélectionnée.
+                </p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
