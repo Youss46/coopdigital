@@ -33,6 +33,7 @@ import {
   getRapportVehicule,
   getDepenses,
   getDepense,
+  emettreBonAchatPiece,
   createDepense,
   updateDepense,
   deleteDepense,
@@ -714,6 +715,24 @@ export async function handleGetBonAchatPiecePdf(req: Request, res: Response): Pr
     res.send(pdf);
   } catch (err) {
     req.log.error({ err }, "Erreur bon achat pièce PDF");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function handleEmettreBonAchatPiece(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    const userId = req.user?.id;
+    if (!cooperativeId || !userId) { res.status(400).json({ erreur: "Compte utilisateur invalide" }); return; }
+    const id = parseInt(String(req.params["id"]));
+    if (isNaN(id)) { res.status(400).json({ erreur: "ID invalide" }); return; }
+    const result = await emettreBonAchatPiece(cooperativeId, id, userId);
+    res.status(result.dejaEmis ? 200 : 201).json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Erreur interne";
+    if (message === "Dépense introuvable") { res.status(404).json({ erreur: message }); return; }
+    if (message.includes("réservé")) { res.status(400).json({ erreur: message }); return; }
+    req.log.error({ err }, "Erreur émission bon achat pièce");
     res.status(500).json({ erreur: "Erreur interne" });
   }
 }

@@ -26,6 +26,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 function nomProducteur(p: PaiementListItem) {
   if (p.bonCarburantNumero) return `Carburant — ${p.bonCarburantNumero}`;
+  if (p.depenseVehiculeId) return `Pièce de rechange — ${p.depenseVehiculeLibelle ?? `Bon BAP-${String(p.depenseVehiculeId).padStart(5, "0")}`}`;
   const nom = p.membreNom ?? p.fournisseurNom ?? "";
   const prenoms = p.membrePrenoms ?? p.fournisseurPrenoms ?? "";
   return `${nom} ${prenoms}`.trim() || "—";

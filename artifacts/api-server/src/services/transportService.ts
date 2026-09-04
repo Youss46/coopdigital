@@ -6,6 +6,7 @@ import {
   entretienVehiculeTable,
   depensesVehiculeTable,
   bonsCarburantTable,
+  paiementsTable,
 } from "@workspace/db";
 import { eq, and, sql, desc, lte, gte } from "drizzle-orm";
 import { logger } from "../lib/logger";
@@ -481,6 +482,41 @@ export async function getDepense(cooperativeId: number, id: number) {
     .where(and(eq(depensesVehiculeTable.id, id), eq(depensesVehiculeTable.cooperativeId, cooperativeId)))
     .limit(1);
   return row ?? null;
+}
+
+export async function emettreBonAchatPiece(cooperativeId: number, id: number, userId: number) {
+  return db.transaction(async (tx) => {
+    const [depense] = await tx
+      .select()
+      .from(depensesVehiculeTable)
+      .where(and(eq(depensesVehiculeTable.id, id), eq(depensesVehiculeTable.cooperativeId, cooperativeId)))
+      .for("update")
+      .limit(1);
+    if (!depense) throw new Error("Dépense introuvable");
+    if (depense.type !== "piece_rechange") throw new Error("Le bon d'achat est réservé aux pièces de rechange");
+
+    const [existant] = await tx
+      .select({ id: paiementsTable.id })
+      .from(paiementsTable)
+      .where(eq(paiementsTable.depenseVehiculeId, id))
+      .limit(1);
+    if (existant) return { paiementId: existant.id, dejaEmis: true };
+
+    const [paiement] = await tx
+      .insert(paiementsTable)
+      .values({
+        depenseVehiculeId: id,
+        montantFcfa: Math.round(Number(depense.montantFcfa)),
+        montantAPayerFcfa: depense.montantFcfa,
+        montantVerseFcfa: "0",
+        resteAPayerFcfa: depense.montantFcfa,
+        libelle: `Achat pièce de rechange — ${depense.libelle}`,
+        statut: "en_attente",
+        initialisePar: userId,
+      })
+      .returning({ id: paiementsTable.id });
+    return { paiementId: paiement!.id, dejaEmis: false };
+  });
 }
 
 export async function createDepense(

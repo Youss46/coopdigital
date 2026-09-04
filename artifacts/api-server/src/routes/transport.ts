@@ -42,6 +42,7 @@ import {
   handleUpdateDepenseVehicule,
   handleDeleteDepenseVehicule,
   handleGetBonAchatPiecePdf,
+  handleEmettreBonAchatPiece,
   handleGetBonsCarburant,
   handleCreateBonCarburant,
   handleGetBonCarburant,
@@ -84,6 +85,7 @@ router.post("/transport/vehicules/:id/depenses",        authMiddleware, handleCr
 router.put("/transport/depenses/:id",                   authMiddleware, handleUpdateDepenseVehicule);
 router.delete("/transport/depenses/:id",                authMiddleware, handleDeleteDepenseVehicule);
 router.get("/transport/depenses/:id/bon-achat-pdf",      authMiddleware, handleGetBonAchatPiecePdf);
+router.post("/transport/depenses/:id/emettre-bon-achat",  authMiddleware, handleEmettreBonAchatPiece);
 
 router.get("/transport/carburant/bons",                     authMiddleware, handleGetBonsCarburant);
 router.post("/transport/carburant/bons",                    authMiddleware, handleCreateBonCarburant);

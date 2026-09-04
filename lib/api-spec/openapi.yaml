@@ -7889,6 +7889,12 @@ components:
           type: ["integer", "null"]
         bonCarburantNumero:
           type: ["string", "null"]
+        depenseVehiculeId:
+          type: ["integer", "null"]
+        depenseVehiculeLibelle:
+          type: ["string", "null"]
+        depenseVehiculeFournisseur:
+          type: ["string", "null"]
         membreId:
           type: ["integer", "null"]
         montantFcfa:

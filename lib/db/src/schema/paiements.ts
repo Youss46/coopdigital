@@ -7,6 +7,7 @@ import { membresTable } from "./membres";
 import { campagnesTable } from "./campagnes";
 import { usersTable } from "./users";
 import { bonsCarburantTable } from "./transport";
+import { depensesVehiculeTable } from "./transport";
 
 export const modePaiementEnum = pgEnum("mode_paiement", [
   "orange_money",
@@ -32,6 +33,9 @@ export const paiementsTable = pgTable("paiements", {
     .references(() => livraisonsTable.id, { onDelete: "cascade" }),
   bonCarburantId: integer("bon_carburant_id")
     .references(() => bonsCarburantTable.id, { onDelete: "set null" }),
+  depenseVehiculeId: integer("depense_vehicule_id")
+    .references(() => depensesVehiculeTable.id, { onDelete: "set null" })
+    .unique(),
   membreId: integer("membre_id")
     .references(() => membresTable.id),
   campagneId: integer("campagne_id").references(() => campagnesTable.id),

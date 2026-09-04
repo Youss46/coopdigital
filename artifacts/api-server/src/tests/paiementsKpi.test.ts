@@ -15,7 +15,7 @@ function table(name: string, columns: string[]) {
 vi.mock("@workspace/db", () => ({
   db: { select: mocks.select },
   paiementsTable: table("paiements", [
-    "id", "livraisonId", "bonCarburantId", "membreId", "montantFcfa",
+    "id", "livraisonId", "bonCarburantId", "depenseVehiculeId", "membreId", "montantFcfa",
     "modePaiement", "referenceTransaction", "statut", "createdAt",
     "motifRejet", "dateValidation", "agentSaisiseurId",
   ]),
@@ -27,6 +27,7 @@ vi.mock("@workspace/db", () => ({
   fournisseursTable: table("fournisseurs", ["id", "cooperativeId", "creeParDelegueId"]),
   usersTable: table("users", ["id", "role"]),
   bonsCarburantTable: table("bons_carburant", ["id", "cooperativeId"]),
+  depensesVehiculeTable: table("depenses_vehicule", ["id", "cooperativeId", "libelle", "fournisseur"]),
   ventesExportateursTable: table("ventes_exportateurs", []),
   exportateursTable: table("exportateurs", []),
   parcellesTable: table("parcelles", []),

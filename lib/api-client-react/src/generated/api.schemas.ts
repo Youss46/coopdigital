@@ -1108,6 +1108,12 @@ export interface PaiementListItem {
   /** @nullable */
   bonCarburantNumero?: string | null;
   /** @nullable */
+  depenseVehiculeId?: number | null;
+  /** @nullable */
+  depenseVehiculeLibelle?: string | null;
+  /** @nullable */
+  depenseVehiculeFournisseur?: string | null;
+  /** @nullable */
   membreId?: number | null;
   montantFcfa: number;
   /** @nullable */

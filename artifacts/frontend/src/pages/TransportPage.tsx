@@ -2176,13 +2176,18 @@ function TabDepenses() {
       setPdfLoadingId(d.id);
       const base = import.meta.env.VITE_API_URL ?? "";
       const token = localStorage.getItem("coop_token") ?? "";
+      const emission = await fetch(`${base}/api/transport/depenses/${d.id}/emettre-bon-achat`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!emission.ok) throw new Error("Impossible d'émettre le bon d'achat");
       const response = await fetch(`${base}/api/transport/depenses/${d.id}/bon-achat-pdf`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) throw new Error("Impossible de générer le bon d'achat");
       openPdfViewer(URL.createObjectURL(await response.blob()), `bon-achat-piece-BAP-${String(d.id).padStart(5, "0")}.pdf`);
     } catch {
-      toast({ title: "Erreur", description: "Impossible de générer le bon d'achat", variant: "destructive" });
+      toast({ title: "Erreur", description: "Impossible d'émettre le bon d'achat", variant: "destructive" });
     } finally {
       setPdfLoadingId(null);
     }
@@ -2351,7 +2356,7 @@ function TabDepenses() {
                           size="icon"
                           variant="ghost"
                           className="h-7 w-7 text-green-700"
-                          title="Imprimer ou télécharger le bon d'achat"
+                          title="Émettre, imprimer ou télécharger le bon d'achat"
                           disabled={pdfLoadingId === d.id}
                           onClick={() => void openBonAchat(d)}
                         >

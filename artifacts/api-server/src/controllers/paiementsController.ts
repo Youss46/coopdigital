@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { db, paiementsTable, paiementLignesTable, membresTable, livraisonsTable, fournisseursTable, usersTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable, caissesTable, chequesEmisTable, bonsCarburantTable, campagnesTable, sessionsPeseeTable, commissionsMembresDelaguesTable } from "@workspace/db";
+import { db, paiementsTable, paiementLignesTable, membresTable, livraisonsTable, fournisseursTable, usersTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable, caissesTable, chequesEmisTable, bonsCarburantTable, campagnesTable, sessionsPeseeTable, commissionsMembresDelaguesTable, depensesVehiculeTable } from "@workspace/db";
 import { eq, desc, and, or, sql, gte, lt, lte, inArray, isNull, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { envoyerPushGroupePortail, envoyerPushGroupe } from "../services/pushService";
@@ -230,6 +230,9 @@ const SELECT_FIELDS = {
   livraisonId: paiementsTable.livraisonId,
   bonCarburantId: paiementsTable.bonCarburantId,
   bonCarburantNumero: bonsCarburantTable.numero,
+  depenseVehiculeId: paiementsTable.depenseVehiculeId,
+  depenseVehiculeLibelle: depensesVehiculeTable.libelle,
+  depenseVehiculeFournisseur: depensesVehiculeTable.fournisseur,
   membreId: paiementsTable.membreId,
   montantFcfa: paiementsTable.montantFcfa,
   modePaiement: paiementsTable.modePaiement,
@@ -292,6 +295,7 @@ async function fetchEnrichedPaiement(id: number) {
     .leftJoin(sessionsPeseeTable, eq(sessionsPeseeTable.livraisonId, livraisonsTable.id))
     .leftJoin(commissionsMembresDelaguesTable, eq(commissionsMembresDelaguesTable.sessionPeseeId, sessionsPeseeTable.id))
     .leftJoin(bonsCarburantTable, eq(paiementsTable.bonCarburantId, bonsCarburantTable.id))
+    .leftJoin(depensesVehiculeTable, eq(paiementsTable.depenseVehiculeId, depensesVehiculeTable.id))
     .leftJoin(saisiseurUserAlias, eq(paiementsTable.agentSaisiseurId, saisiseurUserAlias.id))
     .where(eq(paiementsTable.id, id))
     .limit(1);
@@ -328,6 +332,7 @@ export async function listPaiements(req: Request, res: Response): Promise<void> 
       eq(membresTable.cooperativeId, cooperativeId),
       eq(fournisseursTable.cooperativeId, cooperativeId),
       eq(bonsCarburantTable.cooperativeId, cooperativeId),
+      eq(depensesVehiculeTable.cooperativeId, cooperativeId),
     )!;
     const conditions: SQL<unknown>[] = [coopFilter];
     if (statut) conditions.push(eq(paiementsTable.statut, statut as "en_attente" | "confirme" | "echec" | "rejete" | "en_cours" | "effectue"));
@@ -404,6 +409,7 @@ export async function listPaiements(req: Request, res: Response): Promise<void> 
       .leftJoin(commissionsMembresDelaguesTable, eq(commissionsMembresDelaguesTable.sessionPeseeId, sessionsPeseeTable.id))
       .leftJoin(agentUserAlias, eq(livraisonsTable.agentId, agentUserAlias.id))
       .leftJoin(bonsCarburantTable, eq(paiementsTable.bonCarburantId, bonsCarburantTable.id))
+      .leftJoin(depensesVehiculeTable, eq(paiementsTable.depenseVehiculeId, depensesVehiculeTable.id))
       .leftJoin(saisiseurUserAlias, eq(paiementsTable.agentSaisiseurId, saisiseurUserAlias.id))
       .where(and(...conditions))
       .orderBy(desc(paiementsTable.createdAt))
@@ -488,6 +494,7 @@ export async function statsPaiements(req: Request, res: Response): Promise<void>
       eq(membresTable.cooperativeId, cooperativeId),
       eq(fournisseursTable.cooperativeId, cooperativeId),
       eq(bonsCarburantTable.cooperativeId, cooperativeId),
+      eq(depensesVehiculeTable.cooperativeId, cooperativeId),
     )!;
     const statsConditions: SQL<unknown>[] = [statsCoopFilter];
     // Un délégué ne voit que les stats des membres/fournisseurs qui lui sont rattachés
@@ -529,6 +536,7 @@ export async function statsPaiements(req: Request, res: Response): Promise<void>
       .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
       .leftJoin(agentUserAlias, eq(livraisonsTable.agentId, agentUserAlias.id))
       .leftJoin(bonsCarburantTable, eq(paiementsTable.bonCarburantId, bonsCarburantTable.id))
+      .leftJoin(depensesVehiculeTable, eq(paiementsTable.depenseVehiculeId, depensesVehiculeTable.id))
       .leftJoin(chequesEmisTable, eq(chequesEmisTable.paiementId, paiementsTable.id))
       .where(and(...statsConditions));
 
@@ -771,6 +779,9 @@ async function debiterMobileDansTransaction(
         membreDelegueId: membresTable.delegueId,
         fournisseurCoopId: fournisseursTable.cooperativeId,
         bonCarburantCoopId: bonsCarburantTable.cooperativeId,
+        depenseVehiculeCoopId: depensesVehiculeTable.cooperativeId,
+        depenseVehiculeLibelle: depensesVehiculeTable.libelle,
+        depenseVehiculeFournisseur: depensesVehiculeTable.fournisseur,
         livraisonStatutPaiement: livraisonsTable.statutPaiement,
         livraisonMontantNetFcfa: livraisonsTable.montantNetFcfa,
         livraisonMontantRestant: sql<number>`coalesce(${livraisonsTable.montantRestant}, '0')::integer`,
@@ -787,6 +798,7 @@ async function debiterMobileDansTransaction(
       .leftJoin(sessionsPeseeTable, eq(sessionsPeseeTable.livraisonId, livraisonsTable.id))
       .leftJoin(commissionsMembresDelaguesTable, eq(commissionsMembresDelaguesTable.sessionPeseeId, sessionsPeseeTable.id))
       .leftJoin(bonsCarburantTable, eq(paiementsTable.bonCarburantId, bonsCarburantTable.id))
+       .leftJoin(depensesVehiculeTable, eq(paiementsTable.depenseVehiculeId, depensesVehiculeTable.id))
       .where(eq(paiementsTable.id, id))
       .limit(1);
 
@@ -794,7 +806,7 @@ async function debiterMobileDansTransaction(
       res.status(404).json({ erreur: "Paiement introuvable" });
       return;
     }
-    if (row.membreCoopId !== cooperativeId && row.fournisseurCoopId !== cooperativeId && row.bonCarburantCoopId !== cooperativeId) {
+    if (row.membreCoopId !== cooperativeId && row.fournisseurCoopId !== cooperativeId && row.bonCarburantCoopId !== cooperativeId && row.depenseVehiculeCoopId !== cooperativeId) {
       res.status(403).json({ erreur: "Ce paiement n'appartient pas à votre coopérative" });
       return;
     }
@@ -805,6 +817,8 @@ async function debiterMobileDansTransaction(
     const beneficiairePaiement = (
       `${row.nom ?? ""} ${row.prenoms ?? ""}`.trim()
       || `${row.fournisseurNom ?? ""} ${row.fournisseurPrenoms ?? ""}`.trim()
+      || row.depenseVehiculeFournisseur?.trim()
+      || row.depenseVehiculeLibelle?.trim()
       || `PAI-${id}`
     );
 
@@ -917,8 +931,11 @@ async function debiterMobileDansTransaction(
       }
 
       const isBonCarburant = !!row.paiement.bonCarburantId;
+      const isDepenseVehicule = !!row.paiement.depenseVehiculeId;
       const compteDebitPaiement = isBonCarburant
         ? "6042"
+        : isDepenseVehicule
+        ? "624"
         : await resolveCompteDetteProducteur(cooperativeId, row.compteDetteProducteur);
       const lignesEspeces = lignes.filter((ligne) => ligne.modePaiement === "especes");
       const lignesMobiles = lignes.filter((ligne) =>
@@ -1079,14 +1096,16 @@ async function debiterMobileDansTransaction(
                 sourceId: id,
                 libelle: isBonCarburant
                   ? `Carburant – Bon PAI-${id} (${ligne.modePaiement})`
+                  : isDepenseVehicule
+                  ? `Pièce de rechange – ${beneficiairePaiement} (${ligne.modePaiement})`
                   : `Paiement producteur – ${beneficiairePaiement} (${ligne.modePaiement})`,
                 compteDebit: compteDebitPaiement,
                 compteCredit,
                 montantFcfa: montantProducteur,
                 date: new Date().toISOString().slice(0, 10),
                 numeroPiece: `PAI-${id}`,
-                tiersId: isBonCarburant ? undefined : (row.paiement.membreId ?? undefined),
-                tiersType: isBonCarburant ? undefined : "membre",
+                tiersId: isBonCarburant || isDepenseVehicule ? undefined : (row.paiement.membreId ?? undefined),
+                tiersType: isBonCarburant || isDepenseVehicule ? undefined : "membre",
               });
             }
             if (montantCommission > 0 && row.commissionCollecteMembreId != null) {
@@ -1352,6 +1371,7 @@ async function debiterMobileDansTransaction(
       }
 
       const isBonCarburant = !!row.paiement.bonCarburantId;
+      const isDepenseVehicule = !!row.paiement.depenseVehiculeId;
       const isMobile = mode === "orange_money" || mode === "mtn_momo" || mode === "wave";
       const compteDebitPaiement = isBonCarburant
         ? "6042"
@@ -1409,14 +1429,16 @@ async function debiterMobileDansTransaction(
         sourceId: id,
         libelle: isBonCarburant
           ? `Carburant – Bon PAI-${id}`
+          : isDepenseVehicule
+          ? `Pièce de rechange – ${beneficiairePaiement}`
           : `Paiement producteur – ${beneficiairePaiement}`,
         compteDebit: compteDebitPaiement,
         compteCredit: isMobile ? "552" : mode === "especes" ? "571" : "521",
         montantFcfa: montantDemande,
         date: new Date().toISOString().slice(0, 10),
         numeroPiece: `PAI-${id}`,
-        tiersId: isBonCarburant ? undefined : (row.paiement.membreId ?? undefined),
-        tiersType: isBonCarburant ? undefined : "membre",
+        tiersId: isBonCarburant || isDepenseVehicule ? undefined : (row.paiement.membreId ?? undefined),
+        tiersType: isBonCarburant || isDepenseVehicule ? undefined : "membre",
       }];
       if (inclureFraisCollecte && row.commissionCollecteMembreId != null) {
         const compteDebitCommission = await resolveCompteDebit(
@@ -1495,6 +1517,7 @@ export async function rejeterPaiement(req: Request, res: Response): Promise<void
         nom: membresTable.nom,
         fournisseurCoopId: fournisseursTable.cooperativeId,
         bonCarburantCoopId: bonsCarburantTable.cooperativeId,
+        depenseVehiculeCoopId: depensesVehiculeTable.cooperativeId,
         livraisonStatutPaiement: livraisonsTable.statutPaiement,
         livraisonMontantNetFcfa: livraisonsTable.montantNetFcfa,
         livraisonMontantRestant: sql<number>`coalesce(${livraisonsTable.montantRestant}, '0')::integer`,
@@ -1504,6 +1527,7 @@ export async function rejeterPaiement(req: Request, res: Response): Promise<void
       .leftJoin(livraisonsTable, eq(paiementsTable.livraisonId, livraisonsTable.id))
       .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
       .leftJoin(bonsCarburantTable, eq(paiementsTable.bonCarburantId, bonsCarburantTable.id))
+      .leftJoin(depensesVehiculeTable, eq(paiementsTable.depenseVehiculeId, depensesVehiculeTable.id))
       .where(eq(paiementsTable.id, id))
       .limit(1);
 
@@ -1511,7 +1535,7 @@ export async function rejeterPaiement(req: Request, res: Response): Promise<void
       res.status(404).json({ erreur: "Paiement introuvable" });
       return;
     }
-    if (row.membreCoopId !== cooperativeId && row.fournisseurCoopId !== cooperativeId && row.bonCarburantCoopId !== cooperativeId) {
+    if (row.membreCoopId !== cooperativeId && row.fournisseurCoopId !== cooperativeId && row.bonCarburantCoopId !== cooperativeId && row.depenseVehiculeCoopId !== cooperativeId) {
       res.status(403).json({ erreur: "Ce paiement n'appartient pas à votre coopérative" });
       return;
     }
