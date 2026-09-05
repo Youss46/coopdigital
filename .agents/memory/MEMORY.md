@@ -92,6 +92,7 @@
 - [Références PDF des pesées](pdf-local-numbering.md) — les reçus et bordereaux affichent PES-S-<rang> avant tout identifiant legacy.
 - [Ordre des verrous des transferts de trésorerie](treasury-transfer-lock-order.md) — banque puis caisse dans les deux sens pour éviter les deadlocks.
 - [Date de session du journal de caisse](cash-journal-session-date.md) — les débits automatiques doivent cibler la session ouverte du jour, sinon le journal quotidien masque le mouvement.
+- [Synchronisation des sessions de caisse](caisse-session-state-refresh.md) — après une mutation depuis le journal, rafraîchir l’état des caisses parent pour éviter les statuts ouverts périmés.
 - [Règlement transport export](export-transport-settlement.md) — mouvement de trésorerie, écriture 401 et statut payé doivent rester atomiques; litige/annulation bloque le débit.
 - [Analyse Claude des balances Sage](balance-sage-claude-analysis.md) — une ligne Sage mouvementée peut être analysée malgré un compte absent du plan; la préparation comptable garde le contrôle bloquant.
 - [Bons carburant saisis en montant](bons-carburant-montant.md) — montant autorisé et montant consommé pilotent le flux; litres/prix restent facultatifs pour les historiques et le détail.

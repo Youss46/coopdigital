@@ -673,7 +673,15 @@ function ModalTransfert({
 
 // ─── Onglet 2 — Journal de caisse ─────────────────────────────────────────────
 
-function JournalCaisse({ caisses, initCaisseId }: { caisses: Caisse[] | null; initCaisseId?: number }) {
+function JournalCaisse({
+  caisses,
+  initCaisseId,
+  onCaissesChanged,
+}: {
+  caisses: Caisse[] | null;
+  initCaisseId?: number;
+  onCaissesChanged: () => Promise<void>;
+}) {
   const { toast } = useToast();
   const { utilisateur } = useAuth();
   const peutEcrire = ["pca", "directeur", "comptable", "caissier", "delegue"].includes(utilisateur?.role ?? "");
@@ -727,6 +735,7 @@ function JournalCaisse({ caisses, initCaisseId }: { caisses: Caisse[] | null; in
       const json = await r.json();
       if (!r.ok) throw new Error(json.error ?? "Erreur");
       toast({ title: "Session ouverte" });
+      await onCaissesChanged();
       charger();
     } catch (e) {
       toast({ title: "Erreur", description: e instanceof Error ? e.message : "Erreur", variant: "destructive" });
@@ -882,10 +891,18 @@ function JournalCaisse({ caisses, initCaisseId }: { caisses: Caisse[] | null; in
       )}
 
       {modalMvt && caisseId && (
-        <ModalMouvement caisseId={caisseId as number} onClose={() => setModalMvt(false)} onDone={() => { setModalMvt(false); charger(); }} />
+        <ModalMouvement
+          caisseId={caisseId as number}
+          onClose={() => setModalMvt(false)}
+          onDone={() => { setModalMvt(false); charger(); void onCaissesChanged(); }}
+        />
       )}
       {modalFermer && caisseId && (
-        <ModalFermeture caisseId={caisseId as number} onClose={() => setModalFermer(false)} onDone={() => { setModalFermer(false); charger(); }} />
+        <ModalFermeture
+          caisseId={caisseId as number}
+          onClose={() => setModalFermer(false)}
+          onDone={() => { setModalFermer(false); charger(); void onCaissesChanged(); }}
+        />
       )}
       {modalVirementBanque && caisseId && (
         <ModalVirementBanque
@@ -893,7 +910,7 @@ function JournalCaisse({ caisses, initCaisseId }: { caisses: Caisse[] | null; in
           caisseName={caisseSelectionnee?.nom ?? ""}
           soldeCaisse={caisseSelectionnee?.solde_actuel_fcfa ?? "0"}
           onClose={() => setModalVirementBanque(false)}
-          onDone={() => { setModalVirementBanque(false); charger(); }}
+          onDone={() => { setModalVirementBanque(false); charger(); void onCaissesChanged(); }}
         />
       )}
     </div>
@@ -1487,7 +1504,11 @@ export default function CaissePage() {
         <EtatCaisses caisses={caisses} loading={loading} refetch={chargerCaisses} onJournal={versJournal} />
       )}
       {tab === "journal" && (
-        <JournalCaisse caisses={caisses} initCaisseId={journalCaisseId} />
+        <JournalCaisse
+          caisses={caisses}
+          initCaisseId={journalCaisseId}
+          onCaissesChanged={chargerCaisses}
+        />
       )}
       {tab === "historique" && (
         <HistoriqueSessions caisses={caisses} />
