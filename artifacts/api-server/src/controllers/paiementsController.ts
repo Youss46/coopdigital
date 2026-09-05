@@ -33,6 +33,22 @@ class PaiementMontantInvalideError extends Error {
   }
 }
 
+export function getPaiementTresorerieDescriptor(
+  paiementId: number,
+  bonCarburantNumero?: string | null,
+): { motif: "carburant" | "paiement_producteur"; libelle: string } {
+  if (bonCarburantNumero) {
+    return {
+      motif: "carburant",
+      libelle: `Carburant — Bon ${bonCarburantNumero}`,
+    };
+  }
+  return {
+    motif: "paiement_producteur",
+    libelle: `Paiement producteur — règlement #${paiementId}`,
+  };
+}
+
 async function debiterCaissePourLotCarburant(
   tx: ComptabiliteTransaction,
   cooperativeId: number,
@@ -57,7 +73,7 @@ async function debiterCaissePourLotCarburant(
   }
   await enregistrerMouvement(caisse.id, {
     type: "sortie",
-    motif: "paiement_producteur",
+    motif: "carburant",
     montantFcfa,
     libelle: `Règlement groupé carburant — ${montantFcfa.toLocaleString("fr-FR")} FCFA`,
     referenceOperation: referenceOperation ?? `CARB-LOT-${Date.now()}`,
@@ -97,7 +113,7 @@ async function debiterMobilePourLotCarburant(
     compteId: compte.id,
     cooperativeId,
     type: "debit",
-    motif: "paiement_producteur",
+    motif: "carburant",
     montantFcfa: montant.toString(),
     libelle: `Règlement groupé carburant — ${montant.toLocaleString("fr-FR")} FCFA`,
     reference: referenceTransaction,
@@ -778,6 +794,7 @@ async function debiterCaisseDansTransaction(
   montantFcfa: number,
   paiementId: number,
   responsableId?: number,
+  bonCarburantNumero?: string | null,
 ) {
   const [caisse] = await tx
     .select()
@@ -797,11 +814,12 @@ async function debiterCaisseDansTransaction(
   // Utiliser le même service que les autres sorties de caisse garantit que le
   // mouvement, la session et le solde sont écrits ensemble. Le paiement crée
   // déjà sa propre écriture OHADA plus bas : on ne la duplique pas ici.
+  const descriptor = getPaiementTresorerieDescriptor(paiementId, bonCarburantNumero);
   await enregistrerMouvement(caisse.id, {
     type: "sortie",
-    motif: "paiement_producteur",
+    motif: descriptor.motif,
     montantFcfa,
-    libelle: `Paiement producteur — règlement #${paiementId}`,
+    libelle: descriptor.libelle,
     referenceOperation: `PAI-${paiementId}`,
     userId,
     cooperativeId,
@@ -817,6 +835,7 @@ async function debiterMobileDansTransaction(
   paiementId: number,
   userId: number | undefined,
   referenceTransaction?: string | null,
+  bonCarburantNumero?: string | null,
 ) {
   const [compte] = await tx
     .select()
@@ -834,13 +853,14 @@ async function debiterMobileDansTransaction(
     throw new Error(`Solde Mobile Money insuffisant. Disponible : ${solde.toLocaleString("fr-FR")} FCFA, requis : ${montant.toLocaleString("fr-FR")} FCFA.`);
   }
   const nouveauSolde = solde - montant;
+  const descriptor = getPaiementTresorerieDescriptor(paiementId, bonCarburantNumero);
   await tx.insert(mouvementsMobileMarchandTable).values({
     compteId: compte.id,
     cooperativeId,
     type: "debit",
-    motif: "paiement_producteur",
+    motif: descriptor.motif,
     montantFcfa: montant.toString(),
-    libelle: `Paiement producteur — règlement #${paiementId}`,
+    libelle: descriptor.libelle,
     reference: referenceTransaction ?? null,
     dateOperation: new Date().toISOString().slice(0, 10),
     soldeApresFcfa: nouveauSolde.toString(),
@@ -889,6 +909,7 @@ async function debiterMobileDansTransaction(
         depenseVehiculeFournisseur: depensesVehiculeTable.fournisseur,
         livraisonStatutPaiement: livraisonsTable.statutPaiement,
         livraisonMontantNetFcfa: livraisonsTable.montantNetFcfa,
+        bonCarburantNumero: bonsCarburantTable.numero,
         livraisonMontantRestant: sql<number>`coalesce(${livraisonsTable.montantRestant}, '0')::integer`,
         compteDetteProducteur: livraisonsTable.compteDetteProducteur,
         commissionCollecteId: commissionsMembresDelaguesTable.id,
@@ -1190,17 +1211,28 @@ async function debiterMobileDansTransaction(
           if (lignesEspeces.length > 0) {
             const montantEspeces = lignesEspeces.reduce((total, ligne) => total + ligne.montantFcfa, 0);
             if (req.user?.role === "delegue") {
-              await debiterCaisseDansTransaction(tx, cooperativeId, userId, montantEspeces, id, userId);
+              await debiterCaisseDansTransaction(
+                tx, cooperativeId, userId, montantEspeces, id, userId, row.bonCarburantNumero,
+              );
             } else {
               // Toute validation faite par l'administration débite la caisse
               // principale de la coopérative pour la part espèces.
-              await debiterCaisseDansTransaction(tx, cooperativeId, userId, montantEspeces, id);
+              await debiterCaisseDansTransaction(
+                tx, cooperativeId, userId, montantEspeces, id, undefined, row.bonCarburantNumero,
+              );
             }
           }
 
           for (const ligne of lignesMobiles) {
             await debiterMobileDansTransaction(
-              tx, cooperativeId, ligne.modePaiement, ligne.montantFcfa, id, userId, ligne.referenceTransaction,
+              tx,
+              cooperativeId,
+              ligne.modePaiement,
+              ligne.montantFcfa,
+              id,
+              userId,
+              ligne.referenceTransaction,
+              row.bonCarburantNumero,
             );
           }
 
@@ -1567,9 +1599,13 @@ async function debiterMobileDansTransaction(
 
       if (mode === "especes" && cooperativeId) {
         if (isDelegueEspeces) {
-          await debiterCaisseDansTransaction(tx, cooperativeId, userId, montantTotalPaiement, id);
+          await debiterCaisseDansTransaction(
+            tx, cooperativeId, userId, montantTotalPaiement, id, userId, row.bonCarburantNumero,
+          );
         } else {
-          await debiterCaisseDansTransaction(tx, cooperativeId, userId, montantTotalPaiement, id);
+          await debiterCaisseDansTransaction(
+            tx, cooperativeId, userId, montantTotalPaiement, id, undefined, row.bonCarburantNumero,
+          );
         }
       }
 
@@ -1582,6 +1618,7 @@ async function debiterMobileDansTransaction(
           id,
           userId,
           body.referenceTransaction ?? row.paiement.referenceTransaction,
+          row.bonCarburantNumero,
         );
       }
 
@@ -1786,7 +1823,7 @@ export async function validerLotPaiementsCarburant(req: Request, res: Response):
           cooperativeId,
           {
             type: "debit",
-            motif: "paiement_producteur",
+            motif: "carburant",
             montantFcfa: montantTotal,
             libelle,
             reference,

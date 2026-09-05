@@ -84,7 +84,7 @@ vi.mock("../services/recuService.js", () => ({ genererNumeroRecu: vi.fn() }));
 vi.mock("../lib/logger.js", () => ({ logger: { warn: vi.fn(), error: vi.fn() } }));
 
 import { getDashboard } from "../controllers/dashboardController.js";
-import { listPaiements, statsPaiements } from "../controllers/paiementsController.js";
+import { getPaiementTresorerieDescriptor, listPaiements, statsPaiements } from "../controllers/paiementsController.js";
 
 type SelectChain = {
   from: ReturnType<typeof vi.fn>;
@@ -137,6 +137,20 @@ describe("date effective des règlements", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it("identifie un règlement de bon carburant dans la trésorerie", () => {
+    expect(getPaiementTresorerieDescriptor(161, "BC-2026-0042")).toEqual({
+      motif: "carburant",
+      libelle: "Carburant — Bon BC-2026-0042",
+    });
+  });
+
+  it("conserve le libellé producteur pour un paiement de livraison", () => {
+    expect(getPaiementTresorerieDescriptor(161)).toEqual({
+      motif: "paiement_producteur",
+      libelle: "Paiement producteur — règlement #161",
+    });
   });
 
   it("alimente « Payés ce mois » avec la date de validation", async () => {
