@@ -122,3 +122,4 @@
 - [Fixtures de paiements PostgreSQL](payment-integration-fixtures.md) — les paiements coopératifs de test exigent un reçu local; la table comptable dépend de la configuration automatique.
 - [Format natif Sage 100](sage-txt-import-format.md) — l’export natif utilise journal, date JJMMAA, pièce, compte, libellé, montant, sens D/C et type OD.
 - [Formats Sage paramétrables](sage-parametric-import.md) — ne jamais supposer l’ordre des colonnes; aligner la trame exportée sur le format d’import Sage réellement configuré.
+- [Compte auxiliaire Sage absent](sage-auxiliary-empty.md) — laisser le champ compte tiers vide sans compte personnalisé; ne jamais utiliser un identifiant technique ou `00` comme secours.

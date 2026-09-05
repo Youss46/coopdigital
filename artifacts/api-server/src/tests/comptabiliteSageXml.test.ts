@@ -127,9 +127,9 @@ describe("buildSageTxt", () => {
     expect(dataLines.some((line) => line.includes("membre-17"))).toBe(false);
   });
 
-  it("normalise les libellés pour l'encodage ASCII Sage et garde les totaux équilibrés", () => {
+  it("laisse le compte tiers vide sans compte auxiliaire personnalisé", () => {
     const txt = buildSageTxt(2026, "CAIS", [
-      ["2026-08-28", "CAIS", "PAI-001", "Chèque encaissé — Soro n°1212", "401", "401000", "", "", "1000000", "0", "FOU-000121"],
+      ["2026-08-28", "CAIS", "PAI-001", "Chèque encaissé — Soro n°1212", "401", "00", "", "", "1000000", "0", "FOU-000121"],
       ["2026-08-28", "CAIS", "PAI-001", "Chèque encaissé — Soro n°1212", "521", "521000", "", "", "0", "1000000", ""],
       ["2026-08-29", "CAIS", "", "Frais d'achat œufs", "601", "601000", "", "", "125000", "0", ""],
       ["2026-08-29", "CAIS", "", "Frais d'achat œufs", "571", "571000", "", "", "0", "125000", ""],
@@ -148,7 +148,7 @@ describe("buildSageTxt", () => {
       { debit: 0, credit: 0 },
     );
 
-    expect(dataLines).toContain("CAIS;280826;PAI-001;401000;Cheque encaisse - Soro n 1212;1000000;D;FOU-000121");
+    expect(dataLines).toContain("CAIS;280826;PAI-001;401000;Cheque encaisse - Soro n 1212;1000000;D;");
     expect(dataLines).toContain("CAIS;290826;;601000;Frais d'achat oeufs;125000;D;");
     expect(totals).toEqual({ debit: 1125000, credit: 1125000 });
   });

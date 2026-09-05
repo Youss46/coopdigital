@@ -8,7 +8,7 @@ import ExcelJS from "exceljs";
 import Anthropic from "@anthropic-ai/sdk";
 import { genererNumeroRecu } from "../services/recuService.js";
 import { normaliserNumeroCompte } from "../lib/numeroCompte.js";
-import { determinerCodeJournal, determinerCompteCollectifSage, determinerCompteTiersSage } from "../lib/sageJournal.js";
+import { determinerCodeJournal, determinerCompteCollectifSage } from "../lib/sageJournal.js";
 
 class TenantError extends Error {
   readonly status = 401;
@@ -72,6 +72,13 @@ export function buildSageTxt(
     const isCredit = credit > 0 && debit <= 0;
     const montant = Math.abs(isCredit ? credit : debit);
     const sens = isCredit ? "C" : "D";
+    const compteAuxiliaireBrut = (line[5] ?? "").trim();
+    const compteGeneral = normaliserNumeroCompte(line[4] || line[5] || "");
+    const compteAuxiliaire = compteAuxiliaireBrut
+      && !/^0+$/.test(compteAuxiliaireBrut)
+      && normaliserNumeroCompte(compteAuxiliaireBrut) !== compteGeneral
+      ? compteAuxiliaireBrut
+      : "";
 
     return [
       line[1] || journal,
@@ -81,9 +88,7 @@ export function buildSageTxt(
       line[3] || "",
       montant,
       sens,
-      line[5] && normaliserNumeroCompte(line[5]) !== normaliserNumeroCompte(line[4] || "")
-        ? line[5]
-        : line[10] || "",
+      compteAuxiliaire,
     ].map(sageTxtField).join(";");
   });
 
@@ -2132,14 +2137,7 @@ export async function exportJournalSageTxt(req: Request, res: Response): Promise
           ecriture.tiersType ?? "",
           String(debit),
           String(credit),
-          determinerCompteTiersSage({
-            // Le compte tiers stable se détermine sur le collectif OHADA
-            // (401/411), même lorsque la colonne Compte contient le numéro
-            // auxiliaire personnalisé du tiers.
-            compte,
-            tiersType: tier?.tiersType,
-            tiersId: tier?.tiersId,
-          }),
+          "",
         ]);
       };
       side(ecriture.compteDebit, ecriture.montantFcfa, 0);
