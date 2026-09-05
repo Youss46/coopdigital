@@ -49,3 +49,27 @@ VAPID_PUBLIC_KEY = "BKnMG7CUr2jjx0YvKSmTk3WxXEkYaj3LdxHl5xd222aazEThwDi6dg3SMfXH
 VAPID_PRIVATE_KEY = "6pzZD_J29CV_2M_d-tMaTpl1nSRzwd_1tXn_wz5fRH8"
 VAPID_SUBJECT = "mailto:admin@coopdigital.ci"
 ALLOWED_ORIGINS = ""
+
+[[ports]]
+localPort = 8080
+externalPort = 8080
+
+[[ports]]
+localPort = 8081
+externalPort = 8081
+
+[[ports]]
+localPort = 18130
+externalPort = 3000
+
+[[ports]]
+localPort = 20823
+externalPort = 80
+
+[[ports]]
+localPort = 23492
+externalPort = 3002
+
+[[ports]]
+localPort = 25014
+externalPort = 3001
