@@ -11934,13 +11934,17 @@ components:
 
     StatsCarburant:
       type: object
-      required: [nb_bons, qte_autorisee_l, qte_livree_l, montant_autorise_total_fcfa, montant_total_fcfa, par_vehicule]
+      required: [nb_bons, qte_autorisee_l, qte_livree_l, montant_autorise_total_fcfa, montant_total_fcfa, nb_bons_en_attente_reglement, montant_total_en_attente_reglement_fcfa, nb_bons_regles, montant_total_regle_fcfa, par_vehicule]
       properties:
         nb_bons:            { type: integer }
         qte_autorisee_l:    { type: number }
         qte_livree_l:       { type: number }
         montant_autorise_total_fcfa: { type: number }
         montant_total_fcfa: { type: number }
+        nb_bons_en_attente_reglement: { type: integer }
+        montant_total_en_attente_reglement_fcfa: { type: number }
+        nb_bons_regles: { type: integer }
+        montant_total_regle_fcfa: { type: number }
         par_vehicule:
           type: array
           items:

@@ -1715,6 +1715,20 @@ function TabCarburant() {
                   <div className="text-xs text-gray-500">Coût total</div>
                   <div className="text-xl font-bold">{formatFcfa(stats.montant_total_fcfa)}</div>
                 </Card>
+                <Card className="p-3 border-amber-200 bg-amber-50/50">
+                  <div className="text-xs text-amber-700">Montant total en attente de règlement</div>
+                  <div className="text-xl font-bold text-amber-700">{formatFcfa(stats.montant_total_en_attente_reglement_fcfa)}</div>
+                  <div className="text-xs text-amber-600 mt-1">
+                    {stats.nb_bons_en_attente_reglement} bon{stats.nb_bons_en_attente_reglement > 1 ? "s" : ""}
+                  </div>
+                </Card>
+                <Card className="p-3 border-green-200 bg-green-50/50">
+                  <div className="text-xs text-green-700">Montant total réglé</div>
+                  <div className="text-xl font-bold text-green-700">{formatFcfa(stats.montant_total_regle_fcfa)}</div>
+                  <div className="text-xs text-green-600 mt-1">
+                    {stats.nb_bons_regles} bon{stats.nb_bons_regles > 1 ? "s" : ""}
+                  </div>
+                </Card>
               </div>
               <Card>
                 <CardHeader className="pb-2">
