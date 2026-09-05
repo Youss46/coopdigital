@@ -151,7 +151,7 @@ export async function creerDon(cooperativeId: number, payload: CreerDonPayload) 
     await calculerValeurNature(don.id);
   }
 
-  return don;
+  return await getDonDetail(cooperativeId, don.id);
 }
 
 // ── Calculer valeur nature ─────────────────────────────────────────────────────
@@ -241,13 +241,18 @@ export async function annulerDon(donId: number, motif: string) {
 
 // ── Modifier un don ────────────────────────────────────────────────────────────
 
-export async function modifierDon(donId: number, payload: Partial<CreerDonPayload>) {
-  const [don] = await db.select().from(donsTable).where(eq(donsTable.id, donId)).limit(1);
+export async function modifierDon(cooperativeId: number, donId: number, payload: Partial<CreerDonPayload>) {
+  const [don] = await db
+    .select()
+    .from(donsTable)
+    .where(and(eq(donsTable.id, donId), eq(donsTable.cooperativeId, cooperativeId)))
+    .limit(1);
   if (!don) throw new Error("Don introuvable");
   if (don.statut !== "brouillon") throw new Error("Seuls les dons en brouillon peuvent être modifiés");
 
   type DonUpdate = typeof donsTable.$inferInsert;
   const update: Partial<DonUpdate> = { updatedAt: new Date() };
+  if (payload.forme !== undefined) update.forme = payload.forme;
   if (payload.libelle !== undefined) update.libelle = payload.libelle;
   if (payload.description !== undefined) update.description = payload.description;
   if (payload.dateDon !== undefined) update.dateDon = payload.dateDon;
@@ -262,6 +267,8 @@ export async function modifierDon(donId: number, payload: Partial<CreerDonPayloa
   if (payload.donateurType !== undefined) update.donateurType = payload.donateurType;
   if (payload.donateurContact !== undefined) update.donateurContact = payload.donateurContact;
   if (payload.pvRemise !== undefined) update.pvRemise = payload.pvRemise;
+  if (payload.forme === "nature") update.montantFcfa = "0";
+  if (payload.forme === "especes") update.valeurEstimeeFcfa = "0";
 
   const [updated] = await db
     .update(donsTable)
@@ -270,21 +277,25 @@ export async function modifierDon(donId: number, payload: Partial<CreerDonPayloa
     .returning();
 
   // Mettre à jour les lignes nature si fournies
-  if (payload.lignesNature !== undefined && payload.lignesNature.length > 0) {
+  if (payload.forme === "especes" || payload.lignesNature !== undefined) {
     await db.delete(lignesDonNatureTable).where(eq(lignesDonNatureTable.donId, donId));
-    await db.insert(lignesDonNatureTable).values(
-      payload.lignesNature.map((l) => ({
-        donId,
-        designation: l.designation,
-        quantite: String(l.quantite),
-        unite: l.unite,
-        valeurUnitaireFcfa: String(l.valeurUnitaireFcfa),
-      })),
-    );
-    await calculerValeurNature(donId);
+    if (payload.forme !== "especes" && payload.lignesNature && payload.lignesNature.length > 0) {
+      await db.insert(lignesDonNatureTable).values(
+        payload.lignesNature.map((l) => ({
+          donId,
+          designation: l.designation,
+          quantite: String(l.quantite),
+          unite: l.unite,
+          valeurUnitaireFcfa: String(l.valeurUnitaireFcfa),
+        })),
+      );
+    }
+    if (payload.forme === "nature" || payload.lignesNature !== undefined) {
+      await calculerValeurNature(donId);
+    }
   }
 
-  return updated;
+  return await getDonDetail(cooperativeId, donId);
 }
 
 // ── Liste des dons ─────────────────────────────────────────────────────────────

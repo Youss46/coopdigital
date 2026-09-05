@@ -91,7 +91,9 @@ export async function getDonHandler(req: Request, res: Response): Promise<void> 
 
 export async function modifierDonHandler(req: Request, res: Response): Promise<void> {
   try {
-    const don = await donService.modifierDon(pid(req.params.id), req.body as Parameters<typeof donService.modifierDon>[1]);
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
+    const don = await donService.modifierDon(cooperativeId, pid(req.params.id), req.body as Parameters<typeof donService.modifierDon>[2]);
     res.json(don);
   } catch (err) {
     res.status(400).json({ erreur: err instanceof Error ? err.message : "Erreur" });

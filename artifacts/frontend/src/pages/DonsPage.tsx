@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Gift, ArrowUpCircle, ArrowDownCircle, TrendingUp, Plus, Loader2,
   RefreshCw, CheckCircle2, XCircle, Clock, FileText, X, Trash2,
-  BarChart3, Users,
+  BarChart3, Users, Pencil,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 
@@ -39,12 +39,16 @@ interface Categorie { id: number; libelle: string; sens: string }
 interface LigneNature { designation: string; quantite: number; unite: string; valeurUnitaireFcfa: number }
 interface Don {
   id: number; reference?: string; sens: string; forme: string;
-  libelle: string; dateDon: string; statut: string;
+  libelle: string; dateDon: string; statut: string; description?: string;
   categorieId?: number; categorieLibelle?: string;
   beneficiaireNom?: string; beneficiaireType?: string; beneficiaireMembreId?: number;
-  donateurNom?: string; donateurType?: string;
+  beneficiaireVillage?: string; beneficiaireContact?: string;
+  donateurNom?: string; donateurType?: string; donateurContact?: string;
   montantFcfa?: string; valeurEstimeeFcfa?: string;
   pvRemise?: boolean; ecritureGeneree?: boolean;
+}
+interface DonDetail extends Don {
+  lignesNature?: LigneNature[];
 }
 interface Programme {
   id: number; libelle: string; description?: string;
@@ -86,30 +90,35 @@ const COLORS = ["#2563eb", "#16a34a", "#d97706", "#dc2626", "#7c3aed", "#0891b2"
 interface ModalDonProps {
   sens: "effectue" | "recu";
   categories: Categorie[];
+  don?: DonDetail;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-function ModalNouveauDon({ sens, categories, onClose, onSuccess }: ModalDonProps) {
-  const [forme, setForme] = useState<"especes" | "nature">("especes");
-  const [libelle, setLibelle] = useState("");
-  const [dateDon, setDateDon] = useState(new Date().toISOString().slice(0, 10));
-  const [categorieId, setCategorieId] = useState<number | "">("");
-  const [description, setDescription] = useState("");
-  const [montantFcfa, setMontantFcfa] = useState<number | "">("");
+function ModalNouveauDon({ sens, categories, don, onClose, onSuccess }: ModalDonProps) {
+  const isEditing = Boolean(don);
+  const [forme, setForme] = useState<"especes" | "nature">(don?.forme === "nature" ? "nature" : "especes");
+  const [libelle, setLibelle] = useState(don?.libelle ?? "");
+  const [dateDon, setDateDon] = useState(String(don?.dateDon ?? new Date().toISOString()).slice(0, 10));
+  const [categorieId, setCategorieId] = useState<number | "">(don?.categorieId ?? "");
+  const [description, setDescription] = useState(don?.description ?? "");
+  const [montantFcfa, setMontantFcfa] = useState<number | "">(don?.forme === "especes" ? Number(don.montantFcfa ?? 0) : "");
   // Bénéficiaire
-  const [beneficiaireNom, setBeneficiaireNom] = useState("");
-  const [beneficiaireType, setBeneficiaireType] = useState("communaute");
-  const [beneficiaireVillage, setBeneficiaireVillage] = useState("");
+  const [beneficiaireNom, setBeneficiaireNom] = useState(don?.beneficiaireNom ?? "");
+  const [beneficiaireType, setBeneficiaireType] = useState(don?.beneficiaireType ?? "communaute");
+  const [beneficiaireVillage, setBeneficiaireVillage] = useState(don?.beneficiaireVillage ?? "");
   // Donateur
-  const [donateurNom, setDonateurNom] = useState("");
-  const [donateurType, setDonateurType] = useState("ong");
-  const [donateurContact, setDonateurContact] = useState("");
+  const [donateurNom, setDonateurNom] = useState(don?.donateurNom ?? "");
+  const [donateurType, setDonateurType] = useState(don?.donateurType ?? "ong");
+  const [donateurContact, setDonateurContact] = useState(don?.donateurContact ?? "");
   // Lignes nature
-  const [lignes, setLignes] = useState<LigneNature[]>([
-    { designation: "", quantite: 1, unite: "unité", valeurUnitaireFcfa: 0 },
-  ]);
-  const [pvRemise, setPvRemise] = useState(false);
+  const [lignes, setLignes] = useState<LigneNature[]>(() => don?.lignesNature?.map((l) => ({
+    designation: l.designation,
+    quantite: Number(l.quantite),
+    unite: l.unite,
+    valeurUnitaireFcfa: Number(l.valeurUnitaireFcfa),
+  })) ?? [{ designation: "", quantite: 1, unite: "unité", valeurUnitaireFcfa: 0 }]);
+  const [pvRemise, setPvRemise] = useState(Boolean(don?.pvRemise));
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -128,6 +137,10 @@ function ModalNouveauDon({ sens, categories, onClose, onSuccess }: ModalDonProps
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!libelle || !dateDon) { setErr("Libellé et date obligatoires"); return; }
+    if (forme === "nature" && lignes.filter((l) => l.designation.trim()).length === 0) {
+      setErr("Ajoutez au moins un article pour un don en nature");
+      return;
+    }
     setErr(""); setLoading(true);
     try {
       const payload: Record<string, unknown> = {
@@ -145,7 +158,11 @@ function ModalNouveauDon({ sens, categories, onClose, onSuccess }: ModalDonProps
       } else {
         payload.lignesNature = lignes.filter((l) => l.designation);
       }
-      await apiPost("/api/dons", payload);
+      if (isEditing && don) {
+        await apiPut(`/api/dons/${don.id}`, payload);
+      } else {
+        await apiPost("/api/dons", payload);
+      }
       onSuccess();
       onClose();
     } catch (e) {
@@ -164,7 +181,7 @@ function ModalNouveauDon({ sens, categories, onClose, onSuccess }: ModalDonProps
       <div className="bg-card border rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b">
           <h2 className="text-lg font-bold">
-            {sens === "effectue" ? "Nouveau don effectué" : "Enregistrer un don reçu"}
+            {isEditing ? "Modifier le don" : sens === "effectue" ? "Nouveau don effectué" : "Enregistrer un don reçu"}
           </h2>
           <button onClick={onClose} className="p-1.5 hover:bg-muted rounded-lg">
             <X size={18} />
@@ -328,7 +345,7 @@ function ModalNouveauDon({ sens, categories, onClose, onSuccess }: ModalDonProps
             <button type="button" onClick={onClose} className="flex-1 py-2.5 border rounded-lg text-sm hover:bg-muted">Annuler</button>
             <button type="submit" disabled={loading} className="flex-1 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-60 flex items-center justify-center gap-2">
               {loading && <Loader2 size={14} className="animate-spin" />}
-              Enregistrer en brouillon
+              {isEditing ? "Enregistrer les modifications" : "Enregistrer en brouillon"}
             </button>
           </div>
         </form>
@@ -340,13 +357,14 @@ function ModalNouveauDon({ sens, categories, onClose, onSuccess }: ModalDonProps
 // ── Tableau de dons ──────────────────────────────────────────────────────────
 interface TableDonsProps {
   dons: Don[];
+  onModifier: (don: Don) => void;
   onValider: (id: number) => void;
   onAnnuler: (id: number) => void;
   valideLoading: number | null;
   annuleLoading: number | null;
 }
 
-function TableDons({ dons, onValider, onAnnuler, valideLoading, annuleLoading }: TableDonsProps) {
+function TableDons({ dons, onModifier, onValider, onAnnuler, valideLoading, annuleLoading }: TableDonsProps) {
   if (dons.length === 0) {
     return (
       <div className="text-center py-16 text-muted-foreground">
@@ -380,6 +398,10 @@ function TableDons({ dons, onValider, onAnnuler, valideLoading, annuleLoading }:
                 <div className="text-xs text-muted-foreground">{d.forme}</div>
                 {d.statut === "brouillon" && (
                   <div className="flex gap-1 mt-1 justify-end">
+                    <button onClick={() => onModifier(d)} title="Modifier le brouillon"
+                      className="px-2 py-0.5 border border-primary/30 text-primary rounded text-xs hover:bg-primary/10 flex items-center gap-1">
+                      <Pencil size={10} /> Modifier
+                    </button>
                     <button onClick={() => onValider(d.id)} disabled={valideLoading === d.id}
                       className="px-2 py-0.5 bg-green-600 text-white rounded text-xs hover:bg-green-700 flex items-center gap-1">
                       {valideLoading === d.id ? <Loader2 size={10} className="animate-spin" /> : <CheckCircle2 size={10} />} Valider
@@ -427,6 +449,10 @@ function TableDons({ dons, onValider, onAnnuler, valideLoading, annuleLoading }:
               <td className="px-4 py-3">
                 {d.statut === "brouillon" && (
                   <div className="flex gap-1">
+                    <button onClick={() => onModifier(d)} title="Modifier le brouillon"
+                      className="px-2 py-1 border border-primary/30 text-primary rounded text-xs hover:bg-primary/10 flex items-center gap-1">
+                      <Pencil size={11} /> Modifier
+                    </button>
                     <button onClick={() => onValider(d.id)} disabled={valideLoading === d.id}
                       className="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 flex items-center gap-1">
                       {valideLoading === d.id ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle2 size={11} />}
@@ -450,7 +476,7 @@ function TableDons({ dons, onValider, onAnnuler, valideLoading, annuleLoading }:
 // ── Page principale ──────────────────────────────────────────────────────────
 export default function DonsPage() {
   const [activeTab, setActiveTab] = useState<TabType>("Tableau de bord");
-  const [showModal, setShowModal] = useState<"effectue" | "recu" | null>(null);
+  const [modalDon, setModalDon] = useState<{ sens: "effectue" | "recu"; don?: DonDetail } | null>(null);
   const [valideLoading, setValideLoading] = useState<number | null>(null);
   const [annuleLoading, setAnnuleLoading] = useState<number | null>(null);
   const [showModalProgramme, setShowModalProgramme] = useState(false);
@@ -500,6 +526,15 @@ export default function DonsPage() {
       void qc.invalidateQueries({ queryKey: ["dons-stats"] });
     } finally {
       setValideLoading(null);
+    }
+  }
+
+  async function handleModifier(don: Don) {
+    try {
+      const detail = await apiFetch<DonDetail>(`/api/dons/${don.id}`);
+      setModalDon({ sens: don.sens as "effectue" | "recu", don: detail });
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Impossible de charger le don");
     }
   }
 
@@ -573,12 +608,12 @@ export default function DonsPage() {
               Rapport PDF
             </button>
             {activeTab === "Dons effectués" && (
-              <button onClick={() => setShowModal("effectue")} className="flex items-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90">
+                <button onClick={() => setModalDon({ sens: "effectue" })} className="flex items-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90">
                 <Plus size={14} /> Don effectué
               </button>
             )}
             {activeTab === "Dons reçus" && (
-              <button onClick={() => setShowModal("recu")} className="flex items-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90">
+                <button onClick={() => setModalDon({ sens: "recu" })} className="flex items-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90">
                 <Plus size={14} /> Don reçu
               </button>
             )}
@@ -756,7 +791,7 @@ export default function DonsPage() {
                 <Loader2 size={20} className="animate-spin mr-2" /> Chargement…
               </div>
             ) : (
-              <TableDons dons={donsEffectues} onValider={handleValider} onAnnuler={handleAnnuler} valideLoading={valideLoading} annuleLoading={annuleLoading} />
+              <TableDons dons={donsEffectues} onModifier={handleModifier} onValider={handleValider} onAnnuler={handleAnnuler} valideLoading={valideLoading} annuleLoading={annuleLoading} />
             )}
           </div>
         )}
@@ -777,7 +812,7 @@ export default function DonsPage() {
                 <Loader2 size={20} className="animate-spin mr-2" /> Chargement…
               </div>
             ) : (
-              <TableDons dons={donsRecus} onValider={handleValider} onAnnuler={handleAnnuler} valideLoading={valideLoading} annuleLoading={annuleLoading} />
+              <TableDons dons={donsRecus} onModifier={handleModifier} onValider={handleValider} onAnnuler={handleAnnuler} valideLoading={valideLoading} annuleLoading={annuleLoading} />
             )}
           </div>
         )}
@@ -847,11 +882,13 @@ export default function DonsPage() {
       </div>
 
       {/* Modal création don */}
-      {showModal && (
+      {modalDon && (
         <ModalNouveauDon
-          sens={showModal}
+          key={modalDon.don?.id ?? `new-${modalDon.sens}`}
+          sens={modalDon.sens}
+          don={modalDon.don}
           categories={categories}
-          onClose={() => setShowModal(null)}
+          onClose={() => setModalDon(null)}
           onSuccess={onSuccess}
         />
       )}
