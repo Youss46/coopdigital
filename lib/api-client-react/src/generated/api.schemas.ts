@@ -4485,6 +4485,10 @@ export interface StatsCarburant {
   qte_livree_l: number;
   montant_autorise_total_fcfa: number;
   montant_total_fcfa: number;
+  nb_bons_en_attente_reglement: number;
+  montant_total_en_attente_reglement_fcfa: number;
+  nb_bons_regles: number;
+  montant_total_regle_fcfa: number;
   par_vehicule: StatsCarburantParVehiculeItem[];
 }
 

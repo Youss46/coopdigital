@@ -35,6 +35,7 @@ import {
   getGetRapportCampagneTransportQueryKey,
   getGetDepensesTransportQueryKey,
   getGetBonsCarburantQueryKey,
+  getGetStatsCarburantQueryKey,
   getListPaiementsQueryKey,
   getGetPaiementsStatsQueryKey,
   getBonCarburantPdf,
@@ -1595,7 +1596,10 @@ function TabCarburant() {
   const [form,   setForm]   = useState<BonForm>(EMPTY_BON_FORM);
   const [uForm,  setUForm]  = useState<UtiliserForm>(EMPTY_UTILISER_FORM);
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: getGetBonsCarburantQueryKey() });
+  const invalidate = () => {
+    void qc.invalidateQueries({ queryKey: getGetBonsCarburantQueryKey() });
+    void qc.invalidateQueries({ queryKey: getGetStatsCarburantQueryKey() });
+  };
 
   const createMut = useCreateBonCarburant({ mutation: {
     onSuccess: () => { toast({ title: "Bon créé" }); setShowCreate(false); invalidate(); },

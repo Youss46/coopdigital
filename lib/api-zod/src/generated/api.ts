@@ -7254,6 +7254,10 @@ export const GetStatsCarburantResponse = zod.object({
   "qte_livree_l": zod.number(),
   "montant_autorise_total_fcfa": zod.number(),
   "montant_total_fcfa": zod.number(),
+  "nb_bons_en_attente_reglement": zod.number(),
+  "montant_total_en_attente_reglement_fcfa": zod.number(),
+  "nb_bons_regles": zod.number(),
+  "montant_total_regle_fcfa": zod.number(),
   "par_vehicule": zod.array(zod.object({
   "vehicule_id": zod.number().optional(),
   "immatriculation": zod.string().nullish(),
