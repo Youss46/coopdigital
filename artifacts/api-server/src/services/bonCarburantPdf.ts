@@ -257,6 +257,13 @@ export interface BonCarburantReglementData {
   stationService: string | null;
 }
 
+export function formatFicheReglementReference(date = new Date()): string {
+  const jour = String(date.getDate()).padStart(2, "0");
+  const mois = String(date.getMonth() + 1).padStart(2, "0");
+  const annee = String(date.getFullYear());
+  return `CARB-${jour}-${mois}-${annee}`;
+}
+
 export async function generateBonsCarburantReglement(
   cooperativeId: number,
   bons: BonCarburantReglementData[],
@@ -361,7 +368,7 @@ export async function generateBonsCarburantReglement(
       if (!firstGroup || pageIndex > 0) doc.addPage();
       await drawHeader(doc, cooperativeId, {
         titre_document: "FICHE RÈGLEMENT",
-        reference: `CARB-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}`,
+        reference: formatFicheReglementReference(),
       });
       drawStationBlock(station, pageRows, total, pageIndex === 0, pageIndex === pages.length - 1);
     }

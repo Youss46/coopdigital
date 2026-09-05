@@ -5,7 +5,7 @@ vi.mock("../services/pdfHeaderService.js", () => ({
   drawFooter: vi.fn().mockResolvedValue(undefined),
 }));
 
-const { generateBonsCarburantReglement } = await import("../services/bonCarburantPdf.js");
+const { generateBonsCarburantReglement, formatFicheReglementReference } = await import("../services/bonCarburantPdf.js");
 
 function bon(index: number, stationService: string) {
   return {
@@ -22,6 +22,10 @@ function bon(index: number, stationService: string) {
 }
 
 describe("generateBonsCarburantReglement", () => {
+  it("formate la référence avec le jour, le mois et l'année", () => {
+    expect(formatFicheReglementReference(new Date(2026, 8, 5))).toBe("CARB-05-09-2026");
+  });
+
   it("génère une fiche PDF regroupée par station sur plusieurs pages", async () => {
     const rows = [
       ...Array.from({ length: 19 }, (_, index) => bon(index + 1, "Station A")),

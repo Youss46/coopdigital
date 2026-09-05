@@ -1700,9 +1700,15 @@ function TabCarburant() {
         const payload = await response.json().catch(() => null) as { erreur?: string } | null;
         throw new Error(payload?.erreur ?? "Impossible de générer la fiche de règlement.");
       }
+      const date = new Date();
+      const dateFichier = [
+        String(date.getDate()).padStart(2, "0"),
+        String(date.getMonth() + 1).padStart(2, "0"),
+        date.getFullYear(),
+      ].join("-");
       openPdfViewer(
         URL.createObjectURL(await response.blob()),
-        `fiche-reglement-carburant-${new Date().toISOString().slice(0, 10)}.pdf`,
+        `fiche-reglement-carburant-${dateFichier}.pdf`,
       );
     } catch (error) {
       toast({
