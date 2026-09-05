@@ -17,7 +17,7 @@ describe("buildSageTxt", () => {
     ]]);
 
     expect(txt).toContain("#FLG 001\r\n#VER 8\r\n#DEV XOF\r\n#MECG\r\nCAIS\r\n");
-    expect(txt).toContain("28/08/2026;CAIS;P-001;0052962;Achat & règlement, urgent;125000;0");
+    expect(txt).toContain("28/08/2026;CAIS;P-001;0052962;Achat & reglement, urgent;125000;0");
     expect(txt.endsWith("\r\n")).toBe(true);
   });
 });

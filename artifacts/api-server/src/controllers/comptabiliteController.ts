@@ -44,6 +44,12 @@ function sageTxtField(value: string | number | null | undefined): string {
   return String(value ?? "")
     .replace(/[\r\n]+/g, " ")
     .replace(/;/g, ",")
+    // Sage 100 i7 can reject UTF-8 punctuation in a TXT import.
+    .replace(/[–—−]/g, "-")
+    .replace(/œ/gi, "oe")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\x20-\x7E]/g, " ")
     .trim();
 }
 
