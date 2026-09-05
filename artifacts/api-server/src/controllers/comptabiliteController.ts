@@ -2012,6 +2012,33 @@ export async function exportJournalSageTxt(req: Request, res: Response): Promise
         }
       }
     }
+    const memberIds = new Set<number>();
+    for (const ecriture of ecritures) {
+      if (ecriture.tiersType === "membre" && ecriture.tiersId != null) {
+        memberIds.add(ecriture.tiersId);
+      } else if (ecriture.tiersId == null && ecriture.sourceId != null) {
+        const sourceTier = sourceTiers.get(`${ecriture.source}:${ecriture.sourceId}`);
+        if (sourceTier?.tiersType === "membre") {
+          memberIds.add(sourceTier.tiersId);
+        }
+      }
+    }
+    const memberCategoryById = new Map<number, string | null>();
+    if (memberIds.size > 0) {
+      const members = await db
+        .select({
+          id: membresTable.id,
+          categorieMembre: membresTable.categorieMembre,
+        })
+        .from(membresTable)
+        .where(and(
+          eq(membresTable.cooperativeId, coop),
+          inArray(membresTable.id, [...memberIds]),
+        ));
+      for (const member of members) {
+        memberCategoryById.set(member.id, member.categorieMembre);
+      }
+    }
 
     const mappingByTier = new Map<string, Map<string, string>>();
     for (const mapping of mappings) {
@@ -2032,8 +2059,11 @@ export async function exportJournalSageTxt(req: Request, res: Response): Promise
       const tierKey = tier
         ? `${tier.tiersType}:${tier.tiersId}`
         : null;
+      const memberIsDelegated = tier?.tiersType === "membre"
+        && memberCategoryById.get(tier.tiersId)?.trim().toLowerCase() === "délégué de localités";
+      const primaryMemberMappingType = memberIsDelegated ? "membre_delegue" : "membre";
       const mappingTypes = tier?.tiersType === "membre"
-        ? ["membre", "membre_delegue"]
+        ? [primaryMemberMappingType, primaryMemberMappingType === "membre" ? "membre_delegue" : "membre"]
         : tier
           ? [tier.tiersType]
           : [];
