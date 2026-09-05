@@ -1,111 +1,72 @@
-# Validation de l’export XML avec Sage 100 i7
+# Validation de l'export TXT Sage 100 i7
 
-## Statut
+## Résultat de la validation disponible
 
-**Validation Sage en attente — installation et modèle d’import non fournis.**
+Le dépôt ne contient ni installation Sage 100 i7 ni fichier de définition
+exporté depuis un dossier Sage. L'import dans une copie du dossier ne peut
+donc pas être confirmé depuis cet environnement Linux. Les sorties TXT
+fournies et les tests automatisés permettent toutefois de verrouiller le
+contrat à remettre à l'utilisateur Sage.
 
-CoopDigital produit actuellement un XML déterministe et bien formé selon son propre
-contrat d’export. Ce contrat ne constitue pas, à lui seul, un format XML natif
-Sage 100 i7. Une importation réussie ne peut donc pas être affirmée depuis
-l’environnement de développement.
+Le format observé et retenu est :
 
-La conclusion actuelle est : **le fichier est exploitable comme fichier
-d’échange à rapprocher d’un profil d’import Sage, mais il doit être validé ou
-adapté avec le paramétrage d’import de la société dans Sage 100 i7 avant toute
-utilisation en production**.
-
-## Contrat XML actuellement exporté
-
-Déclaration et encodage :
-
-- déclaration XML `<?xml version="1.0" encoding="UTF-8"?>` ;
-- caractères encodés en UTF-8 ;
-- fin de ligne CRLF ;
-- valeurs XML échappées (`&`, `<`, `>`, `"`, `'`) ;
-- valeurs absentes représentées par un élément vide (`<NumeroPiece/>`).
-
-Arbre et ordre des éléments :
-
-```xml
-<ExportSage exercice="AAAA" source="CoopDigital">
-  <Ecritures>
-    <Ecriture>
-      <Date>AAAA-MM-JJ</Date>
-      <Journal>...</Journal>
-      <NumeroPiece>...</NumeroPiece>
-      <Libelle>...</Libelle>
-      <CompteGeneral>...</CompteGeneral>
-      <CompteSage>...</CompteSage>
-      <CodeTiers>...</CodeTiers>
-      <TypeTiers>...</TypeTiers>
-      <Debit>...</Debit>
-      <Credit>...</Credit>
-    </Ecriture>
-  </Ecritures>
-</ExportSage>
+```text
+Date;Journal;Pièce;Compte;Libellé;Débit;Crédit
 ```
 
-Une écriture comptable CoopDigital est exportée en deux lignes au maximum :
-une ligne débit et une ligne crédit. Les montants sont des entiers FCFA. Les
-écritures exportées sont celles de l’exercice demandé et le contrôle existant
-bloque le téléchargement lorsqu’un compte auxiliaire requis n’est pas
-paramétré.
+Le fichier ne contient pas de ligne de titres de colonnes. Il commence par
+les directives Sage suivantes, qui doivent être conservées :
 
-## Comparaison avec un import Sage 100 i7
+```text
+#FLG 001
+#VER 8
+#DEV XOF
+#MECG
+CAIS
+```
 
-| Point à vérifier dans le profil Sage | Valeur CoopDigital | État |
-| --- | --- | --- |
-| Fichier accepté par la fonction d’import | XML avec racine `ExportSage` | **À confirmer** |
-| Nom de la racine et des balises | Noms CoopDigital ci-dessus | **À confirmer / probablement à mapper** |
-| Namespace ou schéma XML | Aucun | **À confirmer** |
-| Ordre des champs | Ordre du tableau ci-dessus | **À confirmer** |
-| Date | ISO `AAAA-MM-JJ` | **À confirmer** ; adapter au masque Sage si nécessaire |
-| Journal | Valeur `source` en majuscules (`PAIEMENT`, `LIVRAISON`, etc.) | **À confirmer** ; vérifier le code journal Sage |
-| Pièce | `numeroPiece`, vide si absent | **À confirmer** |
-| Compte | `CompteSage` contient le compte détaillé configuré pour le tiers | **À mapper au champ compte Sage** |
-| Tiers | `CodeTiers` vaut actuellement `<type>-<id>` | **Adaptation probable** : utiliser le code tiers connu de Sage |
-| Sens | deux éléments `Debit` / `Credit` par mouvement | **À confirmer** |
-| Montant | entier positif, unité FCFA | **À confirmer** ; vérifier séparateur et devise du dossier Sage |
-| Libellé | texte XML échappé | **À confirmer** ; vérifier la longueur maximale |
-| Encodage | UTF-8 déclaré et produit | **À confirmer** avec l’option d’import Sage |
+Chaque ligne de données comporte exactement sept champs. La date est au format
+`JJ/MM/AAAA`, la pièce peut être vide, le compte est le compte Sage détaillé
+configuré pour le tiers ou le compte général, et les montants sont des entiers
+positifs en FCFA. L'encodage produit est ASCII compatible Sage : les accents,
+tirets typographiques, symboles monétaires et retours à la ligne des libellés
+sont normalisés.
 
-Les valeurs `CodeTiers` et `TypeTiers` sont des identifiants CoopDigital. Elles
-ne doivent pas être présentées comme des codes tiers Sage tant qu’une
-correspondance n’a pas été fournie par le dossier Sage. C’est le principal
-point d’adaptation identifié à ce stade, avec les noms de balises et le format
-de date.
+## Contrôles automatisés réalisés
 
-## Procédure de validation à réaliser dans Sage
+Le test `artifacts/api-server/src/tests/comptabiliteSageXml.test.ts` vérifie :
 
-Cette procédure doit être exécutée sur une copie du dossier comptable, avec un
-utilisateur habilité à importer des écritures :
+- l'en-tête et les directives Sage ;
+- l'ordre `Pièce` puis `Compte`, avec des valeurs différentes ;
+- sept colonnes exactement et aucune colonne devise supplémentaire ;
+- une écriture avec compte auxiliaire de tiers et une écriture sans tiers ;
+- les pièces présentes et les pièces vides ;
+- la normalisation ASCII des libellés ;
+- l'égalité des totaux débit et crédit.
 
-1. Obtenir le modèle ou la définition du format d’import de la version exacte
-   de Sage 100 i7 utilisée par la coopérative.
-2. Relever la racine XML, le namespace éventuel, les noms et l’ordre des
-   champs, le masque de date, le séparateur décimal, le mode débit/crédit et
-   les champs obligatoires.
-3. Exporter depuis CoopDigital un exercice de test contenant au moins :
-   une écriture avec tiers, une écriture sans tiers, un libellé accentué et un
-   numéro de pièce vide.
-4. Importer le fichier dans une copie du dossier Sage, sans valider
-   définitivement les écritures.
-5. Contrôler le journal, les dates, les pièces, les libellés, les comptes
-   généraux, les comptes auxiliaires et l’égalité débit/crédit.
-6. Comparer les totaux importés avec la balance auxiliaire CoopDigital.
-7. Si Sage refuse le fichier, conserver le message d’erreur et le profil
-   d’import exporté par Sage ; ils sont nécessaires pour implémenter
-   l’adaptateur sans deviner un format propriétaire.
+Les comptes auxiliaires non configurés restent bloquants côté API. Il ne faut
+pas remplacer cette vérification par un code tiers CoopDigital : l'identifiant
+`type-id` n'est pas automatiquement un code tiers Sage.
 
-## Critères de clôture
+## Vérification à faire dans Sage 100 i7
 
-La validation pourra être marquée **réussie** lorsque le même fichier de test
-est importé sans erreur dans la version Sage ciblée et que les contrôles de
-totaux passent. Sinon, l’adaptation à réaliser doit être consignée au minimum
-pour :
+Cette dernière étape nécessite la version exacte de Sage et son profil
+d'import. Elle doit être faite sur une copie du dossier comptable :
 
-- la racine, le namespace et les balises ;
-- l’ordre et le type des champs ;
-- la conversion de `CodeTiers` vers le code Sage ;
-- les dates, montants et éventuels arrondis ;
-- l’encodage et les champs obligatoires.
+1. Exporter un exercice de test contenant une écriture avec tiers, une écriture
+   sans tiers, une pièce renseignée et une pièce vide.
+2. Dans le profil d'import Sage, choisir le séparateur `;`, conserver les
+   directives du fichier et mapper les sept champs dans l'ordre ci-dessus.
+3. Importer sans valider définitivement les écritures.
+4. Vérifier les dates, journaux, pièces, comptes généraux, comptes auxiliaires,
+   libellés et l'absence de huitième colonne.
+5. Comparer les totaux débit et crédit importés avec le fichier exporté et la
+   balance auxiliaire CoopDigital.
+6. Si le profil exige des colonnes supplémentaires, conserver sa définition et
+   son message d'erreur : l'export devra alors être adapté explicitement au
+   profil concerné, sans modifier le format commun par hypothèse.
+
+Tant que cette procédure n'a pas été exécutée dans le dossier Sage cible, le
+statut doit rester **validation Sage externe en attente**. Les tests locaux
+confirment la structure et les données produites, pas l'acceptation par une
+version Sage non disponible dans le dépôt.
