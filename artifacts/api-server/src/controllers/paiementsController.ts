@@ -25,6 +25,22 @@ class PaiementDejaTraiteError extends Error {
   }
 }
 
+async function verrouillerPaiementPourValidation(
+  tx: ComptabiliteTransaction,
+  paiementId: number,
+): Promise<void> {
+  const [paiement] = await tx
+    .select({ statut: paiementsTable.statut })
+    .from(paiementsTable)
+    .where(eq(paiementsTable.id, paiementId))
+    .for("update")
+    .limit(1);
+
+  if (!paiement || paiement.statut !== "en_attente") {
+    throw new PaiementDejaTraiteError();
+  }
+}
+
 class PaiementMontantInvalideError extends Error {
   readonly status = 422;
   constructor(message: string) {
@@ -1093,6 +1109,8 @@ async function debiterMobileDansTransaction(
       let soldeApresLivraison: number | null = null;
       try {
         await db.transaction(async (tx) => {
+          await verrouillerPaiementPourValidation(tx, id);
+
            const retenueAvance = inclureFraisCollecte
              && row.commissionCollecteId != null
              && row.commissionCollecteMembreId != null
@@ -1484,6 +1502,8 @@ async function debiterMobileDansTransaction(
 
     let soldeApresLivraison: number | null = null;
     await db.transaction(async (tx) => {
+      await verrouillerPaiementPourValidation(tx, id);
+
       const retenueAvance = inclureFraisCollecte
         && row.commissionCollecteId != null
         && row.commissionCollecteMembreId != null

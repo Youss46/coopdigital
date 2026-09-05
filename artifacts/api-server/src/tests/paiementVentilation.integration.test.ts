@@ -274,6 +274,74 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
     return { paymentId: id, deliveryId: livraisonId };
   }
 
+  async function createCommissionCoveredPayment(): Promise<{
+    paymentId: number;
+    commissionId: number;
+    advanceId: number;
+  }> {
+    const numeroPesee = 900_000 + process.pid + paymentIds.length;
+    const livraison = await client.query(
+      `INSERT INTO livraisons
+        (cooperative_id, membre_id, poids_kg, prix_unitaire_fcfa,
+         montant_brut_fcfa, avance_deduite_fcfa, intrants_deduits_fcfa,
+         montant_net_fcfa, date_livraison, numero_pesee,
+         annee_numero_pesee, statut_paiement, montant_restant)
+       VALUES ($1, $2, 1000, 495, 495000, 0, 0, 495000,
+               CURRENT_DATE, $3, $4, 'EN_ATTENTE', 495000)
+       RETURNING id`,
+      [cooperativeId, memberId, numeroPesee, postgresReferenceYear],
+    );
+    const deliveryId = livraison.rows[0].id as number;
+    deliveryIds.push(deliveryId);
+
+    const session = await client.query(
+      `INSERT INTO sessions_pesee
+        (cooperative_id, numero_session, membre_id, statut,
+         poids_total_kg, nb_sacs_total, livraison_id)
+       VALUES ($1, $2, $3, 'terminee', 1000, 10, $4)
+       RETURNING id`,
+      [cooperativeId, `COM-${process.pid}-${paymentIds.length}`, memberId, deliveryId],
+    );
+    const sessionId = session.rows[0].id as number;
+    sessionIds.push(sessionId);
+
+    const commission = await client.query(
+      `INSERT INTO commissions_membres_delegues
+        (membre_delegue_id, session_pesee_id, taux_fcfa_par_kg,
+         poids_kg, montant_fcfa, frequence_paiement, statut)
+       VALUES ($1, $2, 22.5, 1000, 22500, 'fin_campagne', 'en_attente')
+       RETURNING id`,
+      [memberId, sessionId],
+    );
+    const commissionId = commission.rows[0].id as number;
+    commissionIds.push(commissionId);
+
+    const advance = await client.query(
+      `INSERT INTO avances
+        (membre_id, montant_octroye_fcfa, montant_rembourse_fcfa,
+         solde_restant_fcfa, date_octroi, statut, plan_type, deduction_source)
+       VALUES ($1, 22500, 0, 22500, CURRENT_DATE - INTERVAL '1 day',
+               'en_cours', 'integral', 'commission')
+       RETURNING id`,
+      [memberId],
+    );
+    const advanceId = advance.rows[0].id as number;
+    advanceIds.push(advanceId);
+
+    const payment = await client.query(
+      `INSERT INTO paiements
+        (cooperative_id, livraison_id, membre_id, numero_recu,
+         montant_fcfa, mode_paiement, statut)
+       VALUES ($1, $2, $3, $4, 495000, NULL, 'en_attente')
+       RETURNING id`,
+      [cooperativeId, deliveryId, memberId, `TEST-COM-${process.pid}-${paymentIds.length}`],
+    );
+    const paymentId = payment.rows[0].id as number;
+    paymentIds.push(paymentId);
+
+    return { paymentId, commissionId, advanceId };
+  }
+
   function request(paymentId: number, body: unknown) {
     return {
       params: { id: String(paymentId) },
@@ -477,65 +545,7 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
   });
 
   it("accepte le montant ventilé hors commission quand l'avance couvre toute la commission", async () => {
-    const numeroPesee = 900_000 + process.pid;
-    const livraison = await client.query(
-      `INSERT INTO livraisons
-        (cooperative_id, membre_id, poids_kg, prix_unitaire_fcfa,
-         montant_brut_fcfa, avance_deduite_fcfa, intrants_deduits_fcfa,
-         montant_net_fcfa, date_livraison, numero_pesee,
-         annee_numero_pesee, statut_paiement, montant_restant)
-       VALUES ($1, $2, 1000, 495, 495000, 0, 0, 495000,
-               CURRENT_DATE, $3, $4, 'EN_ATTENTE', 495000)
-       RETURNING id`,
-      [cooperativeId, memberId, numeroPesee, postgresReferenceYear],
-    );
-    const deliveryId = livraison.rows[0].id as number;
-    deliveryIds.push(deliveryId);
-
-    const session = await client.query(
-      `INSERT INTO sessions_pesee
-        (cooperative_id, numero_session, membre_id, statut,
-         poids_total_kg, nb_sacs_total, livraison_id)
-       VALUES ($1, $2, $3, 'terminee', 1000, 10, $4)
-       RETURNING id`,
-      [cooperativeId, `COM-${process.pid}`, memberId, deliveryId],
-    );
-    const sessionId = session.rows[0].id as number;
-    sessionIds.push(sessionId);
-
-    const commission = await client.query(
-      `INSERT INTO commissions_membres_delegues
-        (membre_delegue_id, session_pesee_id, taux_fcfa_par_kg,
-         poids_kg, montant_fcfa, frequence_paiement, statut)
-       VALUES ($1, $2, 22.5, 1000, 22500, 'fin_campagne', 'en_attente')
-       RETURNING id`,
-      [memberId, sessionId],
-    );
-    const commissionId = commission.rows[0].id as number;
-    commissionIds.push(commissionId);
-
-    const advance = await client.query(
-      `INSERT INTO avances
-        (membre_id, montant_octroye_fcfa, montant_rembourse_fcfa,
-         solde_restant_fcfa, date_octroi, statut, plan_type, deduction_source)
-       VALUES ($1, 22500, 0, 22500, CURRENT_DATE - INTERVAL '1 day',
-               'en_cours', 'integral', 'commission')
-       RETURNING id`,
-      [memberId],
-    );
-    const advanceId = advance.rows[0].id as number;
-    advanceIds.push(advanceId);
-
-    const payment = await client.query(
-      `INSERT INTO paiements
-        (cooperative_id, livraison_id, membre_id, numero_recu,
-         montant_fcfa, mode_paiement, statut)
-       VALUES ($1, $2, $3, $4, 495000, NULL, 'en_attente')
-       RETURNING id`,
-      [cooperativeId, deliveryId, memberId, `TEST-COM-${process.pid}`],
-    );
-    const paymentId = payment.rows[0].id as number;
-    paymentIds.push(paymentId);
+    const { paymentId, commissionId, advanceId } = await createCommissionCoveredPayment();
 
     const result = await validate(paymentId, {
       montantReglementFcfa: 495_000,
@@ -574,6 +584,78 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
          AND montant_fcfa = 22500`,
       [cooperativeId, memberId],
     )).toMatchObject({ rows: [{ count: 1 }] });
+  });
+
+  it("ne double pas la retenue d'avance lors de deux validations concurrentes", async () => {
+    const { paymentId, commissionId, advanceId } = await createCommissionCoveredPayment();
+    const retentionEntriesBefore = await client.query(
+      `SELECT count(*)::int AS count
+       FROM ecritures_en_attente
+       WHERE cooperative_id = $1
+         AND source = 'avance'
+         AND source_id = $2
+         AND montant_fcfa = 22500`,
+      [cooperativeId, memberId],
+    );
+    const body = {
+      montantReglementFcfa: 495_000,
+      ventilations: [
+        { modePaiement: "especes", montantFcfa: 495_000 },
+      ],
+      inclureFraisCollecte: true,
+    };
+
+    const results = await Promise.all([
+      validate(paymentId, body),
+      validate(paymentId, body),
+    ]);
+    expect(results.map((result) => result.statusCode).sort()).toEqual([200, 409]);
+
+    expect(await client.query(
+      `SELECT statut, montant_fcfa FROM paiements WHERE id = $1`,
+      [paymentId],
+    )).toMatchObject({
+      rows: [{ statut: "effectue", montant_fcfa: 495000 }],
+    });
+    expect(await client.query(
+      `SELECT statut, retenue_avances_fcfa FROM commissions_membres_delegues
+       WHERE id = $1`,
+      [commissionId],
+    )).toMatchObject({
+      rows: [{ statut: "payé", retenue_avances_fcfa: 22500 }],
+    });
+    expect(await client.query(
+      `SELECT solde_restant_fcfa, montant_rembourse_fcfa, statut
+       FROM avances WHERE id = $1`,
+      [advanceId],
+    )).toMatchObject({
+      rows: [{ solde_restant_fcfa: 0, montant_rembourse_fcfa: 22500, statut: "rembourse" }],
+    });
+    expect(await client.query(
+      `SELECT count(*)::int AS count
+       FROM remboursements_avances_membres
+       WHERE avance_id = $1 AND commission_membre_delegue_id = $2`,
+      [advanceId, commissionId],
+    )).toMatchObject({ rows: [{ count: 1 }] });
+    expect(await client.query(
+      `SELECT count(*)::int AS count
+       FROM ecritures_en_attente
+       WHERE cooperative_id = $1
+         AND source = 'avance'
+         AND source_id = $2
+         AND montant_fcfa = 22500`,
+      [cooperativeId, memberId],
+    )).toMatchObject({
+      rows: [{ count: retentionEntriesBefore.rows[0].count + 1 }],
+    });
+    expect(await paymentEffects(paymentId)).toEqual({
+      statut: "effectue",
+      lines: 1,
+      movements: 1,
+      mobileMovements: 0,
+      cheques: 0,
+      accounting: 1,
+    });
   });
 
   it("rollbacke les espèces si l'enregistrement du chèque échoue", async () => {
