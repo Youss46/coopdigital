@@ -142,6 +142,9 @@ export async function validerChargeDiverses(
   const compteTresorerieId = charge.compteTresorerieId;
   const mouvementTresorerie = compteCredit !== "401";
 
+  if (compteCredit === "401" && !charge.tiers?.trim()) {
+    throw new Error("Le fournisseur ou le tiers est requis pour une charge à crédit");
+  }
   if (mouvementTresorerie) {
     if (!compteTresorerieType || !compteTresorerieId) {
       throw new Error("Un compte de trésorerie doit être sélectionné avant la validation");

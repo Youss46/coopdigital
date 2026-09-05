@@ -108,6 +108,7 @@ const MODES_PAIEMENT = [
   { value: "cheque",        label: "Chèque" },
   { value: "virement",      label: "Virement bancaire" },
   { value: "mobile_money",  label: "Mobile Money" },
+  { value: "credit",        label: "À crédit" },
 ];
 
 const EMPTY_FORM = {
@@ -269,7 +270,7 @@ export default function ChargesDiversesPage() {
       compte_credit:   c.compte_credit,
       compte_tresorerie_id: c.compte_tresorerie_id ? String(c.compte_tresorerie_id) : "",
       compte_tresorerie_type: c.compte_tresorerie_type ?? "",
-      mode_paiement:   c.mode_paiement,
+      mode_paiement:   c.compte_credit === "401" ? "credit" : c.mode_paiement,
       tiers:           c.tiers ?? "",
       reference_piece: c.reference_piece ?? "",
     });
@@ -284,6 +285,14 @@ export default function ChargesDiversesPage() {
     }
     if (!form.compte_credit) {
       toast({ title: "Compte requis", description: "Sélectionnez le compte crédit de la charge.", variant: "destructive" });
+      return;
+    }
+    if (form.mode_paiement === "credit" && form.compte_credit !== "401") {
+      toast({ title: "Compte fournisseur requis", description: "Une charge à crédit doit utiliser le compte 401 — Fournisseurs.", variant: "destructive" });
+      return;
+    }
+    if (form.mode_paiement === "credit" && !form.tiers.trim()) {
+      toast({ title: "Fournisseur requis", description: "Indiquez le fournisseur ou le tiers pour une charge à crédit.", variant: "destructive" });
       return;
     }
     if (form.compte_credit !== "401" && (!form.compte_tresorerie_type || !form.compte_tresorerie_id)) {
@@ -304,6 +313,7 @@ export default function ChargesDiversesPage() {
         compte_credit: "401",
         compte_tresorerie_id: "",
         compte_tresorerie_type: "",
+        mode_paiement: "credit",
       }));
       return;
     }
@@ -321,6 +331,16 @@ export default function ChargesDiversesPage() {
   }, []);
 
   const handleModePaiementChange = useCallback((modePaiement: string) => {
+    if (modePaiement === "credit") {
+      setForm(f => ({
+        ...f,
+        mode_paiement: "credit",
+        compte_credit: "401",
+        compte_tresorerie_id: "",
+        compte_tresorerie_type: "",
+      }));
+      return;
+    }
     const typeAttendu = modePaiement === "especes"
       ? "caisse"
       : modePaiement === "virement"
@@ -596,7 +616,7 @@ export default function ChargesDiversesPage() {
                 <Select value={compteCreditValue} onValueChange={handleCompteCreditChange}>
                   <SelectTrigger><SelectValue placeholder="Sélectionner un compte" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="401">401 — Fournisseurs (sans sortie immédiate)</SelectItem>
+                    <SelectItem value="401">401 — Fournisseurs (à crédit, sans sortie immédiate)</SelectItem>
                     {form.compte_credit === "571" && !form.compte_tresorerie_id && (
                       <SelectItem value="571" disabled>571 — Caisse (compte historique à remplacer)</SelectItem>
                     )}
@@ -624,7 +644,9 @@ export default function ChargesDiversesPage() {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-gray-400">
-                  La validation créera automatiquement une sortie sur le compte sélectionné.
+                  {form.mode_paiement === "credit"
+                    ? "La validation créera une dette fournisseur, sans sortie de trésorerie immédiate."
+                    : "La validation créera automatiquement une sortie sur le compte sélectionné."}
                 </p>
               </div>
             </div>

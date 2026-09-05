@@ -11,6 +11,26 @@ import {
   securiserReglementPpsi,
 } from "../services/chargesDiversesService";
 
+function erreurStructureCharge(
+  modePaiement: string,
+  compteCredit: string,
+  tiers: string | null | undefined,
+  compteTresorerieId: number | null | undefined,
+  compteTresorerieType: "caisse" | "banque" | "mobile_marchand" | null | undefined,
+): string | null {
+  if (modePaiement === "credit") {
+    if (compteCredit !== "401") return "Une charge à crédit doit utiliser le compte 401 — Fournisseurs";
+    if (compteTresorerieId != null || compteTresorerieType != null) {
+      return "Une charge à crédit ne peut pas avoir de compte de trésorerie";
+    }
+    if (!tiers?.trim()) return "Le fournisseur ou le tiers est requis pour une charge à crédit";
+  }
+  if (compteCredit === "401" && modePaiement !== "credit") {
+    return "Le compte 401 — Fournisseurs nécessite le mode de paiement « À crédit »";
+  }
+  return null;
+}
+
 // ── GET /charges-diverses ─────────────────────────────────────────────────────
 export async function handleListChargesDiverses(req: Request, res: Response): Promise<void> {
   try {
@@ -46,6 +66,16 @@ export async function handleCreateChargeDiverses(req: Request, res: Response): P
       compte_tresorerie_id?: number | null;
       compte_tresorerie_type?: "caisse" | "banque" | "mobile_marchand" | null;
     };
+    const compteCredit = body.compte_credit ?? "571";
+    const modePaiement = body.mode_paiement ?? "especes";
+    const structureError = erreurStructureCharge(
+      modePaiement,
+      compteCredit,
+      body.tiers,
+      body.compte_tresorerie_id,
+      body.compte_tresorerie_type,
+    );
+    if (structureError) { res.status(400).json({ erreur: structureError }); return; }
     if (!body.date_charge || !body.libelle || !body.montant_fcfa || body.montant_fcfa <= 0 || !body.categorie) {
       res.status(400).json({ erreur: "date_charge, libelle, montant_fcfa et categorie requis" });
       return;
@@ -61,8 +91,8 @@ export async function handleCreateChargeDiverses(req: Request, res: Response): P
       montantFcfa:    String(body.montant_fcfa),
       categorie:      body.categorie,
       compteDebit:    body.compte_debit  ?? COMPTE_DEBIT_DEFAUT[body.categorie] ?? "658",
-      compteCredit:   body.compte_credit ?? "571",
-      modePaiement:   body.mode_paiement ?? "especes",
+      compteCredit,
+      modePaiement,
       tiers:          body.tiers ?? null,
       referencePiece: body.reference_piece ?? null,
        compteTresorerieId: body.compte_tresorerie_id == null ? null : Number(body.compte_tresorerie_id),
@@ -104,6 +134,16 @@ export async function handleUpdateChargeDiverses(req: Request, res: Response): P
       compte_tresorerie_id?: number | null;
       compte_tresorerie_type?: "caisse" | "banque" | "mobile_marchand" | null;
     };
+    if (body.mode_paiement === "credit" || body.compte_credit === "401") {
+      const structureError = erreurStructureCharge(
+        body.mode_paiement ?? "credit",
+        body.compte_credit ?? "401",
+        body.tiers,
+        body.compte_tresorerie_id,
+        body.compte_tresorerie_type,
+      );
+      if (structureError) { res.status(400).json({ erreur: structureError }); return; }
+    }
     const row = await updateChargeDiverses(cooperativeId, id, {
       ...(body.date_charge     ? { dateCharge:     body.date_charge }      : {}),
       ...(body.libelle         ? { libelle:        body.libelle }           : {}),
