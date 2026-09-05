@@ -96,7 +96,7 @@ describe("buildSageTxt", () => {
         "LIV-2026-000001",
         "Achat cacao - Koffi Konan",
         "401",
-        "401000",
+        "4011ABOUDE001",
         "membre-17",
         "membre",
         "285000",
@@ -120,7 +120,7 @@ describe("buildSageTxt", () => {
 
     const dataLines = txt.split("\r\n").slice(5, -1);
     expect(dataLines).toEqual([
-      "ACH;260826;LIV-2026-000001;401000;Achat cacao - Koffi Konan;285000;D;MEM-000017",
+      "ACH;260826;LIV-2026-000001;4011ABOUDE001;Achat cacao - Koffi Konan;285000;D;MEM-000017",
       "ACH;260826;LIV-2026-000001;601000;Achat cacao - Koffi Konan;285000;C;",
     ]);
     expect(dataLines.every((line) => line.split(";").length === 8)).toBe(true);

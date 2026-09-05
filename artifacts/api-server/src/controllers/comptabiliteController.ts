@@ -1928,12 +1928,17 @@ export async function exportJournalSageTxt(req: Request, res: Response): Promise
         && ecriture.numeroPiece?.startsWith("PAI-")
       ))
       .map((ecriture) => ecriture.sourceId!);
+    const livraisonIds = ecritures
+      .filter((ecriture) => ecriture.source === "livraison" && ecriture.sourceId != null)
+      .map((ecriture) => ecriture.sourceId!);
     const paiementModes = new Map<number, string | null>();
+    const sourceTiers = new Map<string, { tiersId: number; tiersType: string }>();
     if (paiementIds.length > 0) {
       const paiements = await db
         .select({
           id: paiementsTable.id,
           modePaiement: paiementsTable.modePaiement,
+          membreId: paiementsTable.membreId,
         })
         .from(paiementsTable)
         .where(and(
@@ -1942,6 +1947,29 @@ export async function exportJournalSageTxt(req: Request, res: Response): Promise
         ));
       for (const paiement of paiements) {
         paiementModes.set(paiement.id, paiement.modePaiement);
+        if (paiement.membreId != null) {
+          sourceTiers.set(`paiement:${paiement.id}`, { tiersId: paiement.membreId, tiersType: "membre" });
+        }
+      }
+    }
+    if (livraisonIds.length > 0) {
+      const livraisons = await db
+        .select({
+          id: livraisonsTable.id,
+          membreId: livraisonsTable.membreId,
+          fournisseurId: livraisonsTable.fournisseurId,
+        })
+        .from(livraisonsTable)
+        .where(and(
+          eq(livraisonsTable.cooperativeId, coop),
+          inArray(livraisonsTable.id, livraisonIds),
+        ));
+      for (const livraison of livraisons) {
+        if (livraison.membreId != null) {
+          sourceTiers.set(`livraison:${livraison.id}`, { tiersId: livraison.membreId, tiersType: "membre" });
+        } else if (livraison.fournisseurId != null) {
+          sourceTiers.set(`livraison:${livraison.id}`, { tiersId: livraison.fournisseurId, tiersType: "fournisseur_ext" });
+        }
       }
     }
 
@@ -1956,12 +1984,17 @@ export async function exportJournalSageTxt(req: Request, res: Response): Promise
     const missing = new Set<string>();
     const lines: string[][] = [];
     for (const ecriture of ecritures) {
-      const tierKey = ecriture.tiersId && ecriture.tiersType
-        ? `${ecriture.tiersType}:${ecriture.tiersId}`
+      const tier = ecriture.tiersId != null && ecriture.tiersType
+        ? { tiersId: ecriture.tiersId, tiersType: ecriture.tiersType }
+        : ecriture.sourceId != null
+          ? sourceTiers.get(`${ecriture.source}:${ecriture.sourceId}`)
+          : undefined;
+      const tierKey = tier
+        ? `${tier.tiersType}:${tier.tiersId}`
         : null;
       const byCollectif = tierKey ? mappingByTier.get(tierKey) : undefined;
-      const codeTiers = ecriture.tiersId && ecriture.tiersType
-        ? `${ecriture.tiersType}-${ecriture.tiersId}`
+      const codeTiers = tier
+        ? `${tier.tiersType}-${tier.tiersId}`
         : "";
       const journalEcriture = determinerCodeJournal({
         source: ecriture.source,
@@ -1993,9 +2026,12 @@ export async function exportJournalSageTxt(req: Request, res: Response): Promise
           String(debit),
           String(credit),
           determinerCompteTiersSage({
-            compte: mapped ?? compte,
-            tiersType: ecriture.tiersType,
-            tiersId: ecriture.tiersId,
+            // Le compte tiers stable se détermine sur le collectif OHADA
+            // (401/411), même lorsque la colonne Compte contient le numéro
+            // auxiliaire personnalisé du tiers.
+            compte,
+            tiersType: tier?.tiersType,
+            tiersId: tier?.tiersId,
           }),
         ]);
       };
