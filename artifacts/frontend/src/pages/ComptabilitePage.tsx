@@ -2934,7 +2934,8 @@ function OngletBalanceAuxiliaire() {
         <p>
           Les comptes collectifs CoopDigital restent inchangés. Utilisez <strong>Modifier</strong> pour associer
           chaque tiers à son ou ses comptes détaillés Sage. L’export est bloqué si une écriture utilise un compte tiers non paramétré.
-          Le fichier TXT utilise le journal et le format délimité affichés dans cette page.
+            Dans Sage, configurez le format délimité avec le séparateur <strong>;</strong> et l’ordre
+            <strong> Date;Journal;Compte;Pièce;Libellé;Débit;Crédit</strong>, sans ajouter de ligne de titre.
         </p>
       </div>
 

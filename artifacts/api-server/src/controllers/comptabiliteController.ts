@@ -67,8 +67,8 @@ export function buildSageTxt(
     return [
       date,
       journal,
-      line[2] || "",
        normaliserNumeroCompte(line[5] || line[4] || ""),
+      line[2] || "",
       line[3] || "",
       line[8] || "0",
       line[9] || "0",

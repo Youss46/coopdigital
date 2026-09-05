@@ -121,3 +121,4 @@
 - [Règlements groupés carburant](fuel-batch-payment-atomicity.md) — regrouper le débit de trésorerie sans fusionner le détail des paiements individuels.
 - [Fixtures de paiements PostgreSQL](payment-integration-fixtures.md) — les paiements coopératifs de test exigent un reçu local; la table comptable dépend de la configuration automatique.
 - [Format import Sage 100](sage-txt-import-format.md) — l’écriture TXT Sage doit suivre pièce puis compte, sans colonne devise finale; la devise est portée par l’en-tête.
+- [Formats Sage paramétrables](sage-parametric-import.md) — ne jamais supposer l’ordre des colonnes; aligner la trame exportée sur le format d’import Sage réellement configuré.
