@@ -1968,10 +1968,11 @@ export async function exportJournalSageTxt(req: Request, res: Response): Promise
         && ecriture.numeroPiece?.startsWith("PAI-")
       ))
       .map((ecriture) => ecriture.sourceId!);
-    const livraisonIds = ecritures
+    const livraisonIdsDirects = ecritures
       .filter((ecriture) => ecriture.source === "livraison" && ecriture.sourceId != null)
       .map((ecriture) => ecriture.sourceId!);
     const paiementModes = new Map<number, string | null>();
+    const paiementLivraisonIds = new Map<number, number>();
     const sourceTiers = new Map<string, { tiersId: number; tiersType: string }>();
     if (paiementIds.length > 0) {
       const paiements = await db
@@ -1979,6 +1980,7 @@ export async function exportJournalSageTxt(req: Request, res: Response): Promise
           id: paiementsTable.id,
           modePaiement: paiementsTable.modePaiement,
           membreId: paiementsTable.membreId,
+          livraisonId: paiementsTable.livraisonId,
         })
         .from(paiementsTable)
         .where(and(
@@ -1989,9 +1991,15 @@ export async function exportJournalSageTxt(req: Request, res: Response): Promise
         paiementModes.set(paiement.id, paiement.modePaiement);
         if (paiement.membreId != null) {
           sourceTiers.set(`paiement:${paiement.id}`, { tiersId: paiement.membreId, tiersType: "membre" });
+        } else if (paiement.livraisonId != null) {
+          paiementLivraisonIds.set(paiement.id, paiement.livraisonId);
         }
       }
     }
+    const livraisonIds = [...new Set([
+      ...livraisonIdsDirects,
+      ...paiementLivraisonIds.values(),
+    ])];
     if (livraisonIds.length > 0) {
       const livraisons = await db
         .select({
@@ -2007,8 +2015,18 @@ export async function exportJournalSageTxt(req: Request, res: Response): Promise
       for (const livraison of livraisons) {
         if (livraison.membreId != null) {
           sourceTiers.set(`livraison:${livraison.id}`, { tiersId: livraison.membreId, tiersType: "membre" });
+          for (const [paiementId, paiementLivraisonId] of paiementLivraisonIds) {
+            if (paiementLivraisonId === livraison.id) {
+              sourceTiers.set(`paiement:${paiementId}`, { tiersId: livraison.membreId, tiersType: "membre" });
+            }
+          }
         } else if (livraison.fournisseurId != null) {
           sourceTiers.set(`livraison:${livraison.id}`, { tiersId: livraison.fournisseurId, tiersType: "fournisseur_ext" });
+          for (const [paiementId, paiementLivraisonId] of paiementLivraisonIds) {
+            if (paiementLivraisonId === livraison.id) {
+              sourceTiers.set(`paiement:${paiementId}`, { tiersId: livraison.fournisseurId, tiersType: "fournisseur_ext" });
+            }
+          }
         }
       }
     }
