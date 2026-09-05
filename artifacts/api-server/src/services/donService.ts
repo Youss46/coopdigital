@@ -3,6 +3,44 @@ import { eq, and, sql, desc, asc, gte, lte, isNotNull } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import { proposerEcriture } from "./comptabiliteService.js";
 
+const DEFAULT_CATEGORIES_DONS = [
+  ["Aide sociale", "effectue"],
+  ["Aide funéraire", "effectue"],
+  ["Soutien communautaire", "effectue"],
+  ["Don à une école", "effectue"],
+  ["Don à une structure de santé", "effectue"],
+  ["Infrastructure locale", "effectue"],
+  ["Soutien agricole", "effectue"],
+  ["Autre don effectué", "effectue"],
+  ["Don en espèces", "recu"],
+  ["Matériel agricole", "recu"],
+  ["Intrants agricoles", "recu"],
+  ["Don institutionnel / ONG", "recu"],
+  ["Subvention État", "recu"],
+  ["Don exportateur", "recu"],
+  ["Autre don reçu", "recu"],
+] as const;
+
+async function ensureDefaultCategories(cooperativeId: number): Promise<void> {
+  await db.execute(sql`
+    INSERT INTO categories_dons (cooperative_id, libelle, sens)
+    SELECT ${cooperativeId}, defaults.libelle, defaults.sens
+    FROM (VALUES
+      ${sql.join(
+        DEFAULT_CATEGORIES_DONS.map(([libelle, sens]) => sql`(${libelle}, ${sens})`),
+        sql`, `,
+      )}
+    ) AS defaults(libelle, sens)
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM categories_dons existing
+      WHERE existing.cooperative_id = ${cooperativeId}
+        AND existing.libelle = defaults.libelle
+        AND existing.sens = defaults.sens
+    )
+  `);
+}
+
 
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -428,6 +466,7 @@ export async function getStatsDons(cooperativeId: number, campagneId?: number) {
 // ── Catégories ─────────────────────────────────────────────────────────────────
 
 export async function getCategories(cooperativeId: number, sens?: "effectue" | "recu") {
+  await ensureDefaultCategories(cooperativeId);
   const cond = [eq(categoriesDonsTable.cooperativeId, cooperativeId)];
   if (sens) cond.push(eq(categoriesDonsTable.sens, sens));
   return db
