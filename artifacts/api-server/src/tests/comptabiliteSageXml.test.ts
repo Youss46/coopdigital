@@ -1,7 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { buildSageTxt } from "../controllers/comptabiliteController.js";
+import { buildSageTxt, journalSagePourModePaiement } from "../controllers/comptabiliteController.js";
 
 describe("buildSageTxt", () => {
+  it("choisit le journal selon le mode de paiement", () => {
+    expect(journalSagePourModePaiement("especes", "ACH")).toBe("CAIS");
+    expect(journalSagePourModePaiement("cheque", "ACH")).toBe("BQ");
+    expect(journalSagePourModePaiement("virement", "ACH")).toBe("BQ");
+    expect(journalSagePourModePaiement("orange_money", "ACH")).toBe("ACH");
+    expect(journalSagePourModePaiement(null, "ACH", "571")).toBe("CAIS");
+    expect(journalSagePourModePaiement(null, "ACH", "521")).toBe("BQ");
+
+    const txt = buildSageTxt(2026, "ACH", [
+      ["2026-08-28", "CAIS", "PAI-001", "Paiement espèces", "571", "571", "", "", "100000", "0"],
+      ["2026-08-29", "BQ", "PAI-002", "Paiement chèque", "521", "521", "", "", "200000", "0"],
+    ]);
+
+    expect(txt).toContain("CAIS;280826;PAI-001;571000;Paiement especes;100000;D;OD");
+    expect(txt).toContain("BQ;290826;PAI-002;521000;Paiement cheque;200000;D;OD");
+  });
+
   it("génère l'en-tête Sage et l'ordre de colonnes attendu par le profil réel", () => {
     const txt = buildSageTxt(2026, "CAIS", [[
       "2026-08-28",

@@ -54,6 +54,19 @@ function sageTxtField(value: string | number | null | undefined): string {
     .trim();
 }
 
+export function journalSagePourModePaiement(
+  modePaiement: string | null | undefined,
+  journalParDefaut: string,
+  compteCredit?: string | null,
+): string {
+  if (modePaiement === "especes") return "CAIS";
+  if (modePaiement === "cheque" || modePaiement === "virement") return "BQ";
+  const compte = normaliserNumeroCompte(compteCredit ?? "");
+  if (compte === "571000") return "CAIS";
+  if (compte === "521000") return "BQ";
+  return journalParDefaut;
+}
+
 export function buildSageTxt(
   exercice: number,
   journal: string,
@@ -73,7 +86,7 @@ export function buildSageTxt(
     const sens = isCredit ? "C" : "D";
 
     return [
-      journal,
+      line[1] || journal,
       date,
       line[2] || "",
       normaliserNumeroCompte(line[5] || line[4] || ""),
@@ -1920,6 +1933,26 @@ export async function exportJournalSageTxt(req: Request, res: Response): Promise
       )),
     ]);
 
+    const paiementIds = ecritures
+      .filter((ecriture) => ecriture.source === "paiement" && ecriture.sourceId != null)
+      .map((ecriture) => ecriture.sourceId!);
+    const paiementModes = new Map<number, string | null>();
+    if (paiementIds.length > 0) {
+      const paiements = await db
+        .select({
+          id: paiementsTable.id,
+          modePaiement: paiementsTable.modePaiement,
+        })
+        .from(paiementsTable)
+        .where(and(
+          eq(paiementsTable.cooperativeId, coop),
+          inArray(paiementsTable.id, paiementIds),
+        ));
+      for (const paiement of paiements) {
+        paiementModes.set(paiement.id, paiement.modePaiement);
+      }
+    }
+
     const mappingByTier = new Map<string, Map<string, string>>();
     for (const mapping of mappings) {
       const key = `${mapping.tiersType}:${mapping.tiersId}`;
@@ -1938,6 +1971,13 @@ export async function exportJournalSageTxt(req: Request, res: Response): Promise
       const codeTiers = ecriture.tiersId && ecriture.tiersType
         ? `${ecriture.tiersType}-${ecriture.tiersId}`
         : "";
+      const journalEcriture = ecriture.source === "paiement" && ecriture.sourceId != null
+        ? journalSagePourModePaiement(
+          paiementModes.get(ecriture.sourceId),
+          journal,
+          ecriture.compteCredit,
+        )
+        : journal;
       const side = (compteBrut: string, debit: number, credit: number) => {
         const compte = normaliserNumeroCompte(compteBrut);
         const mapped = byCollectif?.get(compte);
@@ -1949,7 +1989,7 @@ export async function exportJournalSageTxt(req: Request, res: Response): Promise
         }
         lines.push([
           ecriture.dateEcriture,
-          journal,
+          journalEcriture,
           ecriture.numeroPiece ?? "",
           ecriture.libelle,
           compte,
