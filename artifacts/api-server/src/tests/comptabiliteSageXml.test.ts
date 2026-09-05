@@ -1,14 +1,63 @@
 import { describe, expect, it } from "vitest";
-import { buildSageTxt, journalSagePourModePaiement } from "../controllers/comptabiliteController.js";
+import { buildSageTxt } from "../controllers/comptabiliteController.js";
+import { determinerCodeJournal } from "../lib/sageJournal.js";
 
 describe("buildSageTxt", () => {
-  it("choisit le journal selon le mode de paiement", () => {
-    expect(journalSagePourModePaiement("especes", "ACH")).toBe("CAIS");
-    expect(journalSagePourModePaiement("cheque", "ACH")).toBe("BQ");
-    expect(journalSagePourModePaiement("virement", "ACH")).toBe("BQ");
-    expect(journalSagePourModePaiement("orange_money", "ACH")).toBe("ACH");
-    expect(journalSagePourModePaiement(null, "ACH", "571")).toBe("CAIS");
-    expect(journalSagePourModePaiement(null, "ACH", "521")).toBe("BQ");
+  it("détermine le journal Sage selon la nature de chaque transaction", () => {
+    expect(determinerCodeJournal({
+      source: "livraison",
+      libelle: "Achat cacao – Producteur",
+      compteDebit: "601",
+      compteCredit: "401",
+    })).toBe("AKKO");
+    expect(determinerCodeJournal({
+      source: "stock",
+      libelle: "Fournitures de bureau",
+      compteDebit: "311",
+      compteCredit: "401",
+    })).toBe("ACD");
+    expect(determinerCodeJournal({
+      source: "vente",
+      libelle: "Vente cacao – Client",
+      compteDebit: "4111",
+      compteCredit: "701",
+    })).toBe("VKKO");
+    expect(determinerCodeJournal({
+      source: "salaire",
+      libelle: "Versement salaire net",
+      compteDebit: "421",
+      compteCredit: "521",
+    })).toBe("ODP");
+    expect(determinerCodeJournal({
+      source: "paiement",
+      modePaiement: "especes",
+      compteDebit: "401",
+      compteCredit: "571",
+    })).toBe("CAIS");
+    expect(determinerCodeJournal({
+      source: "paiement",
+      modePaiement: "cheque",
+      compteDebit: "401",
+      compteCredit: "521",
+    })).toBe("BQ");
+    expect(determinerCodeJournal({
+      source: "paiement",
+      modePaiement: "virement",
+      compteDebit: "401",
+      compteCredit: "521",
+    })).toBe("BQ");
+    expect(determinerCodeJournal({
+      source: "manuel",
+      typeEcriture: "a_nouveau",
+      compteDebit: "101",
+      compteCredit: "401",
+    })).toBe("RAN");
+    expect(determinerCodeJournal({
+      source: "manuel",
+      libelle: "Régularisation",
+      compteDebit: "658",
+      compteCredit: "571",
+    })).toBe("OD");
 
     const txt = buildSageTxt(2026, "ACH", [
       ["2026-08-28", "CAIS", "PAI-001", "Paiement espèces", "571", "571", "", "", "100000", "0"],

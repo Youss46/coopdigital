@@ -1,0 +1,23 @@
+#FLG 001
+#VER 8
+#DEV XOF
+#MECG
+CAIS
+AKKO;010926;ACH-001;601000;Achat cacao producteur;100000;D;OD
+AKKO;010926;ACH-001;401000;Achat cacao producteur;100000;C;OD
+ACD;020926;ACH-002;624000;Fournitures et services;25000;D;OD
+ACD;020926;ACH-002;401000;Fournitures et services;25000;C;OD
+VKKO;030926;VTE-001;411100;Vente cacao client;500000;D;OD
+VKKO;030926;VTE-001;701000;Vente cacao client;500000;C;OD
+ODP;040926;SAL-001;661000;Charge de personnel;300000;D;OD
+ODP;040926;SAL-001;421000;Charge de personnel;300000;C;OD
+CAIS;050926;PAI-001;401000;Paiement producteur especes;150000;D;OD
+CAIS;050926;PAI-001;571000;Paiement producteur especes;150000;C;OD
+BQ;060926;PAI-002;401000;Paiement producteur cheque;175000;D;OD
+BQ;060926;PAI-002;521000;Paiement producteur cheque;175000;C;OD
+BQ;070926;PAI-003;401000;Paiement producteur virement;200000;D;OD
+BQ;070926;PAI-003;521000;Paiement producteur virement;200000;C;OD
+OD;080926;REG-001;658000;Regularisation diverse;10000;D;OD
+OD;080926;REG-001;571000;Regularisation diverse;10000;C;OD
+RAN;010126;SAGE-001;101000;A-nouveau ouverture;1000000;D;OD
+RAN;010126;SAGE-001;401000;A-nouveau ouverture;1000000;C;OD

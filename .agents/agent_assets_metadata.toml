@@ -1,0 +1,16 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "oetZ9CDhWi31KIK4Wyl3a"
+uri = "file://artifacts/api-server/test-fixtures/sage-journal-validation.txt"
+type = "text"
+title = "Fichier TXT de validation Sage 100 i7"
+description = "Fichier de test non importé dans Sage, contenant des exemples équilibrés pour AKKO, ACD, VKKO, ODP, CAIS, BQ, OD et RAN."
+logical_id = "f32dafc2-362e-4608-ac2c-5ef26489a51d"
+content_hash = "sha256:e2608f65a06e11945240a9e4cfb4d31ec6c49e0b17147b5645e5fe4ed5623a35"
+size = 1145
+mtime_ms = 1788631808084
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:4a52ef0b-528d-4ca8-8517-b1da5886b921/f32dafc2-362e-4608-ac2c-5ef26489a51d/1b46e6be-1349-4929-baff-3bc63154949d"
+storage_version_token = "1788631845392568"
+content_type = "text/plain"

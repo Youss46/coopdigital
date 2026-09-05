@@ -8,6 +8,7 @@ import ExcelJS from "exceljs";
 import Anthropic from "@anthropic-ai/sdk";
 import { genererNumeroRecu } from "../services/recuService.js";
 import { normaliserNumeroCompte } from "../lib/numeroCompte.js";
+import { determinerCodeJournal } from "../lib/sageJournal.js";
 
 class TenantError extends Error {
   readonly status = 401;
@@ -52,19 +53,6 @@ function sageTxtField(value: string | number | null | undefined): string {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^\x20-\x7E]/g, " ")
     .trim();
-}
-
-export function journalSagePourModePaiement(
-  modePaiement: string | null | undefined,
-  journalParDefaut: string,
-  compteCredit?: string | null,
-): string {
-  if (modePaiement === "especes") return "CAIS";
-  if (modePaiement === "cheque" || modePaiement === "virement") return "BQ";
-  const compte = normaliserNumeroCompte(compteCredit ?? "");
-  if (compte === "571000") return "CAIS";
-  if (compte === "521000") return "BQ";
-  return journalParDefaut;
 }
 
 export function buildSageTxt(
@@ -1934,7 +1922,11 @@ export async function exportJournalSageTxt(req: Request, res: Response): Promise
     ]);
 
     const paiementIds = ecritures
-      .filter((ecriture) => ecriture.source === "paiement" && ecriture.sourceId != null)
+      .filter((ecriture) => (
+        ecriture.source === "paiement"
+        && ecriture.sourceId != null
+        && ecriture.numeroPiece?.startsWith("PAI-")
+      ))
       .map((ecriture) => ecriture.sourceId!);
     const paiementModes = new Map<number, string | null>();
     if (paiementIds.length > 0) {
@@ -1971,13 +1963,15 @@ export async function exportJournalSageTxt(req: Request, res: Response): Promise
       const codeTiers = ecriture.tiersId && ecriture.tiersType
         ? `${ecriture.tiersType}-${ecriture.tiersId}`
         : "";
-      const journalEcriture = ecriture.source === "paiement" && ecriture.sourceId != null
-        ? journalSagePourModePaiement(
-          paiementModes.get(ecriture.sourceId),
-          journal,
-          ecriture.compteCredit,
-        )
-        : journal;
+      const journalEcriture = determinerCodeJournal({
+        source: ecriture.source,
+        typeEcriture: ecriture.typeEcriture,
+        modePaiement: ecriture.sourceId != null ? paiementModes.get(ecriture.sourceId) : undefined,
+        compteDebit: ecriture.compteDebit,
+        compteCredit: ecriture.compteCredit,
+        libelle: ecriture.libelle,
+        numeroPiece: ecriture.numeroPiece,
+      });
       const side = (compteBrut: string, debit: number, credit: number) => {
         const compte = normaliserNumeroCompte(compteBrut);
         const mapped = byCollectif?.get(compte);
