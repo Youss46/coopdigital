@@ -111,8 +111,8 @@ export async function getCompteResultat(req: Request, res: Response): Promise<vo
     const mensuel = await db.execute(sql`
       SELECT
         EXTRACT(MONTH FROM date_ecriture::date)::int AS mois,
-        COALESCE(SUM(CASE WHEN compte_credit = '701' THEN montant_fcfa ELSE 0 END), 0)::int AS "produitsFcfa",
-        COALESCE(SUM(CASE WHEN compte_debit IN ('601','621','641','661') THEN montant_fcfa ELSE 0 END), 0)::int AS "chargesFcfa"
+        COALESCE(SUM(CASE WHEN compte_credit = '701000' THEN montant_fcfa ELSE 0 END), 0)::int AS "produitsFcfa",
+        COALESCE(SUM(CASE WHEN compte_debit IN ('601000','621000','641000','661000') THEN montant_fcfa ELSE 0 END), 0)::int AS "chargesFcfa"
       FROM ecritures_comptables
       WHERE cooperative_id = ${coopId(req)} AND exercice = ${exercice}
       GROUP BY mois
@@ -146,8 +146,8 @@ export async function getFluxTresorerie(req: Request, res: Response): Promise<vo
 
     const rows = await db.execute(sql`
       SELECT
-        COALESCE(SUM(CASE WHEN compte_debit = '521' AND source = 'paiement' THEN montant_fcfa ELSE 0 END), 0)::int AS "encaissementsExportateursFcfa",
-        COALESCE(SUM(CASE WHEN compte_debit = '401' AND compte_credit IN ('521','552','571') AND source = 'paiement' THEN montant_fcfa ELSE 0 END), 0)::int AS "paiementsProducteursFcfa",
+        COALESCE(SUM(CASE WHEN compte_debit = '521000' AND source = 'paiement' THEN montant_fcfa ELSE 0 END), 0)::int AS "encaissementsExportateursFcfa",
+        COALESCE(SUM(CASE WHEN compte_debit = '401000' AND compte_credit IN ('521000','552000','571000') AND source = 'paiement' THEN montant_fcfa ELSE 0 END), 0)::int AS "paiementsProducteursFcfa",
         COALESCE((
           SELECT SUM(a.montant_octroye_fcfa)
           FROM avances a
@@ -165,8 +165,8 @@ export async function getFluxTresorerie(req: Request, res: Response): Promise<vo
             AND r.created_at >= ${dateDebut}
             AND r.created_at < ${dateFin}
         ), 0)::int AS "avancesRembourses",
-        COALESCE(SUM(CASE WHEN compte_debit IN ('521','552','571') THEN montant_fcfa ELSE 0 END), 0)::int AS "totalEntrees",
-        COALESCE(SUM(CASE WHEN compte_credit IN ('521','552','571') THEN montant_fcfa ELSE 0 END), 0)::int AS "totalSorties"
+        COALESCE(SUM(CASE WHEN compte_debit IN ('521000','552000','571000') THEN montant_fcfa ELSE 0 END), 0)::int AS "totalEntrees",
+        COALESCE(SUM(CASE WHEN compte_credit IN ('521000','552000','571000') THEN montant_fcfa ELSE 0 END), 0)::int AS "totalSorties"
       FROM ecritures_comptables
       WHERE cooperative_id = ${cooperativeId} AND exercice = ${exercice}
     `);
@@ -240,9 +240,9 @@ export async function getComparatifCampagnes(req: Request, res: Response): Promi
       ) lv ON true
       LEFT JOIN LATERAL (
         SELECT
-          SUM(CASE WHEN e.compte_credit = '701' THEN e.montant_fcfa ELSE 0 END)                  AS "caVentesFcfa",
-          SUM(CASE WHEN e.compte_debit  = '601' THEN e.montant_fcfa ELSE 0 END)                  AS "coutAchatsFcfa",
-          SUM(CASE WHEN e.compte_debit IN ('621','641','661') THEN e.montant_fcfa ELSE 0 END)    AS "chargesFcfa"
+          SUM(CASE WHEN e.compte_credit = '701000' THEN e.montant_fcfa ELSE 0 END)                  AS "caVentesFcfa",
+          SUM(CASE WHEN e.compte_debit  = '601000' THEN e.montant_fcfa ELSE 0 END)                  AS "coutAchatsFcfa",
+          SUM(CASE WHEN e.compte_debit IN ('621000','641000','661000') THEN e.montant_fcfa ELSE 0 END)    AS "chargesFcfa"
         FROM ecritures_comptables e
         WHERE e.cooperative_id = c.cooperative_id
           AND e.exercice = c.annee_debut
@@ -315,9 +315,9 @@ export async function getMargeCampagnes(req: Request, res: Response): Promise<vo
       db.execute(sql`
         SELECT
           exercice AS annee,
-          COALESCE(SUM(CASE WHEN compte_credit = '701' THEN montant_fcfa ELSE 0 END), 0)::int AS "caVentesFcfa",
-          COALESCE(SUM(CASE WHEN compte_debit = '601' THEN montant_fcfa ELSE 0 END), 0)::int AS "coutAchatsFcfa",
-          COALESCE(SUM(CASE WHEN compte_debit IN ('621','641','661') THEN montant_fcfa ELSE 0 END), 0)::int AS "chargesFcfa"
+          COALESCE(SUM(CASE WHEN compte_credit = '701000' THEN montant_fcfa ELSE 0 END), 0)::int AS "caVentesFcfa",
+          COALESCE(SUM(CASE WHEN compte_debit = '601000' THEN montant_fcfa ELSE 0 END), 0)::int AS "coutAchatsFcfa",
+          COALESCE(SUM(CASE WHEN compte_debit IN ('621000','641000','661000') THEN montant_fcfa ELSE 0 END), 0)::int AS "chargesFcfa"
         FROM ecritures_comptables
         WHERE cooperative_id = ${cid}
         GROUP BY exercice

@@ -79,23 +79,23 @@ describe("generateEcrituresLivraison — charges du bon membre délégué", () =
     });
 
     expect(state.ecritures).toEqual(expect.arrayContaining([
-      expect.objectContaining({ libelleProppose: "Achat cacao – Awa Koné", compteDebitPropose: "601", compteCreditPropose: "401", montantFcfa: 10_000 }),
-      expect.objectContaining({ libelleProppose: "Carburant avancé – Awa Koné", compteDebitPropose: "4091", compteCreditPropose: "521", montantFcfa: 8_000 }),
-      expect.objectContaining({ libelleProppose: "Retenue carburant – Awa Koné", compteDebitPropose: "401", compteCreditPropose: "4091", montantFcfa: 8_000 }),
-      expect.objectContaining({ libelleProppose: "Transport complémentaire avancé – Awa Koné", compteDebitPropose: "4091", compteCreditPropose: "521", montantFcfa: 6_000 }),
-      expect.objectContaining({ libelleProppose: "Retenue transport complémentaire – Awa Koné", compteDebitPropose: "401", compteCreditPropose: "4091", montantFcfa: 2_000 }),
+      expect.objectContaining({ libelleProppose: "Achat cacao – Awa Koné", compteDebitPropose: "601000", compteCreditPropose: "401000", montantFcfa: 10_000 }),
+      expect.objectContaining({ libelleProppose: "Carburant avancé – Awa Koné", compteDebitPropose: "409100", compteCreditPropose: "521000", montantFcfa: 8_000 }),
+      expect.objectContaining({ libelleProppose: "Retenue carburant – Awa Koné", compteDebitPropose: "401000", compteCreditPropose: "409100", montantFcfa: 8_000 }),
+      expect.objectContaining({ libelleProppose: "Transport complémentaire avancé – Awa Koné", compteDebitPropose: "409100", compteCreditPropose: "521000", montantFcfa: 6_000 }),
+      expect.objectContaining({ libelleProppose: "Retenue transport complémentaire – Awa Koné", compteDebitPropose: "401000", compteCreditPropose: "409100", montantFcfa: 2_000 }),
     ]));
     expect(state.ecritures.some((e) => e.compteCreditPropose === "758")).toBe(false);
 
     const recoveries401 = state.ecritures
-      .filter((e) => e.compteDebitPropose === "401")
+      .filter((e) => e.compteDebitPropose === "401000")
       .reduce((total, e) => total + Number(e.montantFcfa), 0);
     expect(recoveries401).toBe(10_000);
 
     const creance4091 = state.ecritures.reduce((solde, e) => {
       const montant = Number(e.montantFcfa);
-      if (e.compteDebitPropose === "4091") return solde + montant;
-      if (e.compteCreditPropose === "4091") return solde - montant;
+      if (e.compteDebitPropose === "409100") return solde + montant;
+      if (e.compteCreditPropose === "409100") return solde - montant;
       return solde;
     }, 0);
     expect(creance4091).toBe(4_000);
@@ -126,19 +126,19 @@ describe("generateEcrituresLivraison — charges du bon membre délégué", () =
     expect(state.ecritures).toEqual(expect.arrayContaining([
       expect.objectContaining({
         libelleProppose: "Carburant avancé – Mariam Yao",
-        compteDebitPropose: "4092",
-        compteCreditPropose: "571",
+        compteDebitPropose: "409200",
+        compteCreditPropose: "571000",
         montantFcfa: 5_000,
       }),
       expect.objectContaining({
         libelleProppose: "Retenue carburant – Mariam Yao",
-        compteDebitPropose: "401",
-        compteCreditPropose: "4092",
+        compteDebitPropose: "401000",
+        compteCreditPropose: "409200",
         montantFcfa: 5_000,
       }),
     ]));
     expect(state.ecritures.some((e) => e.compteCreditPropose === "758")).toBe(false);
-    expect(state.ecritures.some((e) => e.compteDebitPropose === "4012")).toBe(false);
+    expect(state.ecritures.some((e) => e.compteDebitPropose === "401200")).toBe(false);
   });
 
   it("utilise le même compte de dette personnalisé pour l'achat et sa retenue", async () => {
@@ -170,20 +170,20 @@ describe("generateEcrituresLivraison — charges du bon membre délégué", () =
     expect(state.ecritures).toEqual(expect.arrayContaining([
       expect.objectContaining({
         libelleProppose: "Achat cacao – Akissi Koffi",
-        compteDebitPropose: "6012",
-        compteCreditPropose: "4012",
+        compteDebitPropose: "601200",
+        compteCreditPropose: "401200",
         montantFcfa: 20_000,
       }),
       expect.objectContaining({
         libelleProppose: "Retenue carburant – Akissi Koffi",
-        compteDebitPropose: "4012",
-        compteCreditPropose: "4092",
+        compteDebitPropose: "401200",
+        compteCreditPropose: "409200",
         montantFcfa: 5_000,
       }),
     ]));
     expect(state.ecritures.some((e) => e.compteCreditPropose === "758")).toBe(false);
 
-    expect(state.livraisonUpdate).toEqual({ compteDetteProducteur: "4012" });
+    expect(state.livraisonUpdate).toEqual({ compteDetteProducteur: "401200" });
     state.params.set("livraisons:achat_cacao_producteur", {
       compteDebit: "601",
       compteCredit: "401",
@@ -211,11 +211,11 @@ describe("generateEcrituresLivraison — charges du bon membre délégué", () =
       if (e.compteDebitPropose === "4012") return solde - montant;
       return solde;
     }, 0);
-    expect(compteDettePaiement).toBe("4012");
+    expect(compteDettePaiement).toBe("401200");
     expect(soldeDette4012).toBe(0);
     expect(state.ecritures.some((e) =>
       e.libelleProppose === "Paiement producteur – Akissi Koffi" &&
-      e.compteDebitPropose === "401"
+      e.compteDebitPropose === "401000"
     )).toBe(false);
   });
 
@@ -240,14 +240,14 @@ describe("generateEcrituresLivraison — charges du bon membre délégué", () =
     expect(state.ecritures).toEqual(expect.arrayContaining([
       expect.objectContaining({
         libelleProppose: "Autres charges avancé – Aya N'Dri",
-        compteDebitPropose: "4091",
-        compteCreditPropose: "521",
+        compteDebitPropose: "409100",
+        compteCreditPropose: "521000",
         montantFcfa: 3_000,
       }),
       expect.objectContaining({
         libelleProppose: "Retenue autres charges – Aya N'Dri",
-        compteDebitPropose: "401",
-        compteCreditPropose: "4091",
+        compteDebitPropose: "401000",
+        compteCreditPropose: "409100",
         montantFcfa: 3_000,
       }),
     ]));

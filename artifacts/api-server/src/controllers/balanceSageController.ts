@@ -14,6 +14,7 @@ import {
 } from "@workspace/db";
 import { usersTable } from "@workspace/db";
 import { parseBalanceSage, type BalanceSageMapping } from "../services/balanceSageService.js";
+import { normaliserNumeroCompte } from "../lib/numeroCompte.js";
 
 export const balanceSageUpload = multer({
   storage: multer.memoryStorage(),
@@ -367,7 +368,7 @@ export async function prepareBalanceSageReprise(req: Request, res: Response): Pr
     auditContext = { cooperativeId, importId: imp.id, exercice: imp.exercice, action: "preparation" };
     if (imp.mode !== "reprise") throw new Error("Seul un import en mode reprise peut générer des à-nouveaux");
     if (imp.statut === "validee") throw new Error("Cette reprise est déjà validée");
-    const compteContrepartie = String(req.body["compteContrepartie"] ?? "").trim();
+    const compteContrepartie = normaliserNumeroCompte(String(req.body["compteContrepartie"] ?? ""));
     if (!compteContrepartie) throw new Error("Le compte de contrepartie est obligatoire");
     const dateReprise = String(req.body["dateReprise"] ?? `${imp.exercice}-01-01`);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dateReprise)) throw new Error("Date de reprise invalide");

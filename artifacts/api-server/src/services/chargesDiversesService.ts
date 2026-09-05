@@ -11,6 +11,7 @@ import {
 } from "@workspace/db";
 import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
 import { getTauxPpsi } from "./fiscaliteService.js";
+import { normaliserNumeroCompte } from "../lib/numeroCompte.js";
 
 export type CreateChargeInput = {
   dateCharge: string;
@@ -133,23 +134,23 @@ export async function validerChargeDiverses(
   const brut = Math.round(parseFloat(charge.montantFcfa));
   const reglement = isPpsi ? calculerReglementPpsi(brut, tauxPpsi!) : null;
   const compteParType = {
-    caisse: "571",
-    banque: "521",
-    mobile_marchand: "552",
+    caisse: "571000",
+    banque: "521000",
+    mobile_marchand: "552000",
   } as const;
-  const compteCredit = charge.compteCredit;
+  const compteCredit = normaliserNumeroCompte(charge.compteCredit);
   const compteTresorerieType = charge.compteTresorerieType as keyof typeof compteParType | null;
   const compteTresorerieId = charge.compteTresorerieId;
   const isCredit = charge.modePaiement === "credit";
   const mouvementTresorerie = !isCredit;
 
-  if (isCredit && compteCredit !== "401") {
+  if (isCredit && compteCredit !== "401000") {
     throw new Error("Une charge à crédit doit utiliser le compte 401 — Fournisseurs");
   }
-  if (!isCredit && compteCredit === "401") {
+  if (!isCredit && compteCredit === "401000") {
     throw new Error("Le compte 401 — Fournisseurs nécessite le mode de paiement « À crédit »");
   }
-  if (compteCredit === "401" && !charge.tiers?.trim()) {
+  if (compteCredit === "401000" && !charge.tiers?.trim()) {
     throw new Error("Le fournisseur ou le tiers est requis pour une charge à crédit");
   }
   if (mouvementTresorerie) {

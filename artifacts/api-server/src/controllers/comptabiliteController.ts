@@ -7,6 +7,7 @@ import { assignerNumeroPiece, assignerNumerosPieces } from "../lib/numeroPiece";
 import ExcelJS from "exceljs";
 import Anthropic from "@anthropic-ai/sdk";
 import { genererNumeroRecu } from "../services/recuService.js";
+import { normaliserNumeroCompte } from "../lib/numeroCompte.js";
 
 class TenantError extends Error {
   readonly status = 401;
@@ -28,12 +29,12 @@ const TIERS_TYPES = ["membre", "membre_delegue", "delegue", "personnel", "export
 type TiersType = typeof TIERS_TYPES[number];
 
 const COMPTES_COLLECTIFS_PAR_TYPE: Record<TiersType, readonly string[]> = {
-  membre: ["401", "4091", "4092"],
-  membre_delegue: ["401", "4091", "4092"],
-  delegue: ["401", "4091", "4092"],
-  personnel: ["421"],
-  exportateur: ["411", "4111"],
-  fournisseur_ext: ["401"],
+  membre: ["401000", "409100", "409200"],
+  membre_delegue: ["401000", "409100", "409200"],
+  delegue: ["401000", "409100", "409200"],
+  personnel: ["421000"],
+  exportateur: ["411000", "411100"],
+  fournisseur_ext: ["401000"],
 };
 
 function isTiersType(value: string): value is TiersType {
@@ -67,7 +68,7 @@ export function buildSageTxt(
       date,
       journal,
       line[2] || "",
-      line[5] || line[4] || "",
+       normaliserNumeroCompte(line[5] || line[4] || ""),
       line[3] || "",
       line[8] || "0",
       line[9] || "0",
@@ -382,9 +383,9 @@ export async function getMargeCollecte(req: Request, res: Response): Promise<voi
 
     const rows = await db.execute(sql`
       SELECT
-        COALESCE(SUM(CASE WHEN compte_credit = '701' THEN montant_fcfa ELSE 0 END), 0)::int AS "caVentesFcfa",
-        COALESCE(SUM(CASE WHEN compte_debit = '601' THEN montant_fcfa ELSE 0 END), 0)::int AS "coutAchatsFcfa",
-        COALESCE(SUM(CASE WHEN compte_debit IN ('621', '641', '661') THEN montant_fcfa ELSE 0 END), 0)::int AS "chargesFcfa"
+        COALESCE(SUM(CASE WHEN compte_credit = '701000' THEN montant_fcfa ELSE 0 END), 0)::int AS "caVentesFcfa",
+        COALESCE(SUM(CASE WHEN compte_debit = '601000' THEN montant_fcfa ELSE 0 END), 0)::int AS "coutAchatsFcfa",
+        COALESCE(SUM(CASE WHEN compte_debit IN ('621000', '641000', '661000') THEN montant_fcfa ELSE 0 END), 0)::int AS "chargesFcfa"
       FROM ecritures_comptables
       WHERE cooperative_id = ${coopId(req)} AND exercice = ${exercice}
     `);
@@ -408,10 +409,10 @@ export async function getTresorerie(req: Request, res: Response): Promise<void> 
   try {
     const rows = await db.execute(sql`
       SELECT
-        COALESCE(SUM(CASE WHEN compte_debit = '521' THEN montant_fcfa ELSE 0 END) -
-                 SUM(CASE WHEN compte_credit = '521' THEN montant_fcfa ELSE 0 END), 0)::int AS "soldeBanqueFcfa",
-        COALESCE(SUM(CASE WHEN compte_debit = '571' THEN montant_fcfa ELSE 0 END) -
-                 SUM(CASE WHEN compte_credit = '571' THEN montant_fcfa ELSE 0 END), 0)::int AS "soldeCaisseFcfa"
+        COALESCE(SUM(CASE WHEN compte_debit = '521000' THEN montant_fcfa ELSE 0 END) -
+                 SUM(CASE WHEN compte_credit = '521000' THEN montant_fcfa ELSE 0 END), 0)::int AS "soldeBanqueFcfa",
+        COALESCE(SUM(CASE WHEN compte_debit = '571000' THEN montant_fcfa ELSE 0 END) -
+                 SUM(CASE WHEN compte_credit = '571000' THEN montant_fcfa ELSE 0 END), 0)::int AS "soldeCaisseFcfa"
       FROM ecritures_comptables
       WHERE cooperative_id = ${coopId(req)}
     `);
@@ -1324,8 +1325,8 @@ export async function cloturerExercice(req: Request, res: Response): Promise<voi
     const entries: EntreeClot[] = [];
 
     // ── Phase 4A : Résultat d'exploitation → 135 ─────────────────────────────
-    entries.push(...ec(`CLOT-${annee}-E1-PRD`, `Clôture exploitation ${annee}`, "701", "135", prodExpl));
-    entries.push(...ec(`CLOT-${annee}-E1-CHG`, `Clôture exploitation ${annee}`, "135", "601", chgExpl));
+    entries.push(...ec(`CLOT-${annee}-E1-PRD`, `Clôture exploitation ${annee}`, "701000", "135000", prodExpl));
+    entries.push(...ec(`CLOT-${annee}-E1-CHG`, `Clôture exploitation ${annee}`, "135000", "601000", chgExpl));
 
     // ── Phase 4B : Résultat financier → 136 ──────────────────────────────────
     entries.push(...ec(`CLOT-${annee}-E2-PRD`, `Clôture financier ${annee}`, "771", "136", prodFin));
@@ -1520,13 +1521,13 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
           COALESCE(u.nom, '—')                                                  AS nom,
           COALESCE(u.prenoms, '')                                               AS prenoms,
           ''                                                                    AS code,
-          SUM(CASE WHEN e.compte_credit IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END)::integer AS "totalDu",
-          SUM(CASE WHEN e.compte_debit  IN ('401','4091','4092') AND e.source = 'paiement'
+          SUM(CASE WHEN e.compte_credit IN ('401000','409100','409200') THEN e.montant_fcfa ELSE 0 END)::integer AS "totalDu",
+          SUM(CASE WHEN e.compte_debit  IN ('401000','409100','409200') AND e.source = 'paiement'
                    THEN e.montant_fcfa ELSE 0 END)::integer                    AS "totalPaye",
-          SUM(CASE WHEN e.compte_debit  = '4091' THEN e.montant_fcfa ELSE 0 END)::integer AS "totalIntrantsDus",
-          SUM(CASE WHEN e.compte_credit = '4091' THEN e.montant_fcfa ELSE 0 END)::integer AS "totalIntrantsRemb",
-          (SUM(CASE WHEN e.compte_credit IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END)
-           - SUM(CASE WHEN e.compte_debit  IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END))::integer AS "soldeNet"
+          SUM(CASE WHEN e.compte_debit  = '409100' THEN e.montant_fcfa ELSE 0 END)::integer AS "totalIntrantsDus",
+          SUM(CASE WHEN e.compte_credit = '409100' THEN e.montant_fcfa ELSE 0 END)::integer AS "totalIntrantsRemb",
+          (SUM(CASE WHEN e.compte_credit IN ('401000','409100','409200') THEN e.montant_fcfa ELSE 0 END)
+           - SUM(CASE WHEN e.compte_debit  IN ('401000','409100','409200') THEN e.montant_fcfa ELSE 0 END))::integer AS "soldeNet"
         FROM ecritures_comptables e
         LEFT JOIN users u ON u.id = e.tiers_id
         WHERE e.cooperative_id = ${coop}
@@ -1534,8 +1535,8 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
           ${exerciceCond}
         GROUP BY e.tiers_id, u.nom, u.prenoms
         ORDER BY
-          ABS(SUM(CASE WHEN e.compte_credit IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END)
-              - SUM(CASE WHEN e.compte_debit  IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END)) DESC,
+          ABS(SUM(CASE WHEN e.compte_credit IN ('401000','409100','409200') THEN e.montant_fcfa ELSE 0 END)
+              - SUM(CASE WHEN e.compte_debit  IN ('401000','409100','409200') THEN e.montant_fcfa ELSE 0 END)) DESC,
           u.nom
       `);
     } else if (tiersType === "exportateur") {
@@ -1546,12 +1547,12 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
           COALESCE(ex.nom, '—')                                                  AS nom,
           ''                                                                     AS prenoms,
           COALESCE(ex.pays, '')                                                  AS code,
-          SUM(CASE WHEN e.compte_debit  IN ('411','4111') THEN e.montant_fcfa ELSE 0 END)::integer AS "totalDu",
-          SUM(CASE WHEN e.compte_credit IN ('411','4111') THEN e.montant_fcfa ELSE 0 END)::integer AS "totalPaye",
+          SUM(CASE WHEN e.compte_debit  IN ('411000','411100') THEN e.montant_fcfa ELSE 0 END)::integer AS "totalDu",
+          SUM(CASE WHEN e.compte_credit IN ('411000','411100') THEN e.montant_fcfa ELSE 0 END)::integer AS "totalPaye",
           0::integer                                                             AS "totalIntrantsDus",
           0::integer                                                             AS "totalIntrantsRemb",
-          (SUM(CASE WHEN e.compte_debit  IN ('411','4111') THEN e.montant_fcfa ELSE 0 END)
-           - SUM(CASE WHEN e.compte_credit IN ('411','4111') THEN e.montant_fcfa ELSE 0 END))::integer AS "soldeNet"
+          (SUM(CASE WHEN e.compte_debit  IN ('411000','411100') THEN e.montant_fcfa ELSE 0 END)
+           - SUM(CASE WHEN e.compte_credit IN ('411000','411100') THEN e.montant_fcfa ELSE 0 END))::integer AS "soldeNet"
         FROM ecritures_comptables e
         LEFT JOIN exportateurs ex ON ex.id = e.tiers_id
         WHERE e.cooperative_id = ${coop}
@@ -1559,8 +1560,8 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
           ${exerciceCond}
         GROUP BY e.tiers_id, ex.nom, ex.pays
         ORDER BY
-          ABS(SUM(CASE WHEN e.compte_debit  IN ('411','4111') THEN e.montant_fcfa ELSE 0 END)
-              - SUM(CASE WHEN e.compte_credit IN ('411','4111') THEN e.montant_fcfa ELSE 0 END)) DESC,
+          ABS(SUM(CASE WHEN e.compte_debit  IN ('411000','411100') THEN e.montant_fcfa ELSE 0 END)
+              - SUM(CASE WHEN e.compte_credit IN ('411000','411100') THEN e.montant_fcfa ELSE 0 END)) DESC,
           ex.nom
       `);
     } else if (tiersType === "fournisseur_ext") {
@@ -1571,13 +1572,13 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
           COALESCE(f.nom, '—')                                                   AS nom,
           COALESCE(f.prenoms, '')                                                AS prenoms,
           COALESCE(f.code, '')                                                   AS code,
-          SUM(CASE WHEN e.compte_credit = '401' THEN e.montant_fcfa ELSE 0 END)::integer AS "totalDu",
-          SUM(CASE WHEN e.compte_debit  = '401' AND e.source = 'paiement'
+          SUM(CASE WHEN e.compte_credit = '401000' THEN e.montant_fcfa ELSE 0 END)::integer AS "totalDu",
+          SUM(CASE WHEN e.compte_debit  = '401000' AND e.source = 'paiement'
                    THEN e.montant_fcfa ELSE 0 END)::integer                     AS "totalPaye",
           0::integer                                                             AS "totalIntrantsDus",
           0::integer                                                             AS "totalIntrantsRemb",
-          (SUM(CASE WHEN e.compte_credit = '401' THEN e.montant_fcfa ELSE 0 END)
-           - SUM(CASE WHEN e.compte_debit  = '401' THEN e.montant_fcfa ELSE 0 END))::integer AS "soldeNet"
+          (SUM(CASE WHEN e.compte_credit = '401000' THEN e.montant_fcfa ELSE 0 END)
+           - SUM(CASE WHEN e.compte_debit  = '401000' THEN e.montant_fcfa ELSE 0 END))::integer AS "soldeNet"
         FROM ecritures_comptables e
         LEFT JOIN fournisseurs f ON f.id = e.tiers_id
         WHERE e.cooperative_id = ${coop}
@@ -1585,8 +1586,8 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
           ${exerciceCond}
         GROUP BY e.tiers_id, f.nom, f.prenoms, f.code
         ORDER BY
-          ABS(SUM(CASE WHEN e.compte_credit = '401' THEN e.montant_fcfa ELSE 0 END)
-              - SUM(CASE WHEN e.compte_debit  = '401' THEN e.montant_fcfa ELSE 0 END)) DESC,
+          ABS(SUM(CASE WHEN e.compte_credit = '401000' THEN e.montant_fcfa ELSE 0 END)
+              - SUM(CASE WHEN e.compte_debit  = '401000' THEN e.montant_fcfa ELSE 0 END)) DESC,
           f.nom
       `);
     } else {
@@ -1604,13 +1605,13 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
           COALESCE(m.nom,          '—')                                         AS nom,
           COALESCE(m.prenoms,      '')                                          AS prenoms,
           COALESCE(m.carte_numero, '')                                          AS code,
-          SUM(CASE WHEN e.compte_credit IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END)::integer AS "totalDu",
-          SUM(CASE WHEN e.compte_debit  IN ('401','4091','4092') AND e.source = 'paiement'
+          SUM(CASE WHEN e.compte_credit IN ('401000','409100','409200') THEN e.montant_fcfa ELSE 0 END)::integer AS "totalDu",
+          SUM(CASE WHEN e.compte_debit  IN ('401000','409100','409200') AND e.source = 'paiement'
                    THEN e.montant_fcfa ELSE 0 END)::integer                    AS "totalPaye",
-          SUM(CASE WHEN e.compte_debit  = '4091' THEN e.montant_fcfa ELSE 0 END)::integer AS "totalIntrantsDus",
-          SUM(CASE WHEN e.compte_credit = '4091' THEN e.montant_fcfa ELSE 0 END)::integer AS "totalIntrantsRemb",
-          (SUM(CASE WHEN e.compte_credit IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END)
-           - SUM(CASE WHEN e.compte_debit  IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END))::integer AS "soldeNet"
+          SUM(CASE WHEN e.compte_debit  = '409100' THEN e.montant_fcfa ELSE 0 END)::integer AS "totalIntrantsDus",
+          SUM(CASE WHEN e.compte_credit = '409100' THEN e.montant_fcfa ELSE 0 END)::integer AS "totalIntrantsRemb",
+          (SUM(CASE WHEN e.compte_credit IN ('401000','409100','409200') THEN e.montant_fcfa ELSE 0 END)
+           - SUM(CASE WHEN e.compte_debit  IN ('401000','409100','409200') THEN e.montant_fcfa ELSE 0 END))::integer AS "soldeNet"
         FROM (
           SELECT
             e.tiers_id,
@@ -1668,7 +1669,7 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
           SELECT
             a.membre_id AS tiers_id,
             '0000' AS compte_credit,
-            '4091' AS compte_debit,
+            '409100' AS compte_debit,
             a.solde_restant_fcfa AS montant_fcfa,
             'avance' AS source
           FROM avances a
@@ -1699,7 +1700,7 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
           -- Même secours pour une livraison non encore comptabilisée.
           SELECT
             l.membre_id AS tiers_id,
-            '401' AS compte_credit,
+            '401000' AS compte_credit,
             '0000' AS compte_debit,
             COALESCE(l.montant_restant, l.montant_net_fcfa)::integer AS montant_fcfa,
             'livraison' AS source
@@ -1730,8 +1731,8 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
            ${categorieMembreCond}
         GROUP BY e.tiers_id, m.nom, m.prenoms, m.carte_numero
         ORDER BY
-          ABS(SUM(CASE WHEN e.compte_credit IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END)
-              - SUM(CASE WHEN e.compte_debit  IN ('401','4091','4092') THEN e.montant_fcfa ELSE 0 END)) DESC,
+          ABS(SUM(CASE WHEN e.compte_credit IN ('401000','409100','409200') THEN e.montant_fcfa ELSE 0 END)
+              - SUM(CASE WHEN e.compte_debit  IN ('401000','409100','409200') THEN e.montant_fcfa ELSE 0 END)) DESC,
           m.nom
       `);
     }
@@ -1928,9 +1929,13 @@ export async function exportJournalSageTxt(req: Request, res: Response): Promise
       const codeTiers = ecriture.tiersId && ecriture.tiersType
         ? `${ecriture.tiersType}-${ecriture.tiersId}`
         : "";
-      const side = (compte: string, debit: number, credit: number) => {
+      const side = (compteBrut: string, debit: number, credit: number) => {
+        const compte = normaliserNumeroCompte(compteBrut);
         const mapped = byCollectif?.get(compte);
-        if (tierKey && ["401", "4091", "4092", "411", "4111", "421"].includes(compte) && !mapped) {
+        if (tierKey && COMPTES_COLLECTIFS_PAR_TYPE.exportateur.concat(
+          COMPTES_COLLECTIFS_PAR_TYPE.membre,
+          COMPTES_COLLECTIFS_PAR_TYPE.personnel,
+        ).includes(compte) && !mapped) {
           missing.add(`${codeTiers} (${compte})`);
         }
         lines.push([
@@ -1997,7 +2002,7 @@ export async function getGrandLivreTiers(req: Request, res: Response): Promise<v
       .orderBy(asc(ecrituresComptablesTable.dateEcriture), asc(ecrituresComptablesTable.id));
 
     // Comptes "membre" OHADA (classe 4 fournisseur/avances)
-    const COMPTES_FOURNISSEUR = new Set(["401", "4091", "4092"]);
+    const COMPTES_FOURNISSEUR = new Set(["401000", "409100", "409200"]);
 
     // Pour chaque écriture, on calcule l'impact du point de vue du membre :
     //   crédit sur compte fournisseur = la coop doit de l'argent au membre (+)
@@ -2029,8 +2034,8 @@ export async function getGrandLivreTiers(req: Request, res: Response): Promise<v
     // Totaux synthétiques
     const totalDuMembre      = ecritures.filter(e => COMPTES_FOURNISSEUR.has(e.compteCredit)).reduce((s, e) => s + e.montantFcfa, 0);
     const totalPaye          = ecritures.filter(e => COMPTES_FOURNISSEUR.has(e.compteDebit) && e.source === "paiement").reduce((s, e) => s + e.montantFcfa, 0);
-    const totalIntrantsDus   = ecritures.filter(e => e.compteDebit === "4091").reduce((s, e) => s + e.montantFcfa, 0);
-    const totalIntrantsRemb  = ecritures.filter(e => e.compteCredit === "4091").reduce((s, e) => s + e.montantFcfa, 0);
+    const totalIntrantsDus   = ecritures.filter(e => e.compteDebit === "409100").reduce((s, e) => s + e.montantFcfa, 0);
+    const totalIntrantsRemb  = ecritures.filter(e => e.compteCredit === "409100").reduce((s, e) => s + e.montantFcfa, 0);
 
     res.json({
       tiersId, tiersType,
@@ -2236,7 +2241,7 @@ export async function declencherRistournes(req: Request, res: Response): Promise
         numeroPiece:   `RIST-${annee + 1}`,
         libelle:       `Paiement ristournes exercice ${annee} — ${parts.length} membres`,
         compteDebit:   "4461",
-        compteCredit:  "521",
+        compteCredit:  "521000",
         montantFcfa:   montantTotal,
         source:        "manuel",
         sourceId:      null,

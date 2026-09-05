@@ -385,9 +385,9 @@ export async function generateRapportMensuel(cooperativeId: number, mois: number
   ]);
 
   const tonnage    = livraisons.reduce((s, l) => s + parseFloat(l.poidsKg), 0);
-  const caProduits = ecritures.filter(e => e.compteCredit === "701").reduce((s, e) => s + e.montantFcfa, 0);
-  const coutAchats = ecritures.filter(e => e.compteDebit === "601").reduce((s, e) => s + e.montantFcfa, 0);
-  const chargesPersonnelMois = ecritures.filter(e => ["621","641","661"].includes(e.compteDebit ?? "")).reduce((s, e) => s + e.montantFcfa, 0);
+  const caProduits = ecritures.filter(e => e.compteCredit === "701000").reduce((s, e) => s + e.montantFcfa, 0);
+  const coutAchats = ecritures.filter(e => e.compteDebit === "601000").reduce((s, e) => s + e.montantFcfa, 0);
+  const chargesPersonnelMois = ecritures.filter(e => ["621000","641000","661000"].includes(e.compteDebit ?? "")).reduce((s, e) => s + e.montantFcfa, 0);
   const itRow = intrantsMois.rows[0] as Record<string, string>;
   const intrantsDistrib  = Number(itRow?.intrants_distribues ?? 0);
   const intrantsRecouvres = Number(itRow?.intrants_recouvres ?? 0);
@@ -558,20 +558,20 @@ export async function generateBilanCampagne(cooperativeId: number, annee: number
   ]);
 
   // Agrégats
-  const ca701      = ecritures.filter(e => e.compteCredit === "701").reduce((s, e) => s + e.montantFcfa, 0);
-  const couts601   = ecritures.filter(e => e.compteDebit === "601").reduce((s, e) => s + e.montantFcfa, 0);
-  const charges    = ecritures.filter(e => ["621","641","661"].includes(e.compteDebit)).reduce((s, e) => s + e.montantFcfa, 0);
+  const ca701      = ecritures.filter(e => e.compteCredit === "701000").reduce((s, e) => s + e.montantFcfa, 0);
+  const couts601   = ecritures.filter(e => e.compteDebit === "601000").reduce((s, e) => s + e.montantFcfa, 0);
+  const charges    = ecritures.filter(e => ["621000","641000","661000"].includes(e.compteDebit)).reduce((s, e) => s + e.montantFcfa, 0);
   const resultatNet = ca701 - couts601 - charges;
-  const soldeBanque = ecritures.filter(e => e.compteDebit === "521").reduce((s, e) => s + e.montantFcfa, 0)
-    - ecritures.filter(e => e.compteCredit === "521").reduce((s, e) => s + e.montantFcfa, 0);
+  const soldeBanque = ecritures.filter(e => e.compteDebit === "521000").reduce((s, e) => s + e.montantFcfa, 0)
+    - ecritures.filter(e => e.compteCredit === "521000").reduce((s, e) => s + e.montantFcfa, 0);
 
   // Ventilation mensuelle
   const parMois: Record<number, { ca: number; achats: number }> = {};
   for (let m = 1; m <= 12; m++) parMois[m] = { ca: 0, achats: 0 };
   ecritures.forEach(e => {
     const m = new Date(e.dateEcriture).getMonth() + 1;
-    if (e.compteCredit === "701") parMois[m]!.ca += e.montantFcfa;
-    if (e.compteDebit === "601") parMois[m]!.achats += e.montantFcfa;
+    if (e.compteCredit === "701000") parMois[m]!.ca += e.montantFcfa;
+    if (e.compteDebit === "601000") parMois[m]!.achats += e.montantFcfa;
   });
 
   // Suppress unused variable warning
@@ -654,10 +654,10 @@ export async function generateBilanCampagne(cooperativeId: number, annee: number
   doc.fontSize(11).fillColor(VERT).font("Helvetica-Bold").text("Bilan simplifié OHADA", MARGIN, y);
   y += 18;
   const bilanData = [
-    { sect: "ACTIF", label: "Créances exportateurs (4111)", montant: ecritures.filter(e => e.compteDebit === "4111").reduce((s, e) => s + e.montantFcfa, 0) - ecritures.filter(e => e.compteCredit === "4111").reduce((s, e) => s + e.montantFcfa, 0) },
-    { sect: "ACTIF", label: "Avances producteurs (4091)", montant: ecritures.filter(e => e.compteDebit === "4091").reduce((s, e) => s + e.montantFcfa, 0) - ecritures.filter(e => e.compteCredit === "4091").reduce((s, e) => s + e.montantFcfa, 0) },
+    { sect: "ACTIF", label: "Créances exportateurs (411100)", montant: ecritures.filter(e => e.compteDebit === "411100").reduce((s, e) => s + e.montantFcfa, 0) - ecritures.filter(e => e.compteCredit === "411100").reduce((s, e) => s + e.montantFcfa, 0) },
+    { sect: "ACTIF", label: "Avances producteurs (409100)", montant: ecritures.filter(e => e.compteDebit === "409100").reduce((s, e) => s + e.montantFcfa, 0) - ecritures.filter(e => e.compteCredit === "409100").reduce((s, e) => s + e.montantFcfa, 0) },
     { sect: "ACTIF", label: "Banque (521)", montant: soldeBanque },
-    { sect: "PASSIF", label: "Dettes fournisseurs producteurs (401)", montant: ecritures.filter(e => e.compteCredit === "401").reduce((s, e) => s + e.montantFcfa, 0) - ecritures.filter(e => e.compteDebit === "401").reduce((s, e) => s + e.montantFcfa, 0) },
+    { sect: "PASSIF", label: "Dettes fournisseurs producteurs (401000)", montant: ecritures.filter(e => e.compteCredit === "401000").reduce((s, e) => s + e.montantFcfa, 0) - ecritures.filter(e => e.compteDebit === "401000").reduce((s, e) => s + e.montantFcfa, 0) },
     { sect: "PASSIF", label: "Résultat de l'exercice (130)", montant: resultatNet },
   ];
   bilanData.forEach((row) => {
@@ -3936,8 +3936,8 @@ export async function generateCompteResultatOHADA(cooperativeId: number, exercic
   const mensuel = await db.execute(sql`
     SELECT
       EXTRACT(MONTH FROM date_ecriture::date)::int AS mois,
-      COALESCE(SUM(CASE WHEN compte_credit = '701' THEN montant_fcfa ELSE 0 END), 0)::int AS "produitsFcfa",
-      COALESCE(SUM(CASE WHEN compte_debit IN ('601','621','641','661') THEN montant_fcfa ELSE 0 END), 0)::int AS "chargesFcfa"
+      COALESCE(SUM(CASE WHEN compte_credit = '701000' THEN montant_fcfa ELSE 0 END), 0)::int AS "produitsFcfa",
+      COALESCE(SUM(CASE WHEN compte_debit IN ('601000','621000','641000','661000') THEN montant_fcfa ELSE 0 END), 0)::int AS "chargesFcfa"
     FROM ecritures_comptables
     WHERE cooperative_id = ${cooperativeId} AND exercice = ${exercice}
     GROUP BY mois ORDER BY mois
@@ -4060,8 +4060,8 @@ export async function generateFluxTresoreiriePdf(cooperativeId: number, exercice
   const dateFin = `${exercice + 1}-01-01`;
   const rows = await db.execute(sql`
     SELECT
-      COALESCE(SUM(CASE WHEN compte_debit  = '521' AND source = 'paiement'  THEN montant_fcfa ELSE 0 END), 0)::int AS "encaissementsExportateurs",
-      COALESCE(SUM(CASE WHEN compte_debit = '401' AND compte_credit IN ('521','552','571') AND source = 'paiement' THEN montant_fcfa ELSE 0 END), 0)::int AS "paiementsProducteurs",
+      COALESCE(SUM(CASE WHEN compte_debit  = '521000' AND source = 'paiement'  THEN montant_fcfa ELSE 0 END), 0)::int AS "encaissementsExportateurs",
+      COALESCE(SUM(CASE WHEN compte_debit = '401000' AND compte_credit IN ('521000','552000','571000') AND source = 'paiement' THEN montant_fcfa ELSE 0 END), 0)::int AS "paiementsProducteurs",
       COALESCE((
         SELECT SUM(a.montant_octroye_fcfa)
         FROM avances a
@@ -4079,8 +4079,8 @@ export async function generateFluxTresoreiriePdf(cooperativeId: number, exercice
           AND r.created_at >= ${dateDebut}
           AND r.created_at < ${dateFin}
       ), 0)::int AS "avancesRembourses",
-      COALESCE(SUM(CASE WHEN compte_debit IN ('521','552','571') THEN montant_fcfa ELSE 0 END), 0)::int AS "totalEntrees",
-      COALESCE(SUM(CASE WHEN compte_credit IN ('521','552','571') THEN montant_fcfa ELSE 0 END), 0)::int AS "totalSorties"
+      COALESCE(SUM(CASE WHEN compte_debit IN ('521000','552000','571000') THEN montant_fcfa ELSE 0 END), 0)::int AS "totalEntrees",
+      COALESCE(SUM(CASE WHEN compte_credit IN ('521000','552000','571000') THEN montant_fcfa ELSE 0 END), 0)::int AS "totalSorties"
     FROM ecritures_comptables
     WHERE cooperative_id = ${cooperativeId} AND exercice = ${exercice}
   `);

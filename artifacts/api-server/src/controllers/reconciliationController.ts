@@ -175,7 +175,7 @@ export async function postSuggestionsIA(req: Request, res: Response): Promise<vo
     // Fallback SYSCOHADA si plan vide (coopérative sans plan personnalisé)
     const numerosTresorerie = comptesTresorerie.length > 0
       ? comptesTresorerie.map(c => c.numero_compte)
-      : ["521", "522", "523", "514", "571", "572"];
+      : ["521000", "522000", "523000", "514000", "571000", "572000"];
     const planLabel = (num: string) =>
       comptesTresorerie.find(c => c.numero_compte === num)?.libelle ?? num;
 
@@ -190,7 +190,7 @@ export async function postSuggestionsIA(req: Request, res: Response): Promise<vo
         AND (
           compte_debit  IN (SELECT numero_compte FROM plan_comptable WHERE cooperative_id = ${cooperativeId} AND classe = 5 AND actif = true)
           OR compte_credit IN (SELECT numero_compte FROM plan_comptable WHERE cooperative_id = ${cooperativeId} AND classe = 5 AND actif = true)
-          ${comptesTresorerie.length === 0 ? sql`OR compte_debit IN ('521','522','523','514','571','572') OR compte_credit IN ('521','522','523','514','571','572')` : sql``}
+          ${comptesTresorerie.length === 0 ? sql`OR compte_debit IN ('521000','522000','523000','514000','571000','572000') OR compte_credit IN ('521000','522000','523000','514000','571000','572000')` : sql``}
         )
         AND montant_fcfa::numeric BETWEEN ${Math.round(montant * 0.6)} AND ${Math.round(montant * 1.4)}
         AND date_ecriture BETWEEN (${ligne.date_operation}::date - INTERVAL '30 days')

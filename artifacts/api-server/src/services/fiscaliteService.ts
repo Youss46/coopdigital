@@ -219,7 +219,7 @@ async function getChiffreAffairesAnnuel(cooperativeId: number, annee: number): P
     FROM ecritures_comptables
     WHERE cooperative_id = ${cooperativeId}
       AND exercice = ${annee}
-      AND compte_credit = '701'
+      AND compte_credit = '701000'
   `);
   return parseFloat(result.rows[0]?.chiffre_affaires ?? "0") || 0;
 }
@@ -231,7 +231,7 @@ async function getChiffreAffairesMensuel(cooperativeId: number, mois: number, an
     WHERE cooperative_id = ${cooperativeId}
       AND date_ecriture >= make_date(${annee}, ${mois}, 1)
       AND date_ecriture < (make_date(${annee}, ${mois}, 1) + INTERVAL '1 month')::date
-      AND compte_credit = '701'
+      AND compte_credit = '701000'
   `);
   return parseFloat(result.rows[0]?.chiffre_affaires ?? "0") || 0;
 }
@@ -674,7 +674,7 @@ export async function enregistrerPaiement(cooperativeId: number, id: number, dat
 
   const result = await db.transaction(async (tx) => {
     const dateOperation = data.datePaiement ?? today;
-    let compteCredit = "571";
+    let compteCredit = "571000";
 
     if (data.modePaiement === "especes") {
       if (!data.caisseId) throw new Error("Une caisse est requise pour un paiement en espèces");
@@ -713,7 +713,7 @@ export async function enregistrerPaiement(cooperativeId: number, id: number, dat
         soldeApresFcfa: nouveauSolde.toString(), enregistrePar: data.userId ?? null,
       });
       await tx.update(comptesMobilesMarchandsTable).set({ soldeActuelFcfa: nouveauSolde.toString() }).where(eq(comptesMobilesMarchandsTable.id, mobile.id));
-      compteCredit = "552";
+      compteCredit = "552000";
     } else {
       if (!data.mobileCompteId) throw new Error("Un compte bancaire est requis");
       const [banque] = await tx.select().from(comptesBancairesTable)
@@ -730,7 +730,7 @@ export async function enregistrerPaiement(cooperativeId: number, id: number, dat
         dateValeur: null, soldeApresFcfa: nouveauSolde.toString(), enregistrePar: data.userId ?? null,
       });
       await tx.update(comptesBancairesTable).set({ soldeActuelFcfa: nouveauSolde.toString() }).where(eq(comptesBancairesTable.id, banque.id));
-      compteCredit = "521";
+      compteCredit = "521000";
     }
 
     const exo = new Date(dateOperation).getFullYear();

@@ -1,6 +1,7 @@
 import { db, planComptableTable, parametresComptesModulesTable, ecrituresComptablesTable } from "@workspace/db";
 import { eq, and, asc, sql } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
+import { normaliserNumeroCompte } from "../lib/numeroCompte.js";
 
 
 
@@ -63,11 +64,11 @@ export async function seederPlanSyscohadaPourCooperative(cooperativeId: number):
       .values(
         slice.map((c) => ({
           cooperativeId,
-          numeroCompte:   c.numeroCompte,
+           numeroCompte:   normaliserNumeroCompte(c.numeroCompte),
           libelle:        c.libelle,
           type:           c.type,
           classe:         c.classe,
-          compteParent:   c.compteParent,
+           compteParent:   c.compteParent ? normaliserNumeroCompte(c.compteParent) : null,
           ordreAffichage: c.ordreAffichage,
           actif:          true,
         }))
@@ -122,17 +123,19 @@ export async function ajouterCompte(payload: {
   const coopId = payload.cooperativeId;
   if (!coopId) throw new Error("cooperativeId requis");
   // Calculer classe automatiquement depuis le numéro si non fourni
-  const classe = payload.classe ?? (payload.numeroCompte ? parseInt(payload.numeroCompte[0]!) : undefined);
+  const numeroCompte = normaliserNumeroCompte(payload.numeroCompte);
+  const compteParent = payload.compteParent ? normaliserNumeroCompte(payload.compteParent) : null;
+  const classe = payload.classe ?? (numeroCompte ? parseInt(numeroCompte[0]!) : undefined);
 
   const [compte] = await db
     .insert(planComptableTable)
     .values({
       cooperativeId: coopId,
-      numeroCompte: payload.numeroCompte,
+       numeroCompte,
       libelle: payload.libelle,
       type: payload.type,
       classe: classe ?? null,
-      compteParent: payload.compteParent ?? null,
+       compteParent,
       soldeNormal: payload.soldeNormal ?? (["charge", "actif"].includes(payload.type) ? "debiteur" : "crediteur"),
       actif: true,
       ordreAffichage: payload.ordreAffichage ?? null,
@@ -186,12 +189,13 @@ export async function desactiverCompte(cooperativeId: number, id: number) {
 }
 
 export async function validerNumeroCompte(cooperativeId: number, numero: string) {
+  const numeroNormalise = normaliserNumeroCompte(numero);
   const [compte] = await db
     .select()
     .from(planComptableTable)
     .where(and(
       eq(planComptableTable.cooperativeId, cooperativeId),
-      eq(planComptableTable.numeroCompte, numero),
+       eq(planComptableTable.numeroCompte, numeroNormalise),
     ))
     .limit(1);
   return {
@@ -261,41 +265,41 @@ export function genererLibelle(template: string, context: Record<string, string>
 
 // Valeurs OHADA par défaut pour chaque opération
 const OHADA_DEFAULTS: Record<string, { compteDebit: string; compteCredit: string; libelle: string }> = {
-  "livraisons:achat_cacao_producteur":    { compteDebit: "601",  compteCredit: "401",  libelle: "Achat cacao {fournisseur} - {date}" },
-  "livraisons:paiement_producteur_banque":{ compteDebit: "401",  compteCredit: "521",  libelle: "Paiement {fournisseur} - {ref}" },
-  "livraisons:paiement_producteur_caisse":{ compteDebit: "401",  compteCredit: "571",  libelle: "Paiement caisse {fournisseur}" },
-  "avances:octroi_avance_producteur":     { compteDebit: "4091", compteCredit: "521",  libelle: "Avance {membre} - {date}" },
-  "avances:remboursement_avance":         { compteDebit: "401",  compteCredit: "4091", libelle: "Remboursement avance {membre}" },
-  "ventes_export:vente_cacao_exportateur":{ compteDebit: "4111", compteCredit: "701",  libelle: "Vente lot {lot} à {exportateur}" },
-  "ventes_export:encaissement_exportateur":{ compteDebit: "521", compteCredit: "4111", libelle: "Encaissement {exportateur} - {ref}" },
-  "salaires:salaire_brut":                { compteDebit: "661",  compteCredit: "422",  libelle: "Salaires {mois} {annee}" },
-  "salaires:charges_sociales_patronales": { compteDebit: "664",  compteCredit: "431",  libelle: "CNPS patronal {mois} {annee}" },
-  "salaires:paiement_salaire":            { compteDebit: "422",  compteCredit: "521",  libelle: "Paiement salaires {mois}" },
-  "salaires:avance_personnel":            { compteDebit: "425",  compteCredit: "521",  libelle: "Avance {employe} - {date}" },
-  "dons:don_effectue_especes":            { compteDebit: "658",  compteCredit: "521",  libelle: "Don {categorie} - {beneficiaire}" },
-  "dons:don_effectue_nature":             { compteDebit: "658",  compteCredit: "31",   libelle: "Don nature {designation}" },
-  "dons:don_recu_especes":                { compteDebit: "521",  compteCredit: "758",  libelle: "Don reçu {donateur} - {date}" },
-  "dons:don_recu_nature":                 { compteDebit: "31",   compteCredit: "758",  libelle: "Don nature reçu {donateur}" },
-  "intrants:appro_intrants":              { compteDebit: "31",   compteCredit: "401",  libelle: "Appro {intrant} - {fournisseur}" },
-  "intrants:distribution_credit":         { compteDebit: "4091", compteCredit: "31",   libelle: "Intrants {intrant} à {membre}" },
-  "emprunts:reception_emprunt":           { compteDebit: "521",  compteCredit: "164",  libelle: "Emprunt {preteur} - {ref}" },
-  "emprunts:remboursement_capital":       { compteDebit: "164",  compteCredit: "521",  libelle: "Rembt capital {preteur}" },
-  "emprunts:paiement_interets":           { compteDebit: "671",  compteCredit: "521",  libelle: "Intérêts {preteur} {mois}" },
-  "transport:frais_transport":            { compteDebit: "624",  compteCredit: "521",  libelle: "Transport {mission} - {date}" },
-  "amortissements:dotation_mensuelle":    { compteDebit: "681",  compteCredit: "284",  libelle: "Amort. {equipement} {mois}" },
-  "parts_sociales:liberation_parts":      { compteDebit: "521",  compteCredit: "101",  libelle: "Parts sociales {membre}" },
+  "livraisons:achat_cacao_producteur":    { compteDebit: "601000",  compteCredit: "401000",  libelle: "Achat cacao {fournisseur} - {date}" },
+  "livraisons:paiement_producteur_banque":{ compteDebit: "401000",  compteCredit: "521000",  libelle: "Paiement {fournisseur} - {ref}" },
+  "livraisons:paiement_producteur_caisse":{ compteDebit: "401000",  compteCredit: "571000",  libelle: "Paiement caisse {fournisseur}" },
+  "avances:octroi_avance_producteur":     { compteDebit: "409100", compteCredit: "521000",  libelle: "Avance {membre} - {date}" },
+  "avances:remboursement_avance":         { compteDebit: "401000",  compteCredit: "409100", libelle: "Remboursement avance {membre}" },
+  "ventes_export:vente_cacao_exportateur":{ compteDebit: "411100", compteCredit: "701000",  libelle: "Vente lot {lot} à {exportateur}" },
+  "ventes_export:encaissement_exportateur":{ compteDebit: "521000", compteCredit: "411100", libelle: "Encaissement {exportateur} - {ref}" },
+  "salaires:salaire_brut":                { compteDebit: "661000",  compteCredit: "422000",  libelle: "Salaires {mois} {annee}" },
+  "salaires:charges_sociales_patronales": { compteDebit: "664000",  compteCredit: "431000",  libelle: "CNPS patronal {mois} {annee}" },
+  "salaires:paiement_salaire":            { compteDebit: "422000",  compteCredit: "521000",  libelle: "Paiement salaires {mois}" },
+  "salaires:avance_personnel":            { compteDebit: "425000",  compteCredit: "521000",  libelle: "Avance {employe} - {date}" },
+  "dons:don_effectue_especes":            { compteDebit: "658000",  compteCredit: "521000",  libelle: "Don {categorie} - {beneficiaire}" },
+  "dons:don_effectue_nature":             { compteDebit: "658000",  compteCredit: "310000",   libelle: "Don nature {designation}" },
+  "dons:don_recu_especes":                { compteDebit: "521000",  compteCredit: "758000",  libelle: "Don reçu {donateur} - {date}" },
+  "dons:don_recu_nature":                 { compteDebit: "310000",   compteCredit: "758000",  libelle: "Don nature reçu {donateur}" },
+  "intrants:appro_intrants":              { compteDebit: "310000",   compteCredit: "401000",  libelle: "Appro {intrant} - {fournisseur}" },
+  "intrants:distribution_credit":         { compteDebit: "409100", compteCredit: "310000",   libelle: "Intrants {intrant} à {membre}" },
+  "emprunts:reception_emprunt":           { compteDebit: "521000",  compteCredit: "164000",  libelle: "Emprunt {preteur} - {ref}" },
+  "emprunts:remboursement_capital":       { compteDebit: "164000",  compteCredit: "521000",  libelle: "Rembt capital {preteur}" },
+  "emprunts:paiement_interets":           { compteDebit: "671000",  compteCredit: "521000",  libelle: "Intérêts {preteur} {mois}" },
+  "transport:frais_transport":            { compteDebit: "624000",  compteCredit: "521000",  libelle: "Transport {mission} - {date}" },
+  "amortissements:dotation_mensuelle":    { compteDebit: "681000",  compteCredit: "284000",  libelle: "Amort. {equipement} {mois}" },
+  "parts_sociales:liberation_parts":      { compteDebit: "521000",  compteCredit: "101000",  libelle: "Parts sociales {membre}" },
   // Salaires — cotisations salarié
-  "salaires:cotisations_salarie":         { compteDebit: "431",  compteCredit: "421",  libelle: "Cotisations CNPS salarié {employe}" },
+  "salaires:cotisations_salarie":         { compteDebit: "431000",  compteCredit: "421000",  libelle: "Cotisations CNPS salarié {employe}" },
   // Primes
-  "primes:reception_prime":              { compteDebit: "521",  compteCredit: "7588", libelle: "Prime {type} – {exportateur}" },
-  "primes:paiement_prime":              { compteDebit: "6018", compteCredit: "521",  libelle: "Prime producteur – {membre}" },
+  "primes:reception_prime":              { compteDebit: "521000",  compteCredit: "758800", libelle: "Prime {type} – {exportateur}" },
+  "primes:paiement_prime":              { compteDebit: "601800", compteCredit: "521000",  libelle: "Prime producteur – {membre}" },
   // Commissions délégués
-  "commissions_delegues:paiement_commission": { compteDebit: "6322", compteCredit: "521", libelle: "Commission délégué – {delegue}" },
+  "commissions_delegues:paiement_commission": { compteDebit: "632200", compteCredit: "521000", libelle: "Commission délégué – {delegue}" },
   // Règlement intégré des membres délégués de localités depuis le bon réception.
-  "receptions_membres_delegues:frais_carburant":      { compteDebit: "4091", compteCredit: "521",  libelle: "Carburant avancé pour le membre – {membre}" },
-  "receptions_membres_delegues:retenue_carburant":    { compteDebit: "401",  compteCredit: "4091", libelle: "Récupération carburant sur règlement – {membre}" },
-  "receptions_membres_delegues:autres_charges":       { compteDebit: "4091", compteCredit: "521",  libelle: "Autres charges avancées pour le membre – {membre}" },
-  "receptions_membres_delegues:retenue_autres_charges": { compteDebit: "401", compteCredit: "4091", libelle: "Récupération autres charges sur règlement – {membre}" },
+  "receptions_membres_delegues:frais_carburant":      { compteDebit: "409100", compteCredit: "521000",  libelle: "Carburant avancé pour le membre – {membre}" },
+  "receptions_membres_delegues:retenue_carburant":    { compteDebit: "401000",  compteCredit: "409100", libelle: "Récupération carburant sur règlement – {membre}" },
+  "receptions_membres_delegues:autres_charges":       { compteDebit: "409100", compteCredit: "521000",  libelle: "Autres charges avancées pour le membre – {membre}" },
+  "receptions_membres_delegues:retenue_autres_charges": { compteDebit: "401000", compteCredit: "409100", libelle: "Récupération autres charges sur règlement – {membre}" },
 };
 
 export async function modifierParams(cooperativeId: number, id: number, payload: {
@@ -306,21 +310,23 @@ export async function modifierParams(cooperativeId: number, id: number, payload:
 }) {
   // Valider les comptes
   if (payload.compteDebit) {
-    const chk = await validerNumeroCompte(cooperativeId, payload.compteDebit);
-    if (!chk.valide) throw new Error(`Compte débit "${payload.compteDebit}" introuvable dans le plan comptable`);
-    if (!chk.actif) throw new Error(`Compte débit "${payload.compteDebit}" est désactivé`);
+    const compteDebit = normaliserNumeroCompte(payload.compteDebit);
+    const chk = await validerNumeroCompte(cooperativeId, compteDebit);
+    if (!chk.valide) throw new Error(`Compte débit "${compteDebit}" introuvable dans le plan comptable`);
+    if (!chk.actif) throw new Error(`Compte débit "${compteDebit}" est désactivé`);
   }
   if (payload.compteCredit) {
-    const chk = await validerNumeroCompte(cooperativeId, payload.compteCredit);
-    if (!chk.valide) throw new Error(`Compte crédit "${payload.compteCredit}" introuvable dans le plan comptable`);
-    if (!chk.actif) throw new Error(`Compte crédit "${payload.compteCredit}" est désactivé`);
+    const compteCredit = normaliserNumeroCompte(payload.compteCredit);
+    const chk = await validerNumeroCompte(cooperativeId, compteCredit);
+    if (!chk.valide) throw new Error(`Compte crédit "${compteCredit}" introuvable dans le plan comptable`);
+    if (!chk.actif) throw new Error(`Compte crédit "${compteCredit}" est désactivé`);
   }
 
   const [updated] = await db
     .update(parametresComptesModulesTable)
     .set({
-      ...(payload.compteDebit ? { compteDebit: payload.compteDebit } : {}),
-      ...(payload.compteCredit ? { compteCredit: payload.compteCredit } : {}),
+       ...(payload.compteDebit ? { compteDebit: normaliserNumeroCompte(payload.compteDebit) } : {}),
+       ...(payload.compteCredit ? { compteCredit: normaliserNumeroCompte(payload.compteCredit) } : {}),
       ...(payload.libelleEcritureAuto !== undefined ? { libelleEcritureAuto: payload.libelleEcritureAuto } : {}),
       modifiePar: payload.modifiePar ?? null,
       updatedAt: new Date(),

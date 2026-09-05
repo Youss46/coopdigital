@@ -11,6 +11,7 @@ import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { assignerNumeroPiece } from "../lib/numeroPiece";
 import { getParamsEcriture } from "./planComptableService.js";
+import { normaliserComptes, normaliserNumeroCompte } from "../lib/numeroCompte.js";
 
 export type ComptabiliteTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -121,6 +122,7 @@ export async function proposerEcriture(
   payload: ProposerEcriturePayload
 ): Promise<{ mode: "automatique" | "manuel"; statut: "enregistree" | "en_attente" }> {
   try {
+    const comptes = normaliserComptes(payload.compteDebit, payload.compteCredit);
     const config = await getConfigComptable(cooperativeId);
     const cle = AUTO_KEY_MAP[payload.source];
     const modeAuto = config[cle] === true;
@@ -132,8 +134,8 @@ export async function proposerEcriture(
         dateEcriture: payload.date,
         numeroPiece: payload.numeroPiece ?? null,
         libelle: payload.libelle,
-        compteDebit: payload.compteDebit,
-        compteCredit: payload.compteCredit,
+        compteDebit: comptes.compteDebit,
+        compteCredit: comptes.compteCredit,
         montantFcfa: Math.round(payload.montantFcfa),
         source: DB_SOURCE_MAP[payload.source],
         sourceId: payload.sourceId ?? null,
@@ -152,8 +154,8 @@ export async function proposerEcriture(
       source: DB_SOURCE_MAP[payload.source],
       sourceId: payload.sourceId ?? null,
       libelleProppose: payload.libelle,
-      compteDebitPropose: payload.compteDebit,
-      compteCreditPropose: payload.compteCredit,
+      compteDebitPropose: comptes.compteDebit,
+      compteCreditPropose: comptes.compteCredit,
       montantFcfa: Math.round(payload.montantFcfa),
       dateProposee: payload.date,
       statut: "en_attente",
@@ -178,6 +180,7 @@ export async function proposerEcrituresDansTransaction(
   const config = await getConfigComptable(cooperativeId, tx);
 
   for (const payload of payloads) {
+    const comptes = normaliserComptes(payload.compteDebit, payload.compteCredit);
     const cle = AUTO_KEY_MAP[payload.source];
     const modeAuto = config[cle] === true;
 
@@ -188,8 +191,8 @@ export async function proposerEcrituresDansTransaction(
         dateEcriture: payload.date,
         numeroPiece: payload.numeroPiece ?? null,
         libelle: payload.libelle,
-        compteDebit: payload.compteDebit,
-        compteCredit: payload.compteCredit,
+         compteDebit: comptes.compteDebit,
+         compteCredit: comptes.compteCredit,
         montantFcfa: Math.round(payload.montantFcfa),
         source: DB_SOURCE_MAP[payload.source],
         sourceId: payload.sourceId ?? null,
@@ -203,8 +206,8 @@ export async function proposerEcrituresDansTransaction(
         source: DB_SOURCE_MAP[payload.source],
         sourceId: payload.sourceId ?? null,
         libelleProppose: payload.libelle,
-        compteDebitPropose: payload.compteDebit,
-        compteCreditPropose: payload.compteCredit,
+         compteDebitPropose: comptes.compteDebit,
+         compteCreditPropose: comptes.compteCredit,
         montantFcfa: Math.round(payload.montantFcfa),
         dateProposee: payload.date,
         statut: "en_attente",
@@ -227,11 +230,11 @@ async function resolveComptes(
 ): Promise<{ compteDebit: string; compteCredit: string }> {
   try {
     const p = await getParamsEcriture(cooperativeId, module, operation);
-    if (p) return { compteDebit: p.compteDebit, compteCredit: p.compteCredit };
+    if (p) return normaliserComptes(p.compteDebit, p.compteCredit);
   } catch {
     /* ignore — utiliser le fallback */
   }
-  return { compteDebit: fallbackDebit, compteCredit: fallbackCredit };
+  return normaliserComptes(fallbackDebit, fallbackCredit);
 }
 
 /**
@@ -242,7 +245,7 @@ export async function resolveCompteDetteProducteur(
   cooperativeId: number,
   compteFige?: string | null,
 ): Promise<string> {
-  if (compteFige?.trim()) return compteFige.trim();
+  if (compteFige?.trim()) return normaliserNumeroCompte(compteFige);
   const comptes = await resolveComptes(
     cooperativeId,
     "livraisons",

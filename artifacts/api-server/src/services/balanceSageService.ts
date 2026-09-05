@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import * as XLSX from "xlsx";
+import { normaliserNumeroCompte } from "../lib/numeroCompte.js";
 
 export type BalanceSageMapping = {
   numeroCompte: number;
@@ -39,7 +40,7 @@ function normaliseRows(rawRows: unknown[][], mapping: BalanceSageMapping): Balan
   rawRows.forEach((raw, index) => {
     const values = raw.map(clean);
     if (values.every((value) => !value)) return;
-    const numeroCompte = clean(raw[mapping.numeroCompte]);
+    const numeroCompte = normaliserNumeroCompte(clean(raw[mapping.numeroCompte]));
     const libelle = clean(raw[mapping.libelle]);
     if (index === 0 && /compte|account|num[ée]ro/i.test(numeroCompte) && /libell[ée]|intitul[ée]|description/i.test(libelle)) return;
     const totalDebit = amount(raw[mapping.totalDebit]);

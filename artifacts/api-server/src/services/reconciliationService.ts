@@ -289,7 +289,7 @@ export async function reconcilierAutomatiquement(cooperativeId: number, releveId
       FROM ecritures_comptables
       WHERE cooperative_id = ${cooperativeId}
         AND ABS(montant_fcfa) = ${montant}
-        AND (compte_debit IN ('521','522') OR compte_credit IN ('521','522'))
+        AND (compte_debit IN ('521000','522000') OR compte_credit IN ('521000','522000'))
         AND id NOT IN (
           SELECT ecriture_id FROM lignes_releve
           WHERE ecriture_id IS NOT NULL AND releve_id != ${releveId}
@@ -437,7 +437,7 @@ export async function rechercherEcritures(cooperativeId: number, q: string, mont
     SELECT id, date_ecriture::text, libelle, compte_debit, compte_credit, montant_fcfa
     FROM ecritures_comptables
     WHERE cooperative_id = ${cooperativeId}
-      AND (compte_debit IN ('521','522') OR compte_credit IN ('521','522'))
+      AND (compte_debit IN ('521000','522000') OR compte_credit IN ('521000','522000'))
       ${q ? sql`AND LOWER(libelle) LIKE ${"%" + q.toLowerCase() + "%"}` : sql``}
       ${montant ? sql`AND ABS(montant_fcfa) = ${montant}` : sql``}
     ORDER BY date_ecriture DESC

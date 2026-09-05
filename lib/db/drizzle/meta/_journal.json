@@ -1114,6 +1114,13 @@
       "when": 1788541500000,
       "tag": "0158_frequence_paiement_commissions",
       "breakpoints": true
+    },
+    {
+      "idx": 159,
+      "version": "7",
+      "when": 1788541800000,
+      "tag": "0159_comptes_generaux_six_chiffres",
+      "breakpoints": true
     }
   ]
 }

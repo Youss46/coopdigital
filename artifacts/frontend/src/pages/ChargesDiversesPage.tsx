@@ -90,17 +90,17 @@ interface MobileTresorerie {
 
 // ── Référentiels ──────────────────────────────────────────────────────────────
 const CATEGORIES: Array<{ value: string; label: string; compte: string }> = [
-  { value: "loyer",           label: "Loyer et charges locatives",  compte: "622"  },
-  { value: "eau_electricite", label: "Eau et électricité",           compte: "605"  },
-  { value: "fournitures",     label: "Fournitures de bureau",        compte: "604"  },
-  { value: "communication",   label: "Téléphone et communication",   compte: "628"  },
-  { value: "deplacement",     label: "Déplacements et transport",    compte: "618"  },
-  { value: "reception",       label: "Réceptions et hébergement",    compte: "627"  },
-  { value: "entretien",       label: "Entretien et réparations",     compte: "624"  },
-  { value: "honoraires",      label: "Honoraires et consultants",    compte: "632"  },
-  { value: "ppsi",            label: "Prestation informelle — PPSSI", compte: "632"  },
-  { value: "publicite",       label: "Publicité et marketing",       compte: "627"  },
-  { value: "autre",           label: "Autres charges",               compte: "658"  },
+  { value: "loyer",           label: "Loyer et charges locatives",  compte: "622000"  },
+  { value: "eau_electricite", label: "Eau et électricité",           compte: "605000"  },
+  { value: "fournitures",     label: "Fournitures de bureau",        compte: "604000"  },
+  { value: "communication",   label: "Téléphone et communication",   compte: "628000"  },
+  { value: "deplacement",     label: "Déplacements et transport",    compte: "618000"  },
+  { value: "reception",       label: "Réceptions et hébergement",    compte: "627000"  },
+  { value: "entretien",       label: "Entretien et réparations",     compte: "624000"  },
+  { value: "honoraires",      label: "Honoraires et consultants",    compte: "632000"  },
+  { value: "ppsi",            label: "Prestation informelle — PPSSI", compte: "632000"  },
+  { value: "publicite",       label: "Publicité et marketing",       compte: "627000"  },
+  { value: "autre",           label: "Autres charges",               compte: "658000"  },
 ];
 
 const MODES_PAIEMENT = [
@@ -117,7 +117,7 @@ const EMPTY_FORM = {
   description:     "",
   montant_fcfa:    "",
   categorie:       "autre",
-  compte_debit:    "6580",
+  compte_debit:    "658000",
   compte_credit:   "",
   compte_tresorerie_id: "",
   compte_tresorerie_type: "",
@@ -270,7 +270,7 @@ export default function ChargesDiversesPage() {
       compte_credit:   c.compte_credit,
       compte_tresorerie_id: c.compte_tresorerie_id ? String(c.compte_tresorerie_id) : "",
       compte_tresorerie_type: c.compte_tresorerie_type ?? "",
-      mode_paiement:   c.compte_credit === "401" ? "credit" : c.mode_paiement,
+      mode_paiement:   c.compte_credit === "401000" ? "credit" : c.mode_paiement,
       tiers:           c.tiers ?? "",
       reference_piece: c.reference_piece ?? "",
     });
@@ -287,7 +287,7 @@ export default function ChargesDiversesPage() {
       toast({ title: "Compte requis", description: "Sélectionnez le compte crédit de la charge.", variant: "destructive" });
       return;
     }
-    if (form.mode_paiement === "credit" && form.compte_credit !== "401") {
+    if (form.mode_paiement === "credit" && form.compte_credit !== "401000") {
       toast({ title: "Compte fournisseur requis", description: "Une charge à crédit doit utiliser le compte 401 — Fournisseurs.", variant: "destructive" });
       return;
     }
@@ -295,11 +295,11 @@ export default function ChargesDiversesPage() {
       toast({ title: "Fournisseur requis", description: "Indiquez le fournisseur ou le tiers pour une charge à crédit.", variant: "destructive" });
       return;
     }
-    if (form.mode_paiement !== "credit" && form.compte_credit === "401") {
+    if (form.mode_paiement !== "credit" && form.compte_credit === "401000") {
       toast({ title: "Mode de paiement invalide", description: "Le compte 401 — Fournisseurs nécessite le mode de paiement « À crédit ».", variant: "destructive" });
       return;
     }
-    if (form.compte_credit !== "401" && (!form.compte_tresorerie_type || !form.compte_tresorerie_id)) {
+    if (form.compte_credit !== "401000" && (!form.compte_tresorerie_type || !form.compte_tresorerie_id)) {
       toast({ title: "Compte de trésorerie requis", description: "Sélectionnez le compte de trésorerie qui sera débité à la validation.", variant: "destructive" });
       return;
     }
@@ -311,10 +311,10 @@ export default function ChargesDiversesPage() {
   }, [form, editTarget, createMut, updateMut, toast, isFeatureReadOnly]);
 
   const handleCompteCreditChange = useCallback((value: string) => {
-    if (value === "401") {
+    if (value === "401000") {
       setForm(f => ({
         ...f,
-        compte_credit: "401",
+        compte_credit: "401000",
         compte_tresorerie_id: "",
         compte_tresorerie_type: "",
         mode_paiement: "credit",
@@ -323,7 +323,7 @@ export default function ChargesDiversesPage() {
     }
     const [type, id] = value.split(":");
     if (!id || !["caisse", "banque", "mobile_marchand"].includes(type ?? "")) return;
-    const compteCredit = type === "caisse" ? "571" : type === "banque" ? "521" : "552";
+    const compteCredit = type === "caisse" ? "571000" : type === "banque" ? "521000" : "552000";
     const modePaiement = type === "caisse" ? "especes" : type === "banque" ? "virement" : "mobile_money";
     setForm(f => ({
       ...f,
@@ -339,7 +339,7 @@ export default function ChargesDiversesPage() {
       setForm(f => ({
         ...f,
         mode_paiement: "credit",
-        compte_credit: "401",
+        compte_credit: "401000",
         compte_tresorerie_id: "",
         compte_tresorerie_type: "",
       }));
@@ -355,7 +355,7 @@ export default function ChargesDiversesPage() {
     setForm(f => ({
       ...f,
       mode_paiement: modePaiement,
-      ...(f.compte_credit === "401" || (typeAttendu && f.compte_tresorerie_type !== typeAttendu)
+      ...(f.compte_credit === "401000" || (typeAttendu && f.compte_tresorerie_type !== typeAttendu)
         ? { compte_credit: "", compte_tresorerie_id: "", compte_tresorerie_type: "" }
         : {}),
     }));
@@ -620,15 +620,15 @@ export default function ChargesDiversesPage() {
                 <Select value={compteCreditValue} onValueChange={handleCompteCreditChange}>
                   <SelectTrigger><SelectValue placeholder="Sélectionner un compte" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="401">401 — Fournisseurs (à crédit, sans sortie immédiate)</SelectItem>
-                    {form.compte_credit === "571" && !form.compte_tresorerie_id && (
-                      <SelectItem value="571" disabled>571 — Caisse (compte historique à remplacer)</SelectItem>
+                    <SelectItem value="401000">401000 — Fournisseurs (à crédit, sans sortie immédiate)</SelectItem>
+                    {form.compte_credit === "571000" && !form.compte_tresorerie_id && (
+                      <SelectItem value="571000" disabled>571000 — Caisse (compte historique à remplacer)</SelectItem>
                     )}
-                    {form.compte_credit === "521" && !form.compte_tresorerie_id && (
-                      <SelectItem value="521" disabled>521 — Banque (compte historique à remplacer)</SelectItem>
+                    {form.compte_credit === "521000" && !form.compte_tresorerie_id && (
+                      <SelectItem value="521000" disabled>521000 — Banque (compte historique à remplacer)</SelectItem>
                     )}
-                    {form.compte_credit === "552" && !form.compte_tresorerie_id && (
-                      <SelectItem value="552" disabled>552 — Mobile Marchand (compte historique à remplacer)</SelectItem>
+                    {form.compte_credit === "552000" && !form.compte_tresorerie_id && (
+                      <SelectItem value="552000" disabled>552000 — Mobile Marchand (compte historique à remplacer)</SelectItem>
                     )}
                     {afficherCaisses && caisses.map(c => (
                       <SelectItem key={`caisse:${c.id}`} value={`caisse:${c.id}`}>

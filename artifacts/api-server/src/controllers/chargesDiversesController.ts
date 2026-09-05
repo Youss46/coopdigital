@@ -10,6 +10,7 @@ import {
   getStatsChargesDiverses,
   securiserReglementPpsi,
 } from "../services/chargesDiversesService";
+import { normaliserNumeroCompte } from "../lib/numeroCompte.js";
 
 export function erreurStructureCharge(
   modePaiement: string,
@@ -18,14 +19,15 @@ export function erreurStructureCharge(
   compteTresorerieId: number | null | undefined,
   compteTresorerieType: "caisse" | "banque" | "mobile_marchand" | null | undefined,
 ): string | null {
+  compteCredit = normaliserNumeroCompte(compteCredit);
   if (modePaiement === "credit") {
-    if (compteCredit !== "401") return "Une charge à crédit doit utiliser le compte 401 — Fournisseurs";
+    if (compteCredit !== "401000") return "Une charge à crédit doit utiliser le compte 401000 — Fournisseurs";
     if (compteTresorerieId != null || compteTresorerieType != null) {
       return "Une charge à crédit ne peut pas avoir de compte de trésorerie";
     }
     if (!tiers?.trim()) return "Le fournisseur ou le tiers est requis pour une charge à crédit";
   }
-  if (compteCredit === "401" && modePaiement !== "credit") {
+  if (compteCredit === "401000" && modePaiement !== "credit") {
     return "Le compte 401 — Fournisseurs nécessite le mode de paiement « À crédit »";
   }
   return null;
@@ -66,7 +68,7 @@ export async function handleCreateChargeDiverses(req: Request, res: Response): P
       compte_tresorerie_id?: number | null;
       compte_tresorerie_type?: "caisse" | "banque" | "mobile_marchand" | null;
     };
-    const compteCredit = body.compte_credit ?? "571";
+    const compteCredit = normaliserNumeroCompte(body.compte_credit ?? "571000");
     const modePaiement = body.mode_paiement ?? "especes";
     const structureError = erreurStructureCharge(
       modePaiement,
@@ -134,10 +136,10 @@ export async function handleUpdateChargeDiverses(req: Request, res: Response): P
       compte_tresorerie_id?: number | null;
       compte_tresorerie_type?: "caisse" | "banque" | "mobile_marchand" | null;
     };
-    if (body.mode_paiement === "credit" || body.compte_credit === "401") {
+    if (body.mode_paiement === "credit" || body.compte_credit === "401000") {
       const structureError = erreurStructureCharge(
         body.mode_paiement ?? "credit",
-        body.compte_credit ?? "401",
+        body.compte_credit ?? "401000",
         body.tiers,
         body.compte_tresorerie_id,
         body.compte_tresorerie_type,
@@ -195,15 +197,15 @@ export async function handleValiderChargeDiverses(req: Request, res: Response): 
       const retenue = reglement.retenue;
       const net = reglement.net;
       const piece = row.referencePiece ?? `PPSI-${row.id}`;
-       const compteTresorerie = ["571", "521", "552"].includes(row.compteCredit)
+       const compteTresorerie = ["571000", "521000", "552000"].includes(row.compteCredit)
          ? row.compteCredit
-         : row.modePaiement === "mobile_money" ? "552"
-         : row.modePaiement === "virement" || row.modePaiement === "cheque" ? "521"
-         : "571";
+         : row.modePaiement === "mobile_money" ? "552000"
+         : row.modePaiement === "virement" || row.modePaiement === "cheque" ? "521000"
+         : "571000";
       const entries = [
-        { compteDebit: row.compteDebit, compteCredit: "401", montantFcfa: montantBrut, libelle: `Prestation brute — ${row.libelle}` },
-        ...(retenue > 0 ? [{ compteDebit: "401", compteCredit: "447", montantFcfa: retenue, libelle: `Retenue PPSI — ${row.libelle}` }] : []),
-        ...(net > 0 ? [{ compteDebit: "401", compteCredit: compteTresorerie, montantFcfa: net, libelle: `Règlement net prestataire — ${row.libelle}` }] : []),
+        { compteDebit: row.compteDebit, compteCredit: "401000", montantFcfa: montantBrut, libelle: `Prestation brute — ${row.libelle}` },
+        ...(retenue > 0 ? [{ compteDebit: "401000", compteCredit: "447000", montantFcfa: retenue, libelle: `Retenue PPSI — ${row.libelle}` }] : []),
+        ...(net > 0 ? [{ compteDebit: "401000", compteCredit: compteTresorerie, montantFcfa: net, libelle: `Règlement net prestataire — ${row.libelle}` }] : []),
       ];
       await Promise.all(entries.map(entry => proposerEcriture(cooperativeId, {
         source: "charges_diverses",

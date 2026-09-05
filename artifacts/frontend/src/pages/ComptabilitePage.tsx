@@ -277,7 +277,9 @@ function ModalModifierValider({ ecriture, onClose, onDone }: { ecriture: Ecritur
               <input
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
                 value={form.compteDebit}
-                onChange={(e) => setForm({ ...form, compteDebit: e.target.value })}
+                onChange={(e) => setForm({ ...form, compteDebit: e.target.value.replace(/\D/g, "").slice(0, 6) })}
+                inputMode="numeric"
+                maxLength={6}
               />
             </div>
             <div>
@@ -285,7 +287,9 @@ function ModalModifierValider({ ecriture, onClose, onDone }: { ecriture: Ecritur
               <input
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
                 value={form.compteCredit}
-                onChange={(e) => setForm({ ...form, compteCredit: e.target.value })}
+                onChange={(e) => setForm({ ...form, compteCredit: e.target.value.replace(/\D/g, "").slice(0, 6) })}
+                inputMode="numeric"
+                maxLength={6}
               />
             </div>
           </div>
@@ -1538,12 +1542,13 @@ function OngletPlanComptable() {
               <button onClick={() => setModalCreate(false)}><X size={18} className="text-gray-400" /></button>
             </div>
             <div className="px-6 py-5 space-y-4">
-              {([["Numéro de compte", "numeroCompte", "ex : 6025"], ["Libellé", "libelle", "ex : Achats hévéa brut"]] as const).map(([label, key, ph]) => (
+               {([["Numéro de compte", "numeroCompte", "ex : 602500"], ["Libellé", "libelle", "ex : Achats hévéa brut"]] as const).map(([label, key, ph]) => (
                 <div key={key}>
                   <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
                   <input
                     value={form[key]}
-                    onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                    onChange={(e) => setForm((f) => ({ ...f, [key]: key === "numeroCompte" ? e.target.value.replace(/\D/g, "").slice(0, 6) : e.target.value }))}
+                    {...(key === "numeroCompte" ? { inputMode: "numeric" as const, maxLength: 6 } : {})}
                     placeholder={ph}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
                   />
@@ -1727,12 +1732,14 @@ function OngletComptesModules() {
                               <>
                                 <td className="px-2 sm:px-4 py-1.5">
                                   <input value={editForm.compteDebit}
-                                    onChange={(e) => setEditForm((f) => ({ ...f, compteDebit: e.target.value }))}
+                                     onChange={(e) => setEditForm((f) => ({ ...f, compteDebit: e.target.value.replace(/\D/g, "").slice(0, 6) }))}
+                                     inputMode="numeric" maxLength={6}
                                     className="w-16 sm:w-20 border border-gray-200 rounded px-2 py-1 text-sm font-mono" />
                                 </td>
                                 <td className="px-2 sm:px-4 py-1.5">
                                   <input value={editForm.compteCredit}
-                                    onChange={(e) => setEditForm((f) => ({ ...f, compteCredit: e.target.value }))}
+                                     onChange={(e) => setEditForm((f) => ({ ...f, compteCredit: e.target.value.replace(/\D/g, "").slice(0, 6) }))}
+                                     inputMode="numeric" maxLength={6}
                                     className="w-16 sm:w-20 border border-gray-200 rounded px-2 py-1 text-sm font-mono" />
                                 </td>
                                 <td className="hidden sm:table-cell px-4 py-1.5">
@@ -3252,14 +3259,16 @@ function ModalSaisieManuelle({ onClose, onSuccess }: { onClose: () => void; onSu
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Compte Débit *</label>
-              <input type="text" value={form.compteDebit} placeholder="ex : 6011"
-                onChange={(e) => setForm((f) => ({ ...f, compteDebit: e.target.value }))}
+              <input type="text" value={form.compteDebit} placeholder="ex : 601100"
+                onChange={(e) => setForm((f) => ({ ...f, compteDebit: e.target.value.replace(/\D/g, "").slice(0, 6) }))}
+                inputMode="numeric" maxLength={6}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Compte Crédit *</label>
-              <input type="text" value={form.compteCredit} placeholder="ex : 401"
-                onChange={(e) => setForm((f) => ({ ...f, compteCredit: e.target.value }))}
+              <input type="text" value={form.compteCredit} placeholder="ex : 401000"
+                onChange={(e) => setForm((f) => ({ ...f, compteCredit: e.target.value.replace(/\D/g, "").slice(0, 6) }))}
+                inputMode="numeric" maxLength={6}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700" />
             </div>
           </div>
