@@ -4697,7 +4697,7 @@ export default function ComptabilitePage() {
     { id: "journal",     label: "Journal",          icon: BookOpen },
     ...(peutGrandLivre ? [{ id: "grand_livre" as Onglet, label: "Grand-livre",  icon: FileText }] : []),
     ...(peutBalance    ? [{ id: "balance"     as Onglet, label: "Balance",         icon: Scale }] : []),
-    ...(peutBalance    ? [{ id: "balance_aux" as Onglet, label: "Balance tiers",   icon: Users }] : []),
+    ...(peutBalance    ? [{ id: "balance_aux" as Onglet, label: "Comptes tiers",   icon: Users }] : []),
     ...(peutImporterBalance ? [{ id: "import_balances" as Onglet, label: "Import Sage", icon: Upload }] : []),
     { id: "flux",        label: "Flux trésorerie",  icon: Droplets },
     ...(peutVoirConfig ? [{ id: "cloture"         as Onglet, label: "Clôture",        icon: Lock }] : []),
