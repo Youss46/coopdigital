@@ -390,4 +390,104 @@ describe.skipIf(!enabled)("règlement groupé carburant sur PostgreSQL", () => {
       }],
     });
   });
+
+  it("ne débite qu'une seule fois lors de deux validations concurrentes du même lot", async () => {
+    const firstPaymentId = await createPayment(9_000);
+    const secondPaymentId = await createPayment(6_000);
+    const reference = `CARB-LOT-${process.pid}-CONCURRENT`;
+    const delayFunction = `task192_caisse_delay_${process.pid}_${Date.now()}`;
+    const delayTrigger = `task192_caisse_delay_trigger_${process.pid}_${Date.now()}`;
+    const identifier = (value: string) => `"${value.replaceAll(`"`, `""`)}"`;
+
+    await client.query(`
+      CREATE FUNCTION ${identifier(delayFunction)}()
+      RETURNS trigger
+      LANGUAGE plpgsql
+      AS $$
+      BEGIN
+        PERFORM pg_sleep(0.1);
+        RETURN NEW;
+      END;
+      $$;
+
+      CREATE TRIGGER ${identifier(delayTrigger)}
+      BEFORE UPDATE OF solde_actuel_fcfa ON caisses
+      FOR EACH ROW
+      WHEN (OLD.id = ${caisseId})
+      EXECUTE FUNCTION ${identifier(delayFunction)}();
+    `);
+
+    try {
+      const results = await Promise.all([
+        validateLot([firstPaymentId, secondPaymentId], reference),
+        validateLot([secondPaymentId, firstPaymentId], reference),
+      ]);
+
+      expect(results.filter((result) => result.statusCode === 200)).toHaveLength(1);
+      expect(results.filter((result) => result.statusCode === 409)).toHaveLength(1);
+
+      await expect(
+        client.query(
+          `SELECT count(*)::int AS count, COALESCE(sum(montant_fcfa), 0)::int AS total
+           FROM mouvements_caisse
+           WHERE caisse_id = $1
+             AND motif = 'carburant'
+             AND reference_operation = $2`,
+          [caisseId, reference],
+        ),
+      ).resolves.toMatchObject({
+        rows: [{ count: 1, total: 15_000 }],
+      });
+
+      await expect(
+        client.query(
+          `SELECT solde_actuel_fcfa
+           FROM caisses
+           WHERE id = $1`,
+          [caisseId],
+        ),
+      ).resolves.toMatchObject({
+        rows: [{ solde_actuel_fcfa: "965000" }],
+      });
+
+      await expect(
+        client.query(
+          `SELECT paiement_id, count(*)::int AS count
+           FROM paiement_lignes
+           WHERE paiement_id = ANY($1::int[])
+           GROUP BY paiement_id
+           ORDER BY paiement_id`,
+          [[firstPaymentId, secondPaymentId]],
+        ),
+      ).resolves.toMatchObject({
+        rows: [
+          { paiement_id: firstPaymentId, count: 1 },
+          { paiement_id: secondPaymentId, count: 1 },
+        ],
+      });
+
+      await expect(
+        client.query(
+          `SELECT source_id, count(*)::int AS count
+           FROM ecritures_comptables
+           WHERE cooperative_id = $1
+             AND source = 'paiement'
+             AND source_id = ANY($2::int[])
+           GROUP BY source_id
+           ORDER BY source_id`,
+          [cooperativeId, [firstPaymentId, secondPaymentId]],
+        ),
+      ).resolves.toMatchObject({
+        rows: [
+          { source_id: firstPaymentId, count: 1 },
+          { source_id: secondPaymentId, count: 1 },
+        ],
+      });
+    } finally {
+      await client.query(`
+        DROP TRIGGER IF EXISTS ${identifier(delayTrigger)} ON caisses;
+        DROP FUNCTION IF EXISTS ${identifier(delayFunction)}();
+      `);
+    }
+  });
 });

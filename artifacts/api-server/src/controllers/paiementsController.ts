@@ -1764,6 +1764,7 @@ export async function validerLotPaiementsCarburant(req: Request, res: Response):
   };
   const paiementIds = Array.isArray(body.paiementIds)
     ? [...new Set(body.paiementIds.map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0))]
+        .sort((a, b) => a - b)
     : [];
   const modesLot = ["especes", "virement", "orange_money", "mtn_momo", "wave"] as const;
   const mode = body.modePaiement as typeof modesLot[number] | undefined;
