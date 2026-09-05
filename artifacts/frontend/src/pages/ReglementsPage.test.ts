@@ -176,4 +176,92 @@ describe("modale de validation d'un règlement", () => {
       true,
     );
   });
+
+  it("conserve le total affiché en répartissant net cacao et reliquat entre espèces et chèque", async () => {
+    const onConfirm = vi.fn();
+    const paiement = {
+      id: 44,
+      membreNom: "Kouassi",
+      membrePrenoms: "Awa",
+      montantFcfa: 500_000,
+      montantBrutFcfa: 517_500,
+      montantNetFcfa: 500_000,
+      statut: "en_attente",
+      modePaiement: null,
+      livraisonId: 101,
+      livraisonStatutPaiement: "EN_ATTENTE",
+      livraisonMontantRestant: 495_000,
+      commissionCollecteId: 9,
+      commissionCollecteFcfa: 22_500,
+      commissionCollecteStatut: "en_attente",
+      commissionCollecteAvanceDisponibleFcfa: 10_000,
+      commissionCollecteFrequencePaiement: "fin_campagne",
+    } as PaiementListItem;
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root.render(createElement(ModalValidation, {
+        paiement,
+        onClose: vi.fn(),
+        onConfirm,
+        loading: false,
+        sessionCaisseOuverte: true,
+      }));
+    });
+
+    const radios = Array.from(container.querySelectorAll<HTMLInputElement>('input[type="radio"]'));
+    await act(async () => {
+      radios[1]!.click();
+    });
+
+    const multiMoyens = container.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    expect(multiMoyens).toBeDefined();
+    await act(async () => {
+      multiMoyens!.click();
+    });
+
+    const montants = Array.from(container.querySelectorAll<HTMLInputElement>('input[inputmode="numeric"]')).slice(-2);
+    expect(montants).toHaveLength(2);
+    await act(async () => {
+      const setInputValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setInputValue?.call(montants[0], "300000");
+      montants[0]!.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    const totalVentile = Array.from(container.querySelectorAll("div")).find((element) =>
+      element.firstElementChild?.textContent === "Total ventilé",
+    );
+    expect(totalVentile).toBeDefined();
+    expect(normaliserEspaces(totalVentile!.textContent ?? "")).toContain("507 500 FCFA / 507 500 FCFA");
+
+    const confirmButton = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Confirmer et payer"),
+    );
+    expect(confirmButton).toBeDefined();
+    await act(async () => {
+      confirmButton!.click();
+    });
+
+    expect(onConfirm).toHaveBeenCalledWith(
+      "",
+      "",
+      507_500,
+      undefined,
+      [
+        { modePaiement: "especes", montantFcfa: 300_000 },
+        {
+          modePaiement: "cheque",
+          montantFcfa: 207_500,
+          numeroCheque: null,
+          banque: null,
+          dateEcheance: null,
+        },
+      ],
+      undefined,
+      true,
+    );
+  });
 });
