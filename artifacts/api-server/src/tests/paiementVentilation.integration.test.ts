@@ -1309,8 +1309,9 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
     const payment = await client.query(
       `INSERT INTO paiements
          (libelle, mode_reglement, montant_a_payer_fcfa, montant_verse_fcfa,
-          reste_a_payer_fcfa, montant_fcfa, mode_paiement, statut)
-       VALUES ($1, $2, $3::numeric, $3::numeric, 0, $5::integer, $4, 'confirme')
+          reste_a_payer_fcfa, montant_fcfa, mode_paiement, statut, date_validation)
+       VALUES ($1, $2, $3::numeric, $3::numeric, 0, $5::integer, $4,
+               'confirme', $6::timestamptz)
        RETURNING id`,
       [
         `Encaissement vente exportateur #${saleId}`,
@@ -1318,6 +1319,7 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
         total,
         lines.length === 1 ? lines[0]!.mode : null,
         total,
+        `${postgresReferenceDate}T12:00:00.000Z`,
       ],
     );
     const paymentId = payment.rows[0].id as number;
