@@ -768,24 +768,33 @@ export async function getStatsCarburant(cooperativeId: number, filters: { vehicu
   const [totaux] = await db
     .select({
       nb_bons:            sql<string>`COUNT(*)`,
-      qte_autorisee_l:    sql<string>`COALESCE(SUM(quantite_autorisee),0)`,
-      qte_livree_l:       sql<string>`COALESCE(SUM(quantite_livree),0)`,
+      qte_autorisee_l:    sql<string>`COALESCE(SUM(${bonsCarburantTable.quantiteAutorisee}),0)`,
+      qte_livree_l:       sql<string>`COALESCE(SUM(${bonsCarburantTable.quantiteLivree}),0)`,
       montant_autorise_total_fcfa: sql<string>`COALESCE(SUM(${bonsCarburantTable.montantAutoriseFcfa}),0)`,
-      montant_total_fcfa: sql<string>`COALESCE(SUM(montant_fcfa),0)`,
+      montant_total_fcfa: sql<string>`COALESCE(SUM(${bonsCarburantTable.montantFcfa}),0)`,
+    })
+    .from(bonsCarburantTable)
+    .where(and(...conds));
+
+  // Agréger les paiements séparément évite de compter deux fois un bon qui
+  // possède plusieurs versements partiels.
+  const [totauxPaiements] = await db
+    .select({
       nb_bons_en_attente_reglement: sql<string>`
-        COUNT(DISTINCT CASE WHEN ${paiementsTable.statut} = 'en_attente' THEN ${bonsCarburantTable.id} END)`,
+        COUNT(DISTINCT CASE WHEN ${paiementsTable.statut} = 'en_attente'
+          THEN ${paiementsTable.bonCarburantId} END)`,
       montant_total_en_attente_reglement_fcfa: sql<string>`
         COALESCE(SUM(CASE WHEN ${paiementsTable.statut} = 'en_attente'
           THEN ${paiementsTable.montantFcfa} ELSE 0 END), 0)`,
       nb_bons_regles: sql<string>`
         COUNT(DISTINCT CASE WHEN ${paiementsTable.statut} IN ('confirme', 'effectue')
-          THEN ${bonsCarburantTable.id} END)`,
+          THEN ${paiementsTable.bonCarburantId} END)`,
       montant_total_regle_fcfa: sql<string>`
         COALESCE(SUM(CASE WHEN ${paiementsTable.statut} IN ('confirme', 'effectue')
           THEN ${paiementsTable.montantFcfa} ELSE 0 END), 0)`,
     })
-    .from(bonsCarburantTable)
-    .leftJoin(paiementsTable, eq(paiementsTable.bonCarburantId, bonsCarburantTable.id))
+    .from(paiementsTable)
+    .innerJoin(bonsCarburantTable, eq(paiementsTable.bonCarburantId, bonsCarburantTable.id))
     .where(and(...conds));
 
   const parVehicule = await db
@@ -794,16 +803,15 @@ export async function getStatsCarburant(cooperativeId: number, filters: { vehicu
       immatriculation:  vehiculesTable.immatriculation,
       marque:           vehiculesTable.marque,
       nb_bons:          sql<string>`COUNT(*)`,
-      qte_livree_l:     sql<string>`COALESCE(SUM(quantite_livree),0)`,
+      qte_livree_l:     sql<string>`COALESCE(SUM(${bonsCarburantTable.quantiteLivree}),0)`,
       montant_autorise_fcfa: sql<string>`COALESCE(SUM(${bonsCarburantTable.montantAutoriseFcfa}),0)`,
       montant_fcfa:     sql<string>`COALESCE(SUM(${bonsCarburantTable.montantFcfa}),0)`,
     })
     .from(bonsCarburantTable)
     .leftJoin(vehiculesTable, eq(vehiculesTable.id, bonsCarburantTable.vehiculeId))
-    .leftJoin(paiementsTable, eq(paiementsTable.bonCarburantId, bonsCarburantTable.id))
     .where(and(...conds))
     .groupBy(bonsCarburantTable.vehiculeId, vehiculesTable.immatriculation, vehiculesTable.marque)
-    .orderBy(desc(sql`SUM(quantite_livree)`));
+    .orderBy(desc(sql`SUM(${bonsCarburantTable.quantiteLivree})`));
 
   return {
     nb_bons:            parseInt(totaux?.nb_bons ?? "0"),
@@ -811,12 +819,12 @@ export async function getStatsCarburant(cooperativeId: number, filters: { vehicu
     qte_livree_l:       parseFloat(totaux?.qte_livree_l ?? "0"),
     montant_autorise_total_fcfa: Math.round(parseFloat(totaux?.montant_autorise_total_fcfa ?? "0")),
     montant_total_fcfa: Math.round(parseFloat(totaux?.montant_total_fcfa ?? "0")),
-    nb_bons_en_attente_reglement: parseInt(totaux?.nb_bons_en_attente_reglement ?? "0"),
+    nb_bons_en_attente_reglement: parseInt(totauxPaiements?.nb_bons_en_attente_reglement ?? "0"),
     montant_total_en_attente_reglement_fcfa: Math.round(
-      parseFloat(totaux?.montant_total_en_attente_reglement_fcfa ?? "0"),
+      parseFloat(totauxPaiements?.montant_total_en_attente_reglement_fcfa ?? "0"),
     ),
-    nb_bons_regles: parseInt(totaux?.nb_bons_regles ?? "0"),
-    montant_total_regle_fcfa: Math.round(parseFloat(totaux?.montant_total_regle_fcfa ?? "0")),
+    nb_bons_regles: parseInt(totauxPaiements?.nb_bons_regles ?? "0"),
+    montant_total_regle_fcfa: Math.round(parseFloat(totauxPaiements?.montant_total_regle_fcfa ?? "0")),
     par_vehicule:       parVehicule.map(r => ({
       vehicule_id:     r.vehicule_id,
       immatriculation: r.immatriculation,
