@@ -55,7 +55,7 @@ export function determinerCompteTiersSage(params: {
     return "";
   }
   const tiersId = params.tiersId;
-  if (!params.tiersType || !Number.isInteger(tiersId) || tiersId <= 0) {
+  if (!params.tiersType || typeof tiersId !== "number" || !Number.isInteger(tiersId) || tiersId <= 0) {
     return "";
   }
 
