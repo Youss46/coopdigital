@@ -1793,7 +1793,20 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
     }
 
     res.json(result.rows.map((row) => {
-      const comptesAuxiliaires = mappingsByTier.get(`${tiersType}:${row.tiersId}`) ?? [];
+      const mappingTypes = tiersType === "membre"
+        ? ["membre", "membre_delegue"]
+        : tiersType === "membre_delegue"
+          ? ["membre_delegue", "membre"]
+          : [tiersType];
+      const comptesParCollectif = new Map<string, { compteCollectif: string; numeroCompte: string }>();
+      for (const mappingType of mappingTypes) {
+        for (const mapping of mappingsByTier.get(`${mappingType}:${row.tiersId}`) ?? []) {
+          if (!comptesParCollectif.has(mapping.compteCollectif)) {
+            comptesParCollectif.set(mapping.compteCollectif, mapping);
+          }
+        }
+      }
+      const comptesAuxiliaires = [...comptesParCollectif.values()];
       const preferredCollectifs = COMPTES_COLLECTIFS_PAR_TYPE[tiersType];
       const compteAuxiliaire =
         preferredCollectifs.map((compte) => comptesAuxiliaires.find((item) => item.compteCollectif === compte)?.numeroCompte)
