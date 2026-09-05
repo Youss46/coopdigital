@@ -28,6 +28,7 @@
 - [Conversion de pesée — poids minimum](pesee-conversion-poids-minimum.md) — une livraison ne peut être créée que si la session totalise un poids net strictement positif; l’interface doit l’expliquer avant toute confirmation.
 - [Peseur rattaché délégué](peseur-delegue.md) — users.delegue_id (FK self-ref); JwtPayload sans section → fetch DB dans createPeseurParDelegue; role "peseur" casté as any (hors USER_ROLES const).
 - [Plan comptable module — sans codegen](plan-comptable-no-codegen.md) — pages utilisant uniquement l'API interne (plan, params, corrections) peuvent se passer d'Orval; utiliser apiFetch/apiPost/apiPut locaux + useQuery/useMutation directement plutôt que les hooks générés.
+- [Filtrage trésorerie des charges diverses](charges-diverses-tresorerie-filter.md) — le mode de paiement filtre les sources compatibles: caisse, banque ou compte marchand.
 - [cooperatives.nom not libelle](cooperatives-nom.md) — cooperatives table uses `nom` column (not `libelle`); columns are: id, nom, ville, region, created_at.
 - [TS project references — rebuild after schema/codegen changes](ts-project-refs-rebuild.md) — after modifying lib/db schema or running Orval codegen, must run `tsc --build` on the affected lib package to refresh dist/*.d.ts; stale dist causes TS errors in consumers even though exports point to src/.
 - [Drizzle migrations — schéma drizzle et pre-population](drizzle-migration-schema.md) — Drizzle stocke migrations dans schéma SQL "drizzle" (pas "public"); logique LIMIT 1 DESC pour skip; pré-peupler via script node avant de lancer migrate().
