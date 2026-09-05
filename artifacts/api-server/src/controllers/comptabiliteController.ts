@@ -2108,8 +2108,8 @@ export async function exportJournalSageTxt(req: Request, res: Response): Promise
         numeroPiece: ecriture.numeroPiece,
       });
       const side = (compteBrut: string, debit: number, credit: number) => {
-        const compte = normaliserNumeroCompte(compteBrut);
-        const compteCollectif = determinerCompteCollectifSage(compte);
+      const compte = normaliserNumeroCompte(compteBrut);
+      const compteCollectif = determinerCompteCollectifSage(compte);
         const mapped = byCollectif?.get(compte) ?? (
           compteCollectif !== compte ? byCollectif?.get(compteCollectif) : undefined
         );
@@ -2124,7 +2124,7 @@ export async function exportJournalSageTxt(req: Request, res: Response): Promise
           journalEcriture,
           ecriture.numeroPiece ?? "",
           ecriture.libelle,
-          compte,
+          compteCollectif,
           mapped ?? compte,
           codeTiers,
           ecriture.tiersType ?? "",

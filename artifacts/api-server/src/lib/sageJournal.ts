@@ -23,10 +23,13 @@ function estCompte(compte: string, prefix: string): boolean {
 
 export function determinerCompteCollectifSage(compteBrut: string | null | undefined): string {
   const compte = normaliserNumeroCompte(compteBrut ?? "");
+  if (compte === "401000" || compte === "409100" || compte === "409200" || compte === "411000" || compte === "411100" || compte === "421000") {
+    return compte;
+  }
   if (compte.startsWith("401")) return "401000";
   if (compte.startsWith("4091")) return "409100";
   if (compte.startsWith("4092")) return "409200";
-  if (compte.startsWith("4111")) return "411000";
+  if (compte.startsWith("4111")) return "411100";
   if (compte.startsWith("411")) return "411000";
   if (compte.startsWith("421")) return "421000";
   return compte;
@@ -62,7 +65,11 @@ export function determinerCompteTiersSage(params: {
   tiersId: number | null | undefined;
 }): string {
   const compteCollectif = determinerCompteCollectifSage(params.compte);
-  if (compteCollectif !== COMPTE_COLLECTIF_FOURNISSEUR && compteCollectif !== COMPTE_COLLECTIF_CLIENT) {
+  if (
+    compteCollectif !== COMPTE_COLLECTIF_FOURNISSEUR
+    && compteCollectif !== COMPTE_COLLECTIF_CLIENT
+    && compteCollectif !== "411100"
+  ) {
     return "";
   }
   const tiersId = params.tiersId;
