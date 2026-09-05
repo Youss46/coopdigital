@@ -222,7 +222,7 @@ export async function getRecuPaiement(req: Request, res: Response): Promise<void
     const buffer = await generateRecuPaiement(id, cooperativeId);
     sendPdf(res, buffer, `recu_paiement_${id}.pdf`);
   } catch (err) {
-    req.log.error({ err }, "Erreur getRecuPaiement");
+    req.log?.error({ err }, "Erreur getRecuPaiement");
     if (err instanceof Error && err.message.includes("introuvable")) {
       res.status(404).json({ erreur: err.message });
     } else {

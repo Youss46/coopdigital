@@ -40,6 +40,11 @@ describe.skipIf(!enabled)("bons d'achat pièces idempotents sur PostgreSQL", () 
   let vehicleId: number;
   let caisseId: number;
   let mobileAccountId: number;
+  let otherCooperativeId: number;
+  let otherUserId: number;
+  let otherVehicleId: number;
+  let otherDepenseId: number;
+  let otherPaymentId: number;
   const depenseIds: number[] = [];
   const paymentIds: number[] = [];
 
@@ -112,6 +117,52 @@ describe.skipIf(!enabled)("bons d'achat pièces idempotents sur PostgreSQL", () 
        VALUES ($1, true)`,
       [cooperativeId],
     );
+
+    const otherCooperative = await client.query(
+      `INSERT INTO cooperatives (nom, ville, region)
+       VALUES ($1, 'Test', 'Test')
+       RETURNING id`,
+      [`Bons achat pièces autre coop ${suffix}`],
+    );
+    otherCooperativeId = otherCooperative.rows[0].id;
+
+    const otherUser = await client.query(
+      `INSERT INTO users
+         (cooperative_id, nom, prenoms, email, password_hash, role)
+       VALUES ($1, 'Autre', 'Coopérative', $2, 'integration-test', 'comptable')
+       RETURNING id`,
+      [otherCooperativeId, `bons-pieces-autre-${suffix}@test.invalid`],
+    );
+    otherUserId = otherUser.rows[0].id;
+
+    const otherVehicle = await client.query(
+      `INSERT INTO vehicules
+         (cooperative_id, immatriculation, marque, modele, type)
+       VALUES ($1, $2, 'Autre', 'Coopérative', 'camion')
+       RETURNING id`,
+      [otherCooperativeId, `TEST-AUTRE-${process.pid}`],
+    );
+    otherVehicleId = otherVehicle.rows[0].id;
+
+    const otherDepense = await client.query(
+      `INSERT INTO depenses_vehicule
+         (cooperative_id, vehicule_id, type, date_depense, montant_fcfa, libelle, demandeur, fournisseur)
+       VALUES ($1, $2, 'piece_rechange', CURRENT_DATE, 1000, 'Pièce autre coop', 'Demandeur autre coop', 'Fournisseur autre coop')
+       RETURNING id`,
+      [otherCooperativeId, otherVehicleId],
+    );
+    otherDepenseId = otherDepense.rows[0].id;
+
+    const otherPayment = await client.query(
+      `INSERT INTO paiements
+         (cooperative_id, depense_vehicule_id, montant_fcfa, montant_a_payer_fcfa,
+          montant_verse_fcfa, reste_a_payer_fcfa, libelle, numero_recu, statut, initialise_par)
+       VALUES ($1, $2, 1000, 1000, 0, 1000, 'Achat pièce autre coop',
+               'REC-AUTRE-001', 'en_attente', $3)
+       RETURNING id`,
+      [otherCooperativeId, otherDepenseId, otherUserId],
+    );
+    otherPaymentId = otherPayment.rows[0].id;
 
     // Ralentir l'INSERT du premier appel afin de garantir que Promise.all
     // exerce réellement le second appel pendant que le premier est actif.
@@ -234,6 +285,11 @@ describe.skipIf(!enabled)("bons d'achat pièces idempotents sur PostgreSQL", () 
       await client.query(`DELETE FROM vehicules WHERE cooperative_id = $1`, [cooperativeId]);
       await client.query(`DELETE FROM users WHERE id = $1`, [userId]);
       await client.query(`DELETE FROM cooperatives WHERE id = $1`, [cooperativeId]);
+      await client.query(`DELETE FROM paiements WHERE id = $1`, [otherPaymentId]);
+      await client.query(`DELETE FROM depenses_vehicule WHERE id = $1`, [otherDepenseId]);
+      await client.query(`DELETE FROM vehicules WHERE id = $1`, [otherVehicleId]);
+      await client.query(`DELETE FROM users WHERE id = $1`, [otherUserId]);
+      await client.query(`DELETE FROM cooperatives WHERE id = $1`, [otherCooperativeId]);
       await client.query("COMMIT");
     } catch (error) {
       await client.query("ROLLBACK").catch(() => undefined);
@@ -413,6 +469,23 @@ describe.skipIf(!enabled)("bons d'achat pièces idempotents sur PostgreSQL", () 
     expect(response.headers.get("content-type")).toMatch(/application\/pdf/);
     expect(normalizedText).toContain("DEMANDEUR RECU PIECE");
     expect(normalizedText).toContain("PIECE DE RECHANGE");
+  });
+
+  it("refuse le reçu d'une autre coopérative tout en autorisant celui de la coopérative courante", async () => {
+    const ownPaymentId = await emitAndGetPaymentId("Reçu coopérative courante");
+
+    const foreignResponse = await fetch(`${baseUrl}/rapports/recu/paiement/${otherPaymentId}`);
+    const foreignBody = await foreignResponse.json() as { erreur: string };
+
+    expect(foreignResponse.status).toBe(404);
+    expect(foreignBody).toEqual({ erreur: "Paiement introuvable" });
+
+    const ownResponse = await fetch(`${baseUrl}/rapports/recu/paiement/${ownPaymentId}`);
+    const ownBody = Buffer.from(await ownResponse.arrayBuffer());
+
+    expect(ownResponse.status).toBe(200);
+    expect(ownResponse.headers.get("content-type")).toMatch(/application\/pdf/);
+    expect(ownBody.slice(0, 4).toString()).toBe("%PDF");
   });
 
   it("télécharge une dépense historique sans demandeur avec le repli —", async () => {

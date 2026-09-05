@@ -1074,7 +1074,10 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
     .leftJoin(depensesVehiculeTable, eq(paiementsTable.depenseVehiculeId, depensesVehiculeTable.id))
     .leftJoin(validateurAlias, eq(paiementsTable.validePar, validateurAlias.id))
     .leftJoin(saisiseurPayAlias, eq(paiementsTable.agentSaisiseurId, saisiseurPayAlias.id))
-    .where(eq(paiementsTable.id, paiementId));
+    .where(and(
+      eq(paiementsTable.id, paiementId),
+      eq(paiementsTable.cooperativeId, cooperativeId),
+    ));
   if (!row) throw new Error("Paiement introuvable");
   const paiementRegle = row.statut === "effectue" || row.statut === "confirme";
   const dateReglement = paiementRegle ? (row.dateValidation ?? row.createdAt) : null;
