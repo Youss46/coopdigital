@@ -360,6 +360,15 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
     return res;
   }
 
+  async function setAutoAvances(enabled: boolean): Promise<void> {
+    await client.query(
+      `UPDATE config_comptable
+       SET auto_avances = $2
+       WHERE cooperative_id = $1`,
+      [cooperativeId, enabled],
+    );
+  }
+
   async function paymentEffects(paymentId: number) {
     const [payment, lines, movements, mobileMovements, cheques, accounting] = await Promise.all([
       pool.query(`SELECT statut FROM paiements WHERE id = $1`, [paymentId]),
@@ -542,6 +551,73 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
       cheques: 0,
       accounting: 0,
     });
+  });
+
+  it("enregistre automatiquement la retenue d'avance avec les comptes 401/4091", async () => {
+    const { paymentId, commissionId, advanceId } = await createCommissionCoveredPayment();
+
+    await setAutoAvances(true);
+    try {
+      const result = await validate(paymentId, {
+        montantReglementFcfa: 495_000,
+        ventilations: [
+          { modePaiement: "especes", montantFcfa: 495_000 },
+        ],
+        inclureFraisCollecte: true,
+      });
+
+      expect(result.statusCode).toBe(200);
+      expect(await client.query(
+        `SELECT compte_debit, compte_credit, montant_fcfa
+         FROM ecritures_comptables
+         WHERE cooperative_id = $1
+           AND source = 'avance'
+           AND source_id = $2`,
+        [cooperativeId, memberId],
+      )).toMatchObject({
+        rows: [{
+          compte_debit: "401",
+          compte_credit: "4091",
+          montant_fcfa: 22500,
+        }],
+      });
+      expect(await client.query(
+        `SELECT count(*)::int AS count
+         FROM ecritures_comptables
+         WHERE cooperative_id = $1
+           AND source = 'avance'
+           AND source_id = $2
+           AND montant_fcfa = 22500`,
+        [cooperativeId, memberId],
+      )).toMatchObject({ rows: [{ count: 1 }] });
+      expect(await client.query(
+        `SELECT count(*)::int AS count
+         FROM ecritures_en_attente
+         WHERE cooperative_id = $1
+           AND source = 'avance'
+           AND source_id = $2
+           AND montant_fcfa = 22500`,
+        [cooperativeId, memberId],
+      )).toMatchObject({ rows: [{ count: 0 }] });
+      expect(await client.query(
+        `SELECT statut, retenue_avances_fcfa
+         FROM commissions_membres_delegues
+         WHERE id = $1`,
+        [commissionId],
+      )).toMatchObject({
+        rows: [{ statut: "payé", retenue_avances_fcfa: 22500 }],
+      });
+      expect(await client.query(
+        `SELECT solde_restant_fcfa, montant_rembourse_fcfa, statut
+         FROM avances
+         WHERE id = $1`,
+        [advanceId],
+      )).toMatchObject({
+        rows: [{ solde_restant_fcfa: 0, montant_rembourse_fcfa: 22500, statut: "rembourse" }],
+      });
+    } finally {
+      await setAutoAvances(false);
+    }
   });
 
   it("accepte le montant ventilé hors commission quand l'avance couvre toute la commission", async () => {
