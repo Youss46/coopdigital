@@ -1764,7 +1764,7 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
     for (const mapping of mappings) {
       const key = `${mapping.tiersType}:${mapping.tiersId}`;
       const current = mappingsByTier.get(key) ?? [];
-      current.push({ compteCollectif: mapping.compteCollectif, numeroCompte: mapping.numeroCompte });
+      current.push({ compteCollectif: normaliserNumeroCompte(mapping.compteCollectif), numeroCompte: mapping.numeroCompte });
       mappingsByTier.set(key, current);
     }
 
@@ -1825,7 +1825,7 @@ export async function updateComptesTiers(req: Request, res: Response): Promise<v
     const comptes = input.comptes.map((item) => {
       const value = item as { compteCollectif?: unknown; numeroCompte?: unknown };
       return {
-        compteCollectif: String(value.compteCollectif ?? "").trim(),
+        compteCollectif: normaliserNumeroCompte(String(value.compteCollectif ?? "").trim()),
         numeroCompte: String(value.numeroCompte ?? "").trim().toUpperCase(),
       };
     });
@@ -1949,7 +1949,7 @@ export async function exportJournalSageTxt(req: Request, res: Response): Promise
     for (const mapping of mappings) {
       const key = `${mapping.tiersType}:${mapping.tiersId}`;
       const byCollectif = mappingByTier.get(key) ?? new Map<string, string>();
-      byCollectif.set(mapping.compteCollectif, mapping.numeroCompte);
+      byCollectif.set(normaliserNumeroCompte(mapping.compteCollectif), mapping.numeroCompte);
       mappingByTier.set(key, byCollectif);
     }
 

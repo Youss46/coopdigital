@@ -2830,6 +2830,18 @@ const TYPES_TIERS = [
   { id: "fournisseur_ext", label: "Fournisseurs ext.", labelDu: "Dû fournisseur (401)", labelPaye: "Payé", showIntrants: false, lienBase: null, comptes: ["401"] },
 ] as const;
 type TiersType = typeof TYPES_TIERS[number]["id"];
+const COMPTE_COLLECTIF_CANONIQUE: Record<string, string> = {
+  "401": "401000",
+  "4091": "409100",
+  "4092": "409200",
+  "411": "411000",
+  "4111": "411100",
+  "421": "421000",
+};
+
+function normaliserCompteCollectif(numero: string): string {
+  return COMPTE_COLLECTIF_CANONIQUE[numero] ?? numero;
+}
 
 function OngletBalanceAuxiliaire() {
   const { toast } = useToast();
@@ -2864,7 +2876,9 @@ function OngletBalanceAuxiliaire() {
   const ouvrirEdition = (ligne: BalanceAuxLigne) => {
     const valeurs: Record<string, string> = {};
     typeMeta.comptes.forEach((compte) => {
-      valeurs[compte] = ligne.comptesAuxiliaires?.find((item) => item.compteCollectif === compte)?.numeroCompte ?? "";
+      valeurs[compte] = ligne.comptesAuxiliaires
+        ?.find((item) => normaliserCompteCollectif(item.compteCollectif) === normaliserCompteCollectif(compte))
+        ?.numeroCompte ?? "";
     });
     setEdition({ tiersId: ligne.tiersId, valeurs });
   };
