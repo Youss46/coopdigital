@@ -8,7 +8,7 @@ import ExcelJS from "exceljs";
 import Anthropic from "@anthropic-ai/sdk";
 import { genererNumeroRecu } from "../services/recuService.js";
 import { normaliserNumeroCompte } from "../lib/numeroCompte.js";
-import { determinerCodeJournal } from "../lib/sageJournal.js";
+import { determinerCodeJournal, determinerCompteTiersSage } from "../lib/sageJournal.js";
 
 class TenantError extends Error {
   readonly status = 401;
@@ -81,7 +81,7 @@ export function buildSageTxt(
       line[3] || "",
       montant,
       sens,
-      "OD",
+      line[10] || "",
     ].map(sageTxtField).join(";");
   });
 
@@ -1992,6 +1992,11 @@ export async function exportJournalSageTxt(req: Request, res: Response): Promise
           ecriture.tiersType ?? "",
           String(debit),
           String(credit),
+          determinerCompteTiersSage({
+            compte: mapped ?? compte,
+            tiersType: ecriture.tiersType,
+            tiersId: ecriture.tiersId,
+          }),
         ]);
       };
       side(ecriture.compteDebit, ecriture.montantFcfa, 0);

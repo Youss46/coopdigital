@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildSageTxt } from "../controllers/comptabiliteController.js";
-import { determinerCodeJournal } from "../lib/sageJournal.js";
+import { determinerCodeJournal, determinerCompteTiersSage } from "../lib/sageJournal.js";
 
 describe("buildSageTxt", () => {
   it("détermine le journal Sage selon la nature de chaque transaction", () => {
@@ -64,8 +64,8 @@ describe("buildSageTxt", () => {
       ["2026-08-29", "BQ", "PAI-002", "Paiement chèque", "521", "521", "", "", "200000", "0"],
     ]);
 
-    expect(txt).toContain("CAIS;280826;PAI-001;571000;Paiement especes;100000;D;OD");
-    expect(txt).toContain("BQ;290826;PAI-002;521000;Paiement cheque;200000;D;OD");
+    expect(txt).toContain("CAIS;280826;PAI-001;571000;Paiement especes;100000;D;");
+    expect(txt).toContain("BQ;290826;PAI-002;521000;Paiement cheque;200000;D;");
   });
 
   it("génère l'en-tête Sage et l'ordre de colonnes attendu par le profil réel", () => {
@@ -80,10 +80,11 @@ describe("buildSageTxt", () => {
       "",
       "125000",
       "0",
+      "",
     ]]);
 
     expect(txt).toContain("#FLG 001\r\n#VER 8\r\n#DEV XOF\r\n#MECG\r\nCAIS\r\n");
-    expect(txt).toContain("CAIS;280826;P-001;401000;Achat & reglement, urgent;125000;D;OD");
+    expect(txt).toContain("CAIS;280826;P-001;401000;Achat & reglement, urgent;125000;D;");
     expect(txt.endsWith("\r\n")).toBe(true);
   });
 
@@ -100,6 +101,7 @@ describe("buildSageTxt", () => {
         "membre",
         "285000",
         "0",
+       "MEM-000017",
       ],
       [
         "2026-08-26",
@@ -112,13 +114,14 @@ describe("buildSageTxt", () => {
         "",
         "0",
         "285000",
+       "",
       ],
     ]);
 
     const dataLines = txt.split("\r\n").slice(5, -1);
     expect(dataLines).toEqual([
-      "ACH;260826;LIV-2026-000001;401000;Achat cacao - Koffi Konan;285000;D;OD",
-      "ACH;260826;LIV-2026-000001;601000;Achat cacao - Koffi Konan;285000;C;OD",
+      "ACH;260826;LIV-2026-000001;401000;Achat cacao - Koffi Konan;285000;D;MEM-000017",
+      "ACH;260826;LIV-2026-000001;601000;Achat cacao - Koffi Konan;285000;C;",
     ]);
     expect(dataLines.every((line) => line.split(";").length === 8)).toBe(true);
     expect(dataLines.some((line) => line.includes("membre-17"))).toBe(false);
@@ -126,10 +129,10 @@ describe("buildSageTxt", () => {
 
   it("normalise les libellés pour l'encodage ASCII Sage et garde les totaux équilibrés", () => {
     const txt = buildSageTxt(2026, "CAIS", [
-      ["2026-08-28", "CAIS", "PAI-001", "Chèque encaissé — Soro n°1212", "401", "401000", "", "", "1000000", "0"],
-      ["2026-08-28", "CAIS", "PAI-001", "Chèque encaissé — Soro n°1212", "521", "521000", "", "", "0", "1000000"],
-      ["2026-08-29", "CAIS", "", "Frais d'achat œufs", "601", "601000", "", "", "125000", "0"],
-      ["2026-08-29", "CAIS", "", "Frais d'achat œufs", "571", "571000", "", "", "0", "125000"],
+      ["2026-08-28", "CAIS", "PAI-001", "Chèque encaissé — Soro n°1212", "401", "401000", "", "", "1000000", "0", "FOU-000121"],
+      ["2026-08-28", "CAIS", "PAI-001", "Chèque encaissé — Soro n°1212", "521", "521000", "", "", "0", "1000000", ""],
+      ["2026-08-29", "CAIS", "", "Frais d'achat œufs", "601", "601000", "", "", "125000", "0", ""],
+      ["2026-08-29", "CAIS", "", "Frais d'achat œufs", "571", "571000", "", "", "0", "125000", ""],
     ]);
 
     const dataLines = txt.split("\r\n").slice(5, -1);
@@ -145,8 +148,31 @@ describe("buildSageTxt", () => {
       { debit: 0, credit: 0 },
     );
 
-    expect(dataLines).toContain("CAIS;280826;PAI-001;401000;Cheque encaisse - Soro n 1212;1000000;D;OD");
-    expect(dataLines).toContain("CAIS;290826;;601000;Frais d'achat oeufs;125000;D;OD");
+    expect(dataLines).toContain("CAIS;280826;PAI-001;401000;Cheque encaisse - Soro n 1212;1000000;D;FOU-000121");
+    expect(dataLines).toContain("CAIS;290826;;601000;Frais d'achat oeufs;125000;D;");
     expect(totals).toEqual({ debit: 1125000, credit: 1125000 });
+  });
+
+  it("génère un compte tiers stable uniquement pour 401000 et 411000", () => {
+    expect(determinerCompteTiersSage({
+      compte: "401",
+      tiersType: "membre",
+      tiersId: 17,
+    })).toBe("MEM-000017");
+    expect(determinerCompteTiersSage({
+      compte: "411000",
+      tiersType: "exportateur",
+      tiersId: 8,
+    })).toBe("CLI-000008");
+    expect(determinerCompteTiersSage({
+      compte: "601000",
+      tiersType: "membre",
+      tiersId: 17,
+    })).toBe("");
+    expect(determinerCompteTiersSage({
+      compte: "401000",
+      tiersType: null,
+      tiersId: null,
+    })).toBe("");
   });
 });

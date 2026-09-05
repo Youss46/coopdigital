@@ -10,12 +10,56 @@ export interface TransactionJournalSage {
   numeroPiece?: string | null;
 }
 
+const COMPTE_COLLECTIF_FOURNISSEUR = "401000";
+const COMPTE_COLLECTIF_CLIENT = "411000";
+
 function normaliserTexte(value: string | null | undefined): string {
   return (value ?? "").trim().toLowerCase();
 }
 
 function estCompte(compte: string, prefix: string): boolean {
   return normaliserNumeroCompte(compte).startsWith(prefix);
+}
+
+function prefixeCompteTiers(tiersType: string): string {
+  switch (normaliserTexte(tiersType)) {
+    case "membre":
+      return "MEM";
+    case "membre_delegue":
+      return "MDE";
+    case "delegue":
+      return "DEL";
+    case "fournisseur_ext":
+      return "FOU";
+    case "exportateur":
+      return "CLI";
+    default:
+      return "TIE";
+  }
+}
+
+/**
+ * Retourne le compte auxiliaire Sage d'une ligne qui touche un collectif.
+ *
+ * Les identifiants internes sont utilisés volontairement : ils sont stables,
+ * indépendants des changements de nom et ne créent pas de collision entre
+ * les différents types de tiers.
+ */
+export function determinerCompteTiersSage(params: {
+  compte: string | null | undefined;
+  tiersType: string | null | undefined;
+  tiersId: number | null | undefined;
+}): string {
+  const compte = normaliserNumeroCompte(params.compte ?? "");
+  if (compte !== COMPTE_COLLECTIF_FOURNISSEUR && compte !== COMPTE_COLLECTIF_CLIENT) {
+    return "";
+  }
+  const tiersId = params.tiersId;
+  if (!params.tiersType || !Number.isInteger(tiersId) || tiersId <= 0) {
+    return "";
+  }
+
+  return `${prefixeCompteTiers(params.tiersType)}-${String(tiersId).padStart(6, "0")}`;
 }
 
 function estAchatAutreQueCacao(transaction: TransactionJournalSage): boolean {
