@@ -7,6 +7,7 @@
  */
 export function normaliserNumeroCompte(numero: string): string {
   const valeur = numero.trim();
+  if (valeur === "31" || valeur === "310000") return "311000";
   if (/^\d{1,6}$/.test(valeur)) return valeur.padEnd(6, "0");
   return valeur;
 }

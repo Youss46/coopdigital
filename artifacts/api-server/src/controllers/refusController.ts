@@ -219,7 +219,7 @@ export async function traiterRefus(req: Request, res: Response) {
       source: "stock",
       sourceId: refus.id,
       libelle: `Retour stock lot refoulé #${refus.venteExportateurId}`,
-      compteDebit: "31",
+      compteDebit: "311000",
       compteCredit: "603",
       montantFcfa: montantEstime,
       date: dateOp,
@@ -231,7 +231,7 @@ export async function traiterRefus(req: Request, res: Response) {
       sourceId: refus.id,
       libelle: `Perte lot refoulé #${refus.venteExportateurId}`,
       compteDebit: "6031",
-      compteCredit: "31",
+      compteCredit: "311000",
       montantFcfa: montantEstime,
       date: dateOp,
     });
