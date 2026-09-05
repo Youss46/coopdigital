@@ -1493,11 +1493,6 @@ function OngletPlanComptable() {
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
         <span>{comptesFiltresUniques} compte{comptesFiltresUniques > 1 ? "s" : ""} affiché{comptesFiltresUniques > 1 ? "s" : ""}</span>
-        {statutSyscohada && (
-          <span className={statutSyscohada.complet ? "text-green-700" : "text-amber-700"}>
-            SYSCOHADA : {statutSyscohada.charges}/{statutSyscohada.attendu} comptes chargés
-          </span>
-        )}
       </div>
 
       {isLoading ? (
