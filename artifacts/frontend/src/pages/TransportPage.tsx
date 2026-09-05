@@ -1581,7 +1581,12 @@ function TabCarburant() {
   };
   const bonsQ  = useGetBonsCarburant(bonsParams);
   const bons   = bonsQ.data?.bons ?? [];
-  const statsQ = useGetStatsCarburant();
+  const statsParams = {
+    ...(filterVehicule !== "all" ? { vehicule_id: parseInt(filterVehicule) } : {}),
+    ...(filterDebut ? { date_debut: filterDebut } : {}),
+    ...(filterFin   ? { date_fin:   filterFin }   : {}),
+  };
+  const statsQ = useGetStatsCarburant(statsParams);
   const stats  = statsQ.data;
 
   // Dialogs

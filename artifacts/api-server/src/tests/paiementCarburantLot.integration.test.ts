@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { pool } from "@workspace/db";
 import { validerLotPaiementsCarburant } from "../controllers/paiementsController.js";
+import { getStatsCarburant } from "../services/transportService.js";
 
 const enabled =
   process.env.RUN_POSTGRES_INTEGRATION === "1" &&
@@ -323,6 +324,61 @@ describe.skipIf(!enabled)("règlement groupé carburant sur PostgreSQL", () => {
     ).resolves.toMatchObject({
       rows: [{ solde_actuel_fcfa: "980000" }],
     });
+  });
+
+  it("ne duplique pas un bon dans les statistiques avec plusieurs versements", async () => {
+    const suffix = `${process.pid}_${Date.now()}_stats`;
+    const before = await getStatsCarburant(cooperativeId);
+    const bon = await client.query(
+      `INSERT INTO bons_carburant
+         (cooperative_id, numero, vehicule_id, type_carburant,
+          quantite_autorisee, montant_autorise_fcfa, quantite_livree,
+          montant_fcfa, date_emission, date_utilisation, statut, created_by)
+       VALUES ($1, $2, $3, 'gasoil', 80, 60000, 50, 60000,
+               CURRENT_DATE, CURRENT_DATE, 'utilise', $4)
+       RETURNING id`,
+      [cooperativeId, `BC-LOT-${suffix}`, vehicleId, userId],
+    );
+    const bonId = bon.rows[0].id as number;
+    bonIds.push(bonId);
+
+    const insertPayment = async (
+      amount: number,
+      statut: "en_attente" | "effectue",
+    ) => {
+      const payment = await client.query(
+        `INSERT INTO paiements
+           (cooperative_id, bon_carburant_id, numero_recu, montant_fcfa, statut,
+            date_validation)
+         VALUES ($1, $2, $3, $4, $5::paiement_statut,
+                 CASE WHEN $5::paiement_statut = 'effectue' THEN CURRENT_TIMESTAMP ELSE NULL END)
+         RETURNING id`,
+        [cooperativeId, bonId, `REC-CARB-${suffix}-${statut}`, amount, statut],
+      );
+      paymentIds.push(payment.rows[0].id as number);
+    };
+
+    await insertPayment(20_000, "en_attente");
+    await insertPayment(40_000, "effectue");
+    const after = await getStatsCarburant(cooperativeId);
+
+    expect(after.nb_bons - before.nb_bons).toBe(1);
+    expect(after.qte_autorisee_l - before.qte_autorisee_l).toBe(80);
+    expect(after.qte_livree_l - before.qte_livree_l).toBe(50);
+    expect(after.montant_autorise_total_fcfa - before.montant_autorise_total_fcfa).toBe(60_000);
+    expect(after.montant_total_fcfa - before.montant_total_fcfa).toBe(60_000);
+    expect(after.nb_bons_en_attente_reglement - before.nb_bons_en_attente_reglement).toBe(1);
+    expect(after.montant_total_en_attente_reglement_fcfa - before.montant_total_en_attente_reglement_fcfa).toBe(20_000);
+    expect(after.nb_bons_regles - before.nb_bons_regles).toBe(1);
+    expect(after.montant_total_regle_fcfa - before.montant_total_regle_fcfa).toBe(40_000);
+
+    const vehicleBefore = before.par_vehicule.find((row) => row.vehicule_id === vehicleId);
+    const vehicleAfter = after.par_vehicule.find((row) => row.vehicule_id === vehicleId);
+    expect(vehicleAfter).toBeDefined();
+    expect(vehicleAfter!.nb_bons - (vehicleBefore?.nb_bons ?? 0)).toBe(1);
+    expect(vehicleAfter!.qte_livree_l - (vehicleBefore?.qte_livree_l ?? 0)).toBe(50);
+    expect(vehicleAfter!.montant_autorise_fcfa - (vehicleBefore?.montant_autorise_fcfa ?? 0)).toBe(60_000);
+    expect(vehicleAfter!.montant_fcfa - (vehicleBefore?.montant_fcfa ?? 0)).toBe(60_000);
   });
 
   it("refuse un lot contenant un paiement déjà traité sans débit partiel", async () => {
