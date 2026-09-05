@@ -762,6 +762,16 @@ function JournalCaisse({
 
   const caisseSelectionnee = caisses?.find(c => c.id === caisseId);
   const sessionOuverte = caisseSelectionnee?.session_statut === "ouverte";
+  const dernierSoldeMouvement = journal?.mouvements
+    .slice()
+    .reverse()
+    .find(m => m.solde_apres_fcfa !== null && m.solde_apres_fcfa !== undefined)
+    ?.solde_apres_fcfa;
+  const soldeFinal = dernierSoldeMouvement !== undefined
+    ? parseFloat(dernierSoldeMouvement)
+    : caisseSelectionnee
+      ? parseFloat(caisseSelectionnee.solde_actuel_fcfa)
+      : 0;
 
   return (
     <div>
@@ -836,7 +846,7 @@ function JournalCaisse({
             <Wallet size={16} className="text-blue-600 mx-auto mb-1" />
             <p className="text-xs text-blue-600 font-medium">Solde Final</p>
             <p className="text-base font-bold text-blue-700">
-              {FCFA(journal.totalEntrees - journal.totalSorties + (caisseSelectionnee ? parseFloat(caisseSelectionnee.solde_ouverture_fcfa ?? caisseSelectionnee.solde_actuel_fcfa) : 0))}
+              {FCFA(soldeFinal)}
             </p>
           </div>
         </div>
