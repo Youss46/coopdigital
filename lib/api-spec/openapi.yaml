@@ -3172,6 +3172,26 @@ paths:
                 items:
                   $ref: "#/components/schemas/PaiementListItem"
 
+  /paiements/carburant/valider-lot:
+    post:
+      operationId: validerLotPaiementsCarburant
+      tags: [paiements]
+      summary: Valider plusieurs paiements de bons carburant en une seule opération
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ValiderLotCarburantInput"
+      responses:
+        "200":
+          description: Règlement groupé effectué
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValiderLotCarburantResponse"
+
   /paiements/{id}/valider:
     patch:
       operationId: validerPaiement
@@ -7862,6 +7882,48 @@ components:
           description: Ventilation du montant entre plusieurs moyens de règlement.
           items:
             $ref: "#/components/schemas/VentilationPaiementInput"
+
+    ValiderLotCarburantInput:
+      type: object
+      required: [paiementIds, modePaiement]
+      properties:
+        paiementIds:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items:
+            type: integer
+        modePaiement:
+          type: string
+          enum: [especes, virement, orange_money, mtn_momo, wave]
+        referenceTransaction:
+          type: string
+          nullable: true
+        compteBancaireId:
+          type: integer
+          nullable: true
+        dateReglement:
+          type: string
+          format: date
+          nullable: true
+
+    ValiderLotCarburantResponse:
+      type: object
+      required: [reference, paiementIds, nombrePaiements, montantTotal, statut]
+      properties:
+        reference:
+          type: string
+        paiementIds:
+          type: array
+          items:
+            type: integer
+        nombrePaiements:
+          type: integer
+        montantTotal:
+          type: integer
+        statut:
+          type: string
+          enum: [confirme, effectue]
 
     VentilationPaiementInput:
       type: object

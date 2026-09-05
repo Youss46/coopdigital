@@ -378,6 +378,8 @@ import type {
   ValiderDoublePesee200,
   ValiderDoublePeseeBody,
   ValiderEcritureInput,
+  ValiderLotCarburantInput,
+  ValiderLotCarburantResponse,
   ValiderPaiementInput,
   ValiderToutEcrituresEnAttente200,
   Vehicule,
@@ -10895,6 +10897,77 @@ export function useListPaiements<TData = Awaited<ReturnType<typeof listPaiements
 
 
 
+
+export const getValiderLotPaiementsCarburantUrl = () => {
+
+
+
+
+  return `/api/paiements/carburant/valider-lot`
+}
+
+/**
+ * @summary Valider plusieurs paiements de bons carburant en une seule opération
+ */
+export const validerLotPaiementsCarburant = async (validerLotCarburantInput: ValiderLotCarburantInput, options?: RequestInit): Promise<ValiderLotCarburantResponse> => {
+
+  return customFetch<ValiderLotCarburantResponse>(getValiderLotPaiementsCarburantUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      validerLotCarburantInput,)
+  }
+);}
+
+
+
+
+export const getValiderLotPaiementsCarburantMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof validerLotPaiementsCarburant>>, TError,{data: BodyType<ValiderLotCarburantInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof validerLotPaiementsCarburant>>, TError,{data: BodyType<ValiderLotCarburantInput>}, TContext> => {
+
+const mutationKey = ['validerLotPaiementsCarburant'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof validerLotPaiementsCarburant>>, {data: BodyType<ValiderLotCarburantInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  validerLotPaiementsCarburant(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ValiderLotPaiementsCarburantMutationResult = NonNullable<Awaited<ReturnType<typeof validerLotPaiementsCarburant>>>
+    export type ValiderLotPaiementsCarburantMutationBody = BodyType<ValiderLotCarburantInput>
+    export type ValiderLotPaiementsCarburantMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Valider plusieurs paiements de bons carburant en une seule opération
+ */
+export const useValiderLotPaiementsCarburant = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof validerLotPaiementsCarburant>>, TError,{data: BodyType<ValiderLotCarburantInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof validerLotPaiementsCarburant>>,
+        TError,
+        {data: BodyType<ValiderLotCarburantInput>},
+        TContext
+      > => {
+      return useMutation(getValiderLotPaiementsCarburantMutationOptions(options));
+    }
 
 export const getValiderPaiementUrl = (id: number,) => {
 

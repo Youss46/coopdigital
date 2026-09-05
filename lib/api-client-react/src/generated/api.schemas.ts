@@ -1061,6 +1061,45 @@ export interface ValiderPaiementInput {
   ventilations?: VentilationPaiementInput[];
 }
 
+export type ValiderLotCarburantInputModePaiement = typeof ValiderLotCarburantInputModePaiement[keyof typeof ValiderLotCarburantInputModePaiement];
+
+
+export const ValiderLotCarburantInputModePaiement = {
+  especes: 'especes',
+  virement: 'virement',
+  orange_money: 'orange_money',
+  mtn_momo: 'mtn_momo',
+  wave: 'wave',
+} as const;
+
+export interface ValiderLotCarburantInput {
+  /**
+     * @minItems 1
+     * @maxItems 200
+     */
+  paiementIds: number[];
+  modePaiement: ValiderLotCarburantInputModePaiement;
+  referenceTransaction?: string | null;
+  compteBancaireId?: number | null;
+  dateReglement?: string | null;
+}
+
+export type ValiderLotCarburantResponseStatut = typeof ValiderLotCarburantResponseStatut[keyof typeof ValiderLotCarburantResponseStatut];
+
+
+export const ValiderLotCarburantResponseStatut = {
+  confirme: 'confirme',
+  effectue: 'effectue',
+} as const;
+
+export interface ValiderLotCarburantResponse {
+  reference: string;
+  paiementIds: number[];
+  nombrePaiements: number;
+  montantTotal: number;
+  statut: ValiderLotCarburantResponseStatut;
+}
+
 /**
  * @nullable
  */

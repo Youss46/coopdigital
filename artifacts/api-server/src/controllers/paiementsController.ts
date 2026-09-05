@@ -5,6 +5,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { envoyerPushGroupePortail, envoyerPushGroupe } from "../services/pushService";
 import { proposerEcrituresDansTransaction, resolveCompteDetteProducteur, resolveCompteDebit } from "../services/comptabiliteService.js";
 import { verifierCaisseEspeces, debiterCaisseParResponsable, getSessionActive, enregistrerMouvement } from "../services/caisseService.js";
+import { enregistrerMouvement as enregistrerMouvementBanque } from "../services/banqueService.js";
 import { notifierParRole } from "../services/notificationService.js";
 import { logger } from "../lib/logger.js";
 import type { ComptabiliteTransaction } from "../services/comptabiliteService.js";
@@ -30,6 +31,83 @@ class PaiementMontantInvalideError extends Error {
     super(message);
     this.name = "PaiementMontantInvalideError";
   }
+}
+
+async function debiterCaissePourLotCarburant(
+  tx: ComptabiliteTransaction,
+  cooperativeId: number,
+  userId: number | undefined,
+  montantFcfa: number,
+  responsableId?: number,
+  referenceOperation?: string,
+) {
+  const [caisse] = await tx
+    .select()
+    .from(caissesTable)
+    .where(and(
+      eq(caissesTable.cooperativeId, cooperativeId),
+      eq(caissesTable.actif, true),
+      responsableId ? eq(caissesTable.responsableId, responsableId) : eq(caissesTable.typeCaisse, "centrale"),
+    ))
+    .limit(1);
+  if (!caisse) {
+    throw new Error(responsableId
+      ? "Aucune caisse ne vous est assignée. Contactez votre administrateur."
+      : "Aucune caisse centrale n'est configurée pour cette coopérative.");
+  }
+  await enregistrerMouvement(caisse.id, {
+    type: "sortie",
+    motif: "paiement_producteur",
+    montantFcfa,
+    libelle: `Règlement groupé carburant — ${montantFcfa.toLocaleString("fr-FR")} FCFA`,
+    referenceOperation: referenceOperation ?? `CARB-LOT-${Date.now()}`,
+    userId,
+    cooperativeId,
+    skipAccounting: true,
+  }, tx);
+}
+
+async function debiterMobilePourLotCarburant(
+  tx: ComptabiliteTransaction,
+  cooperativeId: number,
+  mode: "orange_money" | "mtn_momo" | "wave",
+  montantFcfa: number,
+  userId: number | undefined,
+  referenceTransaction: string,
+) {
+  const [compte] = await tx
+    .select()
+    .from(comptesMobilesMarchandsTable)
+    .where(and(
+      eq(comptesMobilesMarchandsTable.cooperativeId, cooperativeId),
+      eq(comptesMobilesMarchandsTable.operateur, mode),
+      eq(comptesMobilesMarchandsTable.actif, true),
+    ))
+    .for("update")
+    .limit(1);
+  if (!compte) throw new Error(`Aucun compte Mobile Marchand ${mode} actif n'est configuré.`);
+
+  const solde = parseFloat(String(compte.soldeActuelFcfa));
+  const montant = Math.round(montantFcfa);
+  if (solde < montant) {
+    throw new Error(`Solde Mobile Money insuffisant. Disponible : ${solde.toLocaleString("fr-FR")} FCFA, requis : ${montant.toLocaleString("fr-FR")} FCFA.`);
+  }
+  const nouveauSolde = solde - montant;
+  await tx.insert(mouvementsMobileMarchandTable).values({
+    compteId: compte.id,
+    cooperativeId,
+    type: "debit",
+    motif: "paiement_producteur",
+    montantFcfa: montant.toString(),
+    libelle: `Règlement groupé carburant — ${montant.toLocaleString("fr-FR")} FCFA`,
+    reference: referenceTransaction,
+    dateOperation: new Date().toISOString().slice(0, 10),
+    soldeApresFcfa: nouveauSolde.toString(),
+    enregistrePar: userId ?? null,
+  });
+  await tx.update(comptesMobilesMarchandsTable)
+    .set({ soldeActuelFcfa: nouveauSolde.toString() })
+    .where(eq(comptesMobilesMarchandsTable.id, compte.id));
 }
 
 function estLivraisonAvecSolde(statut: string | null | undefined): boolean {
@@ -1606,6 +1684,185 @@ async function debiterMobileDansTransaction(
       return;
     }
     req.log.error({ err }, "Erreur validerPaiement");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+// ─── POST /paiements/carburant/valider-lot ──────────────────────────────────
+
+export async function validerLotPaiementsCarburant(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  const userId = req.user?.id;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
+  const body = (req.body ?? {}) as {
+    paiementIds?: unknown;
+    modePaiement?: string;
+    referenceTransaction?: string | null;
+    compteBancaireId?: number | null;
+    dateReglement?: string | null;
+  };
+  const paiementIds = Array.isArray(body.paiementIds)
+    ? [...new Set(body.paiementIds.map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0))]
+    : [];
+  const modesLot = ["especes", "virement", "orange_money", "mtn_momo", "wave"] as const;
+  const mode = body.modePaiement as typeof modesLot[number] | undefined;
+
+  if (paiementIds.length === 0 || paiementIds.length > 200) {
+    res.status(400).json({ erreur: "Sélectionnez entre 1 et 200 bons carburant." });
+    return;
+  }
+  if (!mode || !modesLot.includes(mode)) {
+    res.status(400).json({ erreur: "Le règlement groupé accepte les espèces, le virement et le mobile money." });
+    return;
+  }
+  if ((mode === "orange_money" || mode === "mtn_momo" || mode === "wave") && !body.referenceTransaction?.trim()) {
+    res.status(400).json({ erreur: "La référence de transaction est obligatoire pour un règlement mobile money." });
+    return;
+  }
+  if (mode === "virement" && (!body.compteBancaireId || !Number.isInteger(Number(body.compteBancaireId)))) {
+    res.status(400).json({ erreur: "Sélectionnez le compte bancaire à débiter." });
+    return;
+  }
+  const dateReglement = body.dateReglement ?? new Date().toISOString().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateReglement)) {
+    res.status(400).json({ erreur: "La date du règlement doit être au format AAAA-MM-JJ." });
+    return;
+  }
+
+  try {
+    const result = await db.transaction(async (tx) => {
+      const rows = await tx
+        .select({
+          id: paiementsTable.id,
+          montantFcfa: paiementsTable.montantFcfa,
+          statut: paiementsTable.statut,
+          bonCarburantId: paiementsTable.bonCarburantId,
+          numeroBon: bonsCarburantTable.numero,
+          cooperativeBonId: bonsCarburantTable.cooperativeId,
+        })
+        .from(paiementsTable)
+        .innerJoin(bonsCarburantTable, eq(paiementsTable.bonCarburantId, bonsCarburantTable.id))
+        .where(and(
+          inArray(paiementsTable.id, paiementIds),
+          eq(bonsCarburantTable.cooperativeId, cooperativeId),
+        ))
+        .for("update");
+
+      if (rows.length !== paiementIds.length) {
+        throw new PaiementMontantInvalideError("Un ou plusieurs paiements sélectionnés n'appartiennent pas à votre coopérative ou ne sont pas des bons carburant.");
+      }
+      const nonEligibles = rows.filter((row) => row.statut !== "en_attente");
+      if (nonEligibles.length > 0) {
+        throw new PaiementDejaTraiteError();
+      }
+
+      const montantTotal = rows.reduce((total, row) => total + Number(row.montantFcfa), 0);
+      if (!Number.isSafeInteger(montantTotal) || montantTotal <= 0) {
+        throw new PaiementMontantInvalideError("Le montant total des bons sélectionnés est invalide.");
+      }
+
+      const reference = body.referenceTransaction?.trim() || `CARB-${dateReglement}-${paiementIds[0]}`;
+      const libelle = `Règlement groupé carburant — ${rows.length} bons`;
+      const isMobile = mode === "orange_money" || mode === "mtn_momo" || mode === "wave";
+
+      if (mode === "especes") {
+        await debiterCaissePourLotCarburant(
+          tx,
+          cooperativeId,
+          userId,
+          montantTotal,
+          req.user?.role === "delegue" ? userId : undefined,
+          reference,
+        );
+      } else if (isMobile) {
+        await debiterMobilePourLotCarburant(tx, cooperativeId, mode, montantTotal, userId, reference);
+      } else {
+        await enregistrerMouvementBanque(
+          Number(body.compteBancaireId),
+          cooperativeId,
+          {
+            type: "debit",
+            motif: "paiement_producteur",
+            montantFcfa: montantTotal,
+            libelle,
+            reference,
+            dateOperation: dateReglement,
+            userId,
+            skipAccounting: true,
+          },
+          tx,
+        );
+      }
+
+      const nouveauStatut = mode === "especes" ? "effectue" : "confirme";
+      const compteCredit = isMobile ? "552" : mode === "especes" ? "571" : "521";
+      const dateValidation = new Date(`${dateReglement}T12:00:00.000Z`);
+
+      for (const row of rows) {
+        const [updated] = await tx
+          .update(paiementsTable)
+          .set({
+            statut: nouveauStatut,
+            modePaiement: mode,
+            referenceTransaction: reference,
+            validePar: userId ?? null,
+            dateValidation,
+          })
+          .where(and(
+            eq(paiementsTable.id, row.id),
+            eq(paiementsTable.statut, "en_attente"),
+          ))
+          .returning({ id: paiementsTable.id });
+        if (!updated) throw new PaiementDejaTraiteError();
+
+        await tx.insert(paiementLignesTable).values({
+          paiementId: row.id,
+          modePaiement: mode,
+          montantFcfa: row.montantFcfa,
+          referenceTransaction: reference,
+        });
+
+        await proposerEcrituresDansTransaction(tx, cooperativeId, [{
+          source: "paiement",
+          sourceId: row.id,
+          libelle: `Carburant – Bon ${row.numeroBon ?? `PAI-${row.id}`}`,
+          compteDebit: "6042",
+          compteCredit,
+          montantFcfa: row.montantFcfa,
+          date: dateReglement,
+          numeroPiece: `PAI-${row.id}`,
+        }]);
+      }
+
+      return {
+        reference,
+        paiementIds: rows.map((row) => row.id),
+        nombrePaiements: rows.length,
+        montantTotal,
+        statut: nouveauStatut,
+      };
+    });
+
+    res.json(result);
+  } catch (err) {
+    if (err instanceof PaiementDejaTraiteError) {
+      res.status(err.status).json({ erreur: "Un ou plusieurs bons sélectionnés ont déjà été réglés. Actualisez la liste avant de recommencer." });
+      return;
+    }
+    if (err instanceof PaiementMontantInvalideError) {
+      res.status(err.status).json({ erreur: err.message });
+      return;
+    }
+    const message = err instanceof Error ? err.message : "Impossible de régler les bons sélectionnés";
+    if (/insuffisant|Aucune caisse|session de caisse|Mobile Marchand|Compte bancaire/i.test(message)) {
+      res.status(422).json({ erreur: message });
+      return;
+    }
+    req.log.error({ err }, "Erreur validerLotPaiementsCarburant");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }

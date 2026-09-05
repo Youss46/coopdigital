@@ -904,6 +904,159 @@ export function ModalValidation({
   );
 }
 
+// ─── Modal règlement groupé carburant ───────────────────────────────────────
+
+type ModeLotCarburant = "especes" | "virement" | "orange_money" | "mtn_momo" | "wave";
+
+function ModalLotCarburant({
+  paiements,
+  comptesBancaires,
+  sessionCaisseOuverte,
+  isDelegue,
+  onClose,
+  onConfirm,
+  loading,
+}: {
+  paiements: PaiementListItem[];
+  comptesBancaires: CompteBancaireTransport[];
+  sessionCaisseOuverte?: boolean | null;
+  isDelegue: boolean;
+  onClose: () => void;
+  onConfirm: (input: {
+    modePaiement: ModeLotCarburant;
+    referenceTransaction?: string;
+    compteBancaireId?: number;
+  }) => void;
+  loading: boolean;
+}) {
+  const [mode, setMode] = useState<ModeLotCarburant>(isDelegue ? "especes" : "virement");
+  const [reference, setReference] = useState("");
+  const [compteBancaireId, setCompteBancaireId] = useState("");
+  const [touched, setTouched] = useState(false);
+  const total = paiements.reduce((sum, paiement) => sum + paiement.montantFcfa, 0);
+  const isMobile = mode === "orange_money" || mode === "mtn_momo" || mode === "wave";
+  const missingReference = isMobile && !reference.trim();
+  const missingBankAccount = mode === "virement" && !compteBancaireId;
+  const blockedByCashSession = mode === "especes" && sessionCaisseOuverte === false;
+  const invalid = missingReference || missingBankAccount || blockedByCashSession;
+
+  function handleConfirm() {
+    if (invalid) {
+      setTouched(true);
+      return;
+    }
+    onConfirm({
+      modePaiement: mode,
+      referenceTransaction: reference.trim() || undefined,
+      ...(mode === "virement" ? { compteBancaireId: Number(compteBancaireId) } : {}),
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
+        <div className="p-6 space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center shrink-0">
+              <Fuel size={18} className="text-amber-700" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-bold text-gray-900 text-sm">Régler les bons carburant</h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {paiements.length} bon{paiements.length > 1 ? "s" : ""} sélectionné{paiements.length > 1 ? "s" : ""}
+              </p>
+            </div>
+            <button onClick={onClose} className="ml-auto text-gray-400 hover:text-gray-600" aria-label="Fermer">
+              <X size={16} />
+            </button>
+          </div>
+
+          <div className="rounded-xl bg-amber-50 border border-amber-100 px-4 py-3">
+            <p className="text-xs text-amber-700">Montant total à régler</p>
+            <p className="text-xl font-bold text-amber-800">{fmt(total)}</p>
+            <p className="text-xs text-amber-700 mt-1">Les bons resteront détaillés individuellement dans l’historique.</p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Mode de règlement</label>
+            <select
+              value={mode}
+              onChange={(event) => {
+                setMode(event.target.value as ModeLotCarburant);
+                setTouched(false);
+              }}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-400"
+            >
+              {!isDelegue && <option value="virement">Virement bancaire</option>}
+              <option value="especes">Espèces</option>
+              {!isDelegue && <option value="orange_money">Orange Money</option>}
+              {!isDelegue && <option value="mtn_momo">MTN MoMo</option>}
+              {!isDelegue && <option value="wave">Wave</option>}
+            </select>
+          </div>
+
+          {mode === "virement" && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Compte bancaire à débiter</label>
+              <select
+                value={compteBancaireId}
+                onChange={(event) => { setCompteBancaireId(event.target.value); setTouched(false); }}
+                className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-400 ${
+                  touched && missingBankAccount ? "border-red-400 bg-red-50" : "border-gray-200"
+                }`}
+              >
+                <option value="">Sélectionner un compte</option>
+                {comptesBancaires.map((compte) => (
+                  <option key={compte.id} value={compte.id}>
+                    {compte.nom} — {compte.banque}
+                  </option>
+                ))}
+              </select>
+              {touched && missingBankAccount && <p className="text-xs text-red-500 mt-1">Sélectionnez le compte bancaire à débiter.</p>}
+            </div>
+          )}
+
+          {mode === "especes" && blockedByCashSession && (
+            <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
+              <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+              <span>Aucune session de caisse n’est ouverte pour effectuer ce règlement.</span>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Référence de l’opération {isMobile ? <span className="text-red-500">*</span> : <span className="text-gray-400">(optionnel)</span>}
+            </label>
+            <input
+              value={reference}
+              onChange={(event) => { setReference(event.target.value); setTouched(false); }}
+              placeholder={isMobile ? "Ex : VIR-2026-001" : "Ex : VIR-2026-001"}
+              className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-400 ${
+                touched && missingReference ? "border-red-400 bg-red-50" : "border-gray-200"
+              }`}
+            />
+            {touched && missingReference && <p className="text-xs text-red-500 mt-1">La référence est obligatoire pour un paiement mobile money.</p>}
+          </div>
+        </div>
+        <div className="flex gap-2 px-6 py-4 border-t border-gray-100">
+          <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50">
+            Annuler
+          </button>
+          <button
+            onClick={handleConfirm}
+            disabled={loading || invalid}
+            className="flex-1 py-2.5 rounded-xl text-white text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-1.5"
+            style={{ backgroundColor: loading || invalid ? "#9ca3af" : "#1a4731" }}
+          >
+            {loading ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
+            Régler la sélection
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Modal Rejet ─────────────────────────────────────────────────────────────
 
 const MOTIFS_RAPIDES = [
@@ -1200,6 +1353,8 @@ export default function ReglementsPage() {
   const [recherche, setRecherche] = useState("");
   const [modal, setModal] = useState<ModalState>(null);
   const [transportModal, setTransportModal] = useState<FraisTransportARegler | null>(null);
+  const [lotCarburantOuvert, setLotCarburantOuvert] = useState(false);
+  const [paiementsCarburantSelectionnes, setPaiementsCarburantSelectionnes] = useState<number[]>([]);
 
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -1299,6 +1454,12 @@ export default function ReglementsPage() {
     enabled: peutValider && !isDelegue && !!transportModal,
     staleTime: 30_000,
   });
+  const { data: comptesBancairesLot = [] } = useQuery<CompteBancaireTransport[]>({
+    queryKey: ["comptes-bancaires-reglement-lot-carburant"],
+    queryFn: () => apiFetchChecked<CompteBancaireTransport[]>("/api/banque"),
+    enabled: peutValider && lotCarburantOuvert && !isDelegue,
+    staleTime: 30_000,
+  });
 
   const validerMut = useValiderPaiement();
   const rejeterMut = useRejeterPaiement();
@@ -1333,6 +1494,29 @@ export default function ReglementsPage() {
     },
     onError: (err: Error) => {
       toast({ title: "Règlement impossible", description: err.message, variant: "destructive" });
+    },
+  });
+  const validerLotCarburantMut = useMutation({
+    mutationFn: (input: {
+      paiementIds: number[];
+      modePaiement: ModeLotCarburant;
+      referenceTransaction?: string;
+      compteBancaireId?: number;
+    }) => apiPostChecked("/api/paiements/carburant/valider-lot", input),
+    onSuccess: (result: { nombrePaiements: number; montantTotal: number; reference: string }) => {
+      invalidateAll();
+      void qc.invalidateQueries({ queryKey: ["caisse-centrale-session"] });
+      void qc.invalidateQueries({ queryKey: ["comptes-bancaires-reglement-lot-carburant"] });
+      if (isDelegue) void qc.invalidateQueries({ queryKey: ["caisse-delegue-solde", utilisateur?.id] });
+      setPaiementsCarburantSelectionnes([]);
+      setLotCarburantOuvert(false);
+      toast({
+        title: "Règlement groupé effectué",
+        description: `${result.nombrePaiements} bon${result.nombrePaiements > 1 ? "s" : ""} réglé${result.nombrePaiements > 1 ? "s" : ""} — ${fmt(result.montantTotal)}.`,
+      });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Règlement groupé impossible", description: err.message, variant: "destructive" });
     },
   });
 
@@ -1420,6 +1604,30 @@ export default function ReglementsPage() {
       (p.bonCarburantNumero ?? "").toLowerCase().includes(r)
     );
   });
+  const bonsCarburantEnAttente = filtreStatut === "en_attente"
+    ? filtres.filter((p) => p.statut === "en_attente" && isBonCarburant(p))
+    : [];
+  const bonsCarburantSelectionnes = bonsCarburantEnAttente.filter((p) => paiementsCarburantSelectionnes.includes(p.id));
+  const tousLesBonsCarburantSontSelectionnes = bonsCarburantEnAttente.length > 0
+    && bonsCarburantEnAttente.every((p) => paiementsCarburantSelectionnes.includes(p.id));
+
+  function basculerSelectionCarburant(id: number) {
+    setPaiementsCarburantSelectionnes((current) =>
+      current.includes(id) ? current.filter((value) => value !== id) : [...current, id],
+    );
+  }
+
+  function basculerTousLesBonsCarburant() {
+    if (tousLesBonsCarburantSontSelectionnes) {
+      setPaiementsCarburantSelectionnes((current) =>
+        current.filter((id) => !bonsCarburantEnAttente.some((paiement) => paiement.id === id)),
+      );
+    } else {
+      setPaiementsCarburantSelectionnes((current) => [
+        ...new Set([...current, ...bonsCarburantEnAttente.map((paiement) => paiement.id)]),
+      ]);
+    }
+  }
 
   const FILTRES_STATUT = [
     { value: "en_attente", label: "En attente" },
@@ -1799,6 +2007,43 @@ export default function ReglementsPage() {
         </button>
       </div>
 
+      {peutValider && filtreStatut === "en_attente" && bonsCarburantEnAttente.length > 0 && (
+        <section className="rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-amber-900">Règlement groupé des bons carburant</p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                {bonsCarburantEnAttente.length} bon{bonsCarburantEnAttente.length > 1 ? "s" : ""} affiché{bonsCarburantEnAttente.length > 1 ? "s" : ""} —
+                {" "}{fmt(bonsCarburantEnAttente.reduce((sum, paiement) => sum + paiement.montantFcfa, 0))}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={basculerTousLesBonsCarburant}
+                className="px-3 py-2 rounded-lg border border-amber-300 bg-white text-xs font-semibold text-amber-800 hover:bg-amber-100"
+              >
+                {tousLesBonsCarburantSontSelectionnes ? "Tout désélectionner" : "Tout sélectionner"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setLotCarburantOuvert(true)}
+                disabled={bonsCarburantSelectionnes.length === 0}
+                className="px-3 py-2 rounded-lg text-xs font-semibold text-white disabled:opacity-50"
+                style={{ backgroundColor: "#1a4731" }}
+              >
+                Régler la sélection ({bonsCarburantSelectionnes.length})
+              </button>
+            </div>
+          </div>
+          {bonsCarburantSelectionnes.length > 0 && (
+            <p className="text-xs text-amber-800 mt-2">
+              Sélection : {fmt(bonsCarburantSelectionnes.reduce((sum, paiement) => sum + paiement.montantFcfa, 0))}
+            </p>
+          )}
+        </section>
+      )}
+
       {/* ── Liste ── */}
       {isLoading ? (
         <div className="flex justify-center py-16">
@@ -1818,6 +2063,9 @@ export default function ReglementsPage() {
               peutValider={peutValider}
               peutRejeter={peutRejeter}
               isDelegue={isDelegue}
+              selectable={p.statut === "en_attente" && isBonCarburant(p)}
+              selected={paiementsCarburantSelectionnes.includes(p.id)}
+              onToggle={() => basculerSelectionCarburant(p.id)}
               onValider={() => setModal({ type: "valider", paiement: p })}
               onRejeter={() => setModal({ type: "rejeter", paiement: p })}
               onRecu={() => setModal({ type: "recu", paiement: p })}
@@ -1849,6 +2097,20 @@ export default function ReglementsPage() {
         <ModalRecu
           paiement={modal.paiement}
           onClose={() => setModal(null)}
+        />
+      )}
+      {lotCarburantOuvert && bonsCarburantSelectionnes.length > 0 && (
+        <ModalLotCarburant
+          paiements={bonsCarburantSelectionnes}
+          comptesBancaires={comptesBancairesLot}
+          sessionCaisseOuverte={isDelegue ? sessionDelegueOuverte : sessionCentraleOuverte}
+          isDelegue={isDelegue}
+          onClose={() => setLotCarburantOuvert(false)}
+          onConfirm={(input) => validerLotCarburantMut.mutate({
+            paiementIds: bonsCarburantSelectionnes.map((paiement) => paiement.id),
+            ...input,
+          })}
+          loading={validerLotCarburantMut.isPending}
         />
       )}
       {transportModal && (
@@ -1906,6 +2168,9 @@ function PaiementRow({
   peutValider,
   peutRejeter,
   isDelegue,
+  selectable = false,
+  selected = false,
+  onToggle,
   onValider,
   onRejeter,
   onRecu,
@@ -1914,6 +2179,9 @@ function PaiementRow({
   peutValider: boolean;
   peutRejeter: boolean;
   isDelegue: boolean;
+  selectable?: boolean;
+  selected?: boolean;
+  onToggle?: () => void;
   onValider: () => void;
   onRejeter: () => void;
   onRecu: () => void;
@@ -1931,10 +2199,20 @@ function PaiementRow({
   const isCarburant = isBonCarburant(p);
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl px-4 py-3">
+    <div className={`bg-white border rounded-xl px-4 py-3 ${selected ? "border-amber-300 ring-1 ring-amber-200" : "border-gray-200"}`}>
       <div className="flex items-start justify-between gap-3">
         {/* Infos */}
-        <div className="min-w-0 flex-1 space-y-1">
+        <div className="min-w-0 flex-1 space-y-1 flex items-start gap-3">
+          {selectable && (
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={onToggle}
+              className="mt-1.5 h-4 w-4 accent-amber-600 shrink-0"
+              aria-label={`Sélectionner ${nomProducteur(p)}`}
+            />
+          )}
+          <div className="min-w-0 flex-1 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
             {isCarburant && <Fuel size={14} className="text-amber-600 shrink-0" />}
             <p className="font-semibold text-gray-900 text-sm">
@@ -1991,6 +2269,7 @@ function PaiementRow({
               <span>Validation réservée au Directeur, Comptable ou PCA</span>
             </div>
           )}
+          </div>
         </div>
 
         {/* Montant net + actions */}

@@ -3579,6 +3579,30 @@ export const ListPaiementsResponse = zod.array(ListPaiementsResponseItem)
 
 
 /**
+ * @summary Valider plusieurs paiements de bons carburant en une seule opération
+ */
+export const validerLotPaiementsCarburantBodyPaiementIdsMax = 200;
+
+
+
+export const ValiderLotPaiementsCarburantBody = zod.object({
+  "paiementIds": zod.array(zod.number()).min(1).max(validerLotPaiementsCarburantBodyPaiementIdsMax),
+  "modePaiement": zod.enum(['especes', 'virement', 'orange_money', 'mtn_momo', 'wave']),
+  "referenceTransaction": zod.string().nullish(),
+  "compteBancaireId": zod.number().nullish(),
+  "dateReglement": zod.coerce.date().nullish()
+})
+
+export const ValiderLotPaiementsCarburantResponse = zod.object({
+  "reference": zod.string(),
+  "paiementIds": zod.array(zod.number()),
+  "nombrePaiements": zod.number(),
+  "montantTotal": zod.number(),
+  "statut": zod.enum(['confirme', 'effectue'])
+})
+
+
+/**
  * @summary Valider un paiement producteur
  */
 export const ValiderPaiementParams = zod.object({
