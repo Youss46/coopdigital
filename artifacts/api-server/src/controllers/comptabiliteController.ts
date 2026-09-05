@@ -1562,7 +1562,7 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
           ex.id                                                                  AS "tiersId",
           COALESCE(ex.nom, '—')                                                  AS nom,
           ''                                                                     AS prenoms,
-          COALESCE(ex.pays, '')                                                  AS code,
+          COALESCE(ex.ville, '')                                                 AS code,
           SUM(CASE WHEN e.compte_debit  IN ('411000','411100') THEN e.montant_fcfa ELSE 0 END)::integer AS "totalDu",
           SUM(CASE WHEN e.compte_credit IN ('411000','411100') THEN e.montant_fcfa ELSE 0 END)::integer AS "totalPaye",
           0::integer                                                             AS "totalIntrantsDus",
@@ -1576,7 +1576,7 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
          AND e.cooperative_id = ${coop}
          ${exerciceJoinCond}
         WHERE ex.cooperative_id = ${coop}
-        GROUP BY ex.id, ex.nom, ex.pays
+        GROUP BY ex.id, ex.nom, ex.ville
         ORDER BY
           ABS(SUM(CASE WHEN e.compte_debit  IN ('411000','411100') THEN e.montant_fcfa ELSE 0 END)
               - SUM(CASE WHEN e.compte_credit IN ('411000','411100') THEN e.montant_fcfa ELSE 0 END)) DESC,
