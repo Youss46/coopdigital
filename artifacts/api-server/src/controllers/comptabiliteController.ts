@@ -1487,6 +1487,7 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
       return;
     }
     const exerciceCond = exercice ? sql`AND e.exercice = ${exercice}` : sql``;
+    const exerciceJoinCond = exercice ? sql`AND e.exercice = ${exercice}` : sql``;
 
     type Row = {
       tiersId: number; nom: string; prenoms: string; code: string;
@@ -1506,18 +1507,20 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
           COALESCE(p.nom, '—')                                                  AS nom,
           COALESCE(p.prenoms, '')                                               AS prenoms,
           COALESCE(p.poste, '')                                                 AS code,
-          SUM(CASE WHEN e.compte_credit = '421' THEN e.montant_fcfa ELSE 0 END)::integer AS "totalDu",
-          SUM(CASE WHEN e.compte_debit  = '421' THEN e.montant_fcfa ELSE 0 END)::integer AS "totalPaye",
+          COALESCE(SUM(CASE WHEN e.compte_credit = '421' THEN e.montant_fcfa ELSE 0 END), 0)::integer AS "totalDu",
+          COALESCE(SUM(CASE WHEN e.compte_debit  = '421' THEN e.montant_fcfa ELSE 0 END), 0)::integer AS "totalPaye",
           0::integer                                                            AS "totalIntrantsDus",
           0::integer                                                            AS "totalIntrantsRemb",
-          (SUM(CASE WHEN e.compte_credit = '421' THEN e.montant_fcfa ELSE 0 END)
+          (COALESCE(SUM(CASE WHEN e.compte_credit = '421' THEN e.montant_fcfa ELSE 0 END), 0)
            - SUM(CASE WHEN e.compte_debit  = '421' THEN e.montant_fcfa ELSE 0 END))::integer AS "soldeNet"
-        FROM ecritures_comptables e
-        LEFT JOIN personnel p ON p.id = e.tiers_id
-        WHERE e.cooperative_id = ${coop}
-          AND e.tiers_type = 'personnel'
-          ${exerciceCond}
-        GROUP BY e.tiers_id, p.nom, p.prenoms, p.poste
+        FROM personnel p
+        LEFT JOIN ecritures_comptables e
+          ON e.tiers_id = p.id
+         AND e.tiers_type = 'personnel'
+         AND e.cooperative_id = ${coop}
+         ${exerciceJoinCond}
+        WHERE p.cooperative_id = ${coop}
+        GROUP BY p.id, p.nom, p.prenoms, p.poste
         ORDER BY
           ABS(SUM(CASE WHEN e.compte_credit = '421' THEN e.montant_fcfa ELSE 0 END)
               - SUM(CASE WHEN e.compte_debit = '421'  THEN e.montant_fcfa ELSE 0 END)) DESC,
@@ -1538,12 +1541,15 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
           SUM(CASE WHEN e.compte_credit = '409100' THEN e.montant_fcfa ELSE 0 END)::integer AS "totalIntrantsRemb",
           (SUM(CASE WHEN e.compte_credit IN ('401000','409100','409200') THEN e.montant_fcfa ELSE 0 END)
            - SUM(CASE WHEN e.compte_debit  IN ('401000','409100','409200') THEN e.montant_fcfa ELSE 0 END))::integer AS "soldeNet"
-        FROM ecritures_comptables e
-        LEFT JOIN users u ON u.id = e.tiers_id
-        WHERE e.cooperative_id = ${coop}
-          AND e.tiers_type = 'delegue'
-          ${exerciceCond}
-        GROUP BY e.tiers_id, u.nom, u.prenoms
+        FROM users u
+        LEFT JOIN ecritures_comptables e
+          ON e.tiers_id = u.id
+         AND e.tiers_type = 'delegue'
+         AND e.cooperative_id = ${coop}
+         ${exerciceJoinCond}
+        WHERE u.cooperative_id = ${coop}
+          AND u.role = 'delegue'
+        GROUP BY u.id, u.nom, u.prenoms
         ORDER BY
           ABS(SUM(CASE WHEN e.compte_credit IN ('401000','409100','409200') THEN e.montant_fcfa ELSE 0 END)
               - SUM(CASE WHEN e.compte_debit  IN ('401000','409100','409200') THEN e.montant_fcfa ELSE 0 END)) DESC,
@@ -1563,12 +1569,14 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
           0::integer                                                             AS "totalIntrantsRemb",
           (SUM(CASE WHEN e.compte_debit  IN ('411000','411100') THEN e.montant_fcfa ELSE 0 END)
            - SUM(CASE WHEN e.compte_credit IN ('411000','411100') THEN e.montant_fcfa ELSE 0 END))::integer AS "soldeNet"
-        FROM ecritures_comptables e
-        LEFT JOIN exportateurs ex ON ex.id = e.tiers_id
-        WHERE e.cooperative_id = ${coop}
-          AND e.tiers_type = 'exportateur'
-          ${exerciceCond}
-        GROUP BY e.tiers_id, ex.nom, ex.pays
+        FROM exportateurs ex
+        LEFT JOIN ecritures_comptables e
+          ON e.tiers_id = ex.id
+         AND e.tiers_type = 'exportateur'
+         AND e.cooperative_id = ${coop}
+         ${exerciceJoinCond}
+        WHERE ex.cooperative_id = ${coop}
+        GROUP BY ex.id, ex.nom, ex.pays
         ORDER BY
           ABS(SUM(CASE WHEN e.compte_debit  IN ('411000','411100') THEN e.montant_fcfa ELSE 0 END)
               - SUM(CASE WHEN e.compte_credit IN ('411000','411100') THEN e.montant_fcfa ELSE 0 END)) DESC,
@@ -1589,12 +1597,15 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
           0::integer                                                             AS "totalIntrantsRemb",
           (SUM(CASE WHEN e.compte_credit = '401000' THEN e.montant_fcfa ELSE 0 END)
            - SUM(CASE WHEN e.compte_debit  = '401000' THEN e.montant_fcfa ELSE 0 END))::integer AS "soldeNet"
-        FROM ecritures_comptables e
-        LEFT JOIN fournisseurs f ON f.id = e.tiers_id
-        WHERE e.cooperative_id = ${coop}
-          AND e.tiers_type = 'fournisseur_ext'
-          ${exerciceCond}
-        GROUP BY e.tiers_id, f.nom, f.prenoms, f.code
+        FROM fournisseurs f
+        LEFT JOIN ecritures_comptables e
+          ON e.tiers_id = f.id
+         AND e.tiers_type = 'fournisseur_ext'
+         AND e.cooperative_id = ${coop}
+         ${exerciceJoinCond}
+        WHERE f.cooperative_id = ${coop}
+          AND f.type_fournisseur IN ('pisteur', 'externe')
+        GROUP BY f.id, f.nom, f.prenoms, f.code
         ORDER BY
           ABS(SUM(CASE WHEN e.compte_credit = '401000' THEN e.montant_fcfa ELSE 0 END)
               - SUM(CASE WHEN e.compte_debit  = '401000' THEN e.montant_fcfa ELSE 0 END)) DESC,
@@ -1735,6 +1746,19 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
                 AND ea_liv2.source_id = l.id
                 AND ea_liv2.statut = 'en_attente'
             )
+
+           UNION ALL
+
+           -- Référentiel complet : un membre sans mouvement doit rester
+           -- paramétrable dans la page des comptes tiers.
+           SELECT
+             m0.id AS tiers_id,
+             '0000' AS compte_credit,
+             '0000' AS compte_debit,
+             0 AS montant_fcfa,
+             'referentiel' AS source
+           FROM membres m0
+           WHERE m0.cooperative_id = ${coop}
         ) e
         LEFT JOIN membres m ON m.id = e.tiers_id
         WHERE m.cooperative_id = ${coop}

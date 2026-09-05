@@ -3051,7 +3051,7 @@ function OngletBalanceAuxiliaire() {
       ) : list.length === 0 ? (
         <div className="text-center py-16">
           <Users className="mx-auto mb-3 text-gray-300" size={40} />
-          <p className="text-gray-500 text-sm">Aucun tiers avec des mouvements pour l'exercice {exercice}</p>
+           <p className="text-gray-500 text-sm">Aucun tiers enregistré dans cette catégorie</p>
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
