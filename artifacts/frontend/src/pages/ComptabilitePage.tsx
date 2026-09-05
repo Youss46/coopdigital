@@ -2739,6 +2739,7 @@ function OngletBalanceAuxiliaire() {
   const anneeActuelle = new Date().getFullYear();
   const [exercice, setExercice]   = useState(anneeActuelle);
   const [recherche, setRecherche] = useState("");
+  const [journalSage, setJournalSage] = useState("CAIS");
   const [tiersType, setTiersType] = useState<TiersType>("membre");
   const [edition, setEdition] = useState<{ tiersId: number; valeurs: Record<string, string> } | null>(null);
   const [sauvegardeEnCours, setSauvegardeEnCours] = useState(false);
@@ -2828,7 +2829,12 @@ function OngletBalanceAuxiliaire() {
 
   const handleExportSageTxt = async () => {
     try {
-      const response = await fetch(`${_BASE}/api/comptabilite/balance-auxiliaire/export-txt?exercice=${exercice}&journal=CAIS`, {
+      const journal = journalSage.trim().toUpperCase();
+      if (!/^[A-Z0-9_-]{1,8}$/.test(journal)) {
+        throw new Error("Le code journal doit contenir de 1 à 8 caractères alphanumériques.");
+      }
+      const params = new URLSearchParams({ exercice: String(exercice), journal });
+      const response = await fetch(`${_BASE}/api/comptabilite/balance-auxiliaire/export-txt?${params.toString()}`, {
         headers: { Authorization: `Bearer ${tok()}` },
       });
       if (!response.ok) {
@@ -2840,7 +2846,7 @@ function OngletBalanceAuxiliaire() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `coopdigital_sage_CAIS_${exercice}.txt`;
+      link.download = `coopdigital_sage_${journal}_${exercice}.txt`;
       link.click();
       URL.revokeObjectURL(url);
       toast({
@@ -2900,13 +2906,23 @@ function OngletBalanceAuxiliaire() {
         ))}
       </div>
 
-      <div className="grid grid-cols-[auto_minmax(0,1fr)] items-end gap-3 mb-5">
+      <div className="grid grid-cols-1 sm:grid-cols-[auto_auto_minmax(0,1fr)] items-end gap-3 mb-5">
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">Exercice</label>
           <select value={exercice} onChange={(e) => setExercice(Number(e.target.value))}
             className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700">
             {annees.map((a) => <option key={a} value={a}>{a}</option>)}
           </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Journal Sage</label>
+          <input
+            value={journalSage}
+            onChange={(e) => setJournalSage(e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, "").slice(0, 8))}
+            placeholder="CAIS"
+            maxLength={8}
+            className="w-full sm:w-24 border border-gray-200 rounded-lg px-3 py-2 text-sm uppercase focus:outline-none focus:ring-2 focus:ring-green-700"
+          />
         </div>
         <div className="min-w-0">
           <label className="block text-xs font-medium text-gray-500 mb-1">Recherche</label>
@@ -2920,7 +2936,7 @@ function OngletBalanceAuxiliaire() {
             />
           </div>
         </div>
-        <div className="col-span-2 flex min-w-0 flex-wrap items-center justify-between gap-3 sm:col-span-2 sm:justify-end">
+        <div className="col-span-1 flex min-w-0 flex-wrap items-center justify-between gap-3 sm:col-span-3 sm:justify-end">
           <p className="text-sm text-gray-500">{list.length} {typeMeta.label.toLowerCase()}</p>
           <div className="flex flex-wrap gap-2">
             <button onClick={handleExport} disabled={list.length === 0}
