@@ -35,7 +35,7 @@ export interface ParamEcriture {
 import sysCohada from "../data/syscohada_plan.json" assert { type: "json" };
 
 /**
- * Charge le plan comptable SYSCOHADA complet (1346 comptes) pour une coopérative.
+ * Charge le plan comptable SYSCOHADA complet pour une coopérative.
  * Insère en batch par paquets de 100 — ON CONFLICT DO NOTHING pour ne pas écraser
  * les comptes déjà personnalisés.
  * Retourne { inseres, deja_presents }.
@@ -53,12 +53,20 @@ export async function seederPlanSyscohadaPourCooperative(cooperativeId: number):
     ordreAffichage: number;
   };
   const plan = sysCohada as PlanRow[];
+  const planNormalise = Array.from(
+    new Map(
+      plan.map((compte) => [
+        normaliserNumeroCompte(compte.numeroCompte),
+        compte,
+      ]),
+    ).values(),
+  );
 
   const BATCH = 100;
   let inseres = 0;
 
-  for (let i = 0; i < plan.length; i += BATCH) {
-    const slice = plan.slice(i, i + BATCH);
+  for (let i = 0; i < planNormalise.length; i += BATCH) {
+    const slice = planNormalise.slice(i, i + BATCH);
     const result = await db
       .insert(planComptableTable)
       .values(
@@ -78,7 +86,7 @@ export async function seederPlanSyscohadaPourCooperative(cooperativeId: number):
     inseres += result.length;
   }
 
-  return { inseres, dejaPresents: plan.length - inseres };
+  return { inseres, dejaPresents: planNormalise.length - inseres };
 }
 
 export async function statutPlanSyscohada(cooperativeId: number): Promise<{

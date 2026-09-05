@@ -1353,7 +1353,7 @@ function SeedOhadaButton({ onSuccess, disabled = false }: { onSuccess: () => voi
       onClick={() => mut.mutate()}
       disabled={disabled || mut.isPending}
       className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-      title={disabled ? "Le plan SYSCOHADA est déjà chargé pour cette coopérative" : "Charger les 1 346 comptes SYSCOHADA révisé"}
+      title={disabled ? "Le plan SYSCOHADA est déjà chargé pour cette coopérative" : "Charger les 1 342 comptes SYSCOHADA révisés"}
     >
       {mut.isPending ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}
       {disabled ? "Plan SYSCOHADA chargé" : "Plan SYSCOHADA"}

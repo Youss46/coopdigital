@@ -44,6 +44,7 @@ describe.skipIf(!enabled)("seeding du plan SYSCOHADA sur PostgreSQL", () => {
       await seederPlanSyscohadaPourCooperative(cooperativeId);
 
     expect(premierChargement.inseres).toBe(expectedActiveAccounts);
+    expect(premierChargement.dejaPresents).toBe(0);
 
     const comptesApresPremierChargement = await pool.query(
       `SELECT numero_compte AS "numeroCompte", actif
@@ -70,6 +71,7 @@ describe.skipIf(!enabled)("seeding du plan SYSCOHADA sur PostgreSQL", () => {
       await seederPlanSyscohadaPourCooperative(cooperativeId);
 
     expect(secondChargement.inseres).toBe(0);
+    expect(secondChargement.dejaPresents).toBe(expectedActiveAccounts);
 
     const total = await pool.query(
       `SELECT count(*)::int AS count
@@ -89,6 +91,12 @@ describe.skipIf(!enabled)("seeding du plan SYSCOHADA sur PostgreSQL", () => {
     expect(
       resultats.reduce((total, resultat) => total + resultat.inseres, 0),
     ).toBe(expectedActiveAccounts);
+    expect(
+      resultats.every(
+        (resultat) =>
+          resultat.inseres + resultat.dejaPresents === expectedActiveAccounts,
+      ),
+    ).toBe(true);
 
     const doublonsActifs = await pool.query(
       `SELECT numero_compte AS "numeroCompte", count(*)::int AS count

@@ -81,7 +81,7 @@ export async function seedPlanOhadaHandler(req: Request, res: Response): Promise
     if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const result = await svc.seederPlanSyscohadaPourCooperative(cooperativeId);
     res.json({
-      message: `Plan SYSCOHADA chargé : ${result.inseres} compte(s) ajouté(s), ${result.dejaPresents} déjà présent(s).`,
+      message: `Plan SYSCOHADA chargé : ${result.inseres} compte(s) inséré(s), ${result.dejaPresents} déjà présent(s) sur ${result.inseres + result.dejaPresents} numéro(s) normalisé(s).`,
       ...result,
     });
   } catch (err) {
