@@ -2935,7 +2935,7 @@ function OngletBalanceAuxiliaire() {
           Les comptes collectifs CoopDigital restent inchangés. Utilisez <strong>Modifier</strong> pour associer
           chaque tiers à son ou ses comptes détaillés Sage. L’export est bloqué si une écriture utilise un compte tiers non paramétré.
             Dans Sage, configurez le format délimité avec le séparateur <strong>;</strong> et l’ordre
-            <strong> Date;Journal;Pièce;Compte;Libellé;Débit;Crédit</strong>, sans ajouter de ligne de titre.
+            <strong> Journal;Date JJMMAA;Pièce;Compte;Libellé;Montant;Sens D/C;Type OD</strong>.
             Les cinq premières lignes sont les directives Sage (<code>#FLG</code>, <code>#VER</code>,
             <code>#DEV</code>, <code>#MECG</code> et le journal) : elles doivent être conservées.
         </p>

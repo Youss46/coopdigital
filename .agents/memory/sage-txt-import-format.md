@@ -1,14 +1,14 @@
 ---
-name: Format import Sage 100
-description: Format de lignes attendu par l’import TXT Sage 100 i7.
+name: Format natif Sage 100
+description: Trame native des écritures TXT utilisée par l’export CoopDigital.
 ---
 
-Le format des lignes d’écritures exportées vers Sage 100 i7 est :
+Pour la trame native retenue, chaque ligne d’écriture suit l’ordre :
 
-`date;journal;pièce;compte;libellé;débit;crédit`
+`Journal;Date JJMMAA;Pièce;Compte;Libellé;Montant;Sens;Type`
 
-La devise est indiquée dans l’en-tête (`#DEV XOF`) et ne doit pas être répétée comme huitième colonne. Les libellés doivent rester en caractères ASCII simples : les tirets typographiques et accents sont normalisés pour éviter le rejet de Sage i7.
+Le montant est positif, le sens vaut `D` ou `C`, et le type d’opération diverse vaut `OD`. Les directives `#FLG`, `#VER`, `#DEV`, `#MECG` et le journal restent dans l’en-tête. Les libellés restent en caractères ASCII simples.
 
-**Why:** Sage signale une incohérence dès la première ligne de données lorsqu’il reçoit le compte avant la pièce, une colonne devise supplémentaire ou une ponctuation UTF-8 non supportée.
+**Why:** Sage signale une incohérence dès la première ligne de données lorsqu’il reçoit la date avant le journal, une date longue, ou le débit et le crédit comme deux colonnes 0/montant.
 
-**How to apply:** Toute évolution de `buildSageTxt` doit préserver cet ordre et maintenir un test avec une pièce et un compte distincts.
+**How to apply:** Conserver cette trame pour le profil natif correspondant. Pour un format paramétrable différent, comparer d’abord le fichier de définition Sage du dossier.

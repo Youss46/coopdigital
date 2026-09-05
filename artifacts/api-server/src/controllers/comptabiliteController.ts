@@ -62,16 +62,25 @@ export function buildSageTxt(
   const body = lines.map((line) => {
     const isoDate = line[0] ?? "";
     const date = /^\d{4}-\d{2}-\d{2}$/.test(isoDate)
-      ? `${isoDate.slice(8, 10)}/${isoDate.slice(5, 7)}/${isoDate.slice(0, 4)}`
-      : isoDate;
+      ? `${isoDate.slice(8, 10)}${isoDate.slice(5, 7)}${isoDate.slice(2, 4)}`
+      : /^\d{2}\/\d{2}\/\d{4}$/.test(isoDate)
+        ? `${isoDate.slice(0, 2)}${isoDate.slice(3, 5)}${isoDate.slice(8, 10)}`
+        : isoDate;
+    const debit = Number(line[8] ?? 0);
+    const credit = Number(line[9] ?? 0);
+    const isCredit = credit > 0 && debit <= 0;
+    const montant = Math.abs(isCredit ? credit : debit);
+    const sens = isCredit ? "C" : "D";
+
     return [
-      date,
       journal,
+      date,
       line[2] || "",
       normaliserNumeroCompte(line[5] || line[4] || ""),
       line[3] || "",
-      line[8] || "0",
-      line[9] || "0",
+      montant,
+      sens,
+      "OD",
     ].map(sageTxtField).join(";");
   });
 
