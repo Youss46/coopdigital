@@ -767,7 +767,7 @@ function JournalCaisse({
     .reverse()
     .find(m => m.solde_apres_fcfa !== null && m.solde_apres_fcfa !== undefined)
     ?.solde_apres_fcfa;
-  const soldeFinal = dernierSoldeMouvement !== undefined
+  const soldeFinal = dernierSoldeMouvement != null
     ? parseFloat(dernierSoldeMouvement)
     : caisseSelectionnee
       ? parseFloat(caisseSelectionnee.solde_actuel_fcfa)
