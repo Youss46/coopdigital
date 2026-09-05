@@ -389,7 +389,7 @@ const MODES_CARBURANT = [
   { value: "wave",         label: "Wave" },
 ];
 
-function ModalValidation({
+export function ModalValidation({
   paiement,
   onClose,
   onConfirm,
