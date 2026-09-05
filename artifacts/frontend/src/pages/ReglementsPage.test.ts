@@ -94,4 +94,86 @@ describe("modale de validation d'un règlement", () => {
       true,
     );
   });
+
+  it("affiche et transmet le total avec le seul reliquat de commission quand l'avance est partielle", async () => {
+    const onConfirm = vi.fn();
+    const paiement = {
+      id: 43,
+      membreNom: "Kouassi",
+      membrePrenoms: "Awa",
+      montantFcfa: 500_000,
+      montantBrutFcfa: 517_500,
+      montantNetFcfa: 500_000,
+      statut: "en_attente",
+      modePaiement: null,
+      livraisonId: 100,
+      livraisonStatutPaiement: "EN_ATTENTE",
+      livraisonMontantRestant: 495_000,
+      commissionCollecteId: 8,
+      commissionCollecteFcfa: 22_500,
+      commissionCollecteStatut: "en_attente",
+      commissionCollecteAvanceDisponibleFcfa: 10_000,
+      commissionCollecteFrequencePaiement: "fin_campagne",
+    } as PaiementListItem;
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root.render(createElement(ModalValidation, {
+        paiement,
+        onClose: vi.fn(),
+        onConfirm,
+        loading: false,
+        sessionCaisseOuverte: true,
+        isDelegue: true,
+      }));
+    });
+
+    const radios = Array.from(container.querySelectorAll<HTMLInputElement>('input[type="radio"]'));
+    expect(radios).toHaveLength(2);
+
+    await act(async () => {
+      radios[1]!.click();
+    });
+
+    const total = Array.from(container.querySelectorAll("div")).find((element) =>
+      element.firstElementChild?.textContent === "Total à décaisser",
+    );
+    expect(total).toBeDefined();
+    expect(normaliserEspaces(total!.textContent ?? "")).toContain("507 500 FCFA");
+    expect(normaliserEspaces(container.textContent ?? "")).toContain("Retenue sur avance");
+    expect(normaliserEspaces(container.textContent ?? "")).toContain("Reliquat de commission à décaisser");
+
+    const montantHint = Array.from(container.querySelectorAll("p")).find((element) =>
+      element.textContent?.startsWith("Montant total :"),
+    );
+    expect(montantHint).toBeDefined();
+    expect(normaliserEspaces(montantHint!.textContent ?? "")).toContain(
+      "Montant total : 495 000 FCFA de net cacao + 12 500 FCFA de commission restant à décaisser",
+    );
+    expect(normaliserEspaces(montantHint!.textContent ?? "")).toContain(
+      "dont 10 000 FCFA retenus sur l’avance",
+    );
+
+    const confirmButton = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Confirmer et payer"),
+    );
+    expect(confirmButton).toBeDefined();
+
+    await act(async () => {
+      confirmButton!.click();
+    });
+
+    expect(onConfirm).toHaveBeenCalledWith(
+      "",
+      "",
+      507_500,
+      "especes",
+      undefined,
+      { numero: "", banque: "" },
+      true,
+    );
+  });
 });

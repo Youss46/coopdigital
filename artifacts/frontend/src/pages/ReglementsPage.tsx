@@ -518,6 +518,7 @@ export function ModalValidation({
 
   function handleConfirm() {
     const montantBase = inclureFraisCollecte ? montantVersementHorsCommission : montantVersement;
+    const montantConfirme = inclureFraisCollecte ? montantVersement : montantBase;
     const montantAControler = montantBase;
     if (!Number.isSafeInteger(montantAControler) || montantAControler <= 0 || montantAControler > montantRestant) {
       setTouched(true);
@@ -535,7 +536,7 @@ export function ModalValidation({
         setTouched(true);
         return;
       }
-      onConfirm("", "", montantBase, undefined, ventilations.map((ligne) => ({
+      onConfirm("", "", montantConfirme, undefined, ventilations.map((ligne) => ({
         modePaiement: ligne.modePaiement,
         montantFcfa: parseMontantSaisi(ligne.montantFcfa),
         ...(ligne.modePaiement === "cheque" ? {
@@ -549,7 +550,7 @@ export function ModalValidation({
     if (modeManquant) { setTouched(true); return; }
     if (sessionBloquee) return;
     if (refManquante) { setTouched(true); return; }
-    onConfirm(ref, telephone, montantBase, selectedMode || undefined, undefined, { numero: numeroCheque, banque }, inclureFraisCollecte);
+    onConfirm(ref, telephone, montantConfirme, selectedMode || undefined, undefined, { numero: numeroCheque, banque }, inclureFraisCollecte);
   }
 
   return (
@@ -628,6 +629,12 @@ export function ModalValidation({
                     <span className="font-semibold">− {fmt(commissionRetenueAvance)}</span>
                   </div>
                 )}
+                {inclureFraisCollecte && commissionNette > 0 && (
+                  <div className="flex justify-between text-blue-700">
+                    <span>Reliquat de commission à décaisser</span>
+                    <span className="font-semibold">+ {fmt(commissionNette)}</span>
+                  </div>
+                )}
                 {inclureFraisCollecte && (
                   <div className="border-t pt-2 flex justify-between font-bold text-blue-800">
                     <span>Total à décaisser</span>
@@ -698,7 +705,7 @@ export function ModalValidation({
               <p className="text-xs text-gray-400 mt-1">
                 {inclureFraisCollecte
                   ? commissionNette > 0
-                    ? `Montant total : ${fmt(montantRestant)} de net cacao + ${fmt(commissionNette)} de frais de collecte nets.`
+                    ? `Montant total : ${fmt(montantRestant)} de net cacao + ${fmt(commissionNette)} de commission restant à décaisser (sur ${fmt(commissionCollecteMontant)}, dont ${fmt(commissionRetenueAvance)} retenus sur l’avance).`
                     : `Montant total : ${fmt(montantRestant)} de net cacao. La commission de ${fmt(commissionCollecteMontant)} est entièrement retenue sur l’avance.`
                   : `Entre 1 et ${fmt(montantRestant)}. Le reliquat sera conservé pour un prochain versement.`}
               </p>
@@ -1543,13 +1550,16 @@ export default function ReglementsPage() {
     const hasPresetMode = !!modal.paiement.modePaiement;
     const isCarburant = isBonCarburant(modal.paiement);
     const sendMode = mode && (!hasPresetMode || isCarburant || livraisonAvecSolde(modal.paiement));
+    const montantNetCacao = inclureFraisCollecte && livraisonAvecSolde(modal.paiement)
+      ? montantRestantLivraison(modal.paiement)
+      : montant;
     try {
       await validerMut.mutateAsync({
         id: modal.paiement.id,
         data: {
           referenceTransaction: ref || null,
           telephone: telephone || null,
-          ...(livraisonAvecSolde(modal.paiement) ? { montantReglementFcfa: montant } : {}),
+          ...(livraisonAvecSolde(modal.paiement) ? { montantReglementFcfa: montantNetCacao } : {}),
           ...(inclureFraisCollecte ? { inclureFraisCollecte: true } : {}),
           ...(sendMode ? { modePaiement: mode } : {}),
           ...(cheque && mode === "cheque" ? {
