@@ -320,6 +320,27 @@ export default function ChargesDiversesPage() {
     }));
   }, []);
 
+  const handleModePaiementChange = useCallback((modePaiement: string) => {
+    const typeAttendu = modePaiement === "especes"
+      ? "caisse"
+      : modePaiement === "virement"
+        ? "banque"
+        : modePaiement === "mobile_money"
+          ? "mobile_marchand"
+          : null;
+    setForm(f => ({
+      ...f,
+      mode_paiement: modePaiement,
+      ...(typeAttendu && f.compte_tresorerie_type !== typeAttendu
+        ? { compte_credit: "", compte_tresorerie_id: "", compte_tresorerie_type: "" }
+        : {}),
+    }));
+  }, []);
+
+  const afficherCaisses = form.mode_paiement === "especes" || form.mode_paiement === "cheque";
+  const afficherBanques = form.mode_paiement === "virement" || form.mode_paiement === "cheque";
+  const afficherMobiles = form.mode_paiement === "mobile_money" || form.mode_paiement === "cheque";
+
   const compteCreditValue = form.compte_tresorerie_type && form.compte_tresorerie_id
     ? `${form.compte_tresorerie_type}:${form.compte_tresorerie_id}`
     : form.compte_credit;
@@ -555,7 +576,7 @@ export default function ChargesDiversesPage() {
               </div>
               <div className="space-y-1">
                 <Label>Mode de paiement</Label>
-                <Select value={form.mode_paiement} onValueChange={v => setForm(f => ({ ...f, mode_paiement: v }))}>
+                <Select value={form.mode_paiement} onValueChange={handleModePaiementChange}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {MODES_PAIEMENT.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
@@ -585,17 +606,17 @@ export default function ChargesDiversesPage() {
                     {form.compte_credit === "552" && !form.compte_tresorerie_id && (
                       <SelectItem value="552" disabled>552 — Mobile Marchand (compte historique à remplacer)</SelectItem>
                     )}
-                    {caisses.map(c => (
+                    {afficherCaisses && caisses.map(c => (
                       <SelectItem key={`caisse:${c.id}`} value={`caisse:${c.id}`}>
                         571 — Caisse : {c.nom}
                       </SelectItem>
                     ))}
-                    {banques.map(c => (
+                    {afficherBanques && banques.map(c => (
                       <SelectItem key={`banque:${c.id}`} value={`banque:${c.id}`}>
                         521 — Banque : {c.nom}{c.banque ? ` (${c.banque})` : ""}
                       </SelectItem>
                     ))}
-                    {mobiles.map(c => (
+                    {afficherMobiles && mobiles.map(c => (
                       <SelectItem key={`mobile_marchand:${c.id}`} value={`mobile_marchand:${c.id}`}>
                         552 — Mobile Marchand : {c.nom}
                       </SelectItem>
