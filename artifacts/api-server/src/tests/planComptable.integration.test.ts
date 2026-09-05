@@ -1,6 +1,9 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { pool } from "@workspace/db";
-import { seederPlanSyscohadaPourCooperative } from "../services/planComptableService.js";
+import {
+  seederPlanSyscohadaPourCooperative,
+  statutPlanSyscohada,
+} from "../services/planComptableService.js";
 
 const enabled =
   process.env.RUN_POSTGRES_INTEGRATION === "1" &&
@@ -115,5 +118,87 @@ describe.skipIf(!enabled)("seeding du plan SYSCOHADA sur PostgreSQL", () => {
       [cooperativeId],
     );
     expect(totalActif.rows[0].count).toBe(expectedActiveAccounts);
+  });
+
+  it("reprend un plan partiel sans écraser les personnalisations ni compter les historiques inactifs", async () => {
+    await pool.query(
+      `INSERT INTO plan_comptable
+         (cooperative_id, numero_compte, libelle, type, classe, actif)
+       VALUES
+         ($1, '101000', 'Compte personnalisé conservé', 'passif', 1, true),
+         ($1, '102000', 'Ancienne version historique', 'passif', 1, false)`,
+      [cooperativeId],
+    );
+
+    const statutAvantChargement = await statutPlanSyscohada(cooperativeId);
+    expect(statutAvantChargement).toEqual({
+      attendu: expectedActiveAccounts,
+      charges: 1,
+      totalComptes: 1,
+      complet: false,
+    });
+
+    const chargement =
+      await seederPlanSyscohadaPourCooperative(cooperativeId);
+
+    expect(chargement.inseres).toBe(expectedActiveAccounts - 1);
+    expect(chargement.dejaPresents).toBe(1);
+
+    const comptes = await pool.query(
+      `SELECT numero_compte AS "numeroCompte", libelle, actif
+       FROM plan_comptable
+       WHERE cooperative_id = $1
+       ORDER BY numero_compte, actif DESC`,
+      [cooperativeId],
+    );
+    const comptesActifs = comptes.rows.filter(
+      (compte: { actif: boolean }) => compte.actif,
+    );
+
+    expect(comptesActifs).toHaveLength(expectedActiveAccounts);
+    expect(
+      comptesActifs.filter(
+        (compte: { numeroCompte: string }) =>
+          compte.numeroCompte === "101000",
+      ),
+    ).toEqual([
+      {
+        numeroCompte: "101000",
+        libelle: "Compte personnalisé conservé",
+        actif: true,
+      },
+    ]);
+    expect(
+      comptes.rows.filter(
+        (compte: { numeroCompte: string; actif: boolean }) =>
+          compte.numeroCompte === "102000",
+      ),
+    ).toHaveLength(2);
+    expect(
+      comptes.rows.filter(
+        (compte: { numeroCompte: string; actif: boolean }) =>
+          compte.numeroCompte === "102000" && compte.actif,
+      ),
+    ).toHaveLength(1);
+    expect(
+      comptes.rows.filter(
+        (compte: { numeroCompte: string; actif: boolean }) =>
+          compte.numeroCompte === "102000" && !compte.actif,
+      ),
+    ).toEqual([
+      {
+        numeroCompte: "102000",
+        libelle: "Ancienne version historique",
+        actif: false,
+      },
+    ]);
+
+    const statutApresChargement = await statutPlanSyscohada(cooperativeId);
+    expect(statutApresChargement).toEqual({
+      attendu: expectedActiveAccounts,
+      charges: expectedActiveAccounts,
+      totalComptes: expectedActiveAccounts,
+      complet: true,
+    });
   });
 });

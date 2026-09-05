@@ -100,7 +100,10 @@ export async function statutPlanSyscohada(cooperativeId: number): Promise<{
   const comptes = await db
     .select({ numeroCompte: planComptableTable.numeroCompte })
     .from(planComptableTable)
-    .where(eq(planComptableTable.cooperativeId, cooperativeId));
+    .where(and(
+      eq(planComptableTable.cooperativeId, cooperativeId),
+      eq(planComptableTable.actif, true),
+    ));
   const numerosCharges = new Set(comptes.map((c) => normaliserNumeroCompte(c.numeroCompte)));
   let charges = 0;
   for (const numero of numerosAttendus) {
