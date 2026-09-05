@@ -1179,8 +1179,8 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
   for (const [i, [label, val]] of payDetails.entries()) {
     const estDateReglement = label === "Date et heure de règlement";
     if (i % 2 === 0) doc.rect(MARGIN, y, 370, 16).fill("#f9fafb");
-    doc.fontSize(8).fillColor(estDateReglement ? "#16a34a" : GRIS).font("Helvetica").text(label, MARGIN + 6, y + 4, { width: 160, lineBreak: false });
-    doc.fontSize(9).fillColor(estDateReglement ? "#16a34a" : "black").font("Helvetica-Bold").text(val, MARGIN + 170, y + 4, { width: 190, lineBreak: false });
+    doc.fontSize(8).fillColor(GRIS).font("Helvetica").text(label, MARGIN + 6, y + 4, { width: 160, lineBreak: false });
+    doc.fontSize(9).fillColor(estDateReglement ? "#15803d" : "#111827").font("Helvetica-Bold").text(val, MARGIN + 170, y + 4, { width: 190, lineBreak: false });
     y += 16;
   }
   if (paiementLignes.length > 1) {
@@ -1245,9 +1245,17 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
   doc.text(formaterFCFA(montantEffectivementEncaisse), MARGIN + 218, y + 8, { width: 145, align: "right", lineBreak: false });
   y += 34;
   const payStatutColor: Record<string, string> = { effectue: "#16a34a", confirme: "#16a34a", en_attente: "#f59e0b", echec: "#ef4444", rejete: "#ef4444" };
-  const statutAffiche = chequeEnAttente ? "EN ATTENTE D’ENCAISSEMENT" : row.statut.replace(/_/g, " ").toUpperCase();
-  doc.fontSize(9).font("Helvetica-Bold").fillColor(chequeEnAttente ? "#f59e0b" : (payStatutColor[row.statut] ?? GRIS))
-    .text(`Statut : ${statutAffiche}`, MARGIN, y);
+  const statutAffiche = chequeEnAttente
+    ? "EN ATTENTE D’ENCAISSEMENT"
+    : row.statut === "effectue" || row.statut === "confirme"
+    ? "PAYÉ"
+    : row.statut.replace(/_/g, " ").toUpperCase();
+  const statutColor = chequeEnAttente ? "#b45309" : (payStatutColor[row.statut] ?? GRIS);
+  doc.roundedRect(MARGIN, y - 3, 370, 22, 4).fill(chequeEnAttente ? "#fffbeb" : "#f0fdf4").stroke(chequeEnAttente ? "#fde68a" : "#bbf7d0");
+  doc.fontSize(8).font("Helvetica").fillColor(GRIS)
+    .text("Statut", MARGIN + 10, y + 4, { width: 55, lineBreak: false });
+  doc.fontSize(9).font("Helvetica-Bold").fillColor(statutColor)
+    .text(statutAffiche, MARGIN + 70, y + 3, { width: 290, lineBreak: false });
 
   // — Ligne "Validé par" si l'agent validateur est connu
   if (row.validateurNom || row.validateurPrenoms) {

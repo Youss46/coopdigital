@@ -338,6 +338,16 @@ describe("generateRecuPaiement (real PDF generation) — receipt number in PDF o
     expect(text).toContain("18/08/2026");
   });
 
+  it("affiche le statut utilisateur PAYÉ pour un paiement effectué", async () => {
+    setupDbSelect(makePaiementRow({ statut: "effectue" }));
+    const buf = await generateRecuPaiement(PAIEMENT_ID, 1);
+    const text = extractPdfText(buf);
+
+    expect(text).toContain("Statut");
+    expect(text).toContain("PAYÉ");
+    expect(text).not.toContain("Statut : EFFECTUE");
+  });
+
   it("affiche le numéro canonique de la pesée liée au paiement", async () => {
     setupDbSelect(makePaiementRow());
     const buf = await generateRecuPaiement(PAIEMENT_ID, 1);
