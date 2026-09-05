@@ -109,7 +109,9 @@ export async function deleteCompteHandler(req: Request, res: Response): Promise<
 
 export async function listParamsHandler(req: Request, res: Response): Promise<void> {
   try {
-    const rows = await svc.listerParams();
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
+    const rows = await svc.listerParams(cooperativeId);
     res.json(rows);
   } catch (err) {
     req.log.error({ err }, "listParams");
@@ -119,8 +121,10 @@ export async function listParamsHandler(req: Request, res: Response): Promise<vo
 
 export async function listParamsModuleHandler(req: Request, res: Response): Promise<void> {
   try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
     const module = String(req.params["module"] ?? "");
-    const rows = await svc.listerParams(undefined, module);
+    const rows = await svc.listerParams(cooperativeId, module);
     res.json(rows);
   } catch (err) {
     req.log.error({ err }, "listParamsModule");

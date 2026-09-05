@@ -1295,6 +1295,40 @@ const MODULES_LABELS: Record<string, string> = {
   parts_sociales: "Parts sociales",
 };
 
+const OPERATIONS_LABELS: Record<string, string> = {
+  achat_cacao_producteur: "Achat cacao producteur",
+  paiement_producteur_banque: "Paiement producteur — banque",
+  paiement_producteur_caisse: "Paiement producteur — caisse",
+  octroi_avance_producteur: "Octroi d'avance producteur",
+  remboursement_avance: "Remboursement d'avance",
+  vente_cacao_exportateur: "Vente cacao à l'exportateur",
+  encaissement_exportateur: "Encaissement exportateur",
+  salaire_brut: "Salaire brut",
+  charges_sociales_patronales: "Charges sociales patronales",
+  paiement_salaire: "Paiement des salaires",
+  avance_personnel: "Avance au personnel",
+  don_effectue_especes: "Don effectué en espèces",
+  don_effectue_nature: "Don effectué en nature",
+  don_recu_especes: "Don reçu en espèces",
+  don_recu_nature: "Don reçu en nature",
+  appro_intrants: "Approvisionnement en intrants",
+  distribution_credit: "Distribution d'intrants à crédit",
+  reception_emprunt: "Réception d'emprunt",
+  remboursement_capital: "Remboursement du capital",
+  paiement_interets: "Paiement des intérêts",
+  frais_transport: "Frais de transport",
+  dotation_mensuelle: "Dotation aux amortissements",
+  liberation_parts: "Libération des parts sociales",
+  cotisations_salarie: "Cotisations salariales",
+  reception_prime: "Réception d'une prime",
+  paiement_prime: "Paiement d'une prime",
+  paiement_commission: "Paiement d'une commission",
+  frais_carburant: "Frais de carburant avancés",
+  retenue_carburant: "Retenue de carburant",
+  autres_charges: "Autres charges avancées",
+  retenue_autres_charges: "Retenue des autres charges",
+};
+
 // ─── Onglet A — Plan comptable ─────────────────────────────────────────────────
 function SeedOhadaButton({ onSuccess }: { onSuccess: () => void }) {
   const { toast } = useToast();
@@ -1624,10 +1658,16 @@ function OngletComptesModules() {
   const { toast } = useToast();
   const peutModifier = usePermission("comptabilite", "modifier_params");
   const peutReset = usePermission("comptabilite", "reset_ohada");
+  const peutVoirPlan = usePermission("comptabilite", "voir_plan");
 
   const { data: params = [], isLoading } = useQuery<ParamModule[]>({
     queryKey: ["params-comptes-modules"],
     queryFn: () => apiFetch<ParamModule[]>("/api/comptabilite/params"),
+  });
+  const { data: comptesPlan = [], isLoading: comptesPlanLoading } = useQuery<ComptePC[]>({
+    queryKey: ["plan-comptable-actifs-pour-parametres"],
+    queryFn: () => apiFetch<ComptePC[]>("/api/comptabilite/plan?actif=true"),
+    enabled: peutVoirPlan,
   });
 
   const [ouverts, setOuverts] = useState<Record<string, boolean>>({});
@@ -1635,6 +1675,7 @@ function OngletComptesModules() {
   const [editForm, setEditForm] = useState({ compteDebit: "", compteCredit: "", libelleEcritureAuto: "" });
 
   const toggleModule = (m: string) => setOuverts((o) => ({ ...o, [m]: !o[m] }));
+  const libelleCompte = (numero: string) => comptesPlan.find((compte) => compte.numeroCompte === numero)?.libelle;
 
   const mutUpdate = useMutation({
     mutationFn: ({ id, data }: { id: number; data: typeof editForm }) =>
@@ -1667,9 +1708,21 @@ function OngletComptesModules() {
       <div className="flex items-start gap-3">
         <p className="text-sm text-gray-500 flex-1">
           Configurez les comptes OHADA utilisés automatiquement par chaque module lors de la génération d'écritures.
+          Ces réglages s'appliquent aux nouvelles écritures ; les écritures déjà enregistrées restent inchangées.
         </p>
         <SeedParamsButton onSuccess={() => void qc.invalidateQueries({ queryKey: ["params-comptes-modules"] })} />
       </div>
+      <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-800">
+        <strong>Conseil :</strong> utilisez un compte actif du plan comptable. Le serveur vérifie le numéro et refuse
+        l'enregistrement d'un compte absent ou désactivé.
+      </div>
+      <datalist id="comptes-plan-options">
+        {comptesPlan.map((compte) => (
+          <option key={compte.id} value={compte.numeroCompte}>
+            {compte.libelle}
+          </option>
+        ))}
+      </datalist>
       {isLoading ? (
         <div className="text-center py-12 text-gray-400">Chargement…</div>
       ) : params.length === 0 ? (
@@ -1725,22 +1778,29 @@ function OngletComptesModules() {
                         </tr>
                       </thead>
                       <tbody>
-                        {rows.sort((a,b) => a.operation.localeCompare(b.operation)).map((p) => (
+                         {[...rows].sort((a,b) => a.operation.localeCompare(b.operation)).map((p) => (
                           <tr key={p.id} className="border-b border-gray-50 hover:bg-gray-50">
-                            <td className="px-2 sm:px-4 py-2.5 text-gray-700 font-mono text-xs">{p.operation}</td>
+                            <td className="px-2 sm:px-4 py-2.5 text-gray-700">
+                              <div className="font-medium text-xs">{OPERATIONS_LABELS[p.operation] ?? p.operation}</div>
+                              <div className="font-mono text-[10px] text-gray-400 mt-0.5">{p.operation}</div>
+                            </td>
                             {editId === p.id ? (
                               <>
                                 <td className="px-2 sm:px-4 py-1.5">
                                   <input value={editForm.compteDebit}
                                      onChange={(e) => setEditForm((f) => ({ ...f, compteDebit: e.target.value.replace(/\D/g, "").slice(0, 6) }))}
-                                     inputMode="numeric" maxLength={6}
+                                     inputMode="numeric" maxLength={6} list="comptes-plan-options"
+                                     title={comptesPlanLoading ? "Chargement du plan comptable…" : "Choisissez un compte du plan actif"}
                                     className="w-16 sm:w-20 border border-gray-200 rounded px-2 py-1 text-sm font-mono" />
+                                   {libelleCompte(editForm.compteDebit) && <div className="text-[10px] text-gray-500 mt-1 max-w-24 truncate">{libelleCompte(editForm.compteDebit)}</div>}
                                 </td>
                                 <td className="px-2 sm:px-4 py-1.5">
                                   <input value={editForm.compteCredit}
                                      onChange={(e) => setEditForm((f) => ({ ...f, compteCredit: e.target.value.replace(/\D/g, "").slice(0, 6) }))}
-                                     inputMode="numeric" maxLength={6}
+                                     inputMode="numeric" maxLength={6} list="comptes-plan-options"
+                                     title={comptesPlanLoading ? "Chargement du plan comptable…" : "Choisissez un compte du plan actif"}
                                     className="w-16 sm:w-20 border border-gray-200 rounded px-2 py-1 text-sm font-mono" />
+                                   {libelleCompte(editForm.compteCredit) && <div className="text-[10px] text-gray-500 mt-1 max-w-24 truncate">{libelleCompte(editForm.compteCredit)}</div>}
                                 </td>
                                 <td className="hidden sm:table-cell px-4 py-1.5">
                                   <input value={editForm.libelleEcritureAuto}
@@ -1759,8 +1819,14 @@ function OngletComptesModules() {
                               </>
                             ) : (
                               <>
-                                <td className="px-2 sm:px-4 py-2.5 font-mono font-semibold text-blue-700">{p.compteDebit}</td>
-                                <td className="px-2 sm:px-4 py-2.5 font-mono font-semibold text-purple-700">{p.compteCredit}</td>
+                                <td className="px-2 sm:px-4 py-2.5">
+                                  <div className="font-mono font-semibold text-blue-700">{p.compteDebit}</div>
+                                  <div className="text-[10px] text-gray-500 truncate max-w-32">{libelleCompte(p.compteDebit) ?? "Compte non trouvé"}</div>
+                                </td>
+                                <td className="px-2 sm:px-4 py-2.5">
+                                  <div className="font-mono font-semibold text-purple-700">{p.compteCredit}</div>
+                                  <div className="text-[10px] text-gray-500 truncate max-w-32">{libelleCompte(p.compteCredit) ?? "Compte non trouvé"}</div>
+                                </td>
                                 <td className="hidden sm:table-cell px-4 py-2.5 text-gray-500 text-xs">{p.libelleEcritureAuto ?? "—"}</td>
                                 <td className="px-2 sm:px-4 py-2.5 text-right">
                                   {peutModifier && (
