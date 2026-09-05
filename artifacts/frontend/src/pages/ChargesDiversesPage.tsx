@@ -295,6 +295,10 @@ export default function ChargesDiversesPage() {
       toast({ title: "Fournisseur requis", description: "Indiquez le fournisseur ou le tiers pour une charge à crédit.", variant: "destructive" });
       return;
     }
+    if (form.mode_paiement !== "credit" && form.compte_credit === "401") {
+      toast({ title: "Mode de paiement invalide", description: "Le compte 401 — Fournisseurs nécessite le mode de paiement « À crédit ».", variant: "destructive" });
+      return;
+    }
     if (form.compte_credit !== "401" && (!form.compte_tresorerie_type || !form.compte_tresorerie_id)) {
       toast({ title: "Compte de trésorerie requis", description: "Sélectionnez le compte de trésorerie qui sera débité à la validation.", variant: "destructive" });
       return;
@@ -351,7 +355,7 @@ export default function ChargesDiversesPage() {
     setForm(f => ({
       ...f,
       mode_paiement: modePaiement,
-      ...(typeAttendu && f.compte_tresorerie_type !== typeAttendu
+      ...(f.compte_credit === "401" || (typeAttendu && f.compte_tresorerie_type !== typeAttendu)
         ? { compte_credit: "", compte_tresorerie_id: "", compte_tresorerie_type: "" }
         : {}),
     }));

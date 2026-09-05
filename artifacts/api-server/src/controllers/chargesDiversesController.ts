@@ -11,7 +11,7 @@ import {
   securiserReglementPpsi,
 } from "../services/chargesDiversesService";
 
-function erreurStructureCharge(
+export function erreurStructureCharge(
   modePaiement: string,
   compteCredit: string,
   tiers: string | null | undefined,
@@ -183,7 +183,7 @@ export async function handleValiderChargeDiverses(req: Request, res: Response): 
     // Pour une prestation informelle, le brut crée la dette prestataire,
     // la retenue la transfère vers la dette fiscale, et seul le net sort.
     const brut = Math.round(parseFloat(row.montantFcfa));
-    if (row.categorie === "ppsi") {
+    if (row.categorie === "ppsi" && row.modePaiement !== "credit") {
       // Reborner aussi les anciennes lignes : validation ne garantit pas que
       // les montants persistés avant ce garde-fou soient cohérents.
       const reglement = securiserReglementPpsi(

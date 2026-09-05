@@ -140,8 +140,15 @@ export async function validerChargeDiverses(
   const compteCredit = charge.compteCredit;
   const compteTresorerieType = charge.compteTresorerieType as keyof typeof compteParType | null;
   const compteTresorerieId = charge.compteTresorerieId;
-  const mouvementTresorerie = compteCredit !== "401";
+  const isCredit = charge.modePaiement === "credit";
+  const mouvementTresorerie = !isCredit;
 
+  if (isCredit && compteCredit !== "401") {
+    throw new Error("Une charge à crédit doit utiliser le compte 401 — Fournisseurs");
+  }
+  if (!isCredit && compteCredit === "401") {
+    throw new Error("Le compte 401 — Fournisseurs nécessite le mode de paiement « À crédit »");
+  }
   if (compteCredit === "401" && !charge.tiers?.trim()) {
     throw new Error("Le fournisseur ou le tiers est requis pour une charge à crédit");
   }
