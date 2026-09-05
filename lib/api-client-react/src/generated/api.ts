@@ -178,6 +178,7 @@ import type {
   GetBilanParams,
   GetBonsCarburant200,
   GetBonsCarburantParams,
+  GetBonsCarburantReglementPdfParams,
   GetBulletinsParams,
   GetCertificationsCriteres200,
   GetChauffeurs200,
@@ -21144,6 +21145,90 @@ export function useGetBonCarburant<TData = Awaited<ReturnType<typeof getBonCarbu
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetBonCarburantQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetBonsCarburantReglementPdfUrl = (params?: GetBonsCarburantReglementPdfParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/transport/carburant/bons/reglement-pdf?${stringifiedParams}` : `/api/transport/carburant/bons/reglement-pdf`
+}
+
+/**
+ * @summary Générer la fiche de règlement des bons carburant en attente
+ */
+export const getBonsCarburantReglementPdf = async (params?: GetBonsCarburantReglementPdfParams, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetBonsCarburantReglementPdfUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBonsCarburantReglementPdfQueryKey = (params?: GetBonsCarburantReglementPdfParams,) => {
+    return [
+    `/api/transport/carburant/bons/reglement-pdf`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetBonsCarburantReglementPdfQueryOptions = <TData = Awaited<ReturnType<typeof getBonsCarburantReglementPdf>>, TError = ErrorType<ErrorResponse>>(params?: GetBonsCarburantReglementPdfParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBonsCarburantReglementPdf>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBonsCarburantReglementPdfQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBonsCarburantReglementPdf>>> = ({ signal }) => getBonsCarburantReglementPdf(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBonsCarburantReglementPdf>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBonsCarburantReglementPdfQueryResult = NonNullable<Awaited<ReturnType<typeof getBonsCarburantReglementPdf>>>
+export type GetBonsCarburantReglementPdfQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Générer la fiche de règlement des bons carburant en attente
+ */
+
+export function useGetBonsCarburantReglementPdf<TData = Awaited<ReturnType<typeof getBonsCarburantReglementPdf>>, TError = ErrorType<ErrorResponse>>(
+ params?: GetBonsCarburantReglementPdfParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBonsCarburantReglementPdf>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBonsCarburantReglementPdfQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

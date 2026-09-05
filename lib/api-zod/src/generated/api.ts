@@ -7099,6 +7099,14 @@ export const GetBonCarburantResponse = zod.object({
 
 
 /**
+ * @summary Générer la fiche de règlement des bons carburant en attente
+ */
+export const GetBonsCarburantReglementPdfQueryParams = zod.object({
+  "ids": zod.coerce.string().optional().describe('Liste CSV des identifiants de bons à inclure; sans valeur, tous les bons utilisés en attente sont inclus.')
+})
+
+
+/**
  * @summary Soumettre un bon pour approbation
  */
 export const SoumettresBonCarburantParams = zod.object({

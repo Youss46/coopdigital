@@ -5857,6 +5857,13 @@ export type GetBonsCarburant200 = {
   bons: BonCarburant[];
 };
 
+export type GetBonsCarburantReglementPdfParams = {
+/**
+ * Liste CSV des identifiants de bons à inclure; sans valeur, tous les bons utilisés en attente sont inclus.
+ */
+ids?: string;
+};
+
 export type GetStatsCarburantParams = {
 vehicule_id?: number;
 date_debut?: string;

@@ -1,6 +1,6 @@
 import PDFDocument from "pdfkit";
 import QRCode from "qrcode";
-import { drawHeader } from "./pdfHeaderService";
+import { drawHeader, drawFooter } from "./pdfHeaderService";
 
 const VERT  = "#16a34a";
 const GRIS  = "#6b7280";
@@ -19,6 +19,46 @@ function formaterFCFA(n: string | number | null | undefined): string {
     .toLocaleString("fr-FR")
     .replace(/[\u202F\u00A0]/g, " ");
   return `${montant} FCFA`;
+}
+
+function tronquer(value: string | null | undefined, max: number): string {
+  const text = value?.trim() || "—";
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
+function nombreEnLettres(n: number): string {
+  const units = ["zéro", "un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit", "neuf", "dix", "onze", "douze", "treize", "quatorze", "quinze", "seize", "dix-sept", "dix-huit", "dix-neuf"];
+  const underHundred = (value: number): string => {
+    if (value < 17) return units[value]!;
+    if (value < 20) return `dix-${units[value - 10]}`;
+    const tens = ["", "", "vingt", "trente", "quarante", "cinquante", "soixante"];
+    if (value < 70) {
+      const dizaine = Math.floor(value / 10);
+      const unite = value % 10;
+      return `${tens[dizaine]}${unite === 1 ? " et un" : unite ? `-${units[unite]}` : ""}`;
+    }
+    if (value < 80) return value === 71 ? "soixante et onze" : `soixante-${underHundred(value - 60)}`;
+    return value === 80 ? "quatre-vingts" : `quatre-vingt-${underHundred(value - 80)}`;
+  };
+  const underThousand = (value: number): string => {
+    if (value < 100) return underHundred(value);
+    const hundreds = Math.floor(value / 100);
+    const reste = value % 100;
+    const prefix = hundreds === 1 ? "cent" : `${units[hundreds]} cent`;
+    return `${prefix}${reste === 0 && hundreds > 1 ? "s" : ""}${reste ? ` ${underHundred(reste)}` : ""}`;
+  };
+  const convert = (value: number): string => {
+    if (value < 1000) return underThousand(value);
+    if (value < 1_000_000) {
+      const milliers = Math.floor(value / 1000);
+      const reste = value % 1000;
+      return `${milliers === 1 ? "mille" : `${underThousand(milliers)} mille`}${reste ? ` ${underThousand(reste)}` : ""}`;
+    }
+    const millions = Math.floor(value / 1_000_000);
+    const reste = value % 1_000_000;
+    return `${convert(millions)} million${millions > 1 ? "s" : ""}${reste ? ` ${convert(reste)}` : ""}`;
+  };
+  return convert(Math.max(0, Math.round(n)));
 }
 
 interface BonData {
@@ -201,6 +241,139 @@ export async function generateBonCarburant(cooperativeId: number, bon: BonData):
     doc.fontSize(6.5).fillColor(GRIS).font("Helvetica").text("Signature", sx + 6, y + 48, { width: sigW - 12, align: "center", lineBreak: false });
   }
 
+  doc.end();
+  return endPromise;
+}
+
+export interface BonCarburantReglementData {
+  numero: string;
+  dateUtilisation: string | null;
+  immatriculation: string | null;
+  chauffeurNom: string | null;
+  chauffeurPrenoms: string | null;
+  typeCarburant: string;
+  quantiteLivree: string | null;
+  montantPaiementFcfa: number | string;
+  stationService: string | null;
+}
+
+export async function generateBonsCarburantReglement(
+  cooperativeId: number,
+  bons: BonCarburantReglementData[],
+): Promise<Buffer> {
+  const doc = new PDFDocument({ size: "A4", margin: MARGIN, bufferPages: true });
+  const chunks: Buffer[] = [];
+  const endPromise = new Promise<Buffer>((resolve, reject) => {
+    doc.on("data", (c: Buffer) => chunks.push(c));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+  });
+
+  const groups = new Map<string, BonCarburantReglementData[]>();
+  for (const bon of bons) {
+    const station = bon.stationService?.trim() || "Station non renseignée";
+    const group = groups.get(station) ?? [];
+    group.push(bon);
+    groups.set(station, group);
+  }
+
+  const widths = [58, 48, 62, 112, 52, 54, 129];
+  const headers = ["N° bon", "Date", "Véhicule", "Chauffeur", "Carburant", "Qté", "Montant"];
+  const drawStationBlock = (
+    station: string,
+    rows: BonCarburantReglementData[],
+    total: number,
+    firstPage: boolean,
+    lastPage: boolean,
+  ) => {
+    let y = doc.y + 8;
+    if (firstPage) {
+      doc.rect(MARGIN, y, PAGE_W, 38).fill("#f0fdf4").stroke("#bbf7d0");
+      doc.font("Helvetica-Bold").fontSize(14).fillColor(VERT)
+        .text(station, MARGIN + 12, y + 8, { width: PAGE_W - 24, lineBreak: false });
+      doc.font("Helvetica").fontSize(8).fillColor("#374151")
+        .text(`${rows.length} bon${rows.length > 1 ? "s" : ""} · Total à payer : ${formaterFCFA(total)}`, MARGIN + 12, y + 25, { width: PAGE_W - 24, lineBreak: false });
+      y += 50;
+    } else {
+      doc.font("Helvetica-Bold").fontSize(10).fillColor(VERT)
+        .text(`${station} — suite`, MARGIN, y, { width: PAGE_W, lineBreak: false });
+      y += 20;
+    }
+
+    let x = MARGIN;
+    doc.rect(MARGIN, y, PAGE_W, 22).fill("#166534");
+    headers.forEach((header, index) => {
+      doc.font("Helvetica-Bold").fontSize(7).fillColor("white")
+        .text(header, x + 4, y + 7, { width: widths[index]! - 8, align: index >= 5 ? "right" : "left", lineBreak: false });
+      x += widths[index]!;
+    });
+    y += 22;
+
+    for (const [index, row] of rows.entries()) {
+      x = MARGIN;
+      const values = [
+        tronquer(row.numero, 10),
+        formaterDate(row.dateUtilisation),
+        tronquer(row.immatriculation, 11),
+        tronquer(`${row.chauffeurPrenoms ?? ""} ${row.chauffeurNom ?? ""}`.trim(), 20),
+        tronquer(CARBURANT_LABELS[row.typeCarburant] ?? row.typeCarburant, 10),
+        row.quantiteLivree ? `${parseFloat(row.quantiteLivree).toFixed(1)} L` : "—",
+        formaterFCFA(row.montantPaiementFcfa),
+      ];
+      if (index % 2 === 0) doc.rect(MARGIN, y, PAGE_W, 22).fill("#f8fafc");
+      values.forEach((value, valueIndex) => {
+        doc.font("Helvetica").fontSize(7).fillColor("#111827")
+          .text(value, x + 4, y + 7, { width: widths[valueIndex]! - 8, align: valueIndex >= 5 ? "right" : "left", lineBreak: false });
+        x += widths[valueIndex]!;
+      });
+      y += 22;
+    }
+
+    if (lastPage) {
+      doc.rect(MARGIN, y + 4, PAGE_W, 50).fill("#ecfdf5").stroke("#86efac");
+      doc.font("Helvetica-Bold").fontSize(10).fillColor("#166534")
+        .text("TOTAL À PAYER", MARGIN + 12, y + 14, { width: 180, lineBreak: false });
+      doc.font("Helvetica-Bold").fontSize(15).fillColor("#111827")
+        .text(formaterFCFA(total), MARGIN + 190, y + 11, { width: PAGE_W - 202, align: "right", lineBreak: false });
+      doc.font("Helvetica-Oblique").fontSize(7.5).fillColor("#374151")
+        .text(`Arrêté à : ${nombreEnLettres(total)} francs CFA`, MARGIN + 12, y + 35, { width: PAGE_W - 24, lineBreak: false });
+      const signatureY = y + 76;
+      const signatureWidth = (PAGE_W - 20) / 3;
+      for (const [index, label] of ["Préparé par", "Contrôlé par", "Visa station"].entries()) {
+        const signatureX = MARGIN + index * (signatureWidth + 10);
+        doc.rect(signatureX, signatureY, signatureWidth, 48).stroke("#d1d5db");
+        doc.font("Helvetica").fontSize(7).fillColor(GRIS)
+          .text(label, signatureX + 6, signatureY + 6, { width: signatureWidth - 12, align: "center", lineBreak: false });
+        doc.moveTo(signatureX + 10, signatureY + 38).lineTo(signatureX + signatureWidth - 10, signatureY + 38).stroke("#9ca3af");
+        doc.fontSize(6).fillColor(GRIS)
+          .text("Signature", signatureX + 6, signatureY + 40, { width: signatureWidth - 12, align: "center", lineBreak: false });
+      }
+      doc.y = signatureY + 58;
+    }
+  };
+
+  let firstGroup = true;
+  for (const [station, rows] of groups) {
+    const total = rows.reduce((sum, row) => sum + Number(row.montantPaiementFcfa || 0), 0);
+    const pages: BonCarburantReglementData[][] = [];
+    for (let i = 0; i < rows.length; i += 18) pages.push(rows.slice(i, i + 18));
+    for (const [pageIndex, pageRows] of pages.entries()) {
+      if (!firstGroup || pageIndex > 0) doc.addPage();
+      await drawHeader(doc, cooperativeId, {
+        titre_document: "FICHE RÈGLEMENT",
+        reference: `CARB-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}`,
+      });
+      drawStationBlock(station, pageRows, total, pageIndex === 0, pageIndex === pages.length - 1);
+    }
+    firstGroup = false;
+  }
+
+  const range = doc.bufferedPageRange();
+  for (let i = 0; i < range.count; i++) {
+    doc.switchToPage(i);
+    await drawFooter(doc, cooperativeId, i + 1, range.count);
+  }
+  doc.flushPages();
   doc.end();
   return endPromise;
 }

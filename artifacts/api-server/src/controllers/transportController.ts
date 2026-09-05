@@ -39,12 +39,13 @@ import {
   deleteDepense,
   DepenseRegleeError,
   getBonsCarburant,
+  getBonsCarburantPourReglement,
   getBonCarburant,
   createBonCarburant,
   transitionBon,
   getStatsCarburant,
 } from "../services/transportService";
-import { generateBonCarburant } from "../services/bonCarburantPdf";
+import { generateBonCarburant, generateBonsCarburantReglement } from "../services/bonCarburantPdf";
 import { generateBonAchatPiece } from "../services/bonAchatPiecePdf";
 import { db, usersTable, stationsCarburantTable, bonsCarburantTable, paiementsTable } from "@workspace/db";
 import { eq, and, isNotNull, count } from "drizzle-orm";
@@ -1125,6 +1126,41 @@ export async function handleGetBonCarburantPdf(req: Request, res: Response): Pro
     res.send(pdfBuffer);
   } catch (err) {
     req.log.error({ err }, "Erreur getBonCarburantPdf");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function handleGetBonsCarburantReglementPdf(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
+    const rawIds = typeof req.query["ids"] === "string" ? req.query["ids"] : "";
+    const bonIds = rawIds
+      .split(",")
+      .map(value => Number(value.trim()))
+      .filter(Number.isInteger)
+      .filter(value => value > 0);
+    const rows = await getBonsCarburantPourReglement(cooperativeId, bonIds.length ? bonIds : undefined);
+    if (rows.length === 0) {
+      res.status(404).json({ erreur: "Aucun bon utilisé en attente de règlement pour ces critères." });
+      return;
+    }
+    const pdfBuffer = await generateBonsCarburantReglement(cooperativeId, rows.map(row => ({
+      numero: row.bon.numero,
+      dateUtilisation: row.bon.dateUtilisation,
+      immatriculation: row.immatriculation,
+      chauffeurNom: row.chauffeurNom,
+      chauffeurPrenoms: row.chauffeurPrenoms,
+      typeCarburant: row.bon.typeCarburant,
+      quantiteLivree: row.bon.quantiteLivree,
+      montantPaiementFcfa: row.montantPaiementFcfa,
+      stationService: row.bon.stationService,
+    })));
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="fiche-reglement-carburant-${new Date().toISOString().slice(0, 10)}.pdf"`);
+    res.send(pdfBuffer);
+  } catch (err) {
+    req.log.error({ err }, "Erreur fiche règlement carburant");
     res.status(500).json({ erreur: "Erreur interne" });
   }
 }

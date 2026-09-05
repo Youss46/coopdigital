@@ -8,7 +8,7 @@ import {
   bonsCarburantTable,
   paiementsTable,
 } from "@workspace/db";
-import { eq, and, sql, desc, lte, gte } from "drizzle-orm";
+import { eq, and, sql, desc, lte, gte, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { genererNumeroRecu } from "./recuService.js";
 
@@ -653,6 +653,35 @@ export async function getBonsCarburant(cooperativeId: number, filters: BonCarbur
     .leftJoin(chauffeursTable, eq(chauffeursTable.id, bonsCarburantTable.chauffeurId))
     .where(and(...conds))
     .orderBy(desc(bonsCarburantTable.createdAt));
+}
+
+export async function getBonsCarburantPourReglement(
+  cooperativeId: number,
+  bonIds?: number[],
+) {
+  const conds = [
+    eq(bonsCarburantTable.cooperativeId, cooperativeId),
+    eq(bonsCarburantTable.statut, "utilise"),
+    eq(paiementsTable.statut, "en_attente"),
+  ];
+  if (bonIds?.length) {
+    conds.push(inArray(bonsCarburantTable.id, bonIds));
+  }
+
+  return db
+    .select({
+      bon: bonsCarburantTable,
+      montantPaiementFcfa: paiementsTable.montantFcfa,
+      immatriculation: vehiculesTable.immatriculation,
+      chauffeurNom: chauffeursTable.nom,
+      chauffeurPrenoms: chauffeursTable.prenoms,
+    })
+    .from(paiementsTable)
+    .innerJoin(bonsCarburantTable, eq(paiementsTable.bonCarburantId, bonsCarburantTable.id))
+    .leftJoin(vehiculesTable, eq(vehiculesTable.id, bonsCarburantTable.vehiculeId))
+    .leftJoin(chauffeursTable, eq(chauffeursTable.id, bonsCarburantTable.chauffeurId))
+    .where(and(...conds))
+    .orderBy(bonsCarburantTable.stationService, bonsCarburantTable.dateUtilisation, bonsCarburantTable.numero);
 }
 
 export async function getBonCarburantByNumero(numero: string) {

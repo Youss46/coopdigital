@@ -1681,6 +1681,38 @@ function TabCarburant() {
     }
   }
 
+  async function openReglementPdf() {
+    const bonsUtilises = bons.filter(bon => bon.statut === "utilise");
+    if (bonsUtilises.length === 0) {
+      toast({
+        title: "Aucun bon à régler",
+        description: "Les bons utilisés en attente de règlement apparaîtront ici.",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      const params = new URLSearchParams({ ids: bonsUtilises.map(bon => String(bon.id)).join(",") });
+      const response = await fetch(`${BASE}/api/transport/carburant/bons/reglement-pdf?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${tok()}` },
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null) as { erreur?: string } | null;
+        throw new Error(payload?.erreur ?? "Impossible de générer la fiche de règlement.");
+      }
+      openPdfViewer(
+        URL.createObjectURL(await response.blob()),
+        `fiche-reglement-carburant-${new Date().toISOString().slice(0, 10)}.pdf`,
+      );
+    } catch (error) {
+      toast({
+        title: "Fiche de règlement impossible",
+        description: error instanceof Error ? error.message : "Une erreur est survenue.",
+        variant: "destructive",
+      });
+    }
+  }
+
   return (
     <div className="space-y-5">
       {/* Barre de vues */}
@@ -1691,6 +1723,11 @@ function TabCarburant() {
         <Button size="sm" variant={view === "stats"  ? "default" : "outline"} onClick={() => setView("stats")}>
           <BarChart3 className="h-4 w-4 mr-1" /> Statistiques
         </Button>
+        {view === "liste" && (
+          <Button size="sm" variant="outline" onClick={() => void openReglementPdf()}>
+            <Printer className="h-4 w-4 mr-1" /> Fiche de règlement
+          </Button>
+        )}
       </div>
 
       {view === "stats" ? (
@@ -1803,6 +1840,9 @@ function TabCarburant() {
             <div>
               <Label className="text-xs">Au</Label>
               <Input type="date" className="h-8 text-sm w-36" value={filterFin} onChange={e => setFilterFin(e.target.value)} />
+            </div>
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-800">
+              La fiche regroupe les bons utilisés encore en attente, par station.
             </div>
             {peutCreer && (
               <Button size="sm" onClick={() => { setForm({ ...EMPTY_BON_FORM, vehicule_id: vehicules[0] ? String(vehicules[0].id) : "" }); setShowCreate(true); }}>

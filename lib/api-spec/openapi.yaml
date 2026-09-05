@@ -5725,6 +5725,29 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/BonCarburant" }
 
+  /transport/carburant/bons/reglement-pdf:
+    get:
+      operationId: getBonsCarburantReglementPdf
+      summary: Générer la fiche de règlement des bons carburant en attente
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: ids
+          in: query
+          required: false
+          description: Liste CSV des identifiants de bons à inclure; sans valeur, tous les bons utilisés en attente sont inclus.
+          schema: { type: string }
+      responses:
+        "200":
+          description: Fiche PDF regroupée par station
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "404":
+          description: Aucun bon utilisé en attente de règlement
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
   /transport/carburant/bons/{id}/soumettre:
     put:
       operationId: soumettresBonCarburant
