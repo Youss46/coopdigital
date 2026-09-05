@@ -1739,7 +1739,23 @@ function TabCarburant() {
       {view === "stats" ? (
         /* ─── Vue statistiques ─────────────────────────────────────────── */
         <div className="space-y-4">
-          {stats && (
+          {statsQ.isLoading && (
+            <Card className="p-8 text-center text-sm text-gray-500">
+              Chargement des statistiques…
+            </Card>
+          )}
+          {statsQ.isError && (
+            <Card className="p-8 text-center">
+              <p className="text-sm font-medium text-red-700">Impossible de charger les statistiques.</p>
+              <p className="text-xs text-gray-500 mt-1">
+                {statsQ.error instanceof Error ? statsQ.error.message : "Une erreur est survenue lors du chargement."}
+              </p>
+              <Button size="sm" variant="outline" className="mt-4" onClick={() => void statsQ.refetch()}>
+                Réessayer
+              </Button>
+            </Card>
+          )}
+          {!statsQ.isLoading && !statsQ.isError && stats && (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                 <Card className="p-3">
