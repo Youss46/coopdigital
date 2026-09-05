@@ -1,13 +1,16 @@
 import express from "express";
 import type { Server } from "node:http";
+import zlib from "node:zlib";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { pool } from "@workspace/db";
 import {
   handleDeleteDepenseVehicule,
   handleEmettreBonAchatPiece,
+  handleGetBonAchatPiecePdf,
   handleUpdateDepenseVehicule,
 } from "../controllers/transportController.js";
 import { listPaiements, rejeterPaiement, validerPaiement } from "../controllers/paiementsController.js";
+import { getRecuPaiement } from "../controllers/rapportsController.js";
 
 const enabled =
   process.env.RUN_POSTGRES_INTEGRATION === "1" &&
@@ -137,9 +140,11 @@ describe.skipIf(!enabled)("bons d'achat pièces idempotents sur PostgreSQL", () 
       next();
     });
     app.post("/transport/depenses/:id/emettre-bon-achat", handleEmettreBonAchatPiece);
+    app.get("/transport/depenses/:id/bon-achat-pdf", handleGetBonAchatPiecePdf);
     app.put("/transport/depenses/:id", handleUpdateDepenseVehicule);
     app.delete("/transport/depenses/:id", handleDeleteDepenseVehicule);
     app.get("/paiements", listPaiements);
+    app.get("/rapports/recu/paiement/:id", getRecuPaiement);
     app.patch("/paiements/:id/valider", validerPaiement);
     app.post("/paiements/:id/rejeter", rejeterPaiement);
 
@@ -238,13 +243,13 @@ describe.skipIf(!enabled)("bons d'achat pièces idempotents sur PostgreSQL", () 
     }
   });
 
-  async function createDepense(libelle: string): Promise<number> {
+  async function createDepense(libelle: string, demandeur: string | null = "Demandeur integration"): Promise<number> {
     const result = await client.query(
       `INSERT INTO depenses_vehicule
-         (cooperative_id, vehicule_id, type, date_depense, montant_fcfa, libelle, fournisseur)
-       VALUES ($1, $2, 'piece_rechange', CURRENT_DATE, 1000, $3, 'Fournisseur test')
+         (cooperative_id, vehicule_id, type, date_depense, montant_fcfa, libelle, demandeur, fournisseur)
+       VALUES ($1, $2, 'piece_rechange', CURRENT_DATE, 1000, $3, $4, 'Fournisseur test')
        RETURNING id`,
-      [cooperativeId, vehicleId, libelle],
+      [cooperativeId, vehicleId, libelle, demandeur],
     );
     const id = result.rows[0].id as number;
     depenseIds.push(id);
@@ -285,6 +290,51 @@ describe.skipIf(!enabled)("bons d'achat pièces idempotents sur PostgreSQL", () 
     expect(body.dejaEmis).toBe(false);
     paymentIds.push(body.paiementId);
     return body.paiementId;
+  }
+
+  function extractPdfText(buffer: Buffer): string {
+    const parts: string[] = [buffer.toString("latin1")];
+    let position = 0;
+
+    while (position < buffer.length) {
+      let marker = buffer.indexOf(Buffer.from("stream\r\n"), position);
+      let markerLength = 8;
+      const alternateMarker = buffer.indexOf(Buffer.from("stream\n"), position);
+      if (marker === -1 || (alternateMarker !== -1 && alternateMarker < marker)) {
+        marker = alternateMarker;
+        markerLength = 7;
+      }
+      if (marker === -1) break;
+
+      const start = marker + markerLength;
+      const end = buffer.indexOf(Buffer.from("endstream"), start);
+      if (end === -1) break;
+
+      try {
+        const inflated = zlib.inflateSync(buffer.subarray(start, end)).toString("latin1");
+        parts.push(inflated);
+        parts.push(inflated.replace(/<([0-9A-Fa-f]{2,})>/g, (_match, hex: string) => {
+          try {
+            return Buffer.from(hex, "hex").toString("latin1");
+          } catch {
+            return _match;
+          }
+        }).replace(/\u0097/g, "—"));
+        parts.push(inflated.replace(/\[([^\]]*)\]\s*TJ/g, (_match, inside: string) => {
+          const chunks: string[] = [];
+          for (const match of inside.matchAll(/<([0-9A-Fa-f]{2,})>/g)) {
+            chunks.push(Buffer.from(match[1]!, "hex").toString("latin1"));
+          }
+          return chunks.join("");
+        }).replace(/\u0097/g, "—"));
+      } catch {
+        // Les flux non compressés (par exemple des images) ne contiennent pas
+        // le texte métier recherché par ces assertions.
+      }
+      position = end + "endstream".length;
+    }
+
+    return parts.join("\n");
   }
 
   async function paymentState(paymentId: number) {
@@ -332,6 +382,49 @@ describe.skipIf(!enabled)("bons d'achat pièces idempotents sur PostgreSQL", () 
         statut: "en_attente",
       }),
     );
+  });
+
+  it("télécharge le bon d'achat via sa route avec le demandeur", async () => {
+    const depenseId = await createDepense("Pompe de direction", "Demandeur bon achat");
+
+    const response = await fetch(`${baseUrl}/transport/depenses/${depenseId}/bon-achat-pdf`);
+    const body = Buffer.from(await response.arrayBuffer());
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toMatch(/application\/pdf/);
+    expect(body.slice(0, 4).toString()).toBe("%PDF");
+    expect(extractPdfText(body)).toContain("Demandeur bon achat");
+  });
+
+  it("télécharge le reçu de règlement avec le demandeur et la nature de pièce", async () => {
+    const depenseId = await createDepense("Alternateur", "Demandeur reçu pièce");
+    const { response: emissionResponse, body: emission } = await emitJson(depenseId);
+    paymentIds.push(emission.paiementId);
+    expect(emissionResponse.status).toBe(201);
+
+    const response = await fetch(`${baseUrl}/rapports/recu/paiement/${emission.paiementId}`);
+    const body = Buffer.from(await response.arrayBuffer());
+    const normalizedText = extractPdfText(body)
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .toUpperCase();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toMatch(/application\/pdf/);
+    expect(normalizedText).toContain("DEMANDEUR RECU PIECE");
+    expect(normalizedText).toContain("PIECE DE RECHANGE");
+  });
+
+  it("télécharge une dépense historique sans demandeur avec le repli —", async () => {
+    const depenseId = await createDepense("Dépense historique sans demandeur", null);
+
+    const response = await fetch(`${baseUrl}/transport/depenses/${depenseId}/bon-achat-pdf`);
+    const body = Buffer.from(await response.arrayBuffer());
+    const text = extractPdfText(body);
+
+    expect(response.status).toBe(200);
+    expect(text).toContain("Demandeur");
+    expect(text).toContain("—");
   });
 
   it("ne crée qu'un règlement lors de deux émissions concurrentes", async () => {
