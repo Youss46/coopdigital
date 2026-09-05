@@ -1755,7 +1755,7 @@ function TabCarburant() {
   return (
     <div className="space-y-5">
       {/* Barre de vues */}
-      <div className="flex gap-2 border-b pb-2">
+      <div className="flex flex-wrap gap-2 border-b pb-2">
         <Button size="sm" variant={view === "liste"  ? "default" : "outline"} onClick={() => setView("liste")}>
           <FileText className="h-4 w-4 mr-1" /> Bons
         </Button>
