@@ -14,29 +14,37 @@ AS $$
   END
 $$;
 
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1
-    FROM plan_comptable
-    WHERE numero_compte = '310000'
-  ) AND EXISTS (
-    SELECT 1
-    FROM plan_comptable
-    WHERE numero_compte = '311000'
-  ) THEN
-    RAISE EXCEPTION 'Collision entre les comptes 310000 et 311000 dans le plan comptable';
-  END IF;
-END
-$$;
-
 UPDATE plan_comptable
 SET compte_parent = '311000'
 WHERE compte_parent IN ('31', '310000');
 
-UPDATE plan_comptable
+-- Plusieurs anciennes normalisations peuvent avoir créé les deux lignes
+-- 310000 et 311000 pour une même coopérative. La ligne 311000 est la
+-- référence canonique lorsqu'elle existe déjà; sinon on conserve la première
+-- ligne historique et on la renomme. Les références de comptes sont textuelles
+-- dans les autres tables, il n'y a donc pas de clé plan_comptable à réécrire.
+CREATE TEMP TABLE _plan_comptable_31_canonique ON COMMIT DROP AS
+SELECT
+  cooperative_id,
+  COALESCE(
+    MIN(id) FILTER (WHERE numero_compte = '311000'),
+    MIN(id)
+  ) AS id_canonique
+FROM plan_comptable
+WHERE numero_compte IN ('31', '310000', '311000')
+GROUP BY cooperative_id;
+
+DELETE FROM plan_comptable doublon
+USING _plan_comptable_31_canonique canonique
+WHERE doublon.cooperative_id = canonique.cooperative_id
+  AND doublon.id <> canonique.id_canonique
+  AND doublon.numero_compte IN ('31', '310000', '311000');
+
+UPDATE plan_comptable compte
 SET numero_compte = '311000'
-WHERE numero_compte IN ('31', '310000');
+FROM _plan_comptable_31_canonique canonique
+WHERE compte.id = canonique.id_canonique
+  AND compte.numero_compte <> '311000';
 
 UPDATE parametres_comptes_modules
 SET compte_debit = '311000'
