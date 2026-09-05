@@ -1254,6 +1254,12 @@ interface ComptePC {
   id: number; cooperativeId: number; numeroCompte: string; libelle: string;
   type: string; classe: number | null; soldeNormal: string; actif: boolean; ordreAffichage: number | null;
 }
+interface PlanSyscohadaStatus {
+  attendu: number;
+  charges: number;
+  totalComptes: number;
+  complet: boolean;
+}
 interface ParamModule {
   id: number; module: string; operation: string; compteDebit: string;
   compteCredit: string; libelleEcritureAuto: string | null; actif: boolean; updatedAt: string | null;
@@ -1330,7 +1336,7 @@ const OPERATIONS_LABELS: Record<string, string> = {
 };
 
 // ─── Onglet A — Plan comptable ─────────────────────────────────────────────────
-function SeedOhadaButton({ onSuccess }: { onSuccess: () => void }) {
+function SeedOhadaButton({ onSuccess, disabled = false }: { onSuccess: () => void; disabled?: boolean }) {
   const { toast } = useToast();
   const mut = useMutation({
     mutationFn: () => apiPost<{ message: string; inseres: number; dejaPresents: number }>(
@@ -1345,12 +1351,12 @@ function SeedOhadaButton({ onSuccess }: { onSuccess: () => void }) {
   return (
     <button
       onClick={() => mut.mutate()}
-      disabled={mut.isPending}
+      disabled={disabled || mut.isPending}
       className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-      title="Charger les 1 346 comptes SYSCOHADA révisé"
+      title={disabled ? "Le plan SYSCOHADA est déjà chargé pour cette coopérative" : "Charger les 1 346 comptes SYSCOHADA révisé"}
     >
       {mut.isPending ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}
-      Plan SYSCOHADA
+      {disabled ? "Plan SYSCOHADA chargé" : "Plan SYSCOHADA"}
     </button>
   );
 }
@@ -1374,6 +1380,10 @@ function OngletPlanComptable() {
   const { data: comptes = [], isLoading } = useQuery<ComptePC[]>({
     queryKey: ["plan-comptable"],
     queryFn: () => apiFetch<ComptePC[]>("/api/comptabilite/plan"),
+  });
+  const { data: statutSyscohada, isLoading: statutSyscohadaLoading } = useQuery<PlanSyscohadaStatus>({
+    queryKey: ["plan-comptable-syscohada-status"],
+    queryFn: () => apiFetch<PlanSyscohadaStatus>("/api/comptabilite/plan/syscohada-status"),
   });
 
   const mutCreate = useMutation({
@@ -1427,6 +1437,7 @@ function OngletPlanComptable() {
     acc[cl]!.push(c);
     return acc;
   }, {});
+  const comptesFiltresUniques = new Set(filtres.map((c) => c.numeroCompte)).size;
 
   return (
     <div className="space-y-4">
@@ -1463,7 +1474,13 @@ function OngletPlanComptable() {
         </label>
         {peutAjouter && (
           <div className="flex items-center gap-2 ml-auto">
-            <SeedOhadaButton onSuccess={() => void qc.invalidateQueries({ queryKey: ["plan-comptable"] })} />
+            <SeedOhadaButton
+              disabled={statutSyscohadaLoading || statutSyscohada?.complet === true}
+              onSuccess={() => {
+                void qc.invalidateQueries({ queryKey: ["plan-comptable"] });
+                void qc.invalidateQueries({ queryKey: ["plan-comptable-syscohada-status"] });
+              }}
+            />
             <button
               onClick={() => setModalCreate(true)}
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white"
@@ -1472,6 +1489,14 @@ function OngletPlanComptable() {
               <Plus size={14} /> Nouveau compte
             </button>
           </div>
+        )}
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
+        <span>{comptesFiltresUniques} compte{comptesFiltresUniques > 1 ? "s" : ""} affiché{comptesFiltresUniques > 1 ? "s" : ""}</span>
+        {statutSyscohada && (
+          <span className={statutSyscohada.complet ? "text-green-700" : "text-amber-700"}>
+            SYSCOHADA : {statutSyscohada.charges}/{statutSyscohada.attendu} comptes chargés
+          </span>
         )}
       </div>
 

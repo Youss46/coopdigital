@@ -90,6 +90,18 @@ export async function seedPlanOhadaHandler(req: Request, res: Response): Promise
   }
 }
 
+export async function statusPlanOhadaHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée au compte" }); return; }
+    const result = await svc.statutPlanSyscohada(cooperativeId);
+    res.json(result);
+  } catch (err) {
+    req.log.error({ err }, "statusPlanOhada");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
 export async function deleteCompteHandler(req: Request, res: Response): Promise<void> {
   try {
     const cooperativeId = req.user?.cooperativeId;

@@ -45,6 +45,7 @@ import {
   updateCompteHandler,
   deleteCompteHandler,
   seedPlanOhadaHandler,
+  statusPlanOhadaHandler,
   seedParamsOhadaHandler,
   listParamsHandler,
   listParamsModuleHandler,
@@ -120,6 +121,7 @@ router.put("/comptabilite/en-attente/:id/rejeter",  checkPermission("comptabilit
 
 // ─── Plan comptable ───────────────────────────────────────────────────────────
 router.get("/comptabilite/plan/valider-compte",     checkPermission("comptabilite", "voir_plan"),     validerNumeroCompteHandler);
+router.get("/comptabilite/plan/syscohada-status",   checkPermission("comptabilite", "voir_plan"),     statusPlanOhadaHandler);
 router.post("/comptabilite/plan/seed-ohada",        checkPermission("comptabilite", "ajouter_compte"), seedPlanOhadaHandler);
 router.get("/comptabilite/plan",                    checkPermission("comptabilite", "voir_plan"),     listPlanComptableHandler);
 router.post("/comptabilite/plan",                   checkPermission("comptabilite", "ajouter_compte"), createCompteHandler);

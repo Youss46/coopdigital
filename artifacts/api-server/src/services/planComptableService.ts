@@ -81,6 +81,31 @@ export async function seederPlanSyscohadaPourCooperative(cooperativeId: number):
   return { inseres, dejaPresents: plan.length - inseres };
 }
 
+export async function statutPlanSyscohada(cooperativeId: number): Promise<{
+  attendu: number;
+  charges: number;
+  totalComptes: number;
+  complet: boolean;
+}> {
+  const plan = sysCohada as Array<{ numeroCompte: string }>;
+  const numerosAttendus = new Set(plan.map((c) => normaliserNumeroCompte(c.numeroCompte)));
+  const comptes = await db
+    .select({ numeroCompte: planComptableTable.numeroCompte })
+    .from(planComptableTable)
+    .where(eq(planComptableTable.cooperativeId, cooperativeId));
+  const numerosCharges = new Set(comptes.map((c) => normaliserNumeroCompte(c.numeroCompte)));
+  let charges = 0;
+  for (const numero of numerosAttendus) {
+    if (numerosCharges.has(numero)) charges++;
+  }
+  return {
+    attendu: numerosAttendus.size,
+    charges,
+    totalComptes: comptes.length,
+    complet: charges === numerosAttendus.size,
+  };
+}
+
 // ── Plan comptable ────────────────────────────────────────────────────────────
 
 export async function listerPlanComptable(opts: {

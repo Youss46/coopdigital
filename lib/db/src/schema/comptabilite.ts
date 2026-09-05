@@ -1,4 +1,5 @@
-import { pgTable, pgEnum, serial, integer, varchar, date, timestamp, boolean, text, unique } from "drizzle-orm/pg-core";
+import { pgTable, pgEnum, serial, integer, varchar, date, timestamp, boolean, text, unique, uniqueIndex } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const typeCompteEnum = pgEnum("type_compte", ["actif", "passif", "charge", "produit"]);
 export const sourceEcritureEnum = pgEnum("source_ecriture", ["livraison", "vente", "avance", "paiement", "manuel", "encaissement", "salaire", "stock", "don"]);
@@ -19,7 +20,11 @@ export const planComptableTable = pgTable("plan_comptable", {
   ordreAffichage:   integer("ordre_affichage"),
   createdAt:        timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt:        timestamp("updated_at", { withTimezone: true }),
-});
+}, (t) => [
+  uniqueIndex("plan_comptable_cooperative_numero_actif_unique")
+    .on(t.cooperativeId, t.numeroCompte)
+    .where(sql`${t.actif} = true`),
+]);
 
 export const parametresComptesModulesTable = pgTable("parametres_comptes_modules", {
   id:                  serial("id").primaryKey(),
