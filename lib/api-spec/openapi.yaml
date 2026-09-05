@@ -1204,30 +1204,6 @@ paths:
         "401":
           description: Non authentifié
 
-  /comptabilite/balance-auxiliaire/export:
-    get:
-      operationId: exportBalanceAuxiliaireSage
-      tags: [comptabilite]
-      summary: Exporter les écritures auxiliaires en XML pour rapprochement avec Sage 100 i7
-      parameters:
-        - name: exercice
-          in: query
-          required: true
-          schema: { type: integer }
-      responses:
-        "200":
-          description: Fichier XML structuré CoopDigital à valider avec le profil d'import Sage 100 i7
-          content:
-            application/xml:
-              schema:
-                type: string
-        "422":
-          description: Des comptes tiers sont manquants
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
   /comptabilite/balance-auxiliaire/export-txt:
     get:
       operationId: exportJournalSageTxt

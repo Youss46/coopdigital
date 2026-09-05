@@ -2797,36 +2797,6 @@ function OngletBalanceAuxiliaire() {
     }
   };
 
-  const handleExportSage = async () => {
-    try {
-      const response = await fetch(`${_BASE}/api/comptabilite/balance-auxiliaire/export?exercice=${exercice}`, {
-        headers: { Authorization: `Bearer ${tok()}` },
-      });
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({})) as { erreur?: string; tiersSansCompte?: string[] };
-        const detail = payload.tiersSansCompte?.slice(0, 3).join(", ");
-        throw new Error(`${payload.erreur ?? response.statusText}${detail ? ` : ${detail}` : ""}`);
-      }
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `coopdigital_sage_${exercice}.xml`;
-      link.click();
-      URL.revokeObjectURL(url);
-      toast({
-        title: "Export XML généré",
-        description: "Le fichier est prêt à être vérifié avec le profil d’import Sage 100 i7.",
-      });
-    } catch (error) {
-      toast({
-        title: "Export Sage impossible",
-        description: error instanceof Error ? error.message : "Des comptes tiers sont peut-être manquants.",
-        variant: "destructive",
-      });
-    }
-  };
-
   const handleExportSageTxt = async () => {
     try {
       const journal = journalSage.trim().toUpperCase();
@@ -2943,11 +2913,6 @@ function OngletBalanceAuxiliaire() {
               className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-1.5 disabled:opacity-40">
               <Download size={14} /> Exporter Excel
             </button>
-            <button onClick={() => void handleExportSage()}
-              className="px-3 py-2 rounded-lg text-sm font-medium text-white flex items-center gap-1.5 hover:opacity-90"
-              style={{ backgroundColor: VERT }}>
-              <FileSpreadsheet size={14} /> Export XML pour Sage
-            </button>
             <button onClick={() => void handleExportSageTxt()}
               className="px-3 py-2 rounded-lg text-sm font-medium text-white flex items-center gap-1.5 hover:opacity-90"
               style={{ backgroundColor: "#2563eb" }}>
@@ -2962,8 +2927,7 @@ function OngletBalanceAuxiliaire() {
         <p>
           Les comptes collectifs CoopDigital restent inchangés. Utilisez <strong>Modifier</strong> pour associer
           chaque tiers à son ou ses comptes détaillés Sage. L’export est bloqué si une écriture utilise un compte tiers non paramétré.
-          Le fichier XML suit le contrat CoopDigital ; validez les balises, les dates et les codes tiers avec le profil
-          d’import de votre version Sage 100 i7 avant de l’importer dans un dossier de production.
+          Le fichier TXT utilise le journal et le format délimité affichés dans cette page.
         </p>
       </div>
 

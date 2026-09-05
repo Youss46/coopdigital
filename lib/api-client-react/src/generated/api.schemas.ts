@@ -5368,10 +5368,6 @@ export const GetBalanceAuxiliaireTiersType = {
   fournisseur_ext: 'fournisseur_ext',
 } as const;
 
-export type ExportBalanceAuxiliaireSageParams = {
-exercice: number;
-};
-
 export type ExportJournalSageTxtParams = {
 exercice: number;
 /**

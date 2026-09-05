@@ -82,7 +82,7 @@ vi.mock("../controllers/comptabiliteController.js", () => ({
   getBalanceAuxiliaire: okHandler,
   listComptesTiers: okHandler,
   updateComptesTiers: okHandler,
-  exportBalanceAuxiliaireSage: okHandler,
+  exportJournalSageTxt: okHandler,
   getGrandLivreTiers: okHandler,
   getApercuAffectationResultat: okHandler,
   apercuRistournes: okHandler,

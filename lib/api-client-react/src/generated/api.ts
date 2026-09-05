@@ -151,7 +151,6 @@ import type {
   EvaluerMembreBody,
   EvolutionScore,
   ExpedierLotInput,
-  ExportBalanceAuxiliaireSageParams,
   ExportJournalSageTxtParams,
   ExportateurDetail,
   ExportateurHistorique,
@@ -4268,90 +4267,6 @@ export function useGetBalanceAuxiliaire<TData = Awaited<ReturnType<typeof getBal
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetBalanceAuxiliaireQueryOptions(params,options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-
-
-export const getExportBalanceAuxiliaireSageUrl = (params: ExportBalanceAuxiliaireSageParams,) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : value.toString())
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0 ? `/api/comptabilite/balance-auxiliaire/export?${stringifiedParams}` : `/api/comptabilite/balance-auxiliaire/export`
-}
-
-/**
- * @summary Exporter les écritures auxiliaires en XML pour rapprochement avec Sage 100 i7
- */
-export const exportBalanceAuxiliaireSage = async (params: ExportBalanceAuxiliaireSageParams, options?: RequestInit): Promise<string> => {
-
-  return customFetch<string>(getExportBalanceAuxiliaireSageUrl(params),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getExportBalanceAuxiliaireSageQueryKey = (params?: ExportBalanceAuxiliaireSageParams,) => {
-    return [
-    `/api/comptabilite/balance-auxiliaire/export`, ...(params ? [params] : [])
-    ] as const;
-    }
-
-
-export const getExportBalanceAuxiliaireSageQueryOptions = <TData = Awaited<ReturnType<typeof exportBalanceAuxiliaireSage>>, TError = ErrorType<ErrorResponse>>(params: ExportBalanceAuxiliaireSageParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportBalanceAuxiliaireSage>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getExportBalanceAuxiliaireSageQueryKey(params);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportBalanceAuxiliaireSage>>> = ({ signal }) => exportBalanceAuxiliaireSage(params, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportBalanceAuxiliaireSage>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type ExportBalanceAuxiliaireSageQueryResult = NonNullable<Awaited<ReturnType<typeof exportBalanceAuxiliaireSage>>>
-export type ExportBalanceAuxiliaireSageQueryError = ErrorType<ErrorResponse>
-
-
-/**
- * @summary Exporter les écritures auxiliaires en XML pour rapprochement avec Sage 100 i7
- */
-
-export function useExportBalanceAuxiliaireSage<TData = Awaited<ReturnType<typeof exportBalanceAuxiliaireSage>>, TError = ErrorType<ErrorResponse>>(
- params: ExportBalanceAuxiliaireSageParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportBalanceAuxiliaireSage>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getExportBalanceAuxiliaireSageQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

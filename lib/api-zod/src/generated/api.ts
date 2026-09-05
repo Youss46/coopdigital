@@ -1420,14 +1420,6 @@ export const GetBalanceAuxiliaireResponse = zod.array(GetBalanceAuxiliaireRespon
 
 
 /**
- * @summary Exporter les écritures auxiliaires en XML pour rapprochement avec Sage 100 i7
- */
-export const ExportBalanceAuxiliaireSageQueryParams = zod.object({
-  "exercice": zod.coerce.number()
-})
-
-
-/**
  * @summary Exporter les écritures en fichier texte délimité pour Sage 100
  */
 export const exportJournalSageTxtQueryJournalDefault = `CAIS`;

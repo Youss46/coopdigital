@@ -40,45 +40,6 @@ function isTiersType(value: string): value is TiersType {
   return (TIERS_TYPES as readonly string[]).includes(value);
 }
 
-function xmlEscape(value: string | number | null | undefined): string {
-  const text = value == null ? "" : String(value);
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
-}
-
-function xmlElement(name: string, value: string | number | null | undefined, indent: string): string {
-  const text = value == null ? "" : String(value);
-  return text.length === 0
-    ? `${indent}<${name}/>`
-    : `${indent}<${name}>${xmlEscape(text)}</${name}>`;
-}
-
-export function buildSageXml(exercice: number, lines: readonly (readonly string[])[]): string {
-  const fields = [
-    "Date", "Journal", "NumeroPiece", "Libelle", "CompteGeneral",
-    "CompteSage", "CodeTiers", "TypeTiers", "Debit", "Credit",
-  ] as const;
-  const body = lines.flatMap((line) => [
-    "    <Ecriture>",
-    ...fields.map((field, index) => xmlElement(field, line[index] ?? "", "      ")),
-    "    </Ecriture>",
-  ]);
-
-  return [
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    `<ExportSage exercice="${xmlEscape(exercice)}" source="CoopDigital">`,
-    "  <Ecritures>",
-    ...body,
-    "  </Ecritures>",
-    "</ExportSage>",
-    "",
-  ].join("\r\n");
-}
-
 function sageTxtField(value: string | number | null | undefined): string {
   return String(value ?? "")
     .replace(/[\r\n]+/g, " ")
@@ -1915,86 +1876,6 @@ export async function updateComptesTiers(req: Request, res: Response): Promise<v
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur updateComptesTiers");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
-  }
-}
-
-export async function exportBalanceAuxiliaireSage(req: Request, res: Response): Promise<void> {
-  try {
-    const coop = coopId(req);
-    const exercice = req.query["exercice"] ? parseInt(String(req.query["exercice"])) : exerciceCourant();
-    if (!Number.isInteger(exercice)) {
-      res.status(400).json({ erreur: "exercice invalide" });
-      return;
-    }
-
-    const [ecritures, mappings] = await Promise.all([
-      db.select().from(ecrituresComptablesTable).where(and(
-        eq(ecrituresComptablesTable.cooperativeId, coop),
-        eq(ecrituresComptablesTable.exercice, exercice),
-      )).orderBy(asc(ecrituresComptablesTable.dateEcriture), asc(ecrituresComptablesTable.id)),
-      db.select().from(comptesTiersTable).where(and(
-        eq(comptesTiersTable.cooperativeId, coop),
-        eq(comptesTiersTable.actif, true),
-      )),
-    ]);
-
-    const mappingByTier = new Map<string, Map<string, string>>();
-    for (const mapping of mappings) {
-      const key = `${mapping.tiersType}:${mapping.tiersId}`;
-      const byCollectif = mappingByTier.get(key) ?? new Map<string, string>();
-      byCollectif.set(mapping.compteCollectif, mapping.numeroCompte);
-      mappingByTier.set(key, byCollectif);
-    }
-
-    const missing = new Set<string>();
-    const lines: string[][] = [];
-
-    for (const ecriture of ecritures) {
-      const tierKey = ecriture.tiersId && ecriture.tiersType
-        ? `${ecriture.tiersType}:${ecriture.tiersId}`
-        : null;
-      const byCollectif = tierKey ? mappingByTier.get(tierKey) : undefined;
-      const codeTiers = ecriture.tiersId && ecriture.tiersType
-        ? `${ecriture.tiersType}-${ecriture.tiersId}`
-        : "";
-      const side = (compte: string, debit: number, credit: number) => {
-        const mapped = byCollectif?.get(compte);
-        if (tierKey && ["401", "4091", "4092", "411", "4111", "421"].includes(compte) && !mapped) {
-          missing.add(`${codeTiers} (${compte})`);
-        }
-        lines.push([
-          ecriture.dateEcriture,
-          ecriture.source.toUpperCase(),
-          ecriture.numeroPiece ?? "",
-          ecriture.libelle,
-          compte,
-          mapped ?? compte,
-          codeTiers,
-          ecriture.tiersType ?? "",
-          String(debit),
-          String(credit),
-        ]);
-      };
-      side(ecriture.compteDebit, ecriture.montantFcfa, 0);
-      side(ecriture.compteCredit, 0, ecriture.montantFcfa);
-    }
-
-    if (missing.size > 0) {
-      res.status(422).json({
-        erreur: "Certains tiers utilisés dans les écritures n'ont pas de compte Sage configuré",
-        tiersSansCompte: [...missing].sort(),
-      });
-      return;
-    }
-
-    const xml = buildSageXml(exercice, lines);
-    res.setHeader("Content-Type", "application/xml; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename="coopdigital_sage_${exercice}.xml"`);
-    res.send(xml);
-  } catch (err) {
-    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
-    req.log.error({ err }, "Erreur exportBalanceAuxiliaireSage");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
