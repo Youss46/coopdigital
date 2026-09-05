@@ -2032,7 +2032,21 @@ export async function exportJournalSageTxt(req: Request, res: Response): Promise
       const tierKey = tier
         ? `${tier.tiersType}:${tier.tiersId}`
         : null;
-      const byCollectif = tierKey ? mappingByTier.get(tierKey) : undefined;
+      const mappingTypes = tier?.tiersType === "membre"
+        ? ["membre", "membre_delegue"]
+        : tier
+          ? [tier.tiersType]
+          : [];
+      const byCollectif = new Map<string, string>();
+      if (tier) {
+        for (const mappingType of mappingTypes) {
+          for (const [compteCollectif, numeroCompte] of mappingByTier.get(`${mappingType}:${tier.tiersId}`) ?? []) {
+            if (!byCollectif.has(compteCollectif)) {
+              byCollectif.set(compteCollectif, numeroCompte);
+            }
+          }
+        }
+      }
       const codeTiers = tier
         ? `${tier.tiersType}-${tier.tiersId}`
         : "";
