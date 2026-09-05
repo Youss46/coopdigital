@@ -112,3 +112,4 @@
 - [Règlement avec commission de collecte](reglement-commission-collecte.md) — le net cacao et la commission liée sont ventilés séparément; seul le choix « tout payer » clôture la commission.
 - [Configuration historique des commissions](commission-config-history.md) — les paramètres restent modifiables; les commissions déjà générées gardent leur taux, montant et historique.
 - [Fréquence de règlement des commissions](commission-frequency-settlement.md) — chaque_paiement impose le règlement conjoint; fin_campagne laisse le choix.
+- [Fixtures de paiements PostgreSQL](payment-integration-fixtures.md) — les paiements coopératifs de test exigent un reçu local; la table comptable dépend de la configuration automatique.
