@@ -2826,6 +2826,36 @@ function OngletBalanceAuxiliaire() {
     }
   };
 
+  const handleExportSageTxt = async () => {
+    try {
+      const response = await fetch(`${_BASE}/api/comptabilite/balance-auxiliaire/export-txt?exercice=${exercice}&journal=CAIS`, {
+        headers: { Authorization: `Bearer ${tok()}` },
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({})) as { erreur?: string; tiersSansCompte?: string[] };
+        const detail = payload.tiersSansCompte?.slice(0, 3).join(", ");
+        throw new Error(`${payload.erreur ?? response.statusText}${detail ? ` : ${detail}` : ""}`);
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `coopdigital_sage_CAIS_${exercice}.txt`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast({
+        title: "Export TXT Sage généré",
+        description: "Le fichier délimité est prêt à être importé avec le format Sage paramétré.",
+      });
+    } catch (error) {
+      toast({
+        title: "Export TXT Sage impossible",
+        description: error instanceof Error ? error.message : "Des comptes tiers sont peut-être manquants.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleExport = () => void exportExcel(
     `balance_auxiliaire_${tiersType}_${exercice}.xlsx`,
     `Balance auxiliaire — ${typeMeta.label}`,
@@ -2901,6 +2931,11 @@ function OngletBalanceAuxiliaire() {
               className="px-3 py-2 rounded-lg text-sm font-medium text-white flex items-center gap-1.5 hover:opacity-90"
               style={{ backgroundColor: VERT }}>
               <FileSpreadsheet size={14} /> Export XML pour Sage
+            </button>
+            <button onClick={() => void handleExportSageTxt()}
+              className="px-3 py-2 rounded-lg text-sm font-medium text-white flex items-center gap-1.5 hover:opacity-90"
+              style={{ backgroundColor: "#2563eb" }}>
+              <FileText size={14} /> Export TXT Sage
             </button>
           </div>
         </div>

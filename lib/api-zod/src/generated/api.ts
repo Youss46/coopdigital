@@ -1428,6 +1428,20 @@ export const ExportBalanceAuxiliaireSageQueryParams = zod.object({
 
 
 /**
+ * @summary Exporter les écritures en fichier texte délimité pour Sage 100
+ */
+export const exportJournalSageTxtQueryJournalDefault = `CAIS`;
+export const exportJournalSageTxtQueryJournalMax = 8;
+
+
+
+export const ExportJournalSageTxtQueryParams = zod.object({
+  "exercice": zod.coerce.number(),
+  "journal": zod.coerce.string().max(exportJournalSageTxtQueryJournalMax).default(exportJournalSageTxtQueryJournalDefault).describe('Code du journal Sage; CAIS par défaut')
+})
+
+
+/**
  * @summary Lister les comptes personnalisés des tiers
  */
 export const ListComptesTiersQueryParams = zod.object({

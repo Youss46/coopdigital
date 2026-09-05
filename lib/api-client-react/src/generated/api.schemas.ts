@@ -5372,6 +5372,15 @@ export type ExportBalanceAuxiliaireSageParams = {
 exercice: number;
 };
 
+export type ExportJournalSageTxtParams = {
+exercice: number;
+/**
+ * Code du journal Sage; CAIS par défaut
+ * @maxLength 8
+ */
+journal?: string;
+};
+
 export type ListComptesTiersParams = {
 tiersType?: ListComptesTiersTiersType;
 };

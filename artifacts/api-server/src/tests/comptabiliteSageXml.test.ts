@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSageXml } from "../controllers/comptabiliteController.js";
+import { buildSageTxt, buildSageXml } from "../controllers/comptabiliteController.js";
 
 describe("buildSageXml", () => {
   it("génère un document XML UTF-8 avec les champs d'une écriture", () => {
@@ -36,5 +36,26 @@ describe("buildSageXml", () => {
     expect(xml).toContain("<NumeroPiece/>");
     expect(xml).toContain("<CodeTiers/>");
     expect(xml).toContain("<TypeTiers/>");
+  });
+});
+
+describe("buildSageTxt", () => {
+  it("génère l'en-tête Sage et les lignes délimitées avec une date française", () => {
+    const txt = buildSageTxt(2026, "CAIS", [[
+      "2026-08-28",
+      "CAIS",
+      "P-001",
+      "Achat & règlement; urgent",
+      "401",
+      "0052962",
+      "",
+      "",
+      "125000",
+      "0",
+    ]]);
+
+    expect(txt).toContain("#FLG 001\r\n#VER 8\r\n#DEV XOF\r\n#MECG\r\nCAIS\r\n");
+    expect(txt).toContain("28/08/2026;CAIS;0052962;P-001;Achat & règlement, urgent;125000;0;XOF");
+    expect(txt.endsWith("\r\n")).toBe(true);
   });
 });

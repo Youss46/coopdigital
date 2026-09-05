@@ -1228,6 +1228,34 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /comptabilite/balance-auxiliaire/export-txt:
+    get:
+      operationId: exportJournalSageTxt
+      tags: [comptabilite]
+      summary: Exporter les écritures en fichier texte délimité pour Sage 100
+      parameters:
+        - name: exercice
+          in: query
+          required: true
+          schema: { type: integer }
+        - name: journal
+          in: query
+          required: false
+          description: Code du journal Sage; CAIS par défaut
+          schema: { type: string, default: CAIS, maxLength: 8 }
+      responses:
+        "200":
+          description: Fichier texte UTF-8 délimité par des points-virgules
+          content:
+            text/plain:
+              schema: { type: string }
+        "422":
+          description: Des comptes tiers sont manquants
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /comptabilite/comptes-tiers:
     get:
       operationId: listComptesTiers

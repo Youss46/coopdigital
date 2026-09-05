@@ -79,6 +79,46 @@ export function buildSageXml(exercice: number, lines: readonly (readonly string[
   ].join("\r\n");
 }
 
+function sageTxtField(value: string | number | null | undefined): string {
+  return String(value ?? "")
+    .replace(/[\r\n]+/g, " ")
+    .replace(/;/g, ",")
+    .trim();
+}
+
+export function buildSageTxt(
+  exercice: number,
+  journal: string,
+  lines: readonly (readonly string[])[],
+): string {
+  const body = lines.map((line) => {
+    const isoDate = line[0] ?? "";
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(isoDate)
+      ? `${isoDate.slice(8, 10)}/${isoDate.slice(5, 7)}/${isoDate.slice(0, 4)}`
+      : isoDate;
+    return [
+      date,
+      journal,
+      line[5] || line[4] || "",
+      line[2] || "",
+      line[3] || "",
+      line[8] || "0",
+      line[9] || "0",
+      "XOF",
+    ].map(sageTxtField).join(";");
+  });
+
+  return [
+    "#FLG 001",
+    "#VER 8",
+    "#DEV XOF",
+    "#MECG",
+    journal,
+    ...body,
+    "",
+  ].join("\r\n");
+}
+
 export async function getGrandLivre(req: Request, res: Response): Promise<void> {
   try {
     const compte = req.query["compte"] as string | undefined;
@@ -1955,6 +1995,90 @@ export async function exportBalanceAuxiliaireSage(req: Request, res: Response): 
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur exportBalanceAuxiliaireSage");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+export async function exportJournalSageTxt(req: Request, res: Response): Promise<void> {
+  try {
+    const coop = coopId(req);
+    const exercice = req.query["exercice"] ? parseInt(String(req.query["exercice"])) : exerciceCourant();
+    if (!Number.isInteger(exercice)) {
+      res.status(400).json({ erreur: "exercice invalide" });
+      return;
+    }
+    const journal = String(req.query["journal"] ?? "CAIS").trim().toUpperCase();
+    if (!/^[A-Z0-9_-]{1,8}$/.test(journal)) {
+      res.status(400).json({ erreur: "Le code journal doit contenir au maximum 8 caractères alphanumériques" });
+      return;
+    }
+
+    const [ecritures, mappings] = await Promise.all([
+      db.select().from(ecrituresComptablesTable).where(and(
+        eq(ecrituresComptablesTable.cooperativeId, coop),
+        eq(ecrituresComptablesTable.exercice, exercice),
+      )).orderBy(asc(ecrituresComptablesTable.dateEcriture), asc(ecrituresComptablesTable.id)),
+      db.select().from(comptesTiersTable).where(and(
+        eq(comptesTiersTable.cooperativeId, coop),
+        eq(comptesTiersTable.actif, true),
+      )),
+    ]);
+
+    const mappingByTier = new Map<string, Map<string, string>>();
+    for (const mapping of mappings) {
+      const key = `${mapping.tiersType}:${mapping.tiersId}`;
+      const byCollectif = mappingByTier.get(key) ?? new Map<string, string>();
+      byCollectif.set(mapping.compteCollectif, mapping.numeroCompte);
+      mappingByTier.set(key, byCollectif);
+    }
+
+    const missing = new Set<string>();
+    const lines: string[][] = [];
+    for (const ecriture of ecritures) {
+      const tierKey = ecriture.tiersId && ecriture.tiersType
+        ? `${ecriture.tiersType}:${ecriture.tiersId}`
+        : null;
+      const byCollectif = tierKey ? mappingByTier.get(tierKey) : undefined;
+      const codeTiers = ecriture.tiersId && ecriture.tiersType
+        ? `${ecriture.tiersType}-${ecriture.tiersId}`
+        : "";
+      const side = (compte: string, debit: number, credit: number) => {
+        const mapped = byCollectif?.get(compte);
+        if (tierKey && ["401", "4091", "4092", "411", "4111", "421"].includes(compte) && !mapped) {
+          missing.add(`${codeTiers} (${compte})`);
+        }
+        lines.push([
+          ecriture.dateEcriture,
+          journal,
+          ecriture.numeroPiece ?? "",
+          ecriture.libelle,
+          compte,
+          mapped ?? compte,
+          codeTiers,
+          ecriture.tiersType ?? "",
+          String(debit),
+          String(credit),
+        ]);
+      };
+      side(ecriture.compteDebit, ecriture.montantFcfa, 0);
+      side(ecriture.compteCredit, 0, ecriture.montantFcfa);
+    }
+
+    if (missing.size > 0) {
+      res.status(422).json({
+        erreur: "Certains tiers utilisés dans les écritures n'ont pas de compte Sage configuré",
+        tiersSansCompte: [...missing].sort(),
+      });
+      return;
+    }
+
+    const text = buildSageTxt(exercice, journal, lines);
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="coopdigital_sage_${journal}_${exercice}.txt"`);
+    res.send(text);
+  } catch (err) {
+    if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    req.log.error({ err }, "Erreur exportJournalSageTxt");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }

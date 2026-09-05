@@ -152,6 +152,7 @@ import type {
   EvolutionScore,
   ExpedierLotInput,
   ExportBalanceAuxiliaireSageParams,
+  ExportJournalSageTxtParams,
   ExportateurDetail,
   ExportateurHistorique,
   ExportateurInput,
@@ -4351,6 +4352,90 @@ export function useExportBalanceAuxiliaireSage<TData = Awaited<ReturnType<typeof
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getExportBalanceAuxiliaireSageQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getExportJournalSageTxtUrl = (params: ExportJournalSageTxtParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/comptabilite/balance-auxiliaire/export-txt?${stringifiedParams}` : `/api/comptabilite/balance-auxiliaire/export-txt`
+}
+
+/**
+ * @summary Exporter les écritures en fichier texte délimité pour Sage 100
+ */
+export const exportJournalSageTxt = async (params: ExportJournalSageTxtParams, options?: RequestInit): Promise<string> => {
+
+  return customFetch<string>(getExportJournalSageTxtUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExportJournalSageTxtQueryKey = (params?: ExportJournalSageTxtParams,) => {
+    return [
+    `/api/comptabilite/balance-auxiliaire/export-txt`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getExportJournalSageTxtQueryOptions = <TData = Awaited<ReturnType<typeof exportJournalSageTxt>>, TError = ErrorType<ErrorResponse>>(params: ExportJournalSageTxtParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportJournalSageTxt>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportJournalSageTxtQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportJournalSageTxt>>> = ({ signal }) => exportJournalSageTxt(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportJournalSageTxt>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ExportJournalSageTxtQueryResult = NonNullable<Awaited<ReturnType<typeof exportJournalSageTxt>>>
+export type ExportJournalSageTxtQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Exporter les écritures en fichier texte délimité pour Sage 100
+ */
+
+export function useExportJournalSageTxt<TData = Awaited<ReturnType<typeof exportJournalSageTxt>>, TError = ErrorType<ErrorResponse>>(
+ params: ExportJournalSageTxtParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportJournalSageTxt>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getExportJournalSageTxtQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
