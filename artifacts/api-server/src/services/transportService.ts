@@ -684,6 +684,32 @@ export async function getBonsCarburantPourReglement(
     .orderBy(bonsCarburantTable.stationService, bonsCarburantTable.dateUtilisation, bonsCarburantTable.numero);
 }
 
+export async function getBonsCarburantPourRecuReglement(cooperativeId: number) {
+  return db
+    .select({
+      numero: bonsCarburantTable.numero,
+      dateUtilisation: bonsCarburantTable.dateUtilisation,
+      immatriculation: vehiculesTable.immatriculation,
+      chauffeurNom: chauffeursTable.nom,
+      chauffeurPrenoms: chauffeursTable.prenoms,
+      typeCarburant: bonsCarburantTable.typeCarburant,
+      quantiteLivree: bonsCarburantTable.quantiteLivree,
+      stationService: bonsCarburantTable.stationService,
+      montantPaiementFcfa: sql<string>`COALESCE(SUM(${paiementsTable.montantFcfa}), 0)`,
+    })
+    .from(paiementsTable)
+    .innerJoin(bonsCarburantTable, eq(paiementsTable.bonCarburantId, bonsCarburantTable.id))
+    .leftJoin(vehiculesTable, eq(vehiculesTable.id, bonsCarburantTable.vehiculeId))
+    .leftJoin(chauffeursTable, eq(chauffeursTable.id, bonsCarburantTable.chauffeurId))
+    .where(and(
+      eq(bonsCarburantTable.cooperativeId, cooperativeId),
+      eq(bonsCarburantTable.statut, "utilise"),
+      inArray(paiementsTable.statut, ["confirme", "effectue"]),
+    ))
+    .groupBy(bonsCarburantTable.id, vehiculesTable.id, chauffeursTable.id)
+    .orderBy(bonsCarburantTable.stationService, bonsCarburantTable.dateUtilisation, bonsCarburantTable.numero);
+}
+
 export async function getBonCarburantByNumero(numero: string) {
   const rows = await db
     .select({

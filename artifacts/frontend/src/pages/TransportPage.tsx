@@ -1724,6 +1724,34 @@ function TabCarburant() {
     }
   }
 
+  async function openRecuReglementPdf() {
+    try {
+      const response = await fetch(`${BASE}/api/transport/carburant/bons/recu-reglement-pdf`, {
+        headers: { Authorization: `Bearer ${tok()}` },
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null) as { erreur?: string } | null;
+        throw new Error(payload?.erreur ?? "Impossible de générer le reçu de règlements.");
+      }
+      const date = new Date();
+      const dateFichier = [
+        String(date.getDate()).padStart(2, "0"),
+        String(date.getMonth() + 1).padStart(2, "0"),
+        date.getFullYear(),
+      ].join("-");
+      openPdfViewer(
+        URL.createObjectURL(await response.blob()),
+        `recu-reglements-carburant-${dateFichier}.pdf`,
+      );
+    } catch (error) {
+      toast({
+        title: "Reçu de règlements impossible",
+        description: error instanceof Error ? error.message : "Une erreur est survenue.",
+        variant: "destructive",
+      });
+    }
+  }
+
   return (
     <div className="space-y-5">
       {/* Barre de vues */}
@@ -1735,9 +1763,14 @@ function TabCarburant() {
           <BarChart3 className="h-4 w-4 mr-1" /> Statistiques
         </Button>
         {view === "liste" && (
-          <Button size="sm" variant="outline" onClick={() => void openReglementPdf()}>
-            <Printer className="h-4 w-4 mr-1" /> Fiche de règlement
-          </Button>
+          <>
+            <Button size="sm" variant="outline" onClick={() => void openReglementPdf()}>
+              <Printer className="h-4 w-4 mr-1" /> Fiche de règlement
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => void openRecuReglementPdf()}>
+              <Printer className="h-4 w-4 mr-1" /> Reçu de règlements
+            </Button>
+          </>
         )}
       </div>
 

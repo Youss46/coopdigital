@@ -257,6 +257,12 @@ export interface BonCarburantReglementData {
   stationService: string | null;
 }
 
+export interface BonCarburantReglementDocumentOptions {
+  titreDocument?: string;
+  totalLabel?: string;
+  reference?: string;
+}
+
 export function formatFicheReglementReference(date = new Date()): string {
   const jour = String(date.getDate()).padStart(2, "0");
   const mois = String(date.getMonth() + 1).padStart(2, "0");
@@ -264,9 +270,17 @@ export function formatFicheReglementReference(date = new Date()): string {
   return `CARB-${jour}-${mois}-${annee}`;
 }
 
+export function formatRecuReglementReference(date = new Date()): string {
+  const jour = String(date.getDate()).padStart(2, "0");
+  const mois = String(date.getMonth() + 1).padStart(2, "0");
+  const annee = String(date.getFullYear());
+  return `REC-CARB-${jour}-${mois}-${annee}`;
+}
+
 export async function generateBonsCarburantReglement(
   cooperativeId: number,
   bons: BonCarburantReglementData[],
+  options: BonCarburantReglementDocumentOptions = {},
 ): Promise<Buffer> {
   const doc = new PDFDocument({ size: "A4", margin: MARGIN, bufferPages: true });
   const chunks: Buffer[] = [];
@@ -339,7 +353,7 @@ export async function generateBonsCarburantReglement(
     if (lastPage) {
       doc.rect(MARGIN, y + 4, PAGE_W, 50).fill("#ecfdf5").stroke("#86efac");
       doc.font("Helvetica-Bold").fontSize(10).fillColor("#166534")
-        .text("TOTAL À PAYER", MARGIN + 12, y + 14, { width: 180, lineBreak: false });
+         .text(options.totalLabel ?? "TOTAL À PAYER", MARGIN + 12, y + 14, { width: 180, lineBreak: false });
       doc.font("Helvetica-Bold").fontSize(15).fillColor("#111827")
         .text(formaterFCFA(total), MARGIN + 190, y + 11, { width: PAGE_W - 202, align: "right", lineBreak: false });
       doc.font("Helvetica-Oblique").fontSize(7.5).fillColor("#374151")
@@ -367,8 +381,8 @@ export async function generateBonsCarburantReglement(
     for (const [pageIndex, pageRows] of pages.entries()) {
       if (!firstGroup || pageIndex > 0) doc.addPage();
       await drawHeader(doc, cooperativeId, {
-        titre_document: "FICHE RÈGLEMENT",
-        reference: formatFicheReglementReference(),
+         titre_document: options.titreDocument ?? "FICHE RÈGLEMENT",
+         reference: options.reference ?? formatFicheReglementReference(),
       });
       drawStationBlock(station, pageRows, total, pageIndex === 0, pageIndex === pages.length - 1);
     }

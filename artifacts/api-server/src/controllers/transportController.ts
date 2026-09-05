@@ -40,12 +40,17 @@ import {
   DepenseRegleeError,
   getBonsCarburant,
   getBonsCarburantPourReglement,
+  getBonsCarburantPourRecuReglement,
   getBonCarburant,
   createBonCarburant,
   transitionBon,
   getStatsCarburant,
 } from "../services/transportService";
-import { generateBonCarburant, generateBonsCarburantReglement } from "../services/bonCarburantPdf";
+import {
+  generateBonCarburant,
+  generateBonsCarburantReglement,
+  formatRecuReglementReference,
+} from "../services/bonCarburantPdf";
 import { generateBonAchatPiece } from "../services/bonAchatPiecePdf";
 import { db, usersTable, stationsCarburantTable, bonsCarburantTable, paiementsTable } from "@workspace/db";
 import { eq, and, isNotNull, count } from "drizzle-orm";
@@ -1161,6 +1166,43 @@ export async function handleGetBonsCarburantReglementPdf(req: Request, res: Resp
     res.send(pdfBuffer);
   } catch (err) {
     req.log.error({ err }, "Erreur fiche règlement carburant");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+export async function handleGetBonsCarburantRecuReglementPdf(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
+    const rows = await getBonsCarburantPourRecuReglement(cooperativeId);
+    if (rows.length === 0) {
+      res.status(404).json({ erreur: "Aucun bon carburant réglé pour cette coopérative." });
+      return;
+    }
+    const pdfBuffer = await generateBonsCarburantReglement(
+      cooperativeId,
+      rows.map(row => ({
+        numero: row.numero,
+        dateUtilisation: row.dateUtilisation,
+        immatriculation: row.immatriculation,
+        chauffeurNom: row.chauffeurNom,
+        chauffeurPrenoms: row.chauffeurPrenoms,
+        typeCarburant: row.typeCarburant,
+        quantiteLivree: row.quantiteLivree,
+        montantPaiementFcfa: row.montantPaiementFcfa,
+        stationService: row.stationService,
+      })),
+      {
+        titreDocument: "REÇU DE RÈGLEMENT",
+        totalLabel: "TOTAL RÉGLÉ",
+        reference: formatRecuReglementReference(),
+      },
+    );
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="recu-reglements-carburant-${new Date().toISOString().slice(0, 10)}.pdf"`);
+    res.send(pdfBuffer);
+  } catch (err) {
+    req.log.error({ err }, "Erreur reçu règlements carburant");
     res.status(500).json({ erreur: "Erreur interne" });
   }
 }
