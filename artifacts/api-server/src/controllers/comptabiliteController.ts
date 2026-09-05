@@ -1503,7 +1503,7 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
       // Compte 421 — Rémunérations dues au personnel
       result = await db.execute<Row>(sql`
         SELECT
-          e.tiers_id                                                            AS "tiersId",
+          p.id                                                                  AS "tiersId",
           COALESCE(p.nom, '—')                                                  AS nom,
           COALESCE(p.prenoms, '')                                               AS prenoms,
           COALESCE(p.poste, '')                                                 AS code,
@@ -1530,7 +1530,7 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
       // Comptes 401/4091/4092 — Fournisseurs/avances (délégués)
       result = await db.execute<Row>(sql`
         SELECT
-          e.tiers_id                                                            AS "tiersId",
+          u.id                                                                  AS "tiersId",
           COALESCE(u.nom, '—')                                                  AS nom,
           COALESCE(u.prenoms, '')                                               AS prenoms,
           ''                                                                    AS code,
@@ -1559,7 +1559,7 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
       // Compte 4111 — Clients exportateurs (créances sur ventes cacao)
       result = await db.execute<Row>(sql`
         SELECT
-          e.tiers_id                                                             AS "tiersId",
+          ex.id                                                                  AS "tiersId",
           COALESCE(ex.nom, '—')                                                  AS nom,
           ''                                                                     AS prenoms,
           COALESCE(ex.pays, '')                                                  AS code,
@@ -1586,7 +1586,7 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
       // Compte 401 — Fournisseurs externes (pisteurs, apporteurs tiers)
       result = await db.execute<Row>(sql`
         SELECT
-          e.tiers_id                                                             AS "tiersId",
+          f.id                                                                   AS "tiersId",
           COALESCE(f.nom, '—')                                                   AS nom,
           COALESCE(f.prenoms, '')                                                AS prenoms,
           COALESCE(f.code, '')                                                   AS code,
