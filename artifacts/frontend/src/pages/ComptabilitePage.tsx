@@ -2851,7 +2851,7 @@ function OngletBalanceAuxiliaire() {
   const annees = Array.from({ length: 5 }, (_, i) => anneeActuelle - i);
   const typeMeta = TYPES_TIERS.find(t => t.id === tiersType)!;
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["balance-aux", exercice, tiersType],
     queryFn: () => apiFetch<BalanceAuxLigne[]>(`/api/comptabilite/balance-auxiliaire?exercice=${exercice}&tiersType=${tiersType}`),
   });
@@ -3043,6 +3043,25 @@ function OngletBalanceAuxiliaire() {
 
       {isLoading ? (
         <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-2 border-green-600 border-t-transparent" /></div>
+      ) : isError ? (
+        <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-5 text-red-800">
+          <AlertTriangle size={20} className="mt-0.5 shrink-0 text-red-600" />
+          <div className="min-w-0">
+            <p className="font-semibold">Impossible de charger les comptes tiers</p>
+            <p className="mt-1 text-sm break-words">
+              {error instanceof Error && error.message.trim()
+                ? error.message
+                : "Le serveur a rencontré une erreur. Veuillez réessayer."}
+            </p>
+            <button
+              type="button"
+              onClick={() => void refetch()}
+              className="mt-3 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100"
+            >
+              Réessayer
+            </button>
+          </div>
+        </div>
       ) : list.length === 0 ? (
         <div className="text-center py-16">
           <Users className="mx-auto mb-3 text-gray-300" size={40} />
