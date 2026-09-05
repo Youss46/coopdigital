@@ -5748,6 +5748,23 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
 
+  /transport/carburant/bons/recu-reglement-pdf:
+    get:
+      operationId: getBonsCarburantRecuReglementPdf
+      summary: Générer le reçu des bons carburant réglés
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Reçu PDF regroupé par station
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "404":
+          description: Aucun bon carburant réglé
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
   /transport/carburant/bons/{id}/soumettre:
     put:
       operationId: soumettresBonCarburant

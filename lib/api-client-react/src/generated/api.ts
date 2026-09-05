@@ -21241,6 +21241,83 @@ export function useGetBonsCarburantReglementPdf<TData = Awaited<ReturnType<typeo
 
 
 
+export const getGetBonsCarburantRecuReglementPdfUrl = () => {
+
+
+
+
+  return `/api/transport/carburant/bons/recu-reglement-pdf`
+}
+
+/**
+ * @summary Générer le reçu des bons carburant réglés
+ */
+export const getBonsCarburantRecuReglementPdf = async ( options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetBonsCarburantRecuReglementPdfUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBonsCarburantRecuReglementPdfQueryKey = () => {
+    return [
+    `/api/transport/carburant/bons/recu-reglement-pdf`
+    ] as const;
+    }
+
+
+export const getGetBonsCarburantRecuReglementPdfQueryOptions = <TData = Awaited<ReturnType<typeof getBonsCarburantRecuReglementPdf>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBonsCarburantRecuReglementPdf>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBonsCarburantRecuReglementPdfQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBonsCarburantRecuReglementPdf>>> = ({ signal }) => getBonsCarburantRecuReglementPdf({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBonsCarburantRecuReglementPdf>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBonsCarburantRecuReglementPdfQueryResult = NonNullable<Awaited<ReturnType<typeof getBonsCarburantRecuReglementPdf>>>
+export type GetBonsCarburantRecuReglementPdfQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Générer le reçu des bons carburant réglés
+ */
+
+export function useGetBonsCarburantRecuReglementPdf<TData = Awaited<ReturnType<typeof getBonsCarburantRecuReglementPdf>>, TError = ErrorType<ErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBonsCarburantRecuReglementPdf>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBonsCarburantRecuReglementPdfQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getSoumettresBonCarburantUrl = (id: number,) => {
 
 
