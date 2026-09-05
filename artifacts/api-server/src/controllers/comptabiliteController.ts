@@ -8,7 +8,7 @@ import ExcelJS from "exceljs";
 import Anthropic from "@anthropic-ai/sdk";
 import { genererNumeroRecu } from "../services/recuService.js";
 import { normaliserNumeroCompte } from "../lib/numeroCompte.js";
-import { determinerCodeJournal, determinerCompteTiersSage } from "../lib/sageJournal.js";
+import { determinerCodeJournal, determinerCompteCollectifSage, determinerCompteTiersSage } from "../lib/sageJournal.js";
 
 class TenantError extends Error {
   readonly status = 401;
@@ -2091,12 +2091,15 @@ export async function exportJournalSageTxt(req: Request, res: Response): Promise
       });
       const side = (compteBrut: string, debit: number, credit: number) => {
         const compte = normaliserNumeroCompte(compteBrut);
-        const mapped = byCollectif?.get(compte);
+        const compteCollectif = determinerCompteCollectifSage(compte);
+        const mapped = byCollectif?.get(compte) ?? (
+          compteCollectif !== compte ? byCollectif?.get(compteCollectif) : undefined
+        );
         if (tierKey && COMPTES_COLLECTIFS_PAR_TYPE.exportateur.concat(
           COMPTES_COLLECTIFS_PAR_TYPE.membre,
           COMPTES_COLLECTIFS_PAR_TYPE.personnel,
-        ).includes(compte) && !mapped) {
-          missing.add(`${codeTiers} (${compte})`);
+        ).includes(compteCollectif) && compte === compteCollectif && !mapped) {
+          missing.add(`${codeTiers} (${compteCollectif})`);
         }
         lines.push([
           ecriture.dateEcriture,

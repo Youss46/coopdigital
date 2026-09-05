@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildSageTxt } from "../controllers/comptabiliteController.js";
-import { determinerCodeJournal, determinerCompteTiersSage } from "../lib/sageJournal.js";
+import { determinerCodeJournal, determinerCompteCollectifSage, determinerCompteTiersSage } from "../lib/sageJournal.js";
 
 describe("buildSageTxt", () => {
   it("détermine le journal Sage selon la nature de chaque transaction", () => {
@@ -154,6 +154,9 @@ describe("buildSageTxt", () => {
   });
 
   it("génère un compte tiers stable uniquement pour 401000 et 411000", () => {
+    expect(determinerCompteCollectifSage("40100000")).toBe("401000");
+    expect(determinerCompteCollectifSage("40910000")).toBe("409100");
+    expect(determinerCompteCollectifSage("41110000")).toBe("411000");
     expect(determinerCompteTiersSage({
       compte: "401",
       tiersType: "membre",
@@ -164,6 +167,11 @@ describe("buildSageTxt", () => {
       tiersType: "exportateur",
       tiersId: 8,
     })).toBe("CLI-000008");
+    expect(determinerCompteTiersSage({
+      compte: "40100000",
+      tiersType: "membre",
+      tiersId: 25,
+    })).toBe("MEM-000025");
     expect(determinerCompteTiersSage({
       compte: "601000",
       tiersType: "membre",
