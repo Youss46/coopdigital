@@ -1803,7 +1803,10 @@ export async function getBalanceAuxiliaire(req: Request, res: Response): Promise
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getBalanceAuxiliaire");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    const message = err instanceof Error && err.message.trim()
+      ? err.message
+      : "Erreur interne du serveur";
+    res.status(500).json({ erreur: message });
   }
 }
 
