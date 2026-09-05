@@ -120,7 +120,7 @@ describe("buildSageTxt", () => {
 
     const dataLines = txt.split("\r\n").slice(5, -1);
     expect(dataLines).toEqual([
-      "ACH;260826;LIV-2026-000001;4011ABOUDE001;Achat cacao - Koffi Konan;285000;D;MEM-000017",
+      "ACH;260826;LIV-2026-000001;401000;Achat cacao - Koffi Konan;285000;D;4011ABOUDE001",
       "ACH;260826;LIV-2026-000001;601000;Achat cacao - Koffi Konan;285000;C;",
     ]);
     expect(dataLines.every((line) => line.split(";").length === 8)).toBe(true);
@@ -156,7 +156,7 @@ describe("buildSageTxt", () => {
   it("génère un compte tiers stable uniquement pour 401000 et 411000", () => {
     expect(determinerCompteCollectifSage("40100000")).toBe("401000");
     expect(determinerCompteCollectifSage("40910000")).toBe("409100");
-    expect(determinerCompteCollectifSage("41110000")).toBe("411000");
+    expect(determinerCompteCollectifSage("41110000")).toBe("411100");
     expect(determinerCompteTiersSage({
       compte: "401",
       tiersType: "membre",

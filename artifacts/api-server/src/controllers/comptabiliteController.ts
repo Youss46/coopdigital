@@ -77,11 +77,13 @@ export function buildSageTxt(
       line[1] || journal,
       date,
       line[2] || "",
-      normaliserNumeroCompte(line[5] || line[4] || ""),
+      normaliserNumeroCompte(line[4] || line[5] || ""),
       line[3] || "",
       montant,
       sens,
-      line[10] || "",
+      line[5] && normaliserNumeroCompte(line[5]) !== normaliserNumeroCompte(line[4] || "")
+        ? line[5]
+        : line[10] || "",
     ].map(sageTxtField).join(";");
   });
 
