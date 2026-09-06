@@ -7,7 +7,7 @@ on:
 
 jobs:
   postgres-integration:
-    name: RH, primes, payment, treasury, received-cheque, and sacherie concurrency protection
+    name: Schema checks, RH, primes, payment, treasury, received-cheque, and sacherie concurrency protection
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -51,6 +51,9 @@ jobs:
 
       - name: Initialize disposable PostgreSQL schema
         run: pnpm --filter @workspace/db fresh-migrate
+
+      - name: Run PostgreSQL schema checks
+        run: pnpm --filter @workspace/api-server run test:integration:schema-check
 
       - name: Run RH PostgreSQL integration tests
         run: pnpm --filter @workspace/api-server run test:integration:rh
