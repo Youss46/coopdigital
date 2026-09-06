@@ -7,7 +7,7 @@ const agentUserAlias = alias(usersTable, "agent_user");
 // Alias pour la jointure peseur saisie physique (proxy délégué central)
 const peseurUserAlias = alias(usersTable, "peseur_user");
 import { creerChequeDepuisLivraison } from "../services/chequesService.js";
-import { eq, and, desc, notInArray, or, sql } from "drizzle-orm";
+import { eq, and, desc, notInArray, or, sql, gte, lte } from "drizzle-orm";
 import { CampagneFermeeError, assertCampagneOuverte } from "../lib/campagneGuard";
 import { checkLivraison, creerAnomalies } from "../services/anomalieService";
 import { CreateLivraisonBody } from "@workspace/api-zod";
@@ -32,6 +32,8 @@ export async function listLivraisons(req: Request, res: Response): Promise<void>
     const defaultLimit = categorieMembreDelegue ? 10000 : 20;
     const limit = Math.min(10000, parseInt(String(req.query["limit"] ?? String(defaultLimit))));
     const statutPaiementFilter = req.query["statut_paiement"] ? String(req.query["statut_paiement"]) : undefined;
+    const dateDebut = req.query["date_debut"] ? String(req.query["date_debut"]) : undefined;
+    const dateFin = req.query["date_fin"] ? String(req.query["date_fin"]) : undefined;
 
     const coopCondition = or(
       eq(membresTable.cooperativeId, cooperativeId),
@@ -44,6 +46,12 @@ export async function listLivraisons(req: Request, res: Response): Promise<void>
     }
     if (statutPaiementFilter) {
       extraConditions.push(eq(livraisonsTable.statutPaiement, statutPaiementFilter));
+    }
+    if (dateDebut) {
+      extraConditions.push(gte(livraisonsTable.dateLivraison, dateDebut));
+    }
+    if (dateFin) {
+      extraConditions.push(lte(livraisonsTable.dateLivraison, dateFin));
     }
     if (req.user?.role === "delegue" && req.user?.id) {
       // Membres rattachés AU délégué OU fournisseurs externes créés PAR ce délégué

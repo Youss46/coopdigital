@@ -6,7 +6,7 @@ import {
   Package, Search, Loader2, ChevronRight, Calendar,
   Scale, Banknote, TrendingDown, ArrowDownCircle, FileDown,
   Warehouse, ChevronDown, MapPin, User, Printer, ClipboardList,
-  ArrowRight, CheckCircle2, AlertCircle,
+  ArrowRight, CheckCircle2, AlertCircle, CalendarDays, X,
 } from "lucide-react";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -123,6 +123,44 @@ function statutPaiementLabel(statut: string | null | undefined) {
   if (normalise === "PAYE") return { label: "Payé", cls: "bg-green-100 text-green-700" };
   if (normalise === "PARTIEL") return { label: "Partiellement payé", cls: "bg-blue-100 text-blue-700" };
   return { label: "En attente", cls: "bg-amber-100 text-amber-700" };
+}
+
+type PeriodeFilter = "all" | "today" | "week" | "month" | "custom";
+
+function getPeriodeDates(
+  periode: PeriodeFilter,
+  customDebut = "",
+  customFin = "",
+): { date_debut?: string; date_fin?: string } {
+  if (periode === "custom") {
+    return {
+      ...(customDebut ? { date_debut: customDebut } : {}),
+      ...(customFin ? { date_fin: customFin } : {}),
+    };
+  }
+  if (periode === "all") return {};
+
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+  if (periode === "today") {
+    const today = fmt(now);
+    return { date_debut: today, date_fin: today };
+  }
+  if (periode === "week") {
+    const day = now.getDay() === 0 ? 6 : now.getDay() - 1;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - day);
+    return { date_debut: fmt(monday), date_fin: fmt(now) };
+  }
+  if (periode === "month") {
+    return {
+      date_debut: fmt(new Date(now.getFullYear(), now.getMonth(), 1)),
+      date_fin: fmt(now),
+    };
+  }
+  return {};
 }
 
 // ─── SessionsPeseeSection ─────────────────────────────────────────────────────
@@ -320,10 +358,18 @@ export default function LivraisonsPage() {
   const [recherche, setRecherche] = useState("");
   const [deleguesOuvert, setDeleguesOuvert] = useState(true);
   const [filtreRole, setFiltreRole] = useState<"" | "peseur" | "delegue" | "agent_terrain">("");
+  const [periode, setPeriode] = useState<PeriodeFilter>("all");
+  const [dateDebut, setDateDebut] = useState("");
+  const [dateFin, setDateFin] = useState("");
+
+  const periodeDates = getPeriodeDates(periode, dateDebut, dateFin);
+  const livraisonParams = new URLSearchParams({ limit: "100" });
+  if (periodeDates.date_debut) livraisonParams.set("date_debut", periodeDates.date_debut);
+  if (periodeDates.date_fin) livraisonParams.set("date_fin", periodeDates.date_fin);
 
   const { data: livraisons = [], isLoading } = useQuery<Livraison[]>({
-    queryKey: ["livraisons-liste"],
-    queryFn: () => apiFetch("/api/livraisons?limit=100"),
+    queryKey: ["livraisons-liste", periode, dateDebut, dateFin],
+    queryFn: () => apiFetch(`/api/livraisons?${livraisonParams.toString()}`),
     staleTime: 30_000,
     refetchInterval: 60_000,
   });
@@ -409,6 +455,71 @@ export default function LivraisonsPage() {
           onChange={(e) => setRecherche(e.target.value)}
           className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-green-400"
         />
+      </div>
+
+      {/* Filtre période */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+          {(["all", "today", "week", "month"] as const).map((p) => {
+            const labels: Record<PeriodeFilter, string> = {
+              all: "Tout", today: "Aujourd'hui", week: "Semaine", month: "Mois", custom: "Personnalisé",
+            };
+            const active = periode === p;
+            return (
+              <button
+                key={p}
+                onClick={() => { setPeriode(p); setDateDebut(""); setDateFin(""); }}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  active ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                {labels[p]}
+              </button>
+            );
+          })}
+        </div>
+
+        <span className="text-gray-300 text-xs hidden sm:inline">|</span>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <CalendarDays size={13} className="text-gray-400 shrink-0" />
+            <span className="text-xs text-gray-500">Du</span>
+            <input
+              type="date"
+              value={dateDebut}
+              max={dateFin || undefined}
+              onChange={(e) => { setDateDebut(e.target.value); setPeriode("custom"); }}
+              aria-label="Date de début"
+              className={`text-xs border rounded-md px-2 py-1.5 h-7 transition-colors outline-none focus:ring-1 focus:ring-[#1a4731] focus:border-[#1a4731] ${
+                periode === "custom" && dateDebut ? "border-[#1a4731] bg-green-50" : "border-gray-200 bg-white"
+              }`}
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-gray-500">Au</span>
+            <input
+              type="date"
+              value={dateFin}
+              min={dateDebut || undefined}
+              onChange={(e) => { setDateFin(e.target.value); setPeriode("custom"); }}
+              aria-label="Date de fin"
+              className={`text-xs border rounded-md px-2 py-1.5 h-7 transition-colors outline-none focus:ring-1 focus:ring-[#1a4731] focus:border-[#1a4731] ${
+                periode === "custom" && dateFin ? "border-[#1a4731] bg-green-50" : "border-gray-200 bg-white"
+              }`}
+            />
+          </div>
+          {periode === "custom" && (dateDebut || dateFin) && (
+            <button
+              onClick={() => { setDateDebut(""); setDateFin(""); setPeriode("all"); }}
+              className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+              title="Réinitialiser la période"
+              aria-label="Réinitialiser la période"
+            >
+              <X size={13} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filtre agent saisie */}
