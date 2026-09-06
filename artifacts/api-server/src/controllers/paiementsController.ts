@@ -1363,7 +1363,7 @@ async function debiterMobileDansTransaction(
           return;
         }
         const message = err instanceof Error ? err.message : "Impossible de valider le règlement";
-        if (/insuffisant|Aucune caisse|session de caisse|Mobile Marchand/i.test(message)) {
+        if (/insuffisant|Aucune caisse|session de caisse|Mobile Marchand|Compte bancaire/i.test(message)) {
           res.status(422).json({ erreur: message });
           return;
         }
@@ -1775,6 +1775,11 @@ async function debiterMobileDansTransaction(
     }
     if (err instanceof PaiementMontantInvalideError) {
       res.status(err.status).json({ erreur: err.message });
+      return;
+    }
+    const message = err instanceof Error ? err.message : "Impossible de valider le règlement";
+    if (/insuffisant|Aucune caisse|session de caisse|Mobile Marchand|Compte bancaire/i.test(message)) {
+      res.status(422).json({ erreur: message });
       return;
     }
     req.log.error({ err }, "Erreur validerPaiement");

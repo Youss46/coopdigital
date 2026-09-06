@@ -1240,6 +1240,193 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
   });
 });
 
+describe.skipIf(!enabled)("règlement carte producteur atomique sur PostgreSQL", () => {
+  let client: any;
+  let cooperativeId: number;
+  let memberId: number;
+  let bankAccountId: number;
+  const paymentIds: number[] = [];
+  const suffix = `${process.pid}_${Date.now()}`;
+
+  beforeAll(async () => {
+    client = await pool.connect();
+
+    const cooperative = await client.query(
+      `INSERT INTO cooperatives (nom, ville, region)
+       VALUES ($1, 'Test', 'Test') RETURNING id`,
+      [`Carte producteur controller ${suffix}`],
+    );
+    cooperativeId = cooperative.rows[0].id;
+
+    const member = await client.query(
+      `INSERT INTO membres
+        (cooperative_id, nom, prenoms, telephone, superficie_ha, date_adhesion,
+         carte_producteur)
+       VALUES ($1, 'Producteur', 'Carte', $2, 1, '2026-01-01', $3)
+       RETURNING id`,
+      [cooperativeId, `070002${process.pid}`, `CARD-${suffix}`],
+    );
+    memberId = member.rows[0].id;
+
+    const account = await client.query(
+      `INSERT INTO comptes_bancaires
+        (cooperative_id, nom, banque, solde_actuel_fcfa,
+         solde_mini_alerte_fcfa, actif)
+       VALUES ($1, $2, 'Banque de test', $3, 0, true)
+       RETURNING id`,
+      [cooperativeId, `Compte carte ${suffix}`, 500_000],
+    );
+    bankAccountId = account.rows[0].id;
+
+    await client.query(
+      `INSERT INTO config_comptable (cooperative_id, auto_paiements)
+       VALUES ($1, true)`,
+      [cooperativeId],
+    );
+  });
+
+  afterAll(async () => {
+    await client.query(
+      `DELETE FROM ecritures_comptables
+       WHERE cooperative_id = $1`,
+      [cooperativeId],
+    );
+    await client.query(
+      `DELETE FROM ecritures_en_attente
+       WHERE cooperative_id = $1`,
+      [cooperativeId],
+    );
+    await client.query(
+      `DELETE FROM mouvements_banque
+       WHERE cooperative_id = $1`,
+      [cooperativeId],
+    );
+    await client.query(
+      `DELETE FROM paiements WHERE id = ANY($1::int[])`,
+      [paymentIds],
+    );
+    await client.query(
+      `DELETE FROM config_comptable WHERE cooperative_id = $1`,
+      [cooperativeId],
+    );
+    await client.query(`DELETE FROM membres WHERE id = $1`, [memberId]);
+    await client.query(`DELETE FROM comptes_bancaires WHERE id = $1`, [
+      bankAccountId,
+    ]);
+    await client.query(`DELETE FROM cooperatives WHERE id = $1`, [
+      cooperativeId,
+    ]);
+    client.release();
+  });
+
+  function request(paymentId: number) {
+    return {
+      params: { id: String(paymentId) },
+      body: { compteBancaireId: bankAccountId },
+      user: { cooperativeId, id: undefined, role: "comptable" },
+      log: { error: () => undefined },
+    } as any;
+  }
+
+  async function createPayment(amount = 125_000): Promise<number> {
+    const result = await client.query(
+      `INSERT INTO paiements
+        (cooperative_id, membre_id, numero_recu, montant_fcfa,
+         mode_paiement, statut)
+       VALUES ($1, $2, $3, $4, 'carte_producteur', 'en_attente')
+       RETURNING id`,
+      [
+        cooperativeId,
+        memberId,
+        `REC-CONTROLLER-CARTE-${suffix}-${paymentIds.length}`,
+        amount,
+      ],
+    );
+    const paymentId = result.rows[0].id as number;
+    paymentIds.push(paymentId);
+    return paymentId;
+  }
+
+  async function validate(paymentId: number) {
+    const res = response();
+    await validerPaiement(request(paymentId), res as any);
+    return res;
+  }
+
+  async function paymentState(paymentId: number) {
+    const result = await client.query(
+      `SELECT statut FROM paiements WHERE id = $1`,
+      [paymentId],
+    );
+    return result.rows[0];
+  }
+
+  async function bankState() {
+    const result = await client.query(
+      `SELECT
+         c.solde_actuel_fcfa,
+         count(m.id)::int AS mouvement_count,
+         coalesce(sum(m.montant_fcfa), 0)::numeric AS mouvement_total
+       FROM comptes_bancaires c
+       LEFT JOIN mouvements_banque m
+         ON m.compte_id = c.id
+        AND m.motif = 'paiement_carte_producteur'
+       WHERE c.id = $1
+       GROUP BY c.solde_actuel_fcfa`,
+      [bankAccountId],
+    );
+    return result.rows[0];
+  }
+
+  it("passe le paiement à effectué et débite le montant exact", async () => {
+    const paymentId = await createPayment();
+
+    const result = await validate(paymentId);
+
+    expect(result.statusCode).toBe(200);
+    await expect(paymentState(paymentId)).resolves.toEqual({ statut: "effectue" });
+    await expect(bankState()).resolves.toMatchObject({
+      solde_actuel_fcfa: "375000",
+      mouvement_count: 1,
+      mouvement_total: "125000",
+    });
+  });
+
+  it("ne crée qu'un débit lors de deux validations concurrentes", async () => {
+    const paymentId = await createPayment();
+
+    const results = await Promise.all([
+      validate(paymentId),
+      validate(paymentId),
+    ]);
+
+    expect(results.map((result) => result.statusCode).sort()).toEqual([200, 409]);
+    await expect(paymentState(paymentId)).resolves.toEqual({ statut: "effectue" });
+    await expect(bankState()).resolves.toMatchObject({
+      solde_actuel_fcfa: "250000",
+      mouvement_count: 2,
+      mouvement_total: "250000",
+    });
+  });
+
+  it("laisse le paiement et le solde inchangés si le compte est insuffisant", async () => {
+    const paymentId = await createPayment(400_000);
+
+    const result = await validate(paymentId);
+
+    expect(result.statusCode).toBe(422);
+    expect(result.body).toMatchObject({
+      erreur: expect.stringContaining("Solde bancaire insuffisant"),
+    });
+    await expect(paymentState(paymentId)).resolves.toEqual({ statut: "en_attente" });
+    await expect(bankState()).resolves.toMatchObject({
+      solde_actuel_fcfa: "250000",
+      mouvement_count: 2,
+      mouvement_total: "250000",
+    });
+  });
+});
+
 describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () => {
   let client: any;
   let cooperativeId: number;
