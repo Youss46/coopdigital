@@ -160,6 +160,23 @@
           "name": "sessions_pesee_bon_reception_unique"
         }
       ]
+    },
+    {
+      "migration": "0167_source_tresorerie_bulletins_paie",
+      "objects": [
+        {
+          "kind": "column",
+          "schema": "public",
+          "table": "bulletins_paie",
+          "name": "compte_source_type"
+        },
+        {
+          "kind": "column",
+          "schema": "public",
+          "table": "bulletins_paie",
+          "name": "compte_source_id"
+        }
+      ]
     }
   ]
 }

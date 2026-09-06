@@ -87,6 +87,11 @@ describe.skipIf(!enabled)("contrôles du schéma PostgreSQL", () => {
          id integer NOT NULL,
          date_operation date
         );
+        CREATE TABLE ${qualifiedIdentifier(schemaName, "bulletins_paie")} (
+          id integer NOT NULL,
+          compte_source_type text,
+          compte_source_id integer
+        );
         CREATE TABLE ${qualifiedIdentifier(schemaName, "charges_diverses")} (
           id integer NOT NULL,
           cooperative_id integer NOT NULL
