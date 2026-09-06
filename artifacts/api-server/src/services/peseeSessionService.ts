@@ -587,6 +587,14 @@ export async function createSession(
 }
 
 // ─── Lister sessions (avec lignes count) ──────────────────────────────────────
+function parseSessionDateFilter(value: string, endOfDay: boolean): Date {
+  const trimmed = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return new Date(`${trimmed}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}Z`);
+  }
+  return new Date(trimmed);
+}
+
 export async function getSessions(
   cooperativeId: number,
   opts: { statut?: string; membreId?: number; fournisseurId?: number; expeditionId?: number; limit?: number; peseurId?: number; dateDebut?: string; dateFin?: string } = {},
@@ -611,10 +619,10 @@ export async function getSessions(
     conditions.push(eq(sessionsPeseeTable.peseurId, opts.peseurId));
   }
   if (opts.dateDebut) {
-    conditions.push(gte(sessionsPeseeTable.dateDebut, new Date(opts.dateDebut)));
+    conditions.push(gte(sessionsPeseeTable.dateDebut, parseSessionDateFilter(opts.dateDebut, false)));
   }
   if (opts.dateFin) {
-    conditions.push(lte(sessionsPeseeTable.dateDebut, new Date(opts.dateFin)));
+    conditions.push(lte(sessionsPeseeTable.dateDebut, parseSessionDateFilter(opts.dateFin, true)));
   }
 
   const sessions = await db
@@ -677,10 +685,10 @@ export async function getSessions(
     return sessions;
   }
   if (opts.dateDebut) {
-    livraisonConditions.push(gte(livraisonsTable.createdAt, new Date(opts.dateDebut)));
+    livraisonConditions.push(gte(livraisonsTable.createdAt, parseSessionDateFilter(opts.dateDebut, false)));
   }
   if (opts.dateFin) {
-    livraisonConditions.push(lte(livraisonsTable.createdAt, new Date(opts.dateFin)));
+    livraisonConditions.push(lte(livraisonsTable.createdAt, parseSessionDateFilter(opts.dateFin, true)));
   }
 
   const livraisonsSimples = await db

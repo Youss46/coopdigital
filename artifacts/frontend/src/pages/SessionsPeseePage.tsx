@@ -4,7 +4,7 @@ import { useFeatureAccess } from "@/hooks/useFeatureAccess";
 import {
   Scale, Search, Loader2, ChevronRight,
   Package, CheckCircle2, AlertCircle, Clock, X,
-  TrendingUp, AlertTriangle, Ban,
+  TrendingUp, AlertTriangle, Ban, CalendarDays,
 } from "lucide-react";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
@@ -325,9 +325,19 @@ function SessionDetailModal({ sessionId, onClose, canWrite }: { sessionId: numbe
 // ─── Page principale ──────────────────────────────────────────────────────────
 
 type StatutFilter = "all" | "en_cours" | "terminee" | "annulee";
-type PeriodeFilter = "all" | "today" | "week" | "month";
+type PeriodeFilter = "all" | "today" | "week" | "month" | "custom";
 
-function getPeriodeDates(periode: PeriodeFilter): { date_debut?: string; date_fin?: string } {
+function getPeriodeDates(
+  periode: PeriodeFilter,
+  customDebut = "",
+  customFin = "",
+): { date_debut?: string; date_fin?: string } {
+  if (periode === "custom") {
+    return {
+      ...(customDebut ? { date_debut: customDebut } : {}),
+      ...(customFin ? { date_fin: customFin } : {}),
+    };
+  }
   if (periode === "all") return {};
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -353,17 +363,19 @@ export default function SessionsPeseePage() {
   const [search, setSearch] = useState("");
   const [statut, setStatut] = useState<StatutFilter>("all");
   const [periode, setPeriode] = useState<PeriodeFilter>("all");
+  const [dateDebut, setDateDebut] = useState("");
+  const [dateFin, setDateFin] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const qc = useQueryClient();
 
-  const periodeDates = getPeriodeDates(periode);
+  const periodeDates = getPeriodeDates(periode, dateDebut, dateFin);
   const params = new URLSearchParams({ limit: "500" });
   if (statut !== "all") params.set("statut", statut);
   if (periodeDates.date_debut) params.set("date_debut", periodeDates.date_debut);
   if (periodeDates.date_fin) params.set("date_fin", periodeDates.date_fin);
 
   const { data: sessions = [], isLoading } = useQuery<SessionPesee[]>({
-    queryKey: ["sessions-pesee", statut, periode],
+    queryKey: ["sessions-pesee", statut, periode, dateDebut, dateFin],
     queryFn: () => apiFetch<SessionPesee[]>(`/api/pesee/sessions?${params.toString()}`),
     refetchInterval: 30_000,
   });
@@ -461,15 +473,17 @@ export default function SessionsPeseePage() {
           />
         </div>
 
-        {/* Filtre période */}
+        {/* Filtres période rapides */}
         <div style={{ display: "flex", gap: 5, background: "#f1f5f9", borderRadius: 8, padding: 3 }}>
           {(["all", "today", "week", "month"] as const).map((p) => {
-            const labels: Record<PeriodeFilter, string> = { all: "Tout", today: "Aujourd'hui", week: "Semaine", month: "Mois" };
+            const labels: Record<PeriodeFilter, string> = {
+              all: "Tout", today: "Aujourd'hui", week: "Semaine", month: "Mois", custom: "Personnalisé",
+            };
             const active = periode === p;
             return (
               <button
                 key={p}
-                onClick={() => setPeriode(p)}
+                onClick={() => { setPeriode(p); setDateDebut(""); setDateFin(""); }}
                 style={{
                   padding: "5px 11px", borderRadius: 6, border: "none",
                   background: active ? "#fff" : "transparent",
@@ -483,6 +497,53 @@ export default function SessionsPeseePage() {
               </button>
             );
           })}
+        </div>
+
+        {/* Plage personnalisée */}
+        <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+          <CalendarDays size={14} color="#94a3b8" />
+          <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: ".78rem", color: "#64748b" }}>
+            Du
+            <input
+              type="date"
+              value={dateDebut}
+              max={dateFin || undefined}
+              onChange={(e) => { setDateDebut(e.target.value); setPeriode("custom"); }}
+              aria-label="Date de début"
+              style={{
+                height: 30, padding: "4px 7px", borderRadius: 7,
+                border: periode === "custom" && dateDebut ? "1px solid #0369a1" : "1px solid #e2e8f0",
+                background: periode === "custom" && dateDebut ? "#f0f9ff" : "#fff",
+                color: "#374151", fontSize: ".78rem", outline: "none",
+              }}
+            />
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: ".78rem", color: "#64748b" }}>
+            Au
+            <input
+              type="date"
+              value={dateFin}
+              min={dateDebut || undefined}
+              onChange={(e) => { setDateFin(e.target.value); setPeriode("custom"); }}
+              aria-label="Date de fin"
+              style={{
+                height: 30, padding: "4px 7px", borderRadius: 7,
+                border: periode === "custom" && dateFin ? "1px solid #0369a1" : "1px solid #e2e8f0",
+                background: periode === "custom" && dateFin ? "#f0f9ff" : "#fff",
+                color: "#374151", fontSize: ".78rem", outline: "none",
+              }}
+            />
+          </label>
+          {periode === "custom" && (dateDebut || dateFin) && (
+            <button
+              onClick={() => { setDateDebut(""); setDateFin(""); setPeriode("all"); }}
+              aria-label="Réinitialiser la période"
+              title="Réinitialiser la période"
+              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", padding: 4, border: "none", background: "transparent", color: "#94a3b8", cursor: "pointer" }}
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
 
         {/* Filtre statut */}
