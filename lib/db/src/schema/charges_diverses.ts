@@ -24,6 +24,12 @@ export const chargesDiversesTable = pgTable("charges_diverses", {
   createdBy:      integer("created_by").references(() => usersTable.id),
   approvedBy:     integer("approved_by").references(() => usersTable.id),
   approvedAt:     timestamp("approved_at", { withTimezone: true }),
+  montantRegleFcfa: integer("montant_regle_fcfa").notNull().default(0),
+  dateReglement:  date("date_reglement", { mode: "string" }),
+  reglePar:       integer("regle_par").references(() => usersTable.id),
+  compteReglementId:   integer("compte_reglement_id"),
+  compteReglementType: varchar("compte_reglement_type", { length: 20 }),
+  referenceReglement:  varchar("reference_reglement", { length: 100 }),
   createdAt:      timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt:      timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

@@ -8,6 +8,7 @@ const mockDb = vi.hoisted(() => ({
   update: vi.fn(),
 }));
 const proposerEcriture = vi.hoisted(() => vi.fn());
+const proposerEcrituresDansTransaction = vi.hoisted(() => vi.fn());
 const getTauxPpsi = vi.hoisted(() => vi.fn());
 
 vi.mock("@workspace/db", () => {
@@ -39,10 +40,10 @@ vi.mock("drizzle-orm", () => ({
 }));
 
 vi.mock("../services/fiscaliteService.js", () => ({ getTauxPpsi }));
-vi.mock("../services/comptabiliteService.js", () => ({ proposerEcriture }));
+vi.mock("../services/comptabiliteService.js", () => ({ proposerEcriture, proposerEcrituresDansTransaction }));
 
 const chargesDiversesService = await import("../services/chargesDiversesService.js");
-const { validerChargeDiverses } = chargesDiversesService;
+const { validerChargeDiverses, reglerChargeFournisseur } = chargesDiversesService;
 const {
   erreurStructureCharge,
   handleValiderChargeDiverses,
@@ -95,6 +96,12 @@ function creditCharge(overrides: Record<string, unknown> = {}) {
     createdBy: 7,
     approvedBy: null,
     approvedAt: null,
+    montantRegleFcfa: 0,
+    dateReglement: null,
+    reglePar: null,
+    compteReglementId: null,
+    compteReglementType: null,
+    referenceReglement: null,
     createdAt: new Date("2026-09-05T00:00:00Z"),
     updatedAt: new Date("2026-09-05T00:00:00Z"),
     ...overrides,
@@ -164,5 +171,58 @@ describe("charges diverses à crédit", () => {
       compteCredit: "401",
       montantFcfa: 50000,
     }));
+  });
+
+  it("règle la dette 401 et refuse un second règlement", async () => {
+    const charge = creditCharge({
+      statut: "valide",
+      compteCredit: "401000",
+      montantRegleFcfa: 0,
+    });
+    const caisse = {
+      id: 3,
+      cooperativeId: 42,
+      nom: "Caisse centrale",
+      actif: true,
+      soldeActuelFcfa: "100000",
+    };
+    const tx = {
+      select: vi.fn()
+        .mockReturnValueOnce(chain([charge]))
+        .mockReturnValueOnce(chain([caisse]))
+        .mockReturnValueOnce(chain([{ id: 9 }])),
+      insert: vi.fn(() => ({ values: vi.fn().mockResolvedValue([]) })),
+      update: vi.fn(() => ({
+        set: vi.fn(() => ({
+          where: vi.fn(() => ({
+            returning: vi.fn().mockResolvedValue([{ ...charge, statut: "reglee", montantRegleFcfa: 50000 }]),
+          })),
+        })),
+      })),
+    };
+    mockDb.transaction.mockImplementationOnce(async (callback: (value: typeof tx) => Promise<unknown>) => callback(tx));
+
+    const result = await reglerChargeFournisseur(42, charge.id, 7, {
+      dateReglement: "2026-09-06",
+      compteTresorerieId: 3,
+      compteTresorerieType: "caisse",
+    });
+
+    expect(result).toEqual(expect.objectContaining({ statut: "reglee" }));
+    expect(tx.insert).toHaveBeenCalledTimes(1);
+    expect(proposerEcrituresDansTransaction).toHaveBeenCalledWith(expect.anything(), 42, [
+      expect.objectContaining({ compteDebit: "401000", compteCredit: "571000", montantFcfa: 50000 }),
+    ]);
+
+    const secondTx = {
+      select: vi.fn(() => chain([])),
+    };
+    mockDb.transaction.mockImplementationOnce(async (callback: (value: typeof secondTx) => Promise<unknown>) => callback(secondTx));
+    await expect(reglerChargeFournisseur(42, charge.id, 8, {
+      dateReglement: "2026-09-06",
+      compteTresorerieId: 3,
+      compteTresorerieType: "caisse",
+    })).resolves.toBeNull();
+    expect(secondTx.select).toHaveBeenCalledTimes(1);
   });
 });

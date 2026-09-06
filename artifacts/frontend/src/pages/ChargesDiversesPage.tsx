@@ -21,7 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useFeatureAccess } from "@/hooks/useFeatureAccess";
 import {
-  Plus, Pencil, Trash2, CheckCircle2, Filter, BarChart3,
+  Plus, Pencil, Trash2, CheckCircle2, Filter, BarChart3, WalletCards,
   TrendingDown, FileText, Loader2,
 } from "lucide-react";
 
@@ -62,6 +62,11 @@ interface Charge {
   reference_piece: string | null;
   statut: string;
   created_at: string;
+  montant_regle_fcfa: number;
+  date_reglement: string | null;
+  compte_reglement_id: number | null;
+  compte_reglement_type: "caisse" | "banque" | "mobile_marchand" | null;
+  reference_reglement: string | null;
 }
 
 interface Stats {
@@ -137,6 +142,7 @@ function fmtFcfa(n: number) {
 const STATUT_BADGE: Record<string, string> = {
   brouillon: "bg-gray-100 text-gray-700",
   valide:    "bg-green-100 text-green-800",
+  reglee:    "bg-blue-100 text-blue-800",
 };
 
 // ── Composant principal ───────────────────────────────────────────────────────
@@ -156,6 +162,13 @@ export default function ChargesDiversesPage() {
   const [editTarget,   setEditTarget]   = useState<Charge | null>(null);
   const [form,         setForm]         = useState({ ...EMPTY_FORM });
   const [showStats,    setShowStats]    = useState(false);
+  const [reglementTarget, setReglementTarget] = useState<Charge | null>(null);
+  const [reglementForm, setReglementForm] = useState({
+    date_reglement: new Date().toISOString().split("T")[0]!,
+    compte_tresorerie_id: "",
+    compte_tresorerie_type: "" as "" | "caisse" | "banque" | "mobile_marchand",
+    reference: "",
+  });
 
   // Sync compte débit quand catégorie change
   useEffect(() => {
@@ -194,6 +207,11 @@ export default function ChargesDiversesPage() {
   const { data: mobiles = [] } = useQuery<MobileTresorerie[]>({
     queryKey: ["charges-diverses-comptes", "mobile_marchand"],
     queryFn:  () => apiFetch<MobileTresorerie[]>("/mobile-marchand"),
+  });
+
+  const { data: dettes = [] } = useQuery<Charge[]>({
+    queryKey: ["charges-diverses-dettes-fournisseurs"],
+    queryFn: () => apiFetch<Charge[]>("/charges-diverses/dettes-fournisseurs"),
   });
 
   // ── Mutations ─────────────────────────────────────────────────────────────────
@@ -251,12 +269,58 @@ export default function ChargesDiversesPage() {
     onError:   (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
 
+  const reglerMut = useMutation({
+    mutationFn: ({ id, ...data }: { id: number; date_reglement: string; compte_tresorerie_id: number; compte_tresorerie_type: "caisse" | "banque" | "mobile_marchand"; reference?: string }) =>
+      apiFetch(`/charges-diverses/${id}/regler`, { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => {
+      toast({ title: "Dette fournisseur réglée", description: "Le compte 401 et la trésorerie ont été mis à jour." });
+      setReglementTarget(null);
+      void qc.invalidateQueries({ queryKey: ["charges-diverses"] });
+      void qc.invalidateQueries({ queryKey: ["charges-diverses-dettes-fournisseurs"] });
+    },
+    onError: (e: Error) => toast({ title: "Règlement impossible", description: e.message, variant: "destructive" }),
+  });
+
   // ── Handlers ──────────────────────────────────────────────────────────────────
   const openCreate = useCallback(() => {
     setEditTarget(null);
     setForm({ ...EMPTY_FORM });
     setShowForm(true);
   }, []);
+
+  const openReglement = useCallback((charge: Charge) => {
+    setReglementTarget(charge);
+    setReglementForm({
+      date_reglement: new Date().toISOString().split("T")[0]!,
+      compte_tresorerie_id: "",
+      compte_tresorerie_type: "",
+      reference: charge.reference_piece ? `REG-${charge.reference_piece}` : "",
+    });
+  }, []);
+
+  const selectReglementTresorerie = useCallback((value: string) => {
+    const [type, id] = value.split(":");
+    if (!id || !["caisse", "banque", "mobile_marchand"].includes(type ?? "")) return;
+    setReglementForm(f => ({
+      ...f,
+      compte_tresorerie_id: id,
+      compte_tresorerie_type: type as "caisse" | "banque" | "mobile_marchand",
+    }));
+  }, []);
+
+  const submitReglement = useCallback(() => {
+    if (!reglementTarget || !reglementForm.date_reglement || !reglementForm.compte_tresorerie_id || !reglementForm.compte_tresorerie_type) {
+      toast({ title: "Compte de trésorerie requis", description: "Sélectionnez le compte qui sera débité.", variant: "destructive" });
+      return;
+    }
+    reglerMut.mutate({
+      id: reglementTarget.id,
+      date_reglement: reglementForm.date_reglement,
+      compte_tresorerie_id: Number(reglementForm.compte_tresorerie_id),
+      compte_tresorerie_type: reglementForm.compte_tresorerie_type,
+      reference: reglementForm.reference || undefined,
+    });
+  }, [reglementTarget, reglementForm, reglerMut, toast]);
 
   const openEdit = useCallback((c: Charge) => {
     setEditTarget(c);
@@ -418,6 +482,33 @@ export default function ChargesDiversesPage() {
         </div>
       )}
 
+      {dettes.length > 0 && (
+        <Card className="border-amber-200 bg-amber-50/40">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <WalletCards className="h-4 w-4 text-amber-700" />
+              Dettes fournisseurs à régler
+              <Badge variant="secondary" className="ml-auto">{dettes.length}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {dettes.map(dette => (
+              <div key={dette.id} className="flex items-center justify-between gap-3 rounded-md border bg-white px-3 py-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">{dette.tiers || "Fournisseur non nommé"} — {dette.libelle}</p>
+                  <p className="text-xs text-gray-500">{fmt(dette.date_charge)} · {fmtFcfa(dette.montant_fcfa)}</p>
+                </div>
+                {!isFeatureReadOnly && (
+                  <Button size="sm" onClick={() => openReglement(dette)}>
+                    <WalletCards className="h-4 w-4 mr-1" /> Régler
+                  </Button>
+                )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Filtres */}
       <Card>
         <CardContent className="pt-4">
@@ -518,11 +609,21 @@ export default function ChargesDiversesPage() {
                     <TableCell className="text-xs text-gray-500 font-mono">{c.compte_debit} / {c.compte_credit}</TableCell>
                     <TableCell>
                       <Badge className={STATUT_BADGE[c.statut] ?? "bg-gray-100 text-gray-600"}>
-                        {c.statut === "valide" ? "✓ Validé" : "Brouillon"}
+                        {c.statut === "reglee" ? "✓ Réglée" : c.statut === "valide" ? "✓ Validé" : "Brouillon"}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center justify-end gap-1">
+                        {c.statut === "valide" && c.mode_paiement === "credit" && !isFeatureReadOnly && (
+                          <Button
+                            variant="ghost" size="icon"
+                            title="Régler la dette fournisseur"
+                            onClick={() => openReglement(c)}
+                            disabled={reglerMut.isPending || c.montant_regle_fcfa > 0}
+                          >
+                            <WalletCards className="h-4 w-4 text-blue-600" />
+                          </Button>
+                        )}
                         {c.statut === "brouillon" && (
                           <>
                             {!isFeatureReadOnly && <Button
@@ -554,6 +655,63 @@ export default function ChargesDiversesPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!reglementTarget} onOpenChange={open => !open && setReglementTarget(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Régler la dette fournisseur</DialogTitle>
+          </DialogHeader>
+          {reglementTarget && (
+            <div className="space-y-4 py-2">
+              <div className="rounded-md bg-gray-50 p-3 text-sm">
+                <p className="font-medium">{reglementTarget.tiers || "Fournisseur non nommé"}</p>
+                <p className="text-gray-600">{reglementTarget.libelle}</p>
+                <p className="mt-1 font-semibold text-blue-700">
+                  {fmtFcfa(reglementTarget.montant_fcfa - reglementTarget.montant_regle_fcfa)} à régler
+                </p>
+              </div>
+              <div className="space-y-1">
+                <Label>Date de règlement *</Label>
+                <Input
+                  type="date"
+                  value={reglementForm.date_reglement}
+                  onChange={e => setReglementForm(f => ({ ...f, date_reglement: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Compte débité *</Label>
+                <Select
+                  value={reglementForm.compte_tresorerie_type && reglementForm.compte_tresorerie_id
+                    ? `${reglementForm.compte_tresorerie_type}:${reglementForm.compte_tresorerie_id}` : ""}
+                  onValueChange={selectReglementTresorerie}
+                >
+                  <SelectTrigger><SelectValue placeholder="Sélectionner une caisse, banque ou Mobile Money" /></SelectTrigger>
+                  <SelectContent>
+                    {caisses.map(c => <SelectItem key={`caisse:${c.id}`} value={`caisse:${c.id}`}>Caisse — {c.nom}</SelectItem>)}
+                    {banques.map(c => <SelectItem key={`banque:${c.id}`} value={`banque:${c.id}`}>Banque — {c.nom}{c.banque ? ` (${c.banque})` : ""}</SelectItem>)}
+                    {mobiles.map(c => <SelectItem key={`mobile_marchand:${c.id}`} value={`mobile_marchand:${c.id}`}>Mobile Money — {c.nom}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Référence du règlement</Label>
+                <Input
+                  placeholder="N° de reçu, virement…"
+                  value={reglementForm.reference}
+                  onChange={e => setReglementForm(f => ({ ...f, reference: e.target.value }))}
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReglementTarget(null)}>Annuler</Button>
+            <Button onClick={submitReglement} disabled={reglerMut.isPending}>
+              {reglerMut.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Régler {reglementTarget ? fmtFcfa(reglementTarget.montant_fcfa - reglementTarget.montant_regle_fcfa) : ""}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modale création/édition */}
       <Dialog open={showForm} onOpenChange={setShowForm}>

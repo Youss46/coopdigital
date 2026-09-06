@@ -3,8 +3,10 @@ import {
   handleListChargesDiverses,
   handleCreateChargeDiverses,
   handleGetChargeDiverses,
+  handleListDettesFournisseurs,
   handleUpdateChargeDiverses,
   handleValiderChargeDiverses,
+  handleReglerChargeFournisseur,
   handleDeleteChargeDiverses,
   handleStatsChargesDiverses,
 } from "../controllers/chargesDiversesController";
@@ -12,11 +14,13 @@ import {
 const router: IRouter = Router();
 
 router.get("/charges-diverses/stats",  handleStatsChargesDiverses);
+router.get("/charges-diverses/dettes-fournisseurs", handleListDettesFournisseurs);
 router.get("/charges-diverses",        handleListChargesDiverses);
 router.post("/charges-diverses",       handleCreateChargeDiverses);
 router.get("/charges-diverses/:id",    handleGetChargeDiverses);
 router.put("/charges-diverses/:id",    handleUpdateChargeDiverses);
 router.put("/charges-diverses/:id/valider", handleValiderChargeDiverses);
+router.post("/charges-diverses/:id/regler", handleReglerChargeFournisseur);
 router.delete("/charges-diverses/:id", handleDeleteChargeDiverses);
 
 export default router;

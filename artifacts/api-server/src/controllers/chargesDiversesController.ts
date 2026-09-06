@@ -3,9 +3,11 @@ import { proposerEcriture } from "../services/comptabiliteService";
 import {
   listChargesDiverses,
   getChargeDiverses,
+  listDettesFournisseurs,
   createChargeDiverses,
   updateChargeDiverses,
   validerChargeDiverses,
+  reglerChargeFournisseur,
   deleteChargeDiverses,
   getStatsChargesDiverses,
   securiserReglementPpsi,
@@ -122,6 +124,19 @@ export async function handleGetChargeDiverses(req: Request, res: Response): Prom
   }
 }
 
+// ── GET /charges-diverses/dettes-fournisseurs ────────────────────────────────
+export async function handleListDettesFournisseurs(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
+    const rows = await listDettesFournisseurs(cooperativeId);
+    res.json(rows.map(mapCharge));
+  } catch (err) {
+    req.log.error({ err }, "Erreur listDettesFournisseurs");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
 // ── PUT /charges-diverses/:id ─────────────────────────────────────────────────
 export async function handleUpdateChargeDiverses(req: Request, res: Response): Promise<void> {
   try {
@@ -234,6 +249,45 @@ export async function handleValiderChargeDiverses(req: Request, res: Response): 
   }
 }
 
+// ── POST /charges-diverses/:id/regler ───────────────────────────────────────
+export async function handleReglerChargeFournisseur(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    const userId = req.user?.id;
+    if (!cooperativeId || !userId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
+
+    const id = parseInt(String(req.params["id"]), 10);
+    const body = (req.body ?? {}) as {
+      date_reglement?: string;
+      compte_tresorerie_id?: number;
+      compte_tresorerie_type?: "caisse" | "banque" | "mobile_marchand";
+      reference?: string | null;
+    };
+    const dateReglement = body.date_reglement ?? new Date().toISOString().slice(0, 10);
+    if (!body.compte_tresorerie_id || !body.compte_tresorerie_type) {
+      res.status(400).json({ erreur: "Le compte de trésorerie est requis pour régler la dette" });
+      return;
+    }
+
+    const row = await reglerChargeFournisseur(cooperativeId, id, userId, {
+      dateReglement,
+      compteTresorerieId: Number(body.compte_tresorerie_id),
+      compteTresorerieType: body.compte_tresorerie_type,
+      reference: body.reference,
+    });
+    if (!row) {
+      res.status(409).json({ erreur: "Cette dette fournisseur est introuvable ou déjà réglée" });
+      return;
+    }
+    res.json(mapCharge(row));
+  } catch (err) {
+    req.log.error({ err }, "Erreur reglerChargeFournisseur");
+    const message = err instanceof Error ? err.message : "Erreur interne";
+    const clientError = /requis|invalide|introuvable|inactive|inactif|insuffisant|session ouverte/i.test(message);
+    res.status(clientError ? 400 : 500).json({ erreur: clientError ? message : "Erreur interne" });
+  }
+}
+
 // ── DELETE /charges-diverses/:id ──────────────────────────────────────────────
 export async function handleDeleteChargeDiverses(req: Request, res: Response): Promise<void> {
   try {
@@ -276,6 +330,12 @@ function mapCharge(r: Awaited<ReturnType<typeof getChargeDiverses>>) {
     ppsi_taux_pct:    r.ppsiTauxPct == null ? null : parseFloat(r.ppsiTauxPct),
     retenue_ppsi_fcfa: r.retenuePpsiFcfa ?? 0,
     montant_net_fcfa: r.montantNetFcfa ?? null,
+    montant_regle_fcfa: r.montantRegleFcfa ?? 0,
+    date_reglement: r.dateReglement ?? null,
+    regle_par: r.reglePar ?? null,
+    compte_reglement_id: r.compteReglementId ?? null,
+    compte_reglement_type: r.compteReglementType ?? null,
+    reference_reglement: r.referenceReglement ?? null,
     categorie:        r.categorie,
     compte_debit:     r.compteDebit,
     compte_credit:    r.compteCredit,

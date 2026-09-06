@@ -12,6 +12,8 @@ import {
 import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
 import { getTauxPpsi } from "./fiscaliteService.js";
 import { normaliserNumeroCompte } from "../lib/numeroCompte.js";
+import { proposerEcrituresDansTransaction } from "./comptabiliteService.js";
+import type { ComptabiliteTransaction } from "./comptabiliteService.js";
 
 export type CreateChargeInput = {
   dateCharge: string;
@@ -32,6 +34,13 @@ export type ReglementPpsi = {
   brut: number;
   retenue: number;
   net: number;
+};
+
+export type ReglerChargeFournisseurInput = {
+  dateReglement: string;
+  compteTresorerieId: number;
+  compteTresorerieType: "caisse" | "banque" | "mobile_marchand";
+  reference?: string | null;
 };
 
 /**
@@ -89,6 +98,20 @@ export async function getChargeDiverses(cooperativeId: number, id: number) {
     .where(and(eq(chargesDiversesTable.id, id), eq(chargesDiversesTable.cooperativeId, cooperativeId)))
     .limit(1);
   return row ?? null;
+}
+
+export async function listDettesFournisseurs(cooperativeId: number) {
+  return db
+    .select()
+    .from(chargesDiversesTable)
+    .where(and(
+      eq(chargesDiversesTable.cooperativeId, cooperativeId),
+      eq(chargesDiversesTable.statut, "valide"),
+      eq(chargesDiversesTable.modePaiement, "credit"),
+      eq(chargesDiversesTable.compteCredit, "401000"),
+      eq(chargesDiversesTable.montantRegleFcfa, 0),
+    ))
+    .orderBy(chargesDiversesTable.dateCharge);
 }
 
 export async function createChargeDiverses(
@@ -311,6 +334,179 @@ export async function validerChargeDiverses(
       ))
       .returning();
     return row ?? null;
+  });
+}
+
+/**
+ * Règle une charge validée à crédit. La charge est verrouillée avant toute
+ * sortie de trésorerie : un second appel concurrent ne peut donc pas payer la
+ * même dette une seconde fois.
+ */
+export async function reglerChargeFournisseur(
+  cooperativeId: number,
+  id: number,
+  reglePar: number,
+  data: ReglerChargeFournisseurInput,
+) {
+  const comptesTresorerie = {
+    caisse: "571000",
+    banque: "521000",
+    mobile_marchand: "552000",
+  } as const;
+  const compteCreditTresorerie = comptesTresorerie[data.compteTresorerieType];
+  if (!compteCreditTresorerie || !Number.isInteger(data.compteTresorerieId) || data.compteTresorerieId <= 0) {
+    throw new Error("Un compte de trésorerie valide est requis pour régler la dette");
+  }
+  if (!data.dateReglement || !/^\d{4}-\d{2}-\d{2}$/.test(data.dateReglement)) {
+    throw new Error("La date de règlement est invalide");
+  }
+
+  return db.transaction(async (tx) => {
+    const [charge] = await tx
+      .select()
+      .from(chargesDiversesTable)
+      .where(and(
+        eq(chargesDiversesTable.id, id),
+        eq(chargesDiversesTable.cooperativeId, cooperativeId),
+        eq(chargesDiversesTable.statut, "valide"),
+        eq(chargesDiversesTable.modePaiement, "credit"),
+        eq(chargesDiversesTable.compteCredit, "401000"),
+        eq(chargesDiversesTable.montantRegleFcfa, 0),
+      ))
+      .for("update")
+      .limit(1);
+    if (!charge) return null;
+
+    const montant = Math.round(parseFloat(String(charge.montantFcfa)));
+    if (!Number.isFinite(montant) || montant <= 0) {
+      throw new Error("Le montant de la dette fournisseur est invalide");
+    }
+
+    const reference = data.reference?.trim() || `REG-CHD-${charge.id}`;
+    const libelle = `Règlement fournisseur — ${charge.libelle}`;
+
+    if (data.compteTresorerieType === "caisse") {
+      const [caisse] = await tx.select().from(caissesTable).where(and(
+        eq(caissesTable.id, data.compteTresorerieId),
+        eq(caissesTable.cooperativeId, cooperativeId),
+        eq(caissesTable.actif, true),
+      )).for("update").limit(1);
+      if (!caisse) throw new Error("Caisse introuvable ou inactive");
+
+      const [session] = await tx.select({ id: sessionsCaisseTable.id })
+        .from(sessionsCaisseTable)
+        .where(and(
+          eq(sessionsCaisseTable.caisseId, caisse.id),
+          eq(sessionsCaisseTable.dateSession, new Date().toISOString().slice(0, 10)),
+          eq(sessionsCaisseTable.statut, "ouverte"),
+        ))
+        .limit(1);
+      if (!session) throw new Error(`Aucune session ouverte sur la caisse "${caisse.nom}"`);
+
+      const solde = parseFloat(String(caisse.soldeActuelFcfa));
+      if (solde < montant) throw new Error(`Solde insuffisant en caisse (${solde.toLocaleString("fr-FR")} FCFA disponible)`);
+      const nouveauSolde = solde - montant;
+      await tx.insert(mouvementsCaisseTable).values({
+        caisseId: caisse.id,
+        sessionId: session.id,
+        cooperativeId,
+        type: "sortie",
+        motif: "paiement_fournisseur",
+        montantFcfa: montant.toString(),
+        libelle,
+        referenceOperation: reference,
+        dateOperation: data.dateReglement,
+        soldeApresFcfa: nouveauSolde.toString(),
+        enregistrePar: reglePar,
+      });
+      await tx.update(caissesTable)
+        .set({ soldeActuelFcfa: nouveauSolde.toString() })
+        .where(eq(caissesTable.id, caisse.id));
+    } else if (data.compteTresorerieType === "banque") {
+      const [banque] = await tx.select().from(comptesBancairesTable).where(and(
+        eq(comptesBancairesTable.id, data.compteTresorerieId),
+        eq(comptesBancairesTable.cooperativeId, cooperativeId),
+        eq(comptesBancairesTable.actif, true),
+      )).for("update").limit(1);
+      if (!banque) throw new Error("Compte bancaire introuvable ou inactif");
+
+      const solde = parseFloat(String(banque.soldeActuelFcfa));
+      if (solde < montant) throw new Error(`Solde bancaire insuffisant (${solde.toLocaleString("fr-FR")} FCFA disponible)`);
+      const nouveauSolde = solde - montant;
+      await tx.insert(mouvementsBanqueTable).values({
+        compteId: banque.id,
+        cooperativeId,
+        type: "debit",
+        motif: "paiement_fournisseur",
+        montantFcfa: montant.toString(),
+        libelle,
+        reference,
+        dateOperation: data.dateReglement,
+        dateValeur: null,
+        soldeApresFcfa: nouveauSolde.toString(),
+        enregistrePar: reglePar,
+      });
+      await tx.update(comptesBancairesTable)
+        .set({ soldeActuelFcfa: nouveauSolde.toString() })
+        .where(eq(comptesBancairesTable.id, banque.id));
+    } else {
+      const [mobile] = await tx.select().from(comptesMobilesMarchandsTable).where(and(
+        eq(comptesMobilesMarchandsTable.id, data.compteTresorerieId),
+        eq(comptesMobilesMarchandsTable.cooperativeId, cooperativeId),
+        eq(comptesMobilesMarchandsTable.actif, true),
+      )).for("update").limit(1);
+      if (!mobile) throw new Error("Compte Mobile Marchand introuvable ou inactif");
+
+      const solde = parseFloat(String(mobile.soldeActuelFcfa));
+      if (solde < montant) throw new Error(`Solde Mobile Marchand insuffisant (${solde.toLocaleString("fr-FR")} FCFA disponible)`);
+      const nouveauSolde = solde - montant;
+      await tx.insert(mouvementsMobileMarchandTable).values({
+        compteId: mobile.id,
+        cooperativeId,
+        type: "debit",
+        motif: "paiement_fournisseur",
+        montantFcfa: montant.toString(),
+        libelle,
+        reference,
+        dateOperation: data.dateReglement,
+        soldeApresFcfa: nouveauSolde.toString(),
+        enregistrePar: reglePar,
+      });
+      await tx.update(comptesMobilesMarchandsTable)
+        .set({ soldeActuelFcfa: nouveauSolde.toString() })
+        .where(eq(comptesMobilesMarchandsTable.id, mobile.id));
+    }
+
+    await proposerEcrituresDansTransaction(tx as ComptabiliteTransaction, cooperativeId, [{
+      source: "charges_diverses",
+      sourceId: charge.id,
+      libelle,
+      compteDebit: "401000",
+      compteCredit: compteCreditTresorerie,
+      montantFcfa: montant,
+      date: data.dateReglement,
+      numeroPiece: reference,
+    }]);
+
+    const [reglee] = await tx.update(chargesDiversesTable)
+      .set({
+        statut: "reglee",
+        montantRegleFcfa: montant,
+        dateReglement: data.dateReglement,
+        reglePar,
+        compteReglementId: data.compteTresorerieId,
+        compteReglementType: data.compteTresorerieType,
+        referenceReglement: reference,
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(chargesDiversesTable.id, id),
+        eq(chargesDiversesTable.cooperativeId, cooperativeId),
+        eq(chargesDiversesTable.statut, "valide"),
+        eq(chargesDiversesTable.montantRegleFcfa, 0),
+      ))
+      .returning();
+    return reglee ?? null;
   });
 }
 
