@@ -423,13 +423,14 @@ export async function getJournal(caisseId: number, opts?: { dateDebut?: string; 
   const result = await db.execute<{
     id: number; type: string; motif: string; montant_fcfa: string;
     libelle: string | null; reference_operation: string | null;
-    solde_apres_fcfa: string | null; created_at: string;
+    solde_apres_fcfa: string | null; date_operation: string; created_at: string;
     enregistre_par_nom: string | null; session_id: number | null;
     session_statut: string | null; date_session: string | null;
   }>(sql`
     SELECT
       m.id, m.type, m.motif, m.montant_fcfa,
       m.libelle, m.reference_operation, m.solde_apres_fcfa,
+      m.date_operation::text,
       m.created_at::text, m.session_id,
       u.nom AS enregistre_par_nom,
       s.statut AS session_statut, s.date_session::text
@@ -437,14 +438,8 @@ export async function getJournal(caisseId: number, opts?: { dateDebut?: string; 
     LEFT JOIN sessions_caisse s ON s.id = m.session_id
     LEFT JOIN users u ON u.id = m.enregistre_par
     WHERE m.caisse_id = ${caisseId}
-      AND (
-        s.date_session BETWEEN ${dateD} AND ${dateF}
-        OR (
-          m.session_id IS NULL
-          AND m.created_at::date BETWEEN ${dateD} AND ${dateF}
-        )
-      )
-    ORDER BY m.created_at, m.id
+      AND m.date_operation BETWEEN ${dateD} AND ${dateF}
+    ORDER BY m.date_operation, m.id
   `);
 
   const mvts = result.rows;
@@ -770,8 +765,8 @@ export async function genererRapportPdf(caisseId: number, dateSession?: string):
 
   // ── Tableau des mouvements
   doc.moveDown(0.5);
-  const headers = ["Heure", "Type", "Motif", "Libellé", "Effectué par", "Montant", "Solde"];
-  const colWidths = [42, 32, 75, 115, 72, 68, 72];
+  const headers = ["Date op.", "Type", "Motif", "Libellé", "Effectué par", "Montant", "Solde"];
+  const colWidths = [62, 32, 75, 115, 72, 68, 72];
   const tableX = margin;
   let tableY = doc.y;
 
@@ -800,7 +795,7 @@ export async function genererRapportPdf(caisseId: number, dateSession?: string):
       doc.save().rect(tableX, tableY, cW, 14).fillColor(bg).fill().restore();
       const entree = m.type === "entree";
       const cols = [
-        m.created_at?.slice(11, 16) ?? "—",
+        m.date_operation ?? "—",
         entree ? "Entrée" : "Sortie",
         m.motif.replace(/_/g, " "),
         m.libelle ?? "—",

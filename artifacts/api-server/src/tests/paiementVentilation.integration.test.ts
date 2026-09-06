@@ -424,6 +424,38 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
     );
   }
 
+  it("classe un mouvement selon sa date comptable et non sa date technique", async () => {
+    const reference = `DATE-OP-${process.pid}`;
+    await client.query(
+      `INSERT INTO mouvements_caisse
+        (caisse_id, session_id, cooperative_id, type, motif, montant_fcfa,
+         libelle, reference_operation, date_operation, solde_apres_fcfa, created_at)
+       VALUES ($1, $2, $3, 'entree', 'autre', 1234, $4, $5, $6, 10001234, $7)`,
+      [
+        caisseId,
+        sessionId,
+        cooperativeId,
+        "Mouvement redaté",
+        reference,
+        postgresPreviousDate,
+        `${postgresReferenceDate}T12:00:00Z`,
+      ],
+    );
+
+    const journal = await getJournal(caisseId, {
+      dateDebut: postgresPreviousDate,
+      dateFin: postgresPreviousDate,
+    });
+    const mouvement = journal.mouvements.find(
+      (row) => row.reference_operation === reference,
+    );
+
+    expect(mouvement).toMatchObject({
+      date_operation: postgresPreviousDate,
+      created_at: expect.stringContaining(postgresReferenceDate),
+    });
+  });
+
   it("expose un paiement espèces seul dans le Journal de caisse", async () => {
     const paymentId = await createPayment(125_000);
 

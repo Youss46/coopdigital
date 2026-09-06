@@ -46,7 +46,7 @@ interface Caisse {
 interface Mouvement {
   id: number; type: string; motif: string; montant_fcfa: string;
   libelle: string | null; solde_apres_fcfa: string | null;
-  created_at: string; enregistre_par_nom: string | null; session_id: number;
+  date_operation: string; created_at: string; enregistre_par_nom: string | null; session_id: number;
 }
 
 interface Session {
@@ -872,7 +872,7 @@ function JournalCaisse({
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 text-gray-500 text-xs">
-                  <th className="text-left px-4 py-3 font-medium">Heure</th>
+                  <th className="text-left px-4 py-3 font-medium">Date opération</th>
                   <th className="text-left px-4 py-3 font-medium">Type</th>
                   <th className="text-left px-4 py-3 font-medium">Motif</th>
                   <th className="text-left px-4 py-3 font-medium">Libellé</th>
@@ -884,7 +884,7 @@ function JournalCaisse({
               <tbody>
                 {journal.mouvements.map((m, i) => (
                   <tr key={m.id} className={`border-t border-gray-50 ${i % 2 === 1 ? "bg-gray-50/50" : ""}`}>
-                    <td className="px-4 py-3 text-gray-400 font-mono text-xs">{m.created_at?.slice(11, 16) ?? "—"}</td>
+                    <td className="px-4 py-3 text-gray-400 font-mono text-xs">{m.date_operation ?? "—"}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${m.type === "entree" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
                         {m.type === "entree" ? "↑ Entrée" : "↓ Sortie"}
@@ -1087,7 +1087,7 @@ function HistoriqueSessions({ caisses }: { caisses: Caisse[] | null }) {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 text-gray-500 text-xs">
-                    <th className="text-left px-3 py-2 font-medium">Heure</th>
+                    <th className="text-left px-3 py-2 font-medium">Date opération</th>
                     <th className="text-left px-3 py-2 font-medium">Type</th>
                     <th className="text-left px-3 py-2 font-medium">Motif</th>
                     <th className="text-left px-3 py-2 font-medium">Effectué par</th>
@@ -1098,7 +1098,7 @@ function HistoriqueSessions({ caisses }: { caisses: Caisse[] | null }) {
                 <tbody>
                   {detail.journal.mouvements.map((m) => (
                     <tr key={m.id} className="border-t border-gray-50">
-                      <td className="px-3 py-2 text-gray-400 font-mono text-xs">{m.created_at?.slice(11, 16)}</td>
+                      <td className="px-3 py-2 text-gray-400 font-mono text-xs">{m.date_operation ?? "—"}</td>
                       <td className="px-3 py-2">
                         <span className={`text-xs font-medium ${m.type === "entree" ? "text-green-600" : "text-red-600"}`}>
                           {m.type === "entree" ? "↑" : "↓"}
