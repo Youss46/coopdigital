@@ -538,8 +538,8 @@ describe.skipIf(!enabled)("auteur des sorties de salaires sur PostgreSQL", () =>
   let caisseId: number;
   let sessionId: number;
   let compteBancaireId: number;
-  let bulletinCaisseId: number;
-  let bulletinBanqueId: number;
+  let bulletinCaisseIds: number[];
+  let bulletinBanqueIds: number[];
   const suffix = `${process.pid}-${Date.now()}`;
 
   beforeAll(async () => {
@@ -603,14 +603,20 @@ describe.skipIf(!enabled)("auteur des sorties de salaires sur PostgreSQL", () =>
          (personnel_id, cooperative_id, mois, annee, periode,
           salaire_base_fcfa, salaire_brut_fcfa, salaire_net_fcfa,
           cout_total_employeur_fcfa, statut)
-       VALUES
-         ($1, $2, 1, 2026, 'janvier 2026', 1000, 1000, 1000, 1000, 'valide'),
-         ($1, $2, 2, 2026, 'février 2026', 2000, 2000, 2000, 2000, 'valide')
+      VALUES
+        ($1, $2, 1, 2026, 'janvier 2026', 1000, 1000, 1000, 1000, 'valide'),
+        ($1, $2, 2, 2026, 'février 2026', 1000, 1000, 1000, 1000, 'valide'),
+        ($1, $2, 3, 2026, 'mars 2026', 1000, 1000, 1000, 1000, 'valide'),
+        ($1, $2, 4, 2026, 'avril 2026', 1000, 1000, 1000, 1000, 'valide')
        RETURNING id, mois`,
       [personnelId, cooperativeId],
     );
-    bulletinCaisseId = bulletins.rows.find((row: { mois: number }) => row.mois === 1).id;
-    bulletinBanqueId = bulletins.rows.find((row: { mois: number }) => row.mois === 2).id;
+    bulletinCaisseIds = bulletins.rows
+      .filter((row: { mois: number }) => row.mois <= 2)
+      .map((row: { id: number }) => row.id);
+    bulletinBanqueIds = bulletins.rows
+      .filter((row: { mois: number }) => row.mois >= 3)
+      .map((row: { id: number }) => row.id);
 
     await pool.query(
       `INSERT INTO mouvements_caisse
@@ -668,27 +674,42 @@ describe.skipIf(!enabled)("auteur des sorties de salaires sur PostgreSQL", () =>
     return jwt.sign({ id: userId, role: "responsable_rh", cooperativeId }, secret);
   }
 
-  async function pay(bulletinId: number, compteSourceType: "caisse" | "banque", compteSourceId: number) {
-    return fetch(`${baseUrl}/salaires/bulletins/${bulletinId}/payer`, {
+  async function payGroup(
+    bulletinIds: number[],
+    compteSourceType: "caisse" | "banque",
+    compteSourceId: number,
+  ) {
+    return fetch(`${baseUrl}/salaires/bulletins/payer-groupe`, {
       method: "PUT",
       headers: {
         Authorization: `Bearer ${token()}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        bulletinIds,
         compteSourceType,
         compteSourceId,
-        referencePaiement: `SAL-${compteSourceType}-${suffix}`,
+        referencePaiement: `SAL-GROUPE-${compteSourceType}-${suffix}`,
       }),
     });
   }
 
-  it("conserve l'auteur authentifié pour les paiements caisse et banque, sans réécrire les historiques NULL", async () => {
-    const caisseResponse = await pay(bulletinCaisseId, "caisse", caisseId);
+  it("conserve l'auteur authentifié pour les paiements groupés caisse et banque, sans réécrire les historiques NULL", async () => {
+    const caisseResponse = await payGroup(bulletinCaisseIds, "caisse", caisseId);
     expect(caisseResponse.status).toBe(200);
+    await expect(caisseResponse.json()).resolves.toMatchObject({
+      payes: 2,
+      erreurs: [],
+      totalPaye: 2000,
+    });
 
-    const banqueResponse = await pay(bulletinBanqueId, "banque", compteBancaireId);
+    const banqueResponse = await payGroup(bulletinBanqueIds, "banque", compteBancaireId);
     expect(banqueResponse.status).toBe(200);
+    await expect(banqueResponse.json()).resolves.toMatchObject({
+      payes: 2,
+      erreurs: [],
+      totalPaye: 2000,
+    });
 
     const caisseMovements = await pool.query(
       `SELECT enregistre_par
@@ -699,6 +720,7 @@ describe.skipIf(!enabled)("auteur des sorties de salaires sur PostgreSQL", () =>
     );
     expect(caisseMovements.rows).toEqual([
       { enregistre_par: null },
+      { enregistre_par: userId },
       { enregistre_par: userId },
     ]);
 
@@ -711,6 +733,7 @@ describe.skipIf(!enabled)("auteur des sorties de salaires sur PostgreSQL", () =>
     );
     expect(banqueMovements.rows).toEqual([
       { enregistre_par: null },
+      { enregistre_par: userId },
       { enregistre_par: userId },
     ]);
   });
