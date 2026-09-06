@@ -32,5 +32,6 @@ router.post("/caisse/:id/virement-banque", checkPermission("caisse", "enregistre
 // ─── Journal & PDF ────────────────────────────────────────────────────────────
 router.get("/caisse/:id/journal",          checkPermission("caisse", "voir"),            ctrl.getJournal);
 router.get("/caisse/:id/rapport-pdf",      checkPermission("caisse", "voir"),            ctrl.getRapportPdf);
+router.get("/caisse/:id/journal/export",  checkPermission("caisse", "voir"),            ctrl.getJournalExcel);
 
 export default router;

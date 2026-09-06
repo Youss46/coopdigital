@@ -174,6 +174,25 @@ export async function getRapportPdf(req: Request, res: Response): Promise<void> 
   } catch (err) { req.log.error({ err }, "getRapportPdf"); res.status(500).json({ error: "Erreur serveur" }); }
 }
 
+// ─── Export tableur ────────────────────────────────────────────────────────────
+
+export async function getJournalExcel(req: Request, res: Response): Promise<void> {
+  try {
+    const id = parseInt(String(req.params["id"]), 10);
+    const { date_debut, date_fin } = req.query as Record<string, string | undefined>;
+    const buffer = await svc.genererJournalExcel(id, { dateDebut: date_debut, dateFin: date_fin });
+    const suffix = date_debut && date_fin && date_debut === date_fin
+      ? date_debut
+      : `${date_debut ?? "debut"}-${date_fin ?? "fin"}`;
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="journal-caisse-${suffix}.xlsx"`);
+    res.send(buffer);
+  } catch (err) {
+    req.log.error({ err }, "getJournalExcel");
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+}
+
 // ─── Soldes & Alertes ─────────────────────────────────────────────────────────
 
 export async function getSoldes(req: Request, res: Response): Promise<void> {

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { openPdfViewer } from "@/lib/pdfViewer";
-import { Wallet, Plus, RefreshCw, Lock, Unlock, Download, AlertTriangle, TrendingUp, TrendingDown, ChevronRight, X, CheckCircle2, Users, ArrowLeftRight, Building2 } from "lucide-react";
+import { Wallet, Plus, RefreshCw, Lock, Unlock, Download, FileSpreadsheet, AlertTriangle, TrendingUp, TrendingDown, ChevronRight, X, CheckCircle2, Users, ArrowLeftRight, Building2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { MoneyInput } from "@/components/ui/money-input";
 import { useAuth } from "@/contexts/AuthContext";
@@ -702,6 +702,7 @@ function JournalCaisse({
   const [modalMvt, setModalMvt] = useState(false);
   const [modalFermer, setModalFermer] = useState(false);
   const [modalVirementBanque, setModalVirementBanque] = useState(false);
+  const [excelLoading, setExcelLoading] = useState(false);
 
   // La liste des caisses arrive après le premier rendu. Sans cette
   // synchronisation, l'onglet ouvert directement reste sans caisse sélectionnée.
@@ -769,6 +770,36 @@ function JournalCaisse({
     }
   };
 
+  const telechargerExcel = async () => {
+    if (!caisseId || excelLoading) return;
+    setExcelLoading(true);
+    try {
+      const url = `${BASE}/api/caisse/${caisseId}/journal/export?date_debut=${encodeURIComponent(date)}&date_fin=${encodeURIComponent(date)}`;
+      const r = await fetch(url, { headers: { Authorization: `Bearer ${tok()}` } });
+      if (!r.ok) {
+        const json = await r.json().catch(() => null) as { error?: string } | null;
+        throw new Error(json?.error ?? `Erreur ${r.status}`);
+      }
+      const blob = await r.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = `journal-caisse-${date}.xlsx`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (e) {
+      toast({
+        title: "Export impossible",
+        description: e instanceof Error ? e.message : "Erreur lors du téléchargement",
+        variant: "destructive",
+      });
+    } finally {
+      setExcelLoading(false);
+    }
+  };
+
   const caisseSelectionnee = caisses?.find(c => c.id === caisseId);
   const sessionOuverte = caisseSelectionnee?.session_statut === "ouverte";
   const dernierSoldeMouvement = journal?.mouvements
@@ -826,14 +857,24 @@ function JournalCaisse({
             </>
           )}
           {journal && (
-            <button onClick={() => void telechargerPdf()}
-              disabled={pdfLoading}
-              className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
-              {pdfLoading
-                ? <RefreshCw size={14} className="animate-spin" />
-                : <Download size={14} />}
-              Télécharger PDF
-            </button>
+            <>
+              <button onClick={() => void telechargerPdf()}
+                disabled={pdfLoading}
+                className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                {pdfLoading
+                  ? <RefreshCw size={14} className="animate-spin" />
+                  : <Download size={14} />}
+                Télécharger PDF
+              </button>
+              <button onClick={() => void telechargerExcel()}
+                disabled={excelLoading}
+                className="flex items-center gap-1.5 px-3 py-2 border border-green-200 rounded-lg text-sm text-green-700 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                {excelLoading
+                  ? <RefreshCw size={14} className="animate-spin" />
+                  : <FileSpreadsheet size={14} />}
+                Télécharger tableur
+              </button>
+            </>
           )}
         </div>
       )}

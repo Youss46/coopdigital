@@ -2,6 +2,7 @@ import { db, caissesTable, sessionsCaisseTable, mouvementsCaisseTable, comptesMo
 import { eq, and, sql } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import PDFDocument from "pdfkit";
+import ExcelJS from "exceljs";
 import { proposerEcriture, proposerEcrituresDansTransaction } from "./comptabiliteService.js";
 import type { ComptabiliteTransaction } from "./comptabiliteService.js";
 import { drawHeader, drawFooter } from "./pdfHeaderService.js";
@@ -447,6 +448,63 @@ export async function getJournal(caisseId: number, opts?: { dateDebut?: string; 
   const totalSorties = mvts.filter(m => m.type === "sortie").reduce((s, m) => s + parseFloat(m.montant_fcfa), 0);
 
   return { mouvements: mvts, totalEntrees, totalSorties };
+}
+
+// ─── Export tableur du journal ─────────────────────────────────────────────────
+
+export async function genererJournalExcel(
+  caisseId: number,
+  opts?: { dateDebut?: string; dateFin?: string },
+): Promise<Buffer> {
+  const journal = await getJournal(caisseId, opts);
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "CoopDigital";
+  workbook.created = new Date();
+
+  const worksheet = workbook.addWorksheet("Journal de caisse");
+  worksheet.columns = [
+    { header: "Date comptable", key: "date_operation", width: 18 },
+    { header: "Type", key: "type", width: 14 },
+    { header: "Motif", key: "motif", width: 28 },
+    { header: "Libellé", key: "libelle", width: 42 },
+    { header: "Opérateur", key: "operateur", width: 24 },
+    { header: "Montant FCFA", key: "montant", width: 18 },
+    { header: "Solde après FCFA", key: "solde", width: 20 },
+  ];
+
+  const headerRow = worksheet.getRow(1);
+  headerRow.height = 22;
+  headerRow.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10 };
+  headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1A4731" } };
+  headerRow.alignment = { vertical: "middle", horizontal: "center" };
+
+  journal.mouvements.forEach((m, index) => {
+    const row = worksheet.addRow({
+      date_operation: m.date_operation,
+      type: m.type === "entree" ? "Entrée" : "Sortie",
+      motif: m.motif.replace(/_/g, " "),
+      libelle: m.libelle ?? "",
+      operateur: m.enregistre_par_nom?.trim() || "Système",
+      montant: Number.parseFloat(m.montant_fcfa) || 0,
+      solde: m.solde_apres_fcfa === null ? null : Number.parseFloat(m.solde_apres_fcfa) || 0,
+    });
+    row.font = { size: 9 };
+    if (index % 2 === 1) {
+      row.eachCell({ includeEmpty: true }, cell => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
+      });
+    }
+  });
+
+  worksheet.getColumn("montant").numFmt = "#,##0";
+  worksheet.getColumn("solde").numFmt = "#,##0";
+  worksheet.getColumn("montant").alignment = { horizontal: "right" };
+  worksheet.getColumn("solde").alignment = { horizontal: "right" };
+  worksheet.views = [{ state: "frozen", ySplit: 1 }];
+  worksheet.autoFilter = { from: "A1", to: "G1" };
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
 }
 
 // ─── Soldes temps réel ────────────────────────────────────────────────────────
