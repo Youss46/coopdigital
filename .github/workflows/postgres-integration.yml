@@ -30,6 +30,7 @@ jobs:
       DATABASE_URL: postgresql://test:test@localhost:5432/test
       RUN_POSTGRES_INTEGRATION: "1"
       POSTGRES_INTEGRATION_REFERENCE_DATE: "2026-08-29"
+      JWT_SECRET: "postgres-integration-test-secret"
 
     steps:
       - name: Checkout
