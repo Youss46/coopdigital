@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import type { Client } from "pg";
 
-type SchemaObjectKind = "table" | "column";
+type SchemaObjectKind = "table" | "column" | "index" | "constraint";
 
 type SchemaObject = {
   kind: SchemaObjectKind;
@@ -110,20 +110,43 @@ async function schemaObjectExists(
 
   if (!object.name) {
     throw new Error(
-      `Objet de schéma invalide : la colonne ${schema}.${object.table} doit avoir un nom`,
+      `Objet de schéma invalide : ${object.kind} ${schema}.${object.table} doit avoir un nom`,
     );
   }
 
-  const result = await client.query<{ exists: boolean }>(
-    `SELECT EXISTS (
-       SELECT 1
-       FROM information_schema.columns
-       WHERE table_schema = $1
-         AND table_name = $2
-         AND column_name = $3
-     ) AS exists`,
-    [schema, object.table, object.name],
-  );
+  const result =
+    object.kind === "column"
+      ? await client.query<{ exists: boolean }>(
+          `SELECT EXISTS (
+             SELECT 1
+             FROM information_schema.columns
+             WHERE table_schema = $1
+               AND table_name = $2
+               AND column_name = $3
+           ) AS exists`,
+          [schema, object.table, object.name],
+        )
+      : object.kind === "index"
+        ? await client.query<{ exists: boolean }>(
+            `SELECT EXISTS (
+               SELECT 1
+               FROM pg_catalog.pg_indexes
+               WHERE schemaname = $1
+                 AND tablename = $2
+                 AND indexname = $3
+             ) AS exists`,
+            [schema, object.table, object.name],
+          )
+        : await client.query<{ exists: boolean }>(
+            `SELECT EXISTS (
+               SELECT 1
+               FROM information_schema.table_constraints
+               WHERE constraint_schema = $1
+                 AND table_name = $2
+                 AND constraint_name = $3
+             ) AS exists`,
+            [schema, object.table, object.name],
+          );
   return result.rows[0]?.exists === true;
 }
 
@@ -140,7 +163,7 @@ export async function verifySchemaObjects(
       const label =
         object.kind === "table"
           ? `table ${schema}.${object.table}`
-          : `column ${schema}.${object.table}.${object.name}`;
+          : `${object.kind} ${schema}.${object.table}.${object.name}`;
       if (!(await schemaObjectExists(client, object))) {
         missing.push(`${check.migration} → ${label}`);
       }

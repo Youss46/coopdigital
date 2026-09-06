@@ -1,6 +1,94 @@
 {
-  "enforceFromMigration": "0162_retenue_avances_commissions",
+  "enforceFromMigration": "0161_plan_comptable_unique_actif",
   "checks": [
+    {
+      "migration": "0070_sessions_pesee_unique_en_cours",
+      "objects": [
+        {
+          "kind": "index",
+          "schema": "public",
+          "table": "sessions_pesee",
+          "name": "sessions_pesee_unique_en_cours"
+        }
+      ]
+    },
+    {
+      "migration": "0118_session_pesee_bon_reception_unique",
+      "objects": [
+        {
+          "kind": "index",
+          "schema": "public",
+          "table": "sessions_pesee",
+          "name": "sessions_pesee_bon_reception_unique"
+        }
+      ]
+    },
+    {
+      "migration": "0147_paiements_date_validation_obligatoire",
+      "objects": [
+        {
+          "kind": "constraint",
+          "schema": "public",
+          "table": "paiements",
+          "name": "paiements_confirmes_date_validation_check"
+        }
+      ]
+    },
+    {
+      "migration": "0151_numeros_recus_par_cooperative",
+      "objects": [
+        {
+          "kind": "constraint",
+          "schema": "public",
+          "table": "paiements",
+          "name": "paiements_cooperative_numero_recu_unique"
+        }
+      ]
+    },
+    {
+      "migration": "0153_exiger_numero_reglement",
+      "objects": [
+        {
+          "kind": "constraint",
+          "schema": "public",
+          "table": "paiements",
+          "name": "paiements_cooperative_numero_recu_check"
+        }
+      ]
+    },
+    {
+      "migration": "0154_numerotation_livraisons_canonique",
+      "objects": [
+        {
+          "kind": "constraint",
+          "schema": "public",
+          "table": "livraisons",
+          "name": "livraisons_cooperative_annee_numero_pesee_unique"
+        }
+      ]
+    },
+    {
+      "migration": "0155_exiger_numerotation_livraisons",
+      "objects": [
+        {
+          "kind": "constraint",
+          "schema": "public",
+          "table": "livraisons",
+          "name": "livraisons_numero_pesee_complet_check"
+        }
+      ]
+    },
+    {
+      "migration": "0161_plan_comptable_unique_actif",
+      "objects": [
+        {
+          "kind": "index",
+          "schema": "public",
+          "table": "plan_comptable",
+          "name": "plan_comptable_cooperative_numero_actif_unique"
+        }
+      ]
+    },
     {
       "migration": "0162_retenue_avances_commissions",
       "objects": [
