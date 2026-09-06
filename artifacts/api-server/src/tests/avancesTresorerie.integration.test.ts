@@ -2,7 +2,7 @@ import express from "express";
 import type { Server } from "node:http";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { pool } from "@workspace/db";
-import { createAvance } from "../controllers/avancesController.js";
+import { createAvance, rembourserAvance } from "../controllers/avancesController.js";
 
 const enabled =
   process.env.RUN_POSTGRES_INTEGRATION === "1" &&
@@ -106,6 +106,7 @@ describe.skipIf(!enabled)("octroi d'avances et trésorerie sur PostgreSQL", () =
       next();
     });
     app.post("/avances", createAvance);
+    app.post("/avances/:id/rembourser", rembourserAvance);
 
     await new Promise<void>((resolve, reject) => {
       server = app.listen(0, "127.0.0.1", (error?: Error) => {
@@ -145,6 +146,11 @@ describe.skipIf(!enabled)("octroi d'avances et trésorerie sur PostgreSQL", () =
       await client.query(
         `DELETE FROM mouvements_banque WHERE cooperative_id = $1`,
         [cooperativeId],
+      );
+      await client.query(
+        `DELETE FROM remboursements_avances_membres
+         WHERE avance_id IN (SELECT id FROM avances WHERE membre_id = $1)`,
+        [membreId],
       );
       await client.query(
         `DELETE FROM sessions_caisse WHERE cooperative_id = $1`,
@@ -206,6 +212,11 @@ describe.skipIf(!enabled)("octroi d'avances et trésorerie sur PostgreSQL", () =
       await client.query(
         `DELETE FROM mouvements_banque WHERE cooperative_id = $1`,
         [cooperativeId],
+      );
+      await client.query(
+        `DELETE FROM remboursements_avances_membres
+         WHERE avance_id IN (SELECT id FROM avances WHERE membre_id = $1)`,
+        [membreId],
       );
       await client.query(
         `DELETE FROM sessions_caisse WHERE cooperative_id = $1`,
@@ -313,6 +324,21 @@ describe.skipIf(!enabled)("octroi d'avances et trésorerie sur PostgreSQL", () =
     };
   }
 
+  async function requestRepayment(
+    avanceId: number,
+    amount: number,
+  ): Promise<{ status: number; body: Record<string, unknown> }> {
+    const response = await fetch(`${baseUrl}/avances/${avanceId}/rembourser`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ montantFcfa: amount, note: "Remboursement intégré" }),
+    });
+    return {
+      status: response.status,
+      body: await response.json() as Record<string, unknown>,
+    };
+  }
+
   async function balance(kind: TreasuryKind, accountId: number): Promise<string> {
     const table = kind === "caisse"
       ? "caisses"
@@ -364,6 +390,48 @@ describe.skipIf(!enabled)("octroi d'avances et trésorerie sur PostgreSQL", () =
       }
     },
   );
+
+  it("attribue le remboursement manuel à l'opérateur sans attribuer artificiellement l'historique", async () => {
+    const caisseId = await createTreasury("caisse", 1_000);
+    const avanceResponse = await requestAdvance("caisse", caisseId, 300);
+    expect(avanceResponse.status).toBe(201);
+    const avanceId = Number(avanceResponse.body.id);
+    expect(Number.isInteger(avanceId)).toBe(true);
+
+    const remboursementResponse = await requestRepayment(avanceId, 120);
+    expect(remboursementResponse.status).toBe(200);
+
+    const manualMovement = await client.query(
+      `SELECT enregistre_par, montant_fcfa, motif
+       FROM mouvements_caisse
+       WHERE cooperative_id = $1
+         AND reference_operation LIKE $2
+       ORDER BY id DESC
+       LIMIT 1`,
+      [cooperativeId, `AVA-${avanceId}-RMB-%`],
+    );
+    expect(manualMovement.rows).toEqual([{
+      enregistre_par: userId,
+      montant_fcfa: "120",
+      motif: "remboursement",
+    }]);
+
+    await client.query(
+      `INSERT INTO mouvements_caisse
+         (caisse_id, cooperative_id, type, motif, montant_fcfa,
+          libelle, reference_operation, solde_apres_fcfa, enregistre_par)
+       VALUES ($1, $2, 'entree', 'remboursement', 25,
+               'Remboursement historique', $3, 1120, NULL)`,
+      [caisseId, cooperativeId, `HIST-AVA-${avanceId}`],
+    );
+    const historicalMovement = await client.query(
+      `SELECT enregistre_par
+       FROM mouvements_caisse
+       WHERE reference_operation = $1`,
+      [`HIST-AVA-${avanceId}`],
+    );
+    expect(historicalMovement.rows).toEqual([{ enregistre_par: null }]);
+  });
 
   it("refuse un compte d'une autre coopérative sans créer d'avance ni de mouvement", async () => {
     const result = await requestAdvance("banque", foreignAccountId, 300);
