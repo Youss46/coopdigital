@@ -3,6 +3,7 @@ import type { Server } from "node:http";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { pool } from "@workspace/db";
 import { createAvance, rembourserAvance } from "../controllers/avancesController.js";
+import { getJournal } from "../services/caisseService.js";
 
 const enabled =
   process.env.RUN_POSTGRES_INTEGRATION === "1" &&
@@ -431,6 +432,24 @@ describe.skipIf(!enabled)("octroi d'avances et trésorerie sur PostgreSQL", () =
       [`HIST-AVA-${avanceId}`],
     );
     expect(historicalMovement.rows).toEqual([{ enregistre_par: null }]);
+
+    const dateOperation = new Date().toISOString().slice(0, 10);
+    const journal = await getJournal(caisseId, {
+      dateDebut: dateOperation,
+      dateFin: dateOperation,
+    });
+    expect(journal.mouvements).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        reference_operation: expect.stringMatching(new RegExp(`^AVA-${avanceId}-RMB-`)),
+        motif: "remboursement",
+        enregistre_par_nom: "Auteur",
+      }),
+      expect.objectContaining({
+        reference_operation: `HIST-AVA-${avanceId}`,
+        motif: "remboursement",
+        enregistre_par_nom: null,
+      }),
+    ]));
   });
 
   it("refuse un compte d'une autre coopérative sans créer d'avance ni de mouvement", async () => {
