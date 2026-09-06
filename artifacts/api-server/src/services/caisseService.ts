@@ -174,6 +174,8 @@ export interface MouvementInput {
   montantFcfa: number;
   libelle?: string;
   referenceOperation?: string;
+  /** Date comptable de l'opération; absente, la base applique sa date du jour. */
+  dateOperation?: string;
   userId?: number;
   cooperativeId?: number;
   /** Remplace le compte débit calculé depuis le motif (ex: dette producteur configurée ou 6042) */
@@ -233,6 +235,7 @@ export async function enregistrerMouvement(
       montantFcfa: montant.toString(),
       libelle: data.libelle ?? null,
       referenceOperation: data.referenceOperation ?? null,
+      ...(data.dateOperation !== undefined ? { dateOperation: data.dateOperation } : {}),
       soldeApresFcfa: nouveauSolde.toString(),
       enregistrePar: data.userId ?? null,
     }).returning();
@@ -253,7 +256,7 @@ export async function enregistrerMouvement(
         compteDebit: data.compteDebitOverride ?? comptes.debit,
         compteCredit:comptes.credit,
         montantFcfa: montant,
-        date:        today(),
+        date:        data.dateOperation ?? today(),
       }]);
     }
 

@@ -112,6 +112,7 @@ function ModalMouvement({ caisseId, onClose, onDone }: { caisseId: number; onClo
   const [motif, setMotif] = useState("");
   const [montant, setMontant] = useState("");
   const [libelle, setLibelle] = useState("");
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [loading, setLoading] = useState(false);
 
   const motifs = type === "entree" ? MOTIFS_ENTREE : MOTIFS_SORTIE;
@@ -125,7 +126,9 @@ function ModalMouvement({ caisseId, onClose, onDone }: { caisseId: number; onClo
       const r = await fetch(`${BASE}/api/caisse/${caisseId}/mouvement`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok()}` },
-        body: JSON.stringify({ type, motif, montantFcfa: parseInt(montant), libelle }),
+         body: JSON.stringify({
+           type, motif, montantFcfa: parseInt(montant), libelle, dateOperation: date,
+         }),
       });
       const json = await r.json();
       if (!r.ok) throw new Error(json.error ?? "Erreur");
@@ -171,6 +174,12 @@ function ModalMouvement({ caisseId, onClose, onDone }: { caisseId: number; onClo
             <MoneyInput value={montant} onChange={(raw) => setMontant(raw)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               placeholder="Ex: 50 000" />
+          </div>
+          {/* Date comptable */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Date opération</label>
+            <input type="date" value={date} onChange={e => setDate(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
           </div>
           {/* Libellé */}
           <div>

@@ -93,6 +93,24 @@ describe.skipIf(!enabled)(
         reference_operation: "EXPLICIT-001",
         date_operation: "2023-06-17",
       });
+
+      const correctionSansDate = await client.query(
+        `UPDATE mouvements_caisse
+            SET motif = $2
+          WHERE id = $1
+        RETURNING date_operation::text AS date_operation`,
+        [insertionDatee.rows[0].id, "regularisation_corrigee"],
+      );
+      expect(correctionSansDate.rows[0].date_operation).toBe("2023-06-17");
+
+      const correctionAvecDate = await client.query(
+        `UPDATE mouvements_caisse
+            SET motif = $2, date_operation = $3
+          WHERE id = $1
+        RETURNING date_operation::text AS date_operation`,
+        [insertionDatee.rows[0].id, "regularisation_redatee", "2023-06-18"],
+      );
+      expect(correctionAvecDate.rows[0].date_operation).toBe("2023-06-18");
     });
   },
 );

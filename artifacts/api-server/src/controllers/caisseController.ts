@@ -92,14 +92,16 @@ export async function postMouvement(req: Request, res: Response): Promise<void> 
   try {
     const id     = parseInt(String(req.params["id"]), 10);
     const userId = (req as Request & { user?: { id: number } }).user?.id;
-    const { type, motif, montantFcfa, libelle, referenceOperation } = req.body as {
+    const { type, motif, montantFcfa, libelle, referenceOperation, dateOperation } = req.body as {
       type: "entree" | "sortie"; motif: string; montantFcfa: number;
-      libelle?: string; referenceOperation?: string;
+      libelle?: string; referenceOperation?: string; dateOperation?: string;
     };
     if (!type || !motif || !montantFcfa) {
       res.status(400).json({ error: "type, motif et montantFcfa requis" }); return;
     }
-    const result = await svc.enregistrerMouvement(id, { type, motif, montantFcfa, libelle, referenceOperation, userId });
+    const result = await svc.enregistrerMouvement(id, {
+      type, motif, montantFcfa, libelle, referenceOperation, dateOperation, userId,
+    });
     res.status(201).json(result);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Erreur serveur";
