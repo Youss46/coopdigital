@@ -86,6 +86,25 @@ describe.skipIf(!enabled)("contrôles du schéma PostgreSQL", () => {
        CREATE TABLE ${qualifiedIdentifier(schemaName, "mouvements_caisse")} (
          id integer NOT NULL,
          date_operation date
+        );
+        CREATE TABLE ${qualifiedIdentifier(schemaName, "charges_diverses")} (
+          id integer NOT NULL,
+          cooperative_id integer NOT NULL
+        );
+        CREATE INDEX ${quoteIdentifier("charges_diverses_dettes_fournisseurs_idx")}
+          ON ${qualifiedIdentifier(schemaName, "charges_diverses")}
+          (cooperative_id);
+        CREATE TABLE ${qualifiedIdentifier(schemaName, "reglements_cartes_producteurs")} (
+          id integer NOT NULL,
+          paiement_id integer NOT NULL,
+          cooperative_id integer NOT NULL,
+          statut text NOT NULL
+        );
+        CREATE UNIQUE INDEX ${quoteIdentifier("reglements_cartes_producteurs_paiement_unique")}
+          ON ${qualifiedIdentifier(schemaName, "reglements_cartes_producteurs")} (paiement_id);
+        CREATE INDEX ${quoteIdentifier("reglements_cartes_producteurs_cooperative_statut_idx")}
+          ON ${qualifiedIdentifier(schemaName, "reglements_cartes_producteurs")}
+          (cooperative_id, statut)
        );`,
     );
   });

@@ -110,6 +110,39 @@
           "name": "date_operation"
         }
       ]
+    },
+    {
+      "migration": "0164_reglement_charges_credit",
+      "objects": [
+        {
+          "kind": "index",
+          "schema": "public",
+          "table": "charges_diverses",
+          "name": "charges_diverses_dettes_fournisseurs_idx"
+        }
+      ]
+    },
+    {
+      "migration": "0165_reglements_cartes_producteurs",
+      "objects": [
+        {
+          "kind": "table",
+          "schema": "public",
+          "table": "reglements_cartes_producteurs"
+        },
+        {
+          "kind": "index",
+          "schema": "public",
+          "table": "reglements_cartes_producteurs",
+          "name": "reglements_cartes_producteurs_paiement_unique"
+        },
+        {
+          "kind": "index",
+          "schema": "public",
+          "table": "reglements_cartes_producteurs",
+          "name": "reglements_cartes_producteurs_cooperative_statut_idx"
+        }
+      ]
     }
   ]
 }
