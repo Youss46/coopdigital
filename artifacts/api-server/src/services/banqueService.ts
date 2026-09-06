@@ -437,7 +437,7 @@ export async function debitBanqueForSalaire(
   userId: number | null,
   tx?: ComptabiliteTransaction,
 ): Promise<{ nouveauSolde: number; alerte?: string }> {
-  const debit = async (executor: ComptabiliteTransaction) => {
+  const enregistrer = async (executor: ComptabiliteTransaction) => {
     const [compte] = await executor
       .select()
       .from(comptesBancairesTable)
@@ -485,7 +485,7 @@ export async function debitBanqueForSalaire(
     return { nouveauSolde, alerte };
   };
 
-  return tx ? debit(tx) : db.transaction(debit);
+  return tx ? enregistrer(tx) : db.transaction(enregistrer);
 }
 
 // ─── Alertes solde ────────────────────────────────────────────────────────────

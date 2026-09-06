@@ -53,8 +53,16 @@ export function formatMontantPdf(n: number | string): string {
   return `${formatted} FCFA`;
 }
 
-async function getCaisse(id: number) {
-  const rows = await db.select().from(caissesTable).where(eq(caissesTable.id, id)).limit(1);
+async function getCaisse(
+  id: number,
+  executor: typeof db | ComptabiliteTransaction = db,
+  forUpdate = false,
+) {
+  const query = executor
+    .select()
+    .from(caissesTable)
+    .where(eq(caissesTable.id, id));
+  const rows = await (forUpdate ? query.for("update") : query).limit(1);
   return rows[0] ?? null;
 }
 
@@ -1190,56 +1198,52 @@ export async function debitCaisseForSalaire(
   userId: number | null,
   tx?: ComptabiliteTransaction,
 ): Promise<{ nouveauSolde: number; alerte?: string }> {
-  const executor = tx ?? db;
-  const [caisse] = await executor
-    .select()
-    .from(caissesTable)
-    .where(and(
-      eq(caissesTable.id, caisseId),
-      eq(caissesTable.cooperativeId, cooperativeId),
-    ))
-    .for("update")
-    .limit(1);
-  if (!caisse) throw new Error("Caisse introuvable");
+  const enregistrer = async (executor: typeof db | ComptabiliteTransaction) => {
+    const caisse = await getCaisse(caisseId, executor, true);
+    if (!caisse) throw new Error("Caisse introuvable");
+    if (caisse.cooperativeId !== cooperativeId) throw new Error("Accès refusé");
 
-  const sessionRow = await getSessionActive(caisseId, executor);
-  if (!sessionRow) {
-    throw new Error(
-      `Aucune session de caisse ouverte. Ouvrez une session dans la page Caisse avant de payer un salaire en espèces.`,
-    );
-  }
+    const sessionRow = await getSessionActive(caisseId, executor);
+    if (!sessionRow) {
+      throw new Error(
+        `Aucune session de caisse ouverte. Ouvrez une session dans la page Caisse avant de payer un salaire en espèces.`,
+      );
+    }
 
-  const montant = Math.round(montantFcfa);
-  const soldeActuel = parseFloat(caisse.soldeActuelFcfa as string);
-  if (soldeActuel < montant) {
-    throw new Error(`Solde insuffisant en caisse. Disponible : ${soldeActuel.toLocaleString("fr-FR")} FCFA`);
-  }
-  const nouveauSolde = soldeActuel - montant;
+    const montant = Math.round(montantFcfa);
+    const soldeActuel = parseFloat(caisse.soldeActuelFcfa as string);
+    if (soldeActuel < montant) {
+      throw new Error(`Solde insuffisant en caisse. Disponible : ${soldeActuel.toLocaleString("fr-FR")} FCFA`);
+    }
+    const nouveauSolde = soldeActuel - montant;
 
-  await executor.insert(mouvementsCaisseTable).values({
-    caisseId,
-    sessionId: sessionRow.id,
-    cooperativeId,
-    type: "sortie",
-    motif: "paiement_salaire",
-    montantFcfa: montant.toString(),
-    libelle,
-    referenceOperation: reference ?? null,
-    soldeApresFcfa: nouveauSolde.toString(),
-    enregistrePar: userId,
-  });
+    await executor.insert(mouvementsCaisseTable).values({
+      caisseId,
+      sessionId: sessionRow.id,
+      cooperativeId,
+      type: "sortie",
+      motif: "paiement_salaire",
+      montantFcfa: montant.toString(),
+      libelle,
+      referenceOperation: reference ?? null,
+      soldeApresFcfa: nouveauSolde.toString(),
+      enregistrePar: userId,
+    });
 
-  await executor.update(caissesTable)
-    .set({ soldeActuelFcfa: nouveauSolde.toString() })
-    .where(eq(caissesTable.id, caisseId));
+    await executor.update(caissesTable)
+      .set({ soldeActuelFcfa: nouveauSolde.toString() })
+      .where(eq(caissesTable.id, caisseId));
 
-  const fondMin = parseFloat(caisse.fondCaisseMinimumFcfa as string);
-  let alerte: string | undefined;
-  if (fondMin > 0 && nouveauSolde < fondMin) {
-    alerte = `⚠️ Solde caisse sous le fond minimum (${fondMin.toLocaleString("fr-FR")} FCFA)`;
-    logger.warn({ caisseId, nouveauSolde, fondMin }, "Caisse sous fond minimum après paiement salaire");
-  }
+    const fondMin = parseFloat(caisse.fondCaisseMinimumFcfa as string);
+    let alerte: string | undefined;
+    if (fondMin > 0 && nouveauSolde < fondMin) {
+      alerte = `⚠️ Solde caisse sous le fond minimum (${fondMin.toLocaleString("fr-FR")} FCFA)`;
+      logger.warn({ caisseId, nouveauSolde, fondMin }, "Caisse sous fond minimum après paiement salaire");
+    }
 
-  logger.info({ caisseId, montant, nouveauSolde }, "Caisse débitée (paiement salaire)");
-  return { nouveauSolde, alerte };
+    logger.info({ caisseId, montant, nouveauSolde }, "Caisse débitée (paiement salaire)");
+    return { nouveauSolde, alerte };
+  };
+
+  return tx ? enregistrer(tx) : db.transaction(enregistrer);
 }

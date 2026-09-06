@@ -662,7 +662,11 @@ export async function generateEcrituresSalaire(cooperativeId: number, params: {
   cotisationsSalarieFcfa: number;
   datePaiement: string;
   compteCredit?: string;
-}) {
+}, tx?: ComptabiliteTransaction) {
+  if (tx) {
+    return generateEcrituresSalaireDansTransaction(tx, cooperativeId, params);
+  }
+
   const { bulletinId, personnelNom, personnelId, salaireNetFcfa, salaireBrutFcfa, cotisationsSalarieFcfa, datePaiement, compteCredit = "521" } = params;
   const piece = `SAL-${bulletinId}`;
   const tiers = personnelId ? { tiersId: personnelId, tiersType: "personnel" as const } : {};
@@ -699,6 +703,80 @@ export async function generateEcrituresSalaire(cooperativeId: number, params: {
   }
 
   await Promise.all(promises);
+}
+
+/**
+ * Variante transactionnelle du paiement d'un bulletin.
+ * Les écritures sont ajoutées au même client que le débit de trésorerie et le
+ * changement de statut afin qu'une erreur annule tout le groupe.
+ */
+export async function generateEcrituresSalaireDansTransaction(
+  tx: ComptabiliteTransaction,
+  cooperativeId: number,
+  params: {
+    bulletinId: number;
+    personnelNom: string;
+    personnelId?: number;
+    salaireNetFcfa: number;
+    salaireBrutFcfa: number;
+    cotisationsSalarieFcfa: number;
+    datePaiement: string;
+    compteCredit?: string;
+  },
+): Promise<void> {
+  const {
+    bulletinId,
+    personnelNom,
+    personnelId,
+    salaireNetFcfa,
+    salaireBrutFcfa,
+    cotisationsSalarieFcfa,
+    datePaiement,
+    compteCredit = "521",
+  } = params;
+  const piece = `SAL-${bulletinId}`;
+  const tiers = personnelId ? { tiersId: personnelId, tiersType: "personnel" as const } : {};
+  const [cBrut, cNet] = await Promise.all([
+    resolveComptes(cooperativeId, "salaires", "salaire_brut", "661", "421"),
+    resolveComptes(cooperativeId, "salaires", "paiement_salaire", "421", compteCredit),
+  ]);
+  const payloads: Parameters<typeof proposerEcrituresDansTransaction>[2] = [
+    {
+      source: "salaire",
+      sourceId: bulletinId,
+      libelle: `Charge de personnel – ${personnelNom}`,
+      compteDebit: cBrut.compteDebit,
+      compteCredit: cBrut.compteCredit,
+      montantFcfa: salaireBrutFcfa,
+      date: datePaiement,
+      numeroPiece: piece,
+    },
+    {
+      source: "salaire",
+      sourceId: bulletinId,
+      libelle: `Versement salaire net – ${personnelNom}`,
+      compteDebit: cNet.compteDebit,
+      compteCredit,
+      montantFcfa: salaireNetFcfa,
+      date: datePaiement,
+      numeroPiece: piece,
+      ...tiers,
+    },
+  ];
+  if (cotisationsSalarieFcfa > 0) {
+    const cCotis = await resolveComptes(cooperativeId, "salaires", "cotisations_salarie", "431", "421");
+    payloads.push({
+      source: "salaire",
+      sourceId: bulletinId,
+      libelle: `Cotisations CNPS salarié – ${personnelNom}`,
+      compteDebit: cCotis.compteDebit,
+      compteCredit: cCotis.compteCredit,
+      montantFcfa: cotisationsSalarieFcfa,
+      date: datePaiement,
+      numeroPiece: piece,
+    });
+  }
+  await proposerEcrituresDansTransaction(tx, cooperativeId, payloads);
 }
 
 /**

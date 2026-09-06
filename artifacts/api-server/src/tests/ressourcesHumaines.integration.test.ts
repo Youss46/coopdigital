@@ -804,4 +804,70 @@ describe.skipIf(!enabled)("auteur des sorties de salaires sur PostgreSQL", () =>
     );
     expect(Number(after.rows[0].solde_actuel_fcfa)).toBe(beforeSolde - 2000);
   });
+
+  it("annule tout le groupe quand le second débit de caisse échoue", async () => {
+    const bulletins = await pool.query(
+      `INSERT INTO bulletins_paie
+         (personnel_id, cooperative_id, mois, annee, periode,
+          salaire_base_fcfa, salaire_brut_fcfa, salaire_net_fcfa,
+          cout_total_employeur_fcfa, statut)
+       VALUES
+        ($1, $2, 7, 2026, 'juillet 2026', 1000, 1000, 1000, 1000, 'valide'),
+        ($1, $2, 8, 2026, 'août 2026', 1000, 1000, 1000, 1000, 'valide')
+       RETURNING id
+      `,
+      [personnelId, cooperativeId],
+    );
+    const ids = bulletins.rows.map((row: { id: number }) => row.id);
+
+    await pool.query(
+      `UPDATE caisses SET solde_actuel_fcfa = 1500 WHERE id = $1`,
+      [caisseId],
+    );
+    const mouvementsAvant = await pool.query(
+      `SELECT count(*)::int AS count
+       FROM mouvements_caisse
+       WHERE cooperative_id = $1 AND motif = 'paiement_salaire'`,
+      [cooperativeId],
+    );
+
+    const response = await payGroup(ids, "caisse", caisseId);
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toMatchObject({ erreur: "Erreur interne" });
+
+    const bulletinsApres = await pool.query(
+      `SELECT id, statut
+       FROM bulletins_paie
+       WHERE id = ANY($1::int[])
+       ORDER BY id`,
+      [ids],
+    );
+    expect(bulletinsApres.rows).toEqual(ids.map((id) => ({ id, statut: "valide" })));
+
+    const caisseApres = await pool.query(
+      `SELECT solde_actuel_fcfa
+       FROM caisses
+       WHERE id = $1`,
+      [caisseId],
+    );
+    expect(Number(caisseApres.rows[0].solde_actuel_fcfa)).toBe(1500);
+
+    const mouvementsApres = await pool.query(
+      `SELECT count(*)::int AS count
+       FROM mouvements_caisse
+       WHERE cooperative_id = $1 AND motif = 'paiement_salaire'`,
+      [cooperativeId],
+    );
+    expect(mouvementsApres.rows[0].count).toBe(mouvementsAvant.rows[0].count);
+
+    const ecritures = await pool.query(
+      `SELECT count(*)::int AS count
+       FROM ecritures_comptables
+       WHERE cooperative_id = $1
+         AND source = 'salaire'
+         AND source_id = ANY($2::int[])`,
+      [cooperativeId, ids],
+    );
+    expect(ecritures.rows[0].count).toBe(0);
+  });
 });
