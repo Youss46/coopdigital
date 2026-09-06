@@ -8,6 +8,13 @@ const mockDb = vi.hoisted(() => ({
   transaction: vi.fn(),
 }));
 
+const drizzleMocks = vi.hoisted(() => ({
+  and: vi.fn((...conditions: unknown[]) => ({ conditions })),
+  desc: vi.fn(() => ({})),
+  eq: vi.fn((left: unknown, right: unknown) => ({ left, right })),
+  sql: vi.fn(() => ({})),
+}));
+
 const tables = vi.hoisted(() => ({
   comptesMobilesMarchandsTable: {
     id: {},
@@ -57,10 +64,7 @@ vi.mock("@workspace/db", () => ({
 }));
 
 vi.mock("drizzle-orm", () => ({
-  and: vi.fn(() => ({})),
-  desc: vi.fn(() => ({})),
-  eq: vi.fn(() => ({})),
-  sql: vi.fn(() => ({})),
+  ...drizzleMocks,
 }));
 
 vi.mock("../services/comptabiliteService.js", () => ({
@@ -272,6 +276,26 @@ describe("journal Mobile Marchand", () => {
         enregistre_par_nom: null,
       }),
     ]);
+  });
+
+  it("ne renvoie aucune ligne pour un compte d'une autre coopérative", async () => {
+    const chain = journalChain([]);
+    mockDb.select.mockReturnValue(chain);
+
+    const res = makeResponse();
+    await getJournal(makeRequest(), res);
+
+    expect(res.json).toHaveBeenCalledWith([]);
+    expect(drizzleMocks.and).toHaveBeenCalledWith(
+      { left: tables.mouvementsMobileMarchandTable.compteId, right: 9 },
+      { left: tables.mouvementsMobileMarchandTable.cooperativeId, right: 12 },
+    );
+    expect(chain.where).toHaveBeenCalledWith({
+      conditions: [
+        { left: tables.mouvementsMobileMarchandTable.compteId, right: 9 },
+        { left: tables.mouvementsMobileMarchandTable.cooperativeId, right: 12 },
+      ],
+    });
   });
 
   it.each([
