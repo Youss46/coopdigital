@@ -1,0 +1,27 @@
+{
+  "enforceFromMigration": "0162_retenue_avances_commissions",
+  "checks": [
+    {
+      "migration": "0162_retenue_avances_commissions",
+      "objects": [
+        {
+          "kind": "column",
+          "schema": "public",
+          "table": "commissions_membres_delegues",
+          "name": "retenue_avances_fcfa"
+        }
+      ]
+    },
+    {
+      "migration": "0163_date_operation_mouvements_caisse",
+      "objects": [
+        {
+          "kind": "column",
+          "schema": "public",
+          "table": "mouvements_caisse",
+          "name": "date_operation"
+        }
+      ]
+    }
+  ]
+}

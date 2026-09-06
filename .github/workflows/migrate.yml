@@ -43,10 +43,7 @@ jobs:
           DATABASE_URL: ${{ secrets.RAILWAY_DATABASE_URL }}
         run: pnpm run ci-migrate
 
-      - name: Vérifier date_operation sur mouvements_caisse
+      - name: Vérifier les objets critiques du schéma Railway (lecture seule)
         env:
           DATABASE_URL: ${{ secrets.RAILWAY_DATABASE_URL }}
-        run: |
-          count="$(psql "$DATABASE_URL" -Atqc "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'mouvements_caisse' AND column_name = 'date_operation';")"
-          test "$count" = "1"
-          echo "✅ mouvements_caisse.date_operation est présente en production"
+        run: pnpm --filter @workspace/db run verify-schema

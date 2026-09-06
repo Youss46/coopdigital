@@ -20,6 +20,11 @@ import { fileURLToPath } from "url";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
+import {
+  loadSchemaCheckManifest,
+  validateSchemaCheckManifest,
+  verifySchemaObjects,
+} from "./schema-check.js";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
@@ -39,6 +44,12 @@ const client = new pg.Client({ connectionString: DATABASE_URL });
 await client.connect();
 
 try {
+  // Refuser d'appliquer une migration qui n'a pas de contrat de vérification.
+  // Cela évite qu'une future migration soit marquée appliquée sans objet
+  // critique vérifiable.
+  const schemaCheckManifest = loadSchemaCheckManifest();
+  validateSchemaCheckManifest(schemaCheckManifest);
+
   // ── Étape 1 : créer le schéma et la table de tracking si absents ─────────
   await client.query("CREATE SCHEMA IF NOT EXISTS drizzle");
   await client.query(`
@@ -50,10 +61,13 @@ try {
   `);
 
   // ── Étape 2 : vérifier le curseur actuel ─────────────────────────────────
-  const { rows } = await client.query<{ count: string; last_ts: string | null }>(
+  const { rows } = await client.query<{
+    count: string;
+    last_ts: string | null;
+  }>(
     `SELECT COUNT(*)::text AS count,
             MAX(created_at)::text AS last_ts
-     FROM drizzle.__drizzle_migrations`
+     FROM drizzle.__drizzle_migrations`,
   );
   const count = parseInt(rows[0].count, 10);
   const lastTs = rows[0].last_ts ? BigInt(rows[0].last_ts) : 0n;
@@ -62,15 +76,15 @@ try {
     // Insérer un enregistrement pour monter le curseur à 0023
     await client.query(
       "INSERT INTO drizzle.__drizzle_migrations (hash, created_at) VALUES ($1, $2)",
-      ["baseline-up-to-0023-push-setup", BASELINE_CREATED_AT]
+      ["baseline-up-to-0023-push-setup", BASELINE_CREATED_AT],
     );
     console.log(
       `✅ Baseline insérée : migrations 0000-0023 marquées appliquées` +
-      ` (lastTs=${lastTs} → ${BASELINE_CREATED_AT})`
+        ` (lastTs=${lastTs} → ${BASELINE_CREATED_AT})`,
     );
   } else {
     console.log(
-      `ℹ️  Curseur déjà à jour (${count} enregistrement(s), last_ts=${lastTs})`
+      `ℹ️  Curseur déjà à jour (${count} enregistrement(s), last_ts=${lastTs})`,
     );
   }
 
@@ -78,6 +92,7 @@ try {
   console.log(`📂 Dossier migrations : ${migrationsFolder}`);
   const db = drizzle(client);
   await migrate(db, { migrationsFolder });
+  await verifySchemaObjects(client, schemaCheckManifest);
   console.log("✅ Migrations appliquées avec succès");
 } finally {
   await client.end();
