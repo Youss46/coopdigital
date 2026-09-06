@@ -1,10 +1,11 @@
-import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { Fragment, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
   UserCheck, Plus, Search, Loader2, Phone, MapPin,
   Users, AlertTriangle, CheckCircle, Clock, Package,
   Eye, Pencil, ShieldCheck, ShieldOff, X, ExternalLink,
+  ChevronDown, ChevronUp, WalletCards,
 } from "lucide-react";
 import {
   useListFournisseurs,
@@ -48,6 +49,103 @@ function fmt(n: number) {
   return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(n);
 }
 
+function fmtFcfa(n: number) {
+  return `${fmt(n)} FCFA`;
+}
+
+interface FournisseurCreditHistory {
+  charges: Array<{
+    id: number;
+    date_charge: string;
+    libelle: string;
+    montant_initial_fcfa: number;
+    montant_regle_fcfa: number;
+    montant_restant_fcfa: number;
+    date_reglement: string | null;
+    statut: string;
+    reference_piece: string | null;
+    reference_reglement: string | null;
+  }>;
+  total_montant_initial_fcfa: number;
+  total_montant_regle_fcfa: number;
+  total_montant_restant_fcfa: number;
+}
+
+const BASE = import.meta.env.VITE_API_URL ?? "";
+
+function FournisseurCreditHistoryPanel({ fournisseurId }: { fournisseurId: number }) {
+  const { data, isLoading, isError } = useQuery<FournisseurCreditHistory>({
+    queryKey: ["fournisseur-credit-history", fournisseurId],
+    queryFn: async () => {
+      const token = localStorage.getItem("coop_token") ?? "";
+      const response = await fetch(`${BASE}/api/charges-diverses/fournisseurs/${fournisseurId}/historique`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error("Impossible de charger l'historique fournisseur");
+      return response.json() as Promise<FournisseurCreditHistory>;
+    },
+  });
+
+  if (isLoading) {
+    return <div className="flex items-center gap-2 py-3 text-sm text-gray-500"><Loader2 className="w-4 h-4 animate-spin" />Chargement de l’historique…</div>;
+  }
+  if (isError || !data) {
+    return <div className="py-3 text-sm text-red-600">Impossible de charger l’historique des charges à crédit.</div>;
+  }
+  if (data.charges.length === 0) {
+    return <div className="py-3 text-sm text-gray-500">Aucune charge à crédit associée à ce fournisseur.</div>;
+  }
+
+  return (
+    <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-3 sm:p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <div className="flex items-center gap-2">
+          <WalletCards className="w-4 h-4 text-blue-700" />
+          <h3 className="text-sm font-semibold text-gray-800">Historique des charges à crédit</h3>
+        </div>
+        <div className="flex flex-wrap gap-2 text-xs">
+          <span className="rounded-md bg-white px-2 py-1 text-gray-600">Initial : <strong>{fmtFcfa(data.total_montant_initial_fcfa)}</strong></span>
+          <span className="rounded-md bg-white px-2 py-1 text-green-700">Réglé : <strong>{fmtFcfa(data.total_montant_regle_fcfa)}</strong></span>
+          <span className="rounded-md bg-amber-100 px-2 py-1 text-amber-800">Reste : <strong>{fmtFcfa(data.total_montant_restant_fcfa)}</strong></span>
+        </div>
+      </div>
+      <div className="overflow-x-auto rounded-md border border-blue-100 bg-white">
+        <table className="w-full min-w-[680px] text-xs">
+          <thead className="bg-gray-50 text-gray-600">
+            <tr>
+              <th className="px-3 py-2 text-left font-medium">Charge</th>
+              <th className="px-3 py-2 text-left font-medium">Date</th>
+              <th className="px-3 py-2 text-right font-medium">Montant initial</th>
+              <th className="px-3 py-2 text-right font-medium">Règlement</th>
+              <th className="px-3 py-2 text-left font-medium">Date de règlement</th>
+              <th className="px-3 py-2 text-right font-medium">Solde restant</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {data.charges.map((charge) => (
+              <tr key={charge.id}>
+                <td className="px-3 py-2 text-gray-800">
+                  <div className="font-medium">{charge.libelle}</div>
+                  {charge.reference_piece && <div className="text-gray-400">{charge.reference_piece}</div>}
+                </td>
+                <td className="px-3 py-2 text-gray-600">{new Date(`${charge.date_charge}T00:00:00`).toLocaleDateString("fr-FR")}</td>
+                <td className="px-3 py-2 text-right text-gray-700">{fmtFcfa(charge.montant_initial_fcfa)}</td>
+                <td className="px-3 py-2 text-right text-green-700">{fmtFcfa(charge.montant_regle_fcfa)}</td>
+                <td className="px-3 py-2 text-gray-600">
+                  {charge.date_reglement ? new Date(`${charge.date_reglement}T00:00:00`).toLocaleDateString("fr-FR") : "Non réglé"}
+                </td>
+                <td className={`px-3 py-2 text-right font-semibold ${charge.montant_restant_fcfa > 0 ? "text-amber-700" : "text-green-700"}`}>
+                  {fmtFcfa(charge.montant_restant_fcfa)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 const FORM_VIDE_PISTEUR: Partial<FournisseurInput> = { typeFournisseur: "pisteur", nationalite: "Ivoirienne" };
 const FORM_VIDE_EXTERNE: Partial<FournisseurInput> = { typeFournisseur: "externe", nationalite: "Ivoirienne" };
 
@@ -64,6 +162,7 @@ export default function FournisseursPage() {
   const [editTarget, setEditTarget]   = useState<Fournisseur | null>(null);
   const [form, setForm]               = useState<Partial<FournisseurInput>>(FORM_VIDE_PISTEUR);
   const [showAgrModal, setShowAgrModal] = useState<Fournisseur | null>(null);
+  const [historiqueFournisseurId, setHistoriqueFournisseurId] = useState<number | null>(null);
   const [agrForm, setAgrForm]         = useState<{ statut: string; dateAgrement: string; dateExpiration: string }>({
     statut: "agree", dateAgrement: "", dateExpiration: "",
   });
@@ -304,7 +403,8 @@ export default function FournisseursPage() {
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {pisteurs.map((f) => (
-                      <tr key={f.id} className="hover:bg-gray-50 transition-colors">
+                      <Fragment key={f.id}>
+                      <tr className="hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-3">
                           <div className="font-medium text-gray-900">{f.prenoms} {f.nom}</div>
                           <div className="text-xs text-amber-600 font-mono font-semibold mt-0.5">{f.code}</div>
@@ -329,6 +429,13 @@ export default function FournisseursPage() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={() => setHistoriqueFournisseurId(historiqueFournisseurId === f.id ? null : f.id)}
+                              className="p-1.5 text-blue-500 hover:text-blue-700 transition-colors"
+                              title="Voir l'historique des charges à crédit"
+                            >
+                              {historiqueFournisseurId === f.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                            </button>
                             {peutModif && (
                               <>
                                 <button
@@ -350,6 +457,10 @@ export default function FournisseursPage() {
                           </div>
                         </td>
                       </tr>
+                      {historiqueFournisseurId === f.id && (
+                        <tr><td colSpan={7} className="px-4 py-3"><FournisseurCreditHistoryPanel fournisseurId={f.id} /></td></tr>
+                      )}
+                      </Fragment>
                     ))}
                   </tbody>
                 </table>
@@ -382,7 +493,8 @@ export default function FournisseursPage() {
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {externes.map((f) => (
-                      <tr key={f.id} className="hover:bg-gray-50 transition-colors">
+                      <Fragment key={f.id}>
+                      <tr className="hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-3">
                           <div className="font-medium text-gray-900">{f.prenoms} {f.nom}</div>
                           <div className="text-xs text-purple-600 font-mono font-semibold mt-0.5">{f.code}</div>
@@ -407,6 +519,13 @@ export default function FournisseursPage() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={() => setHistoriqueFournisseurId(historiqueFournisseurId === f.id ? null : f.id)}
+                              className="p-1.5 text-blue-500 hover:text-blue-700 transition-colors"
+                              title="Voir l'historique des charges à crédit"
+                            >
+                              {historiqueFournisseurId === f.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                            </button>
                             {peutModif && (
                               <button
                                 onClick={() => openEdit(f)}
@@ -419,6 +538,10 @@ export default function FournisseursPage() {
                           </div>
                         </td>
                       </tr>
+                      {historiqueFournisseurId === f.id && (
+                        <tr><td colSpan={8} className="px-4 py-3"><FournisseurCreditHistoryPanel fournisseurId={f.id} /></td></tr>
+                      )}
+                      </Fragment>
                     ))}
                   </tbody>
                 </table>
@@ -467,7 +590,8 @@ export default function FournisseursPage() {
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                       {membres.map((f) => (
-                        <tr key={f.id} className="hover:bg-gray-50 transition-colors">
+                        <Fragment key={f.id}>
+                        <tr className="hover:bg-gray-50 transition-colors">
                           <td className="px-4 py-3">
                             <div className="font-medium text-gray-900">{f.prenoms} {f.nom}</div>
                             <div className="text-xs text-green-700 font-mono font-semibold mt-0.5">{f.code}</div>
@@ -482,17 +606,30 @@ export default function FournisseursPage() {
                             {(f.tonnageTotal ?? 0) > 0 ? `${((f.tonnageTotal ?? 0) / 1000).toFixed(2)} T` : "—"}
                           </td>
                           <td className="px-4 py-3 text-center">
-                            {f.membreId && (
+                            <div className="flex items-center justify-center gap-3">
                               <button
-                                onClick={() => navigate(`/membres/${f.membreId}`)}
+                                onClick={() => setHistoriqueFournisseurId(historiqueFournisseurId === f.id ? null : f.id)}
                                 className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
                               >
-                                <Eye className="w-3 h-3" />
-                                Voir
+                                {historiqueFournisseurId === f.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                                Charges à crédit
                               </button>
-                            )}
+                              {f.membreId && (
+                                <button
+                                  onClick={() => navigate(`/membres/${f.membreId}`)}
+                                  className="inline-flex items-center gap-1 text-xs text-gray-600 hover:text-gray-900 font-medium"
+                                >
+                                  <Eye className="w-3 h-3" />
+                                  Fiche
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
+                        {historiqueFournisseurId === f.id && (
+                          <tr><td colSpan={5} className="px-4 py-3"><FournisseurCreditHistoryPanel fournisseurId={f.id} /></td></tr>
+                        )}
+                        </Fragment>
                       ))}
                     </tbody>
                   </table>

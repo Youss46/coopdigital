@@ -8,6 +8,7 @@ import {
   mouvementsBanqueTable,
   comptesMobilesMarchandsTable,
   mouvementsMobileMarchandTable,
+  fournisseursTable,
 } from "@workspace/db";
 import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
 import { getTauxPpsi } from "./fiscaliteService.js";
@@ -112,6 +113,83 @@ export async function listDettesFournisseurs(cooperativeId: number) {
       eq(chargesDiversesTable.montantRegleFcfa, 0),
     ))
     .orderBy(chargesDiversesTable.dateCharge);
+}
+
+function normaliserIdentiteTiers(value: string | null | undefined): string {
+  return (value ?? "")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Retourne l'historique des charges fournisseurs à crédit en restant
+ * compatible avec les anciennes charges qui ne stockent qu'un tiers texte.
+ * Les charges sont rapprochées par identifiant, code ou nom normalisé.
+ */
+export async function listHistoriqueCreditFournisseur(cooperativeId: number, fournisseurId: number) {
+  const [fournisseur] = await db
+    .select({
+      id: fournisseursTable.id,
+      code: fournisseursTable.code,
+      nom: fournisseursTable.nom,
+      prenoms: fournisseursTable.prenoms,
+    })
+    .from(fournisseursTable)
+    .where(and(
+      eq(fournisseursTable.id, fournisseurId),
+      eq(fournisseursTable.cooperativeId, cooperativeId),
+    ))
+    .limit(1);
+
+  if (!fournisseur) return null;
+
+  const nomsPossibles = [
+    String(fournisseur.id),
+    fournisseur.code,
+    fournisseur.nom,
+    fournisseur.prenoms ? `${fournisseur.prenoms} ${fournisseur.nom}` : fournisseur.nom,
+    fournisseur.prenoms ? `${fournisseur.nom} ${fournisseur.prenoms}` : fournisseur.nom,
+  ]
+    .map(normaliserIdentiteTiers)
+    .filter(Boolean);
+
+  const charges = await db
+    .select()
+    .from(chargesDiversesTable)
+    .where(and(
+      eq(chargesDiversesTable.cooperativeId, cooperativeId),
+      eq(chargesDiversesTable.modePaiement, "credit"),
+      sql`${chargesDiversesTable.statut} <> 'brouillon'`,
+    ))
+    .orderBy(desc(chargesDiversesTable.dateCharge), desc(chargesDiversesTable.id));
+
+  const chargesFournisseur = charges.filter((charge) => (
+    normaliserNumeroCompte(charge.compteCredit) === "401000"
+    && nomsPossibles.includes(normaliserIdentiteTiers(charge.tiers))
+  ));
+
+  const totaux = chargesFournisseur.reduce(
+    (acc, charge) => {
+      const montantInitial = Math.max(0, Math.round(parseFloat(String(charge.montantFcfa)) || 0));
+      const montantRegle = Math.max(0, Math.round(charge.montantRegleFcfa || 0));
+      acc.montantInitial += montantInitial;
+      acc.montantRegle += montantRegle;
+      acc.montantRestant += Math.max(0, montantInitial - montantRegle);
+      return acc;
+    },
+    { montantInitial: 0, montantRegle: 0, montantRestant: 0 },
+  );
+
+  return {
+    fournisseur,
+    charges: chargesFournisseur,
+    totalMontantInitialFcfa: totaux.montantInitial,
+    totalMontantRegleFcfa: totaux.montantRegle,
+    totalMontantRestantFcfa: totaux.montantRestant,
+  };
 }
 
 export async function createChargeDiverses(

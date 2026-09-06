@@ -2923,6 +2923,32 @@ paths:
                 items:
                   $ref: "#/components/schemas/Fournisseur"
 
+  /charges-diverses/fournisseurs/{id}/historique:
+    get:
+      operationId: getFournisseurCreditHistory
+      tags: [fournisseurs]
+      summary: Historique consolidé des charges à crédit d'un fournisseur
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Historique des charges et total restant
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FournisseurCreditHistory"
+        "404":
+          description: Fournisseur introuvable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /fournisseurs/rapport-type:
     get:
       operationId: getRapportTypeFournisseur
@@ -10256,6 +10282,72 @@ components:
           type: ["integer", "null"]
         creeParDelegueNom:
           type: ["string", "null"]
+
+    FournisseurCreditHistory:
+      type: object
+      required:
+        - fournisseur
+        - charges
+        - total_montant_initial_fcfa
+        - total_montant_regle_fcfa
+        - total_montant_restant_fcfa
+      properties:
+        fournisseur:
+          type: object
+          required: [id, nom]
+          properties:
+            id:
+              type: integer
+            code:
+              type: ["string", "null"]
+            nom:
+              type: string
+            prenoms:
+              type: ["string", "null"]
+        charges:
+          type: array
+          items:
+            type: object
+            required:
+              - id
+              - date_charge
+              - libelle
+              - montant_initial_fcfa
+              - montant_regle_fcfa
+              - montant_restant_fcfa
+              - date_reglement
+              - statut
+            properties:
+              id:
+                type: integer
+              date_charge:
+                type: string
+                format: date
+              libelle:
+                type: string
+              montant_initial_fcfa:
+                type: number
+              montant_regle_fcfa:
+                type: number
+              montant_restant_fcfa:
+                type: number
+              date_reglement:
+                type: ["string", "null"]
+                format: date
+              statut:
+                type: string
+              tiers:
+                type: ["string", "null"]
+              reference_piece:
+                type: ["string", "null"]
+              reference_reglement:
+                type: ["string", "null"]
+        total_montant_initial_fcfa:
+          type: number
+        total_montant_regle_fcfa:
+          type: number
+        total_montant_restant_fcfa:
+          type: number
 
     FournisseurInput:
       type: object

@@ -3274,6 +3274,39 @@ export const SearchFournisseursResponse = zod.array(SearchFournisseursResponseIt
 
 
 /**
+ * @summary Historique consolidé des charges à crédit d'un fournisseur
+ */
+export const GetFournisseurCreditHistoryParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetFournisseurCreditHistoryResponse = zod.object({
+  "fournisseur": zod.object({
+  "id": zod.number(),
+  "code": zod.string().nullish(),
+  "nom": zod.string(),
+  "prenoms": zod.string().nullish()
+}),
+  "charges": zod.array(zod.object({
+  "id": zod.number(),
+  "date_charge": zod.coerce.date(),
+  "libelle": zod.string(),
+  "montant_initial_fcfa": zod.number(),
+  "montant_regle_fcfa": zod.number(),
+  "montant_restant_fcfa": zod.number(),
+  "date_reglement": zod.coerce.date().nullable(),
+  "statut": zod.string(),
+  "tiers": zod.string().nullish(),
+  "reference_piece": zod.string().nullish(),
+  "reference_reglement": zod.string().nullish()
+})),
+  "total_montant_initial_fcfa": zod.number(),
+  "total_montant_regle_fcfa": zod.number(),
+  "total_montant_restant_fcfa": zod.number()
+})
+
+
+/**
  * @summary Répartition des fournisseurs par type
  */
 export const GetRapportTypeFournisseurResponseItem = zod.object({

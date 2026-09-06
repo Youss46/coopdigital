@@ -158,6 +158,7 @@ import type {
   FermerCampagneInput,
   FluxTresorerie,
   Fournisseur,
+  FournisseurCreditHistory,
   FournisseurInput,
   FusionLotsInput,
   GenerationResult,
@@ -10196,6 +10197,83 @@ export function useSearchFournisseurs<TData = Awaited<ReturnType<typeof searchFo
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getSearchFournisseursQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetFournisseurCreditHistoryUrl = (id: number,) => {
+
+
+
+
+  return `/api/charges-diverses/fournisseurs/${id}/historique`
+}
+
+/**
+ * @summary Historique consolidé des charges à crédit d'un fournisseur
+ */
+export const getFournisseurCreditHistory = async (id: number, options?: RequestInit): Promise<FournisseurCreditHistory> => {
+
+  return customFetch<FournisseurCreditHistory>(getGetFournisseurCreditHistoryUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetFournisseurCreditHistoryQueryKey = (id: number,) => {
+    return [
+    `/api/charges-diverses/fournisseurs/${id}/historique`
+    ] as const;
+    }
+
+
+export const getGetFournisseurCreditHistoryQueryOptions = <TData = Awaited<ReturnType<typeof getFournisseurCreditHistory>>, TError = ErrorType<ErrorResponse>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFournisseurCreditHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFournisseurCreditHistoryQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFournisseurCreditHistory>>> = ({ signal }) => getFournisseurCreditHistory(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFournisseurCreditHistory>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetFournisseurCreditHistoryQueryResult = NonNullable<Awaited<ReturnType<typeof getFournisseurCreditHistory>>>
+export type GetFournisseurCreditHistoryQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Historique consolidé des charges à crédit d'un fournisseur
+ */
+
+export function useGetFournisseurCreditHistory<TData = Awaited<ReturnType<typeof getFournisseurCreditHistory>>, TError = ErrorType<ErrorResponse>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFournisseurCreditHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetFournisseurCreditHistoryQueryOptions(id,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

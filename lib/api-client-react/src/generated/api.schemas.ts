@@ -2921,6 +2921,41 @@ export interface Fournisseur {
   creeParDelegueNom?: string | null;
 }
 
+export type FournisseurCreditHistoryFournisseur = {
+  id: number;
+  /** @nullable */
+  code?: string | null;
+  nom: string;
+  /** @nullable */
+  prenoms?: string | null;
+};
+
+export type FournisseurCreditHistoryChargesItem = {
+  id: number;
+  date_charge: string;
+  libelle: string;
+  montant_initial_fcfa: number;
+  montant_regle_fcfa: number;
+  montant_restant_fcfa: number;
+  /** @nullable */
+  date_reglement: string | null;
+  statut: string;
+  /** @nullable */
+  tiers?: string | null;
+  /** @nullable */
+  reference_piece?: string | null;
+  /** @nullable */
+  reference_reglement?: string | null;
+};
+
+export interface FournisseurCreditHistory {
+  fournisseur: FournisseurCreditHistoryFournisseur;
+  charges: FournisseurCreditHistoryChargesItem[];
+  total_montant_initial_fcfa: number;
+  total_montant_regle_fcfa: number;
+  total_montant_restant_fcfa: number;
+}
+
 export type FournisseurInputTypeFournisseur = typeof FournisseurInputTypeFournisseur[keyof typeof FournisseurInputTypeFournisseur];
 
 

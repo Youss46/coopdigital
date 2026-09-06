@@ -11,6 +11,7 @@ import {
   deleteChargeDiverses,
   getStatsChargesDiverses,
   securiserReglementPpsi,
+  listHistoriqueCreditFournisseur,
 } from "../services/chargesDiversesService";
 import { normaliserNumeroCompte } from "../lib/numeroCompte.js";
 
@@ -133,6 +134,55 @@ export async function handleListDettesFournisseurs(req: Request, res: Response):
     res.json(rows.map(mapCharge));
   } catch (err) {
     req.log.error({ err }, "Erreur listDettesFournisseurs");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
+}
+
+// ── GET /charges-diverses/fournisseurs/:id/historique ─────────────────────────
+export async function handleHistoriqueCreditFournisseur(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
+
+    const fournisseurId = parseInt(String(req.params["id"]), 10);
+    if (!Number.isInteger(fournisseurId) || fournisseurId <= 0) {
+      res.status(400).json({ erreur: "Identifiant fournisseur invalide" });
+      return;
+    }
+
+    const historique = await listHistoriqueCreditFournisseur(cooperativeId, fournisseurId);
+    if (!historique) { res.status(404).json({ erreur: "Fournisseur introuvable" }); return; }
+
+    res.json({
+      fournisseur: {
+        id: historique.fournisseur.id,
+        code: historique.fournisseur.code,
+        nom: historique.fournisseur.nom,
+        prenoms: historique.fournisseur.prenoms,
+      },
+      charges: historique.charges.map((charge) => {
+        const montantInitial = Math.max(0, Math.round(parseFloat(String(charge.montantFcfa)) || 0));
+        const montantRegle = Math.max(0, Math.round(charge.montantRegleFcfa || 0));
+        return {
+          id: charge.id,
+          date_charge: charge.dateCharge,
+          libelle: charge.libelle,
+          montant_initial_fcfa: montantInitial,
+          montant_regle_fcfa: montantRegle,
+          montant_restant_fcfa: Math.max(0, montantInitial - montantRegle),
+          date_reglement: charge.dateReglement ?? null,
+          statut: charge.statut,
+          tiers: charge.tiers ?? null,
+          reference_piece: charge.referencePiece ?? null,
+          reference_reglement: charge.referenceReglement ?? null,
+        };
+      }),
+      total_montant_initial_fcfa: historique.totalMontantInitialFcfa,
+      total_montant_regle_fcfa: historique.totalMontantRegleFcfa,
+      total_montant_restant_fcfa: historique.totalMontantRestantFcfa,
+    });
+  } catch (err) {
+    req.log.error({ err }, "Erreur historiqueCreditFournisseur");
     res.status(500).json({ erreur: "Erreur interne" });
   }
 }

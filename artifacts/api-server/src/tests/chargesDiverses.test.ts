@@ -27,6 +27,7 @@ vi.mock("@workspace/db", () => {
     mouvementsBanqueTable: makeTable("mouvements_banque"),
     comptesMobilesMarchandsTable: makeTable("comptes_mobiles_marchands"),
     mouvementsMobileMarchandTable: makeTable("mouvements_mobile_marchand"),
+    fournisseursTable: makeTable("fournisseurs"),
   };
 });
 
@@ -43,7 +44,11 @@ vi.mock("../services/fiscaliteService.js", () => ({ getTauxPpsi }));
 vi.mock("../services/comptabiliteService.js", () => ({ proposerEcriture, proposerEcrituresDansTransaction }));
 
 const chargesDiversesService = await import("../services/chargesDiversesService.js");
-const { validerChargeDiverses, reglerChargeFournisseur } = chargesDiversesService;
+const {
+  validerChargeDiverses,
+  reglerChargeFournisseur,
+  listHistoriqueCreditFournisseur,
+} = chargesDiversesService;
 const {
   erreurStructureCharge,
   handleValiderChargeDiverses,
@@ -51,10 +56,18 @@ const {
 
 function chain<T>(rows: T[]) {
   const value: Record<string, unknown> = {};
-  for (const method of ["from", "where", "for"]) {
+  for (const method of ["from", "where", "for", "orderBy"]) {
     value[method] = vi.fn(() => value);
   }
   value.limit = vi.fn().mockResolvedValue(rows);
+  return value;
+}
+
+function orderedChain<T>(rows: T[]) {
+  const value: Record<string, unknown> = {};
+  value.from = vi.fn(() => value);
+  value.where = vi.fn(() => value);
+  value.orderBy = vi.fn().mockResolvedValue(rows);
   return value;
 }
 
@@ -121,6 +134,51 @@ describe("charges diverses à crédit", () => {
   it("rejette une charge à crédit sans fournisseur ou liée à une trésorerie", () => {
     expect(erreurStructureCharge("credit", "401", " ", null, null)).toMatch(/fournisseur/i);
     expect(erreurStructureCharge("credit", "401", "Fournisseur Kouassi", 3, "caisse")).toMatch(/trésorerie/i);
+  });
+
+  it("consolide les charges réglées et partiellement réglées d'un fournisseur", async () => {
+    mockDb.select
+      .mockReturnValueOnce(chain([{
+        id: 9,
+        code: "EXT-2026-0009",
+        nom: "Kouassi",
+        prenoms: "Aya",
+      }]))
+      .mockReturnValueOnce(orderedChain([
+        creditCharge({
+          id: 1,
+          tiers: "Aya Kouassi",
+          compteCredit: "401",
+          statut: "valide",
+          montantFcfa: "100000",
+          montantRegleFcfa: 25000,
+          dateReglement: null,
+        }),
+        creditCharge({
+          id: 2,
+          tiers: "EXT-2026-0009",
+          compteCredit: "401000",
+          statut: "reglee",
+          montantFcfa: "50000",
+          montantRegleFcfa: 50000,
+          dateReglement: "2026-09-06",
+        }),
+        creditCharge({
+          id: 3,
+          tiers: "Autre fournisseur",
+          compteCredit: "401000",
+          statut: "reglee",
+          montantFcfa: "90000",
+          montantRegleFcfa: 90000,
+        }),
+      ]));
+
+    const historique = await listHistoriqueCreditFournisseur(42, 9);
+
+    expect(historique?.charges.map((charge) => charge.id)).toEqual([1, 2]);
+    expect(historique?.totalMontantInitialFcfa).toBe(150000);
+    expect(historique?.totalMontantRegleFcfa).toBe(75000);
+    expect(historique?.totalMontantRestantFcfa).toBe(75000);
   });
 
   it("rejette une charge à crédit avec un compte autre que 401", () => {

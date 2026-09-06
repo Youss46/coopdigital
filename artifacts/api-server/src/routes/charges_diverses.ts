@@ -4,6 +4,7 @@ import {
   handleCreateChargeDiverses,
   handleGetChargeDiverses,
   handleListDettesFournisseurs,
+  handleHistoriqueCreditFournisseur,
   handleUpdateChargeDiverses,
   handleValiderChargeDiverses,
   handleReglerChargeFournisseur,
@@ -15,6 +16,7 @@ const router: IRouter = Router();
 
 router.get("/charges-diverses/stats",  handleStatsChargesDiverses);
 router.get("/charges-diverses/dettes-fournisseurs", handleListDettesFournisseurs);
+router.get("/charges-diverses/fournisseurs/:id/historique", handleHistoriqueCreditFournisseur);
 router.get("/charges-diverses",        handleListChargesDiverses);
 router.post("/charges-diverses",       handleCreateChargeDiverses);
 router.get("/charges-diverses/:id",    handleGetChargeDiverses);
