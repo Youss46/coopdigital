@@ -36,6 +36,15 @@ class GroupePaiementError extends Error {
   }
 }
 
+class PaiementBulletinError extends Error {
+  constructor(
+    message: string,
+    readonly status: 400 | 404,
+  ) {
+    super(message);
+  }
+}
+
 const coopId = (req: import("express").Request): number => {
   const id = req.user?.cooperativeId;
   if (!id) throw new TenantError();
@@ -529,103 +538,128 @@ export async function payerBulletin(
       compteSourceId?: number;
     };
 
-    const [b] = await db
-      .select()
-      .from(bulletinsPaieTable)
-      .where(and(eq(bulletinsPaieTable.id, id), eq(bulletinsPaieTable.cooperativeId, cid)))
-      .limit(1);
-    if (!b) { res.status(404).json({ erreur: "Bulletin introuvable" }); return; }
-    if (b.statut !== "valide") {
-      res.status(400).json({ erreur: "Seuls les bulletins validés peuvent être marqués payés" });
-      return;
-    }
+    const updated = await db.transaction(async (tx) => {
+      // Le bulletin est la ressource métier idempotente : le verrouiller avant
+      // tout débit garantit qu'un retry concurrent ne touche jamais deux fois
+      // la trésorerie du même salaire.
+      const [b] = await tx
+        .select()
+        .from(bulletinsPaieTable)
+        .where(and(
+          eq(bulletinsPaieTable.id, id),
+          eq(bulletinsPaieTable.cooperativeId, cid),
+        ))
+        .for("update")
+        .limit(1);
+      if (!b) throw new PaiementBulletinError("Bulletin introuvable", 404);
+      if (b.statut !== "valide") {
+        throw new GroupePaiementError("Seuls les bulletins validés peuvent être marqués payés");
+      }
 
-    // ── Débit du compte de trésorerie sélectionné ──────────────────────────────
-    if (compteSourceType && compteSourceId) {
+      // ── Débit du compte de trésorerie sélectionné ──────────────────────────
       const libelle = `Salaire – bulletin #${id}`;
       const ref = referencePaiement ?? null;
       const userId = req.user?.id ?? null;
       const montant = b.salaireNetFcfa;
 
-      if (compteSourceType === "caisse") {
-        await debitCaisseForSalaire(compteSourceId, cid, montant, libelle, ref, userId);
-      } else if (compteSourceType === "banque") {
-        await debitBanqueForSalaire(compteSourceId, cid, montant, libelle, ref, userId);
-      } else if (compteSourceType === "mobile") {
-        const [compte] = await db
-          .select()
-          .from(comptesMobilesMarchandsTable)
-          .where(and(eq(comptesMobilesMarchandsTable.id, compteSourceId), eq(comptesMobilesMarchandsTable.cooperativeId, cid)))
-          .limit(1);
-        if (!compte) { res.status(404).json({ erreur: "Compte mobile introuvable" }); return; }
-        const soldeActuel = parseFloat(compte.soldeActuelFcfa as string);
-        if (soldeActuel < montant) {
-          res.status(400).json({ erreur: `Solde insuffisant sur le compte mobile. Disponible : ${soldeActuel.toLocaleString("fr-FR")} FCFA` });
-          return;
-        }
-        const newSolde = soldeActuel - montant;
-        const today = new Date().toISOString().slice(0, 10);
-        await db.insert(mouvementsMobileMarchandTable).values({
-          compteId: compteSourceId,
-          cooperativeId: cid,
-          type: "debit",
-          motif: "paiement_salaire",
-          montantFcfa: montant.toString(),
-          libelle,
-          reference: ref ?? null,
-          dateOperation: today,
-          soldeApresFcfa: newSolde.toString(),
-          enregistrePar: userId,
-        });
-        await db.update(comptesMobilesMarchandsTable)
-          .set({ soldeActuelFcfa: newSolde.toString() })
-          .where(eq(comptesMobilesMarchandsTable.id, compteSourceId));
-      }
-    }
-
-    const [updated] = await db
-      .update(bulletinsPaieTable)
-      .set({
-        statut: "paye",
-        datePaiement: new Date(),
-        referencePaiement: referencePaiement ?? null,
-        payePar: req.user?.id ?? null,
-        compteSourceType: compteSourceType ?? null,
-        compteSourceId: compteSourceId ?? null,
-      })
-      .where(eq(bulletinsPaieTable.id, id))
-      .returning();
-
-    // Écriture comptable OHADA (async, non bloquant)
-    void (async () => {
-      try {
-        const [p] = await db
-          .select({ nom: personnelTable.nom, prenoms: personnelTable.prenoms })
-          .from(personnelTable)
-          .where(eq(personnelTable.id, b.personnelId))
-          .limit(1);
-        const personnelNom = p ? `${p.prenoms} ${p.nom}` : `Personnel #${b.personnelId}`;
-        if (updated) {
-          const compteCredit = compteSourceType === "caisse" ? "571" : compteSourceType === "mobile" ? "554" : "521";
-          await generateEcrituresSalaire(cid, {
-            bulletinId: updated.id,
-            personnelNom,
-            personnelId: updated.personnelId,
-            salaireNetFcfa: updated.salaireNetFcfa,
-            salaireBrutFcfa: updated.salaireBrutFcfa,
-            cotisationsSalarieFcfa: updated.salaireBrutFcfa - updated.salaireNetFcfa,
-            datePaiement: new Date().toISOString().split("T")[0]!,
-            compteCredit,
+      if (compteSourceType && compteSourceId) {
+        if (compteSourceType === "caisse") {
+          await debitCaisseForSalaire(compteSourceId, cid, montant, libelle, ref, userId, tx);
+        } else if (compteSourceType === "banque") {
+          await debitBanqueForSalaire(compteSourceId, cid, montant, libelle, ref, userId, tx);
+        } else if (compteSourceType === "mobile") {
+          const [compte] = await tx
+            .select()
+            .from(comptesMobilesMarchandsTable)
+            .where(and(
+              eq(comptesMobilesMarchandsTable.id, compteSourceId),
+              eq(comptesMobilesMarchandsTable.cooperativeId, cid),
+            ))
+            .for("update")
+            .limit(1);
+          if (!compte) throw new PaiementBulletinError("Compte mobile introuvable", 404);
+          const soldeActuel = parseFloat(compte.soldeActuelFcfa as string);
+          if (soldeActuel < montant) {
+            throw new GroupePaiementError(
+              `Solde insuffisant sur le compte mobile. Disponible : ${soldeActuel.toLocaleString("fr-FR")} FCFA`,
+            );
+          }
+          const newSolde = soldeActuel - montant;
+          const today = new Date().toISOString().slice(0, 10);
+          await tx.insert(mouvementsMobileMarchandTable).values({
+            compteId: compteSourceId,
+            cooperativeId: cid,
+            type: "debit",
+            motif: "paiement_salaire",
+            montantFcfa: montant.toString(),
+            libelle,
+            reference: ref,
+            dateOperation: today,
+            soldeApresFcfa: newSolde.toString(),
+            enregistrePar: userId,
           });
+          await tx.update(comptesMobilesMarchandsTable)
+            .set({ soldeActuelFcfa: newSolde.toString() })
+            .where(eq(comptesMobilesMarchandsTable.id, compteSourceId));
         }
-      } catch (err) {
-        req.log.error({ err, bulletinId: id }, "Erreur génération écritures comptables salaire");
       }
-    })();
+
+      const [paid] = await tx
+        .update(bulletinsPaieTable)
+        .set({
+          statut: "paye",
+          datePaiement: new Date(),
+          referencePaiement: ref,
+          payePar: userId,
+          compteSourceType: compteSourceType ?? null,
+          compteSourceId: compteSourceId ?? null,
+        })
+        .where(and(
+          eq(bulletinsPaieTable.id, id),
+          eq(bulletinsPaieTable.cooperativeId, cid),
+          eq(bulletinsPaieTable.statut, "valide"),
+        ))
+        .returning();
+      if (!paid) throw new Error(`Le bulletin #${id} n'a pas pu être marqué payé`);
+
+      const [p] = await tx
+        .select({ nom: personnelTable.nom, prenoms: personnelTable.prenoms })
+        .from(personnelTable)
+        .where(and(
+          eq(personnelTable.id, paid.personnelId),
+          eq(personnelTable.cooperativeId, cid),
+        ))
+        .limit(1);
+      const compteCredit = compteSourceType === "caisse"
+        ? "571"
+        : compteSourceType === "mobile"
+          ? "554"
+          : "521";
+      await generateEcrituresSalaire(cid, {
+        bulletinId: paid.id,
+        personnelNom: p ? `${p.prenoms} ${p.nom}` : `Personnel #${paid.personnelId}`,
+        personnelId: paid.personnelId,
+        salaireNetFcfa: paid.salaireNetFcfa,
+        salaireBrutFcfa: paid.salaireBrutFcfa,
+        cotisationsSalarieFcfa: paid.salaireBrutFcfa - paid.salaireNetFcfa,
+        datePaiement: new Date().toISOString().slice(0, 10),
+        compteCredit,
+      }, tx);
+
+      return paid;
+    });
 
     res.json(updated);
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
+    if (err instanceof PaiementBulletinError) {
+      res.status(err.status).json({ erreur: err.message });
+      return;
+    }
+    if (err instanceof GroupePaiementError) {
+      res.status(err.status).json({ erreur: err.message });
+      return;
+    }
     req.log.error({ err }, "payerBulletin");
     res.status(500).json({ erreur: "Erreur interne" });
   }

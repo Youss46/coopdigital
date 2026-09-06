@@ -694,6 +694,21 @@ describe.skipIf(!enabled)("auteur des sorties de salaires sur PostgreSQL", () =>
     });
   }
 
+  async function payIndividual(bulletinId: number) {
+    return fetch(`${baseUrl}/salaires/bulletins/${bulletinId}/payer`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token()}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        compteSourceType: "banque",
+        compteSourceId: compteBancaireId,
+        referencePaiement: `SAL-INDIVIDUEL-${suffix}`,
+      }),
+    });
+  }
+
   it("conserve l'auteur authentifié pour les paiements groupés caisse et banque, sans réécrire les historiques NULL", async () => {
     const caisseResponse = await payGroup(bulletinCaisseIds, "caisse", caisseId);
     expect(caisseResponse.status).toBe(200);
@@ -803,6 +818,68 @@ describe.skipIf(!enabled)("auteur des sorties de salaires sur PostgreSQL", () =>
       [compteBancaireId],
     );
     expect(Number(after.rows[0].solde_actuel_fcfa)).toBe(beforeSolde - 2000);
+  });
+
+  it("ne débite qu'une seule fois quand deux paiements individuels concurrents ciblent le même bulletin", async () => {
+    const bulletin = await pool.query(
+      `INSERT INTO bulletins_paie
+         (personnel_id, cooperative_id, mois, annee, periode,
+          salaire_base_fcfa, salaire_brut_fcfa, salaire_net_fcfa,
+          cout_total_employeur_fcfa, statut)
+       VALUES ($1, $2, 9, 2026, 'septembre 2026', 1000, 1000, 1000, 1000, 'valide')
+       RETURNING id`,
+      [personnelId, cooperativeId],
+    );
+    const bulletinId = bulletin.rows[0].id;
+    const before = await pool.query(
+      `SELECT solde_actuel_fcfa
+       FROM comptes_bancaires
+       WHERE id = $1`,
+      [compteBancaireId],
+    );
+    const beforeSolde = Number(before.rows[0].solde_actuel_fcfa);
+
+    const responses = await Promise.all([
+      payIndividual(bulletinId),
+      payIndividual(bulletinId),
+    ]);
+    const payloads = await Promise.all(
+      responses.map(async (response) => ({
+        status: response.status,
+        body: await response.json() as { id?: number; erreur?: string },
+      })),
+    );
+
+    expect(payloads.map((payload) => payload.status).sort()).toEqual([200, 400]);
+    expect(payloads.filter((payload) => payload.status === 200)[0]?.body.id).toBe(bulletinId);
+    expect(payloads.filter((payload) => payload.status === 400)[0]?.body.erreur)
+      .toBe("Seuls les bulletins validés peuvent être marqués payés");
+
+    const finalBulletin = await pool.query(
+      `SELECT statut
+       FROM bulletins_paie
+       WHERE id = $1`,
+      [bulletinId],
+    );
+    expect(finalBulletin.rows).toEqual([{ statut: "paye" }]);
+
+    const movements = await pool.query(
+      `SELECT count(*)::int AS count
+       FROM mouvements_banque
+       WHERE compte_id = $1
+         AND motif = 'paiement_salaire'
+         AND libelle = $2`,
+      [compteBancaireId, `Salaire – bulletin #${bulletinId}`],
+    );
+    expect(movements.rows[0].count).toBe(1);
+
+    const after = await pool.query(
+      `SELECT solde_actuel_fcfa
+       FROM comptes_bancaires
+       WHERE id = $1`,
+      [compteBancaireId],
+    );
+    expect(Number(after.rows[0].solde_actuel_fcfa)).toBe(beforeSolde - 1000);
   });
 
   it("annule tout le groupe quand le second débit de caisse échoue", async () => {
