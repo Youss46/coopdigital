@@ -46,6 +46,12 @@ export async function debiterCaisseDelegue(
   }
 
   const nouveauSolde = soldeActuel - montantFcfa;
+  const [paiement] = await db
+    .select({ numeroRecu: paiementsTable.numeroRecu })
+    .from(paiementsTable)
+    .where(eq(paiementsTable.id, paiementId))
+    .limit(1);
+  const referenceReglement = paiement?.numeroRecu?.trim() || `PAI-${paiementId}`;
 
   await db.update(caissesTable)
     .set({ soldeActuelFcfa: String(nouveauSolde) })
@@ -57,8 +63,8 @@ export async function debiterCaisseDelegue(
     type: "sortie",
     motif: "paiement_producteur",
     montantFcfa: String(montantFcfa),
-    libelle: `Paiement producteur PAI-${paiementId}`,
-    referenceOperation: livraisonId ? `LIV-${livraisonId}` : null,
+    libelle: `Paiement producteur — règlement ${referenceReglement}`,
+    referenceOperation: `PAI-${paiementId}`,
     soldeApresFcfa: String(nouveauSolde),
     enregistrePar: agentId,
   });

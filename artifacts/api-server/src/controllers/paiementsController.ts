@@ -52,6 +52,7 @@ class PaiementMontantInvalideError extends Error {
 export function getPaiementTresorerieDescriptor(
   paiementId: number,
   bonCarburantNumero?: string | null,
+  numeroRecu?: string | null,
 ): { motif: "carburant" | "paiement_producteur"; libelle: string } {
   if (bonCarburantNumero) {
     return {
@@ -59,9 +60,10 @@ export function getPaiementTresorerieDescriptor(
       libelle: `Carburant — Bon ${bonCarburantNumero}`,
     };
   }
+  const referenceReglement = numeroRecu?.trim() || `PAI-${paiementId}`;
   return {
     motif: "paiement_producteur",
-    libelle: `Paiement producteur — règlement #${paiementId}`,
+    libelle: `Paiement producteur — règlement ${referenceReglement}`,
   };
 }
 
@@ -171,6 +173,7 @@ async function debiterCompteMobileMarchandPaiement(
   paiementId: number,
   validePar: number | null | undefined,
   referenceTransaction: string | null | undefined,
+  numeroRecu?: string | null,
 ): Promise<void> {
   try {
     const [compte] = await db
@@ -205,7 +208,7 @@ async function debiterCompteMobileMarchandPaiement(
         type:           "debit",
         motif:          "paiement_producteur",
         montantFcfa:    montantFcfa.toString(),
-        libelle:        `Paiement producteur — règlement #${paiementId}`,
+        libelle:        `Paiement producteur — règlement ${numeroRecu?.trim() || `PAI-${paiementId}`}`,
         reference:      referenceTransaction ?? null,
         dateOperation:  today,
         soldeApresFcfa: newSolde.toString(),
@@ -341,6 +344,7 @@ function dateEffectivePaiementSql() {
 }
 const SELECT_FIELDS = {
   id: paiementsTable.id,
+  numeroRecu: paiementsTable.numeroRecu,
   livraisonId: paiementsTable.livraisonId,
   bonCarburantId: paiementsTable.bonCarburantId,
   bonCarburantNumero: bonsCarburantTable.numero,
@@ -811,6 +815,7 @@ async function debiterCaisseDansTransaction(
   paiementId: number,
   responsableId?: number,
   bonCarburantNumero?: string | null,
+  numeroRecu?: string | null,
 ) {
   const [caisse] = await tx
     .select()
@@ -830,7 +835,7 @@ async function debiterCaisseDansTransaction(
   // Utiliser le même service que les autres sorties de caisse garantit que le
   // mouvement, la session et le solde sont écrits ensemble. Le paiement crée
   // déjà sa propre écriture OHADA plus bas : on ne la duplique pas ici.
-  const descriptor = getPaiementTresorerieDescriptor(paiementId, bonCarburantNumero);
+  const descriptor = getPaiementTresorerieDescriptor(paiementId, bonCarburantNumero, numeroRecu);
   await enregistrerMouvement(caisse.id, {
     type: "sortie",
     motif: descriptor.motif,
@@ -852,6 +857,7 @@ async function debiterMobileDansTransaction(
   userId: number | undefined,
   referenceTransaction?: string | null,
   bonCarburantNumero?: string | null,
+  numeroRecu?: string | null,
 ) {
   const [compte] = await tx
     .select()
@@ -869,7 +875,7 @@ async function debiterMobileDansTransaction(
     throw new Error(`Solde Mobile Money insuffisant. Disponible : ${solde.toLocaleString("fr-FR")} FCFA, requis : ${montant.toLocaleString("fr-FR")} FCFA.`);
   }
   const nouveauSolde = solde - montant;
-  const descriptor = getPaiementTresorerieDescriptor(paiementId, bonCarburantNumero);
+  const descriptor = getPaiementTresorerieDescriptor(paiementId, bonCarburantNumero, numeroRecu);
   await tx.insert(mouvementsMobileMarchandTable).values({
     compteId: compte.id,
     cooperativeId,
@@ -1230,13 +1236,13 @@ async function debiterMobileDansTransaction(
             const montantEspeces = lignesEspeces.reduce((total, ligne) => total + ligne.montantFcfa, 0);
             if (req.user?.role === "delegue") {
               await debiterCaisseDansTransaction(
-                tx, cooperativeId, userId, montantEspeces, id, userId, row.bonCarburantNumero,
+                tx, cooperativeId, userId, montantEspeces, id, userId, row.bonCarburantNumero, row.paiement.numeroRecu,
               );
             } else {
               // Toute validation faite par l'administration débite la caisse
               // principale de la coopérative pour la part espèces.
               await debiterCaisseDansTransaction(
-                tx, cooperativeId, userId, montantEspeces, id, undefined, row.bonCarburantNumero,
+                tx, cooperativeId, userId, montantEspeces, id, undefined, row.bonCarburantNumero, row.paiement.numeroRecu,
               );
             }
           }
@@ -1251,6 +1257,7 @@ async function debiterMobileDansTransaction(
               userId,
               ligne.referenceTransaction,
               row.bonCarburantNumero,
+              row.paiement.numeroRecu,
             );
           }
 
@@ -1620,11 +1627,11 @@ async function debiterMobileDansTransaction(
       if (mode === "especes" && cooperativeId) {
         if (isDelegueEspeces) {
           await debiterCaisseDansTransaction(
-            tx, cooperativeId, userId, montantTotalPaiement, id, userId, row.bonCarburantNumero,
+            tx, cooperativeId, userId, montantTotalPaiement, id, userId, row.bonCarburantNumero, row.paiement.numeroRecu,
           );
         } else {
           await debiterCaisseDansTransaction(
-            tx, cooperativeId, userId, montantTotalPaiement, id, undefined, row.bonCarburantNumero,
+            tx, cooperativeId, userId, montantTotalPaiement, id, undefined, row.bonCarburantNumero, row.paiement.numeroRecu,
           );
         }
       }
@@ -1639,6 +1646,7 @@ async function debiterMobileDansTransaction(
           userId,
           body.referenceTransaction ?? row.paiement.referenceTransaction,
           row.bonCarburantNumero,
+          row.paiement.numeroRecu,
         );
       }
 

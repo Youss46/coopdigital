@@ -147,9 +147,9 @@ describe("date effective des règlements", () => {
   });
 
   it("conserve le libellé producteur pour un paiement de livraison", () => {
-    expect(getPaiementTresorerieDescriptor(161)).toEqual({
+    expect(getPaiementTresorerieDescriptor(161, null, "REC-2026-00042")).toEqual({
       motif: "paiement_producteur",
-      libelle: "Paiement producteur — règlement #161",
+      libelle: "Paiement producteur — règlement REC-2026-00042",
     });
   });
 

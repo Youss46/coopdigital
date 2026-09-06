@@ -627,8 +627,14 @@ describe.skipIf(!enabled)("bons d'achat pièces idempotents sur PostgreSQL", () 
       const movements = await client.query(
         `SELECT count(*)::int AS count
          FROM mouvements_mobile_marchand
-         WHERE compte_id = $1 AND libelle = $2`,
-        [mobileAccountId, `Paiement producteur — règlement #${paymentId}`],
+          WHERE compte_id = $1
+            AND libelle = (
+              SELECT 'Paiement producteur — règlement ' ||
+                     COALESCE(NULLIF(numero_recu, ''), 'PAI-' || id::text)
+              FROM paiements
+              WHERE id = $2
+            )`,
+        [mobileAccountId, paymentId],
       );
       expect(movements.rows[0].count).toBe(1);
     }
@@ -664,13 +670,17 @@ describe.skipIf(!enabled)("bons d'achat pièces idempotents sur PostgreSQL", () 
          (SELECT count(*) FROM mouvements_caisse
           WHERE reference_operation = $3) AS cash_movements,
          (SELECT count(*) FROM mouvements_mobile_marchand
-          WHERE libelle = $4) AS mobile_movements,
+           WHERE libelle = (
+             SELECT 'Paiement producteur — règlement ' ||
+                    COALESCE(NULLIF(numero_recu, ''), 'PAI-' || id::text)
+             FROM paiements
+             WHERE id = $2
+           )) AS mobile_movements,
          (SELECT count(*) FROM cheques_emis WHERE paiement_id = $2) AS cheques`,
       [
         cooperativeId,
         paymentId,
         `PAI-${paymentId}`,
-        `Paiement producteur — règlement #${paymentId}`,
       ],
     );
     expect(effects.rows[0]).toEqual({

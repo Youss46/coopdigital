@@ -1,4 +1,4 @@
-import { db, caissesTable, sessionsCaisseTable, mouvementsCaisseTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable, comptesBancairesTable, mouvementsBanqueTable } from "@workspace/db";
+import { db, caissesTable, sessionsCaisseTable, mouvementsCaisseTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable, comptesBancairesTable, mouvementsBanqueTable, paiementsTable } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import PDFDocument from "pdfkit";
@@ -430,7 +430,13 @@ export async function getJournal(caisseId: number, opts?: { dateDebut?: string; 
   }>(sql`
     SELECT
       m.id, m.type, m.motif, m.montant_fcfa,
-      m.libelle, m.reference_operation, m.solde_apres_fcfa,
+      CASE
+        WHEN m.motif = 'paiement_producteur' AND p.id IS NOT NULL
+          THEN 'Paiement producteur — règlement ' ||
+            COALESCE(NULLIF(BTRIM(p.numero_recu), ''), 'PAI-' || p.id::text)
+        ELSE m.libelle
+      END AS libelle,
+      m.reference_operation, m.solde_apres_fcfa,
       m.date_operation::text,
       m.created_at::text, m.session_id,
       u.nom AS enregistre_par_nom,
@@ -438,6 +444,7 @@ export async function getJournal(caisseId: number, opts?: { dateDebut?: string; 
     FROM mouvements_caisse m
     LEFT JOIN sessions_caisse s ON s.id = m.session_id
     LEFT JOIN users u ON u.id = m.enregistre_par
+    LEFT JOIN paiements p ON m.reference_operation = ('PAI-' || p.id::text)
     WHERE m.caisse_id = ${caisseId}
       AND m.date_operation BETWEEN ${dateD} AND ${dateF}
     ORDER BY m.date_operation, m.id
@@ -977,9 +984,15 @@ export async function debiterCaisseParResponsable(
     throw new Error("Aucune caisse ne vous est assignée. Contactez votre administrateur.");
   }
 
+  const [paiement] = await db
+    .select({ numeroRecu: paiementsTable.numeroRecu })
+    .from(paiementsTable)
+    .where(eq(paiementsTable.id, paiementId))
+    .limit(1);
+  const referenceReglement = paiement?.numeroRecu?.trim() || `PAI-${paiementId}`;
   const defaultLibelle = livraisonId
-    ? `Paiement producteur PAI-${paiementId} / LIV-${livraisonId}`
-    : `Paiement producteur PAI-${paiementId}`;
+    ? `Paiement producteur — règlement ${referenceReglement} / LIV-${livraisonId}`
+    : `Paiement producteur — règlement ${referenceReglement}`;
 
   const result = await enregistrerMouvement(caisse.id, {
     type: "sortie",

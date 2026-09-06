@@ -389,8 +389,13 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
       pool.query(
         `SELECT count(*)::int AS count FROM mouvements_mobile_marchand
          WHERE compte_id = $1
-           AND libelle = $2`,
-        [mobileAccountId, `Paiement producteur — règlement #${paymentId}`],
+           AND libelle = (
+             SELECT 'Paiement producteur — règlement ' ||
+                    COALESCE(NULLIF(numero_recu, ''), 'PAI-' || id::text)
+             FROM paiements
+             WHERE id = $2
+           )`,
+        [mobileAccountId, paymentId],
       ),
       pool.query(
         `SELECT count(*)::int AS count FROM cheques_emis WHERE paiement_id = $1`,
