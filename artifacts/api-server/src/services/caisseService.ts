@@ -767,8 +767,8 @@ export async function genererRapportPdf(caisseId: number, dateSession?: string):
 
   // ── Tableau des mouvements
   doc.moveDown(0.5);
-  const headers = ["Heure", "Type", "Motif", "Libellé", "Montant", "Solde"];
-  const colWidths = [42, 32, 75, 140, 68, 72];
+  const headers = ["Heure", "Type", "Motif", "Libellé", "Effectué par", "Montant", "Solde"];
+  const colWidths = [42, 32, 75, 115, 72, 68, 72];
   const tableX = margin;
   let tableY = doc.y;
 
@@ -801,6 +801,7 @@ export async function genererRapportPdf(caisseId: number, dateSession?: string):
         entree ? "Entrée" : "Sortie",
         m.motif.replace(/_/g, " "),
         m.libelle ?? "—",
+        m.enregistre_par_nom?.trim() || "Système",
         FCFA(m.montant_fcfa),
         m.solde_apres_fcfa ? FCFA(m.solde_apres_fcfa) : "—",
       ];
@@ -809,7 +810,7 @@ export async function genererRapportPdf(caisseId: number, dateSession?: string):
         const color = i === 1 ? (entree ? "#166534" : "#991b1b") : "#222222";
         doc.font(i === 1 ? "Helvetica-Bold" : "Helvetica")
           .fontSize(7).fillColor(color)
-          .text(String(v).slice(0, i === 3 ? 45 : 30), cx, tableY + 3, { width: colWidths[i]! - 4, lineBreak: false });
+          .text(String(v).slice(0, i === 3 ? 38 : 30), cx, tableY + 3, { width: colWidths[i]! - 4, lineBreak: false });
         cx += colWidths[i]!;
       });
       // Bordure inférieure

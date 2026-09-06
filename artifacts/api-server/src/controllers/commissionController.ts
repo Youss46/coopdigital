@@ -112,7 +112,8 @@ export async function payerCommissionsHandler(req: Request, res: Response): Prom
       cooperativeId,
       modePaiement as commissionService.ModePaiementCommission,
       commissionIds,
-      referencePaiement
+      referencePaiement,
+      req.user?.id,
     );
     if (result.nb === 0) {
       res.status(400).json({ erreur: "Aucune commission en attente à payer" });

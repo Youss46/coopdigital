@@ -258,7 +258,8 @@ export async function payerCommissions(
   cooperativeId: number,
   modePaiement: ModePaiementCommission,
   commissionIds?: number[],
-  referencePaiement?: string
+  referencePaiement?: string,
+  userId?: number,
 ): Promise<{ montantTotal: number; nb: number }> {
   // Récupérer les commissions en attente
   const whereClause = commissionIds?.length
@@ -352,6 +353,7 @@ export async function payerCommissions(
         montantFcfa:    String(montantTotal),
         libelle:        libelleMvt,
         soldeApresFcfa: String(nouveauSolde),
+        enregistrePar:  userId ?? null,
       });
     }
 

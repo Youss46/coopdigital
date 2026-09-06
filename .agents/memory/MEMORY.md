@@ -97,6 +97,7 @@
 - [Ordre des verrous des transferts de trésorerie](treasury-transfer-lock-order.md) — banque puis caisse dans les deux sens pour éviter les deadlocks.
 - [Assertions de concurrence trésorerie](treasury-concurrency-assertions.md) — vérifier l’état final et les séquences intermédiaires valides, jamais un ordre imposé entre virements concurrents.
 - [Date de session du journal de caisse](cash-journal-session-date.md) — les débits automatiques doivent cibler la session ouverte du jour, sinon le journal quotidien masque le mouvement.
+- [Traçabilité des mouvements de trésorerie](treasury-movement-actors.md) — afficher `enregistre_par`; utiliser « Système » seulement quand aucune identité humaine n’est disponible.
 - [Solde final du journal de caisse](cash-journal-final-balance.md) — afficher le dernier solde après mouvement visible, pas un recalcul avec un solde d’ouverture hors périmètre.
 - [Synchronisation des sessions de caisse](caisse-session-state-refresh.md) — après une mutation depuis le journal, rafraîchir l’état des caisses parent pour éviter les statuts ouverts périmés.
 - [Règlement transport export](export-transport-settlement.md) — mouvement de trésorerie, écriture 401 et statut payé doivent rester atomiques; litige/annulation bloque le débit.

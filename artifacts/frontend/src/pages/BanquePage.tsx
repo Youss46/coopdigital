@@ -404,6 +404,9 @@ export default function BanquePage() {
                       </td>
                       <td className="px-3 py-3 max-w-[140px] sm:max-w-none">
                         <div className="text-gray-800 truncate">{m.libelle ?? LABEL_MOTIF(m.type, m.motif)}</div>
+                        <div className="text-xs text-gray-400 mt-0.5 truncate">
+                          Effectué par : {m.enregistre_par_nom?.trim() || "Système"}
+                        </div>
                         <div className="text-xs text-gray-400 sm:hidden">{m.reference ?? ""}</div>
                       </td>
                       <td className="px-3 py-3 text-gray-400 text-xs font-mono hidden md:table-cell">{m.reference ?? "—"}</td>

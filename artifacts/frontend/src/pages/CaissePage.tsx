@@ -867,6 +867,7 @@ function JournalCaisse({
                   <th className="text-left px-4 py-3 font-medium">Type</th>
                   <th className="text-left px-4 py-3 font-medium">Motif</th>
                   <th className="text-left px-4 py-3 font-medium">Libellé</th>
+                  <th className="text-left px-4 py-3 font-medium">Effectué par</th>
                   <th className="text-right px-4 py-3 font-medium">Montant</th>
                   <th className="text-right px-4 py-3 font-medium">Solde après</th>
                 </tr>
@@ -882,6 +883,9 @@ function JournalCaisse({
                     </td>
                     <td className="px-4 py-3 text-gray-600 text-xs">{labelMotifCaisse(m.motif)}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{m.libelle ?? "—"}</td>
+                    <td className="px-4 py-3 text-gray-600 text-xs whitespace-nowrap">
+                      {m.enregistre_par_nom?.trim() || "Système"}
+                    </td>
                     <td className={`px-4 py-3 text-right font-semibold ${m.type === "entree" ? "text-green-600" : "text-red-600"}`}>
                       {m.type === "entree" ? "+" : "-"}{FCFA(m.montant_fcfa)}
                     </td>
@@ -1077,6 +1081,7 @@ function HistoriqueSessions({ caisses }: { caisses: Caisse[] | null }) {
                     <th className="text-left px-3 py-2 font-medium">Heure</th>
                     <th className="text-left px-3 py-2 font-medium">Type</th>
                     <th className="text-left px-3 py-2 font-medium">Motif</th>
+                    <th className="text-left px-3 py-2 font-medium">Effectué par</th>
                     <th className="text-right px-3 py-2 font-medium">Montant</th>
                     <th className="text-right px-3 py-2 font-medium">Solde après</th>
                   </tr>
@@ -1091,6 +1096,9 @@ function HistoriqueSessions({ caisses }: { caisses: Caisse[] | null }) {
                         </span>
                       </td>
                       <td className="px-3 py-2 text-gray-600 text-xs">{labelMotifCaisse(m.motif)}</td>
+                      <td className="px-3 py-2 text-gray-600 text-xs whitespace-nowrap">
+                        {m.enregistre_par_nom?.trim() || "Système"}
+                      </td>
                       <td className={`px-3 py-2 text-right font-semibold text-xs ${m.type === "entree" ? "text-green-600" : "text-red-600"}`}>
                         {m.type === "entree" ? "+" : "-"}{FCFA(m.montant_fcfa)}
                       </td>
