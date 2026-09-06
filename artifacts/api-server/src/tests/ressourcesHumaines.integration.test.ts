@@ -737,4 +737,71 @@ describe.skipIf(!enabled)("auteur des sorties de salaires sur PostgreSQL", () =>
       { enregistre_par: userId },
     ]);
   });
+
+  it("ne débite qu'une seule fois quand deux paiements groupés concurrents ciblent les mêmes bulletins", async () => {
+    const bulletins = await pool.query(
+      `INSERT INTO bulletins_paie
+         (personnel_id, cooperative_id, mois, annee, periode,
+          salaire_base_fcfa, salaire_brut_fcfa, salaire_net_fcfa,
+          cout_total_employeur_fcfa, statut)
+       VALUES
+         ($1, $2, 5, 2026, 'mai 2026', 1000, 1000, 1000, 1000, 'valide'),
+         ($1, $2, 6, 2026, 'juin 2026', 1000, 1000, 1000, 1000, 'valide')
+       RETURNING id`,
+      [personnelId, cooperativeId],
+    );
+    const bulletinIds = bulletins.rows.map((row: { id: number }) => row.id);
+    const before = await pool.query(
+      `SELECT solde_actuel_fcfa
+       FROM comptes_bancaires
+       WHERE id = $1`,
+      [compteBancaireId],
+    );
+    const beforeSolde = Number(before.rows[0].solde_actuel_fcfa);
+
+    const responses = await Promise.all([
+      payGroup(bulletinIds, "banque", compteBancaireId),
+      payGroup(bulletinIds, "banque", compteBancaireId),
+    ]);
+    const payloads = await Promise.all(
+      responses.map(async (response) => {
+        expect(response.status).toBe(200);
+        return response.json() as Promise<{ payes: number; erreurs: Array<{ id: number }>; totalPaye: number }>;
+      }),
+    );
+
+    expect(payloads.map((payload) => payload.payes).sort()).toEqual([0, 2]);
+    expect(payloads.find((payload) => payload.payes === 0)?.erreurs).toHaveLength(2);
+    expect(payloads.find((payload) => payload.payes === 2)?.totalPaye).toBe(2000);
+
+    const finalBulletins = await pool.query(
+      `SELECT statut
+       FROM bulletins_paie
+       WHERE id = ANY($1::int[])
+       ORDER BY id`,
+      [bulletinIds],
+    );
+    expect(finalBulletins.rows).toEqual([{ statut: "paye" }, { statut: "paye" }]);
+
+    const movements = await pool.query(
+      `SELECT count(*)::int AS count
+       FROM mouvements_banque
+       WHERE compte_id = $1
+         AND motif = 'paiement_salaire'
+         AND libelle = ANY($2::text[])`,
+      [
+        compteBancaireId,
+        bulletinIds.map((id) => `Salaire – bulletin #${id}`),
+      ],
+    );
+    expect(movements.rows[0].count).toBe(2);
+
+    const after = await pool.query(
+      `SELECT solde_actuel_fcfa
+       FROM comptes_bancaires
+       WHERE id = $1`,
+      [compteBancaireId],
+    );
+    expect(Number(after.rows[0].solde_actuel_fcfa)).toBe(beforeSolde - 2000);
+  });
 });

@@ -124,8 +124,11 @@ export async function updateCaisse(id: number, data: Partial<{
 
 // ─── Sessions ─────────────────────────────────────────────────────────────────
 
-export async function getSessionActive(caisseId: number) {
-  const result = await db.execute<{
+export async function getSessionActive(
+  caisseId: number,
+  executor: typeof db | ComptabiliteTransaction = db,
+) {
+  const result = await executor.execute<{
     id: number; caisse_id: number; date_session: string; statut: string;
     solde_ouverture_fcfa: string; ouvert_par: number | null;
     heure_ouverture: string; nb_mouvements: string;
@@ -1185,12 +1188,21 @@ export async function debitCaisseForSalaire(
   libelle: string,
   reference: string | null,
   userId: number | null,
+  tx?: ComptabiliteTransaction,
 ): Promise<{ nouveauSolde: number; alerte?: string }> {
-  const caisse = await getCaisse(caisseId);
+  const executor = tx ?? db;
+  const [caisse] = await executor
+    .select()
+    .from(caissesTable)
+    .where(and(
+      eq(caissesTable.id, caisseId),
+      eq(caissesTable.cooperativeId, cooperativeId),
+    ))
+    .for("update")
+    .limit(1);
   if (!caisse) throw new Error("Caisse introuvable");
-  if (caisse.cooperativeId !== cooperativeId) throw new Error("Accès refusé");
 
-  const sessionRow = await getSessionActive(caisseId);
+  const sessionRow = await getSessionActive(caisseId, executor);
   if (!sessionRow) {
     throw new Error(
       `Aucune session de caisse ouverte. Ouvrez une session dans la page Caisse avant de payer un salaire en espèces.`,
@@ -1204,7 +1216,7 @@ export async function debitCaisseForSalaire(
   }
   const nouveauSolde = soldeActuel - montant;
 
-  await db.insert(mouvementsCaisseTable).values({
+  await executor.insert(mouvementsCaisseTable).values({
     caisseId,
     sessionId: sessionRow.id,
     cooperativeId,
@@ -1217,7 +1229,7 @@ export async function debitCaisseForSalaire(
     enregistrePar: userId,
   });
 
-  await db.update(caissesTable)
+  await executor.update(caissesTable)
     .set({ soldeActuelFcfa: nouveauSolde.toString() })
     .where(eq(caissesTable.id, caisseId));
 

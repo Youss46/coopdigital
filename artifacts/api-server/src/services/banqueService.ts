@@ -435,9 +435,10 @@ export async function debitBanqueForSalaire(
   libelle: string,
   reference: string | null,
   userId: number | null,
+  tx?: ComptabiliteTransaction,
 ): Promise<{ nouveauSolde: number; alerte?: string }> {
-  return db.transaction(async (tx) => {
-    const [compte] = await tx
+  const debit = async (executor: ComptabiliteTransaction) => {
+    const [compte] = await executor
       .select()
       .from(comptesBancairesTable)
       .where(and(
@@ -454,7 +455,7 @@ export async function debitBanqueForSalaire(
     const nouveauSolde = soldeActuel - montant;
     const dateOp = today();
 
-    const [mouvement] = await tx.insert(mouvementsBanqueTable).values({
+    const [mouvement] = await executor.insert(mouvementsBanqueTable).values({
       compteId,
       cooperativeId,
       type: "debit",
@@ -469,7 +470,7 @@ export async function debitBanqueForSalaire(
     }).returning();
     if (!mouvement) throw new Error("Le débit bancaire n'a pas pu être créé");
 
-    await tx.update(comptesBancairesTable)
+    await executor.update(comptesBancairesTable)
       .set({ soldeActuelFcfa: nouveauSolde.toString() })
       .where(eq(comptesBancairesTable.id, compteId));
 
@@ -482,7 +483,9 @@ export async function debitBanqueForSalaire(
 
     logger.info({ compteId, montant, nouveauSolde }, "Banque débitée (paiement salaire)");
     return { nouveauSolde, alerte };
-  });
+  };
+
+  return tx ? debit(tx) : db.transaction(debit);
 }
 
 // ─── Alertes solde ────────────────────────────────────────────────────────────
