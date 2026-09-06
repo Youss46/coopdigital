@@ -17,6 +17,7 @@ export const modePaiementEnum = pgEnum("mode_paiement", [
   "wave",
   "cheque",
   "virement",
+  "carte_producteur",
 ]);
 
 export const paiementStatutEnum = pgEnum("paiement_statut", [

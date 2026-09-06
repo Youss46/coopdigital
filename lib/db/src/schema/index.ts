@@ -56,6 +56,7 @@ export * from "./pushSubscriptions";
 export * from "./pushSubscriptionsPortail";
 export * from "./banque";
 export * from "./cheques";
+export * from "./reglements_cartes_producteurs";
 export * from "./cheques_recus";
 export * from "./mobile_marchand";
 export * from "./portailNotifications";

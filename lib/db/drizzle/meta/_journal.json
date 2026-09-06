@@ -1156,6 +1156,13 @@
       "when": 1788543300000,
       "tag": "0164_reglement_charges_credit",
       "breakpoints": true
+    },
+    {
+      "idx": 165,
+      "version": "7",
+      "when": 1788543600000,
+      "tag": "0165_reglements_cartes_producteurs",
+      "breakpoints": true
     }
   ]
 }

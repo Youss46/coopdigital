@@ -383,6 +383,7 @@ function ModalReglementTransport({
 const MODES_CARBURANT = [
   { value: "especes",      label: "Espèces" },
   { value: "cheque",       label: "Chèque" },
+  { value: "carte_producteur", label: "Carte producteur" },
   { value: "virement",     label: "Virement bancaire" },
   { value: "orange_money", label: "Orange Money" },
   { value: "mtn_momo",     label: "MTN MoMo" },
@@ -550,6 +551,10 @@ export function ModalValidation({
     if (modeManquant) { setTouched(true); return; }
     if (sessionBloquee) return;
     if (refManquante) { setTouched(true); return; }
+    if (selectedMode === "carte_producteur" && !(paiement as PaiementListItem & { membreCarteProducteur?: string | null }).membreCarteProducteur) {
+      setTouched(true);
+      return;
+    }
     onConfirm(ref, telephone, montantConfirme, selectedMode || undefined, undefined, { numero: numeroCheque, banque }, inclureFraisCollecte);
   }
 
@@ -742,7 +747,7 @@ export function ModalValidation({
                         onChange={(e) => setVentilations((old) => old.map((item, i) => i === index ? { ...item, modePaiement: e.target.value as VentilationPaiementInput["modePaiement"] } : item))}
                         className="flex-1 border border-gray-200 rounded-lg px-2 py-2 text-xs"
                       >
-                        {MODES_CARBURANT.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                         {MODES_CARBURANT.filter((m) => m.value !== "carte_producteur").map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
                       </select>
                       <input
                         type="text"
@@ -816,6 +821,12 @@ export function ModalValidation({
                   <span className="font-semibold">Caisse</span> avant de valider un règlement en espèces.
                 </p>
               </div>
+            </div>
+          )}
+
+          {selectedMode === "carte_producteur" && (
+            <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+              Le numéro de la carte officielle du producteur est conservé avec ce règlement. Aucun TPE n’est appelé : le compte bancaire sera débité lorsque le règlement sera marqué payé.
             </div>
           )}
 
@@ -1540,7 +1551,7 @@ export default function ReglementsPage() {
     ref: string,
     telephone: string,
     montant: number,
-    mode?: ValiderPaiementInputModePaiement,
+    mode?: string,
     ventilations?: VentilationPaiementInput[],
     cheque?: { numero: string; banque: string },
     inclureFraisCollecte = false,
@@ -1561,7 +1572,7 @@ export default function ReglementsPage() {
           telephone: telephone || null,
           ...(livraisonAvecSolde(modal.paiement) ? { montantReglementFcfa: montantNetCacao } : {}),
           ...(inclureFraisCollecte ? { inclureFraisCollecte: true } : {}),
-          ...(sendMode ? { modePaiement: mode } : {}),
+          ...(sendMode ? { modePaiement: mode as ValiderPaiementInputModePaiement } : {}),
           ...(cheque && mode === "cheque" ? {
             numeroCheque: cheque.numero || null,
             banque: cheque.banque || null,
@@ -2089,7 +2100,7 @@ export default function ReglementsPage() {
         <ModalValidation
           paiement={modal.paiement}
           onClose={() => setModal(null)}
-          onConfirm={(ref, telephone, montant, mode, ventilations, cheque, inclureFraisCollecte) => void handleValider(ref, telephone, montant, mode as ValiderPaiementInputModePaiement | undefined, ventilations, cheque, inclureFraisCollecte)}
+           onConfirm={(ref, telephone, montant, mode, ventilations, cheque, inclureFraisCollecte) => void handleValider(ref, telephone, montant, mode ?? undefined, ventilations, cheque, inclureFraisCollecte)}
           loading={validerMut.isPending}
           sessionCaisseOuverte={isDelegue ? sessionDelegueOuverte : sessionCentraleOuverte}
           isDelegue={isDelegue}

@@ -28,6 +28,7 @@ function comptesForMouvement(type: string, motif: string): { debit: string; cred
     frais_bancaires:      "638",  // Autres charges externes
     remboursement_emprunt:"162",  // Emprunts
     paiement_cheque:      "401",  // Fournisseurs (producteurs payés par chèque)
+      paiement_carte_producteur: "401", // Producteurs réglés par carte interne
     reglement_frais_exportation: "401",  // Dette transporteur
     autre_debit:          "628",  // Frais divers
   };

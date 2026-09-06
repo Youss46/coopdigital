@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { db, paiementsTable, paiementLignesTable, membresTable, livraisonsTable, fournisseursTable, usersTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable, caissesTable, chequesEmisTable, bonsCarburantTable, campagnesTable, sessionsPeseeTable, commissionsMembresDelaguesTable, depensesVehiculeTable } from "@workspace/db";
+import { db, paiementsTable, paiementLignesTable, membresTable, livraisonsTable, fournisseursTable, usersTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable, caissesTable, chequesEmisTable, reglementsCartesProducteursTable, bonsCarburantTable, campagnesTable, sessionsPeseeTable, commissionsMembresDelaguesTable, depensesVehiculeTable } from "@workspace/db";
 import { eq, desc, and, or, sql, gte, lt, lte, inArray, isNull, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { envoyerPushGroupePortail, envoyerPushGroupe } from "../services/pushService";
@@ -362,6 +362,7 @@ const SELECT_FIELDS = {
   // Membre
   membreNom: membresTable.nom,
   membrePrenoms: membresTable.prenoms,
+  membreCarteProducteur: membresTable.carteProducteur,
   telephone: membresTable.telephone,
   // Fournisseur externe (pisteur)
   fournisseurNom: fournisseursTable.nom,
@@ -795,7 +796,7 @@ export async function validerPaiement(req: Request, res: Response): Promise<void
     return;
   }
 
-  const MODES_VALIDES = ["especes", "cheque", "virement", "orange_money", "mtn_momo", "wave"] as const;
+  const MODES_VALIDES = ["especes", "cheque", "virement", "orange_money", "mtn_momo", "wave", "carte_producteur"] as const;
 
 type VentilationPaiement = {
   modePaiement: typeof MODES_VALIDES[number];
@@ -924,6 +925,7 @@ async function debiterMobileDansTransaction(
         fournisseurNom: fournisseursTable.nom,
         fournisseurPrenoms: fournisseursTable.prenoms,
         membreDelegueId: membresTable.delegueId,
+        membreCarteProducteur: membresTable.carteProducteur,
         fournisseurCoopId: fournisseursTable.cooperativeId,
         bonCarburantCoopId: bonsCarburantTable.cooperativeId,
         depenseVehiculeCoopId: depensesVehiculeTable.cooperativeId,
@@ -1095,6 +1097,12 @@ async function debiterMobileDansTransaction(
         res.status(403).json({
           erreur: "Un délégué ne peut valider que des paiements en espèces.",
           message: "Les chèques, virements et paiements mobile money doivent être validés par un Directeur, Comptable ou PCA.",
+        });
+        return;
+      }
+      if (lignes.some((ligne) => ligne.modePaiement === "carte_producteur")) {
+        res.status(400).json({
+          erreur: "La carte producteur doit être utilisée comme moyen unique pour créer son règlement différé.",
         });
         return;
       }
@@ -1398,6 +1406,7 @@ async function debiterMobileDansTransaction(
       : null;
     const mode = (modeOverride ?? row.paiement.modePaiement) as string;
     const isMobileMarchand = mode === "orange_money" || mode === "mtn_momo" || mode === "wave";
+    const isCarteProducteur = mode === "carte_producteur";
 
     // Un délégué ne peut valider que les paiements en espèces (toutes sources confondues)
     if (req.user?.role === "delegue" && mode !== "especes") {
@@ -1652,7 +1661,7 @@ async function debiterMobileDansTransaction(
 
       const [ligneInseree] = await tx.insert(paiementLignesTable).values({
         paiementId: id,
-        modePaiement: mode as "especes" | "cheque" | "virement" | "orange_money" | "mtn_momo" | "wave",
+        modePaiement: mode as "especes" | "cheque" | "virement" | "orange_money" | "mtn_momo" | "wave" | "carte_producteur",
         montantFcfa: montantTotalPaiement,
         referenceTransaction: body.referenceTransaction ?? null,
         numeroCheque: mode === "cheque" ? body.numeroCheque ?? null : null,
@@ -1673,6 +1682,26 @@ async function debiterMobileDansTransaction(
           dateEmission: new Date().toISOString().slice(0, 10),
           dateEcheance: body.dateEcheance ?? null,
           statut: "emis",
+          createdBy: userId ?? null,
+        });
+      }
+
+      if (isCarteProducteur) {
+        const numeroCarte = row.membreCarteProducteur?.trim();
+        if (!numeroCarte || !row.paiement.membreId) {
+          throw new PaiementMontantInvalideError("Ce producteur ne possède pas de carte producteur enregistrée.");
+        }
+        await tx.insert(reglementsCartesProducteursTable).values({
+          cooperativeId,
+          paiementId: id,
+          paiementLigneId: ligneInseree!.id,
+          membreId: row.paiement.membreId,
+          livraisonId: row.paiement.livraisonId ?? null,
+          numeroCarteSnapshot: numeroCarte,
+          beneficiaire: beneficiairePaiement,
+          montantFcfa: montantTotalPaiement,
+          dateCreation: new Date().toISOString().slice(0, 10),
+          statut: "en_attente",
           createdBy: userId ?? null,
         });
       }
