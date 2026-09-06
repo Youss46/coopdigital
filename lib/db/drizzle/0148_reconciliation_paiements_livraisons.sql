@@ -1,7 +1,7 @@
 -- Régulariser les anciennes dates de validation manquantes.
 UPDATE paiements
 SET date_validation = created_at
-WHERE statut IN ('confirme', 'effectue')
+WHERE statut::text IN ('confirme', 'effectue')
   AND date_validation IS NULL;
 
 -- Récupérer le mode lorsqu'un règlement historique possède une seule ligne
@@ -26,7 +26,7 @@ WITH paiements_regles AS (
     SUM(montant_fcfa)::numeric AS montant_paye
   FROM paiements
   WHERE livraison_id IS NOT NULL
-    AND statut IN ('confirme', 'effectue')
+    AND statut::text IN ('confirme', 'effectue')
   GROUP BY livraison_id
 )
 UPDATE livraisons l

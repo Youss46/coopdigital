@@ -95,6 +95,7 @@
 - [Fixtures PostgreSQL typées](postgres-fixture-parameter-types.md) — dans un INSERT de test, caster séparément les paramètres réutilisés entre colonnes integer et numeric.
 - [Références PDF des pesées](pdf-local-numbering.md) — les reçus et bordereaux affichent PES-S-<rang> avant tout identifiant legacy.
 - [Ordre des verrous des transferts de trésorerie](treasury-transfer-lock-order.md) — banque puis caisse dans les deux sens pour éviter les deadlocks.
+- [Assertions de concurrence trésorerie](treasury-concurrency-assertions.md) — vérifier l’état final et les séquences intermédiaires valides, jamais un ordre imposé entre virements concurrents.
 - [Date de session du journal de caisse](cash-journal-session-date.md) — les débits automatiques doivent cibler la session ouverte du jour, sinon le journal quotidien masque le mouvement.
 - [Solde final du journal de caisse](cash-journal-final-balance.md) — afficher le dernier solde après mouvement visible, pas un recalcul avec un solde d’ouverture hors périmètre.
 - [Synchronisation des sessions de caisse](caisse-session-state-refresh.md) — après une mutation depuis le journal, rafraîchir l’état des caisses parent pour éviter les statuts ouverts périmés.

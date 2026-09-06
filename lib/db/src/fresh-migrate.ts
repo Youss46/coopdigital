@@ -40,7 +40,7 @@ try {
   console.log(`📂 Dossier migrations : ${migrationsFolder}`);
   const db = drizzle(client);
   await migrate(db, { migrationsFolder });
-  console.log("✅ Toutes les migrations appliquées avec succès (0000 → 0066)");
+  console.log("✅ Toutes les migrations présentes appliquées avec succès");
 
 } catch (err) {
   console.error("❌ Erreur lors des migrations :", err);

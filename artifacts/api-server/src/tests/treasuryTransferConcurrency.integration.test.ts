@@ -290,48 +290,66 @@ describe.skipIf(!enabled)("virements banque-caisse concurrents sur PostgreSQL", 
           type: "debit",
           motif: "virement_sortant",
           montant_fcfa: "175000",
-          solde_apres_fcfa: "325000",
           date_operation: postgresPreviousDate,
         }),
         expect.objectContaining({
           type: "credit",
           motif: "virement_entrant",
           montant_fcfa: "125000",
-          solde_apres_fcfa: "450000",
           date_operation: postgresPreviousDate,
         }),
       ]),
     );
+    const bankBalancesAfterMovements = new Set(
+      bankMovements.rows.map((row: { solde_apres_fcfa: string }) => row.solde_apres_fcfa),
+    );
+    expect(
+      [
+        ["325000", "450000"],
+        ["450000", "625000"],
+      ].some((expected) =>
+        expected.every((balance) => bankBalancesAfterMovements.has(balance)),
+      ),
+    ).toBe(true);
     expect(cashMovements.rows).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           type: "entree",
           motif: "virement_banque",
           montant_fcfa: "175000",
-          solde_apres_fcfa: "675000",
           date_operation: postgresPreviousDate,
         }),
         expect.objectContaining({
           type: "sortie",
           motif: "depot_banque",
           montant_fcfa: "125000",
-          solde_apres_fcfa: "550000",
           date_operation: postgresPreviousDate,
         }),
       ]),
     );
+    const cashBalancesAfterMovements = new Set(
+      cashMovements.rows.map((row: { solde_apres_fcfa: string }) => row.solde_apres_fcfa),
+    );
+    expect(
+      [
+        ["550000", "675000"],
+        ["375000", "550000"],
+      ].some((expected) =>
+        expected.every((balance) => cashBalancesAfterMovements.has(balance)),
+      ),
+    ).toBe(true);
     expect(accounting.rows).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           montant_fcfa: 175_000,
-          compte_debit: "571",
-          compte_credit: "521",
+          compte_debit: "571000",
+          compte_credit: "521000",
           date_ecriture: postgresPreviousDate,
         }),
         expect.objectContaining({
           montant_fcfa: 125_000,
-          compte_debit: "521",
-          compte_credit: "571",
+          compte_debit: "521000",
+          compte_credit: "571000",
           date_ecriture: postgresPreviousDate,
         }),
       ]),

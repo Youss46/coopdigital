@@ -1135,6 +1135,20 @@
       "when": 1788542400000,
       "tag": "0161_plan_comptable_unique_actif",
       "breakpoints": true
+    },
+    {
+      "idx": 162,
+      "version": "7",
+      "when": 1788542700000,
+      "tag": "0162_retenue_avances_commissions",
+      "breakpoints": true
+    },
+    {
+      "idx": 163,
+      "version": "7",
+      "when": 1788543000000,
+      "tag": "0163_date_operation_mouvements_caisse",
+      "breakpoints": true
     }
   ]
 }

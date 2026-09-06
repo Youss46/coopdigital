@@ -384,6 +384,7 @@ export async function virementVersCaisse(
         montantFcfa:        data.montantFcfa.toString(),
         libelle:            `Virement depuis banque ${compteBancaire.nom}${data.libelle ? ` — ${data.libelle}` : ""}`,
         referenceOperation: ref,
+        dateOperation:      dateOp,
         soldeApresFcfa:     nvSoldeCaisse.toString(),
         enregistrePar:      userId,
       })

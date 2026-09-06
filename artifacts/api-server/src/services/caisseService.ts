@@ -607,6 +607,7 @@ export async function virementVersBanque(
         montantFcfa:      mt.toString(),
         libelle:          lib,
         referenceOperation: ref,
+        dateOperation:     dateOp,
         soldeApresFcfa:   nvSoldeCaisse.toString(),
         enregistrePar:    userId ?? null,
       })

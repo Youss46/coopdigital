@@ -41,6 +41,7 @@ export const mouvementsCaisseTable = pgTable("mouvements_caisse", {
   montantFcfa:         numeric("montant_fcfa").notNull(),
   libelle:             varchar("libelle", { length: 300 }),
   referenceOperation:  varchar("reference_operation", { length: 100 }),
+  dateOperation:       date("date_operation").notNull().default(sql`CURRENT_DATE`),
   soldeApresFcfa:      numeric("solde_apres_fcfa"),
   enregistrePar:       integer("enregistre_par"),
   createdAt:           timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

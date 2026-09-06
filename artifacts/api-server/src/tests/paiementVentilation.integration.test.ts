@@ -36,6 +36,9 @@ function shiftIsoDate(date: string, days: number): string {
 
 const postgresPreviousDate = shiftIsoDate(postgresReferenceDate, -1);
 const postgresReferenceYear = Number(postgresReferenceDate.slice(0, 4));
+const COMPTE_CAISSE = "511000";
+const COMPTE_CLIENT = "411100";
+const COMPTE_BANQUE = "571000";
 
 type TestResponse = {
   statusCode: number;
@@ -251,15 +254,17 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
   async function createDeferredPayment(
     amount: number,
   ): Promise<{ paymentId: number; deliveryId: number }> {
+    const numeroPesee = 800_000 + process.pid + paymentIds.length;
     const livraison = await client.query(
       `INSERT INTO livraisons
-        (membre_id, poids_kg, prix_unitaire_fcfa, montant_brut_fcfa,
+        (cooperative_id, membre_id, poids_kg, prix_unitaire_fcfa, montant_brut_fcfa,
          avance_deduite_fcfa, intrants_deduits_fcfa, montant_net_fcfa,
-         date_livraison, statut_paiement, montant_restant)
-       VALUES ($1, 1, $2::integer, $3::integer, 0, 0, $3::integer,
-               CURRENT_DATE, 'EN_ATTENTE', $4::numeric)
+         date_livraison, numero_pesee, annee_numero_pesee,
+         statut_paiement, montant_restant)
+       VALUES ($1, $2, 1, $3::integer, $4::integer, 0, 0, $4::integer,
+               CURRENT_DATE, $5, $6, 'EN_ATTENTE', $7::numeric)
        RETURNING id`,
-      [memberId, amount, amount, amount],
+      [cooperativeId, memberId, amount, amount, numeroPesee, postgresReferenceYear, amount],
     );
     const livraisonId = livraison.rows[0].id as number;
     deliveryIds.push(livraisonId);
@@ -347,7 +352,7 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
       params: { id: String(paymentId) },
       body,
       user: { cooperativeId, id: undefined, role: "comptable" },
-      log: { error: () => undefined },
+       log: { error: () => undefined },
     } as any;
   }
 
@@ -553,7 +558,7 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
     });
   });
 
-  it("enregistre automatiquement la retenue d'avance avec les comptes 401/4091", async () => {
+  it("enregistre automatiquement la retenue d'avance avec les comptes 401000/409100", async () => {
     const { paymentId, commissionId, advanceId } = await createCommissionCoveredPayment();
 
     await setAutoAvances(true);
@@ -576,8 +581,8 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
         [cooperativeId, memberId],
       )).toMatchObject({
         rows: [{
-          compte_debit: "401",
-          compte_credit: "4091",
+          compte_debit: "401000",
+          compte_credit: "409100",
           montant_fcfa: 22500,
         }],
       });
@@ -1646,16 +1651,16 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
     });
     await expect(accountingState(fixture)).resolves.toEqual([
       {
-        compte_debit: "511",
-        compte_credit: "4111",
+        compte_debit: COMPTE_CAISSE,
+        compte_credit: COMPTE_CLIENT,
         montant_fcfa: 100_000,
         source: "encaissement",
         source_id: fixture.saleId,
         numero_piece: `ENC-${fixture.saleId}-cheque`,
       },
       {
-        compte_debit: "4111",
-        compte_credit: "511",
+        compte_debit: COMPTE_CLIENT,
+        compte_credit: COMPTE_CAISSE,
         montant_fcfa: 100_000,
         source: "encaissement",
         source_id: fixture.chequeId,
@@ -1693,24 +1698,24 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
     });
     await expect(accountingState(fixture)).resolves.toEqual([
       {
-        compte_debit: "571",
-        compte_credit: "4111",
+        compte_debit: COMPTE_BANQUE,
+        compte_credit: COMPTE_CLIENT,
         montant_fcfa: 40_000,
         source: "encaissement",
         source_id: fixture.saleId,
         numero_piece: `ENC-${fixture.saleId}-especes`,
       },
       {
-        compte_debit: "511",
-        compte_credit: "4111",
+        compte_debit: COMPTE_CAISSE,
+        compte_credit: COMPTE_CLIENT,
         montant_fcfa: 60_000,
         source: "encaissement",
         source_id: fixture.saleId,
         numero_piece: `ENC-${fixture.saleId}-cheque`,
       },
       {
-        compte_debit: "4111",
-        compte_credit: "511",
+        compte_debit: COMPTE_CLIENT,
+        compte_credit: COMPTE_CAISSE,
         montant_fcfa: 60_000,
         source: "encaissement",
         source_id: fixture.chequeId,
@@ -1748,16 +1753,16 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
     });
     await expect(accountingState(fixture)).resolves.toEqual([
       {
-        compte_debit: "511",
-        compte_credit: "4111",
+        compte_debit: COMPTE_CAISSE,
+        compte_credit: COMPTE_CLIENT,
         montant_fcfa: 85_000,
         source: "encaissement",
         source_id: fixture.saleId,
         numero_piece: `ENC-${fixture.saleId}-cheque`,
       },
       {
-        compte_debit: "4111",
-        compte_credit: "511",
+        compte_debit: COMPTE_CLIENT,
+        compte_credit: COMPTE_CAISSE,
         montant_fcfa: 85_000,
         source: "encaissement",
         source_id: fixture.chequeId,
@@ -1814,16 +1819,16 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
     });
     await expect(accountingState(fixture)).resolves.toEqual([
       {
-        compte_debit: "511",
-        compte_credit: "4111",
+        compte_debit: COMPTE_CAISSE,
+        compte_credit: COMPTE_CLIENT,
         montant_fcfa: 95_000,
         source: "encaissement",
         source_id: fixture.saleId,
         numero_piece: `ENC-${fixture.saleId}-cheque`,
       },
       {
-        compte_debit: "4111",
-        compte_credit: "511",
+        compte_debit: COMPTE_CLIENT,
+        compte_credit: COMPTE_CAISSE,
         montant_fcfa: 95_000,
         source: "encaissement",
         source_id: fixture.chequeId,
@@ -1900,16 +1905,16 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
     );
     await expect(accountingState(fixture)).resolves.toEqual([
       {
-        compte_debit: "511",
-        compte_credit: "4111",
+        compte_debit: COMPTE_CAISSE,
+        compte_credit: COMPTE_CLIENT,
         montant_fcfa: 110_000,
         source: "encaissement",
         source_id: fixture.saleId,
         numero_piece: `ENC-${fixture.saleId}-cheque`,
       },
       {
-        compte_debit: "4111",
-        compte_credit: "511",
+        compte_debit: COMPTE_CLIENT,
+        compte_credit: COMPTE_CAISSE,
         montant_fcfa: 110_000,
         source: "encaissement",
         source_id: fixture.chequeId,
@@ -1992,8 +1997,8 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
       await expect(bankBalance()).resolves.toBe(String(bankBefore + 120_000));
       await expect(accountingState(fixture)).resolves.toEqual([
         {
-          compte_debit: "511",
-          compte_credit: "4111",
+          compte_debit: COMPTE_CAISSE,
+          compte_credit: COMPTE_CLIENT,
           montant_fcfa: 120_000,
           source: "encaissement",
           source_id: fixture.saleId,
@@ -2027,16 +2032,16 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
       await expect(bankBalance()).resolves.toBe(String(bankBefore));
       await expect(accountingState(fixture)).resolves.toEqual([
         {
-          compte_debit: "511",
-          compte_credit: "4111",
+          compte_debit: COMPTE_CAISSE,
+          compte_credit: COMPTE_CLIENT,
           montant_fcfa: 120_000,
           source: "encaissement",
           source_id: fixture.saleId,
           numero_piece: `ENC-${fixture.saleId}-cheque`,
         },
         {
-          compte_debit: "4111",
-          compte_credit: "511",
+          compte_debit: COMPTE_CLIENT,
+          compte_credit: COMPTE_CAISSE,
           montant_fcfa: 120_000,
           source: "encaissement",
           source_id: fixture.chequeId,
@@ -2102,16 +2107,16 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
     });
     await expect(accountingState(fixture)).resolves.toEqual([
       {
-        compte_debit: "511",
-        compte_credit: "4111",
+        compte_debit: COMPTE_CAISSE,
+        compte_credit: COMPTE_CLIENT,
         montant_fcfa: 115_000,
         source: "encaissement",
         source_id: fixture.saleId,
         numero_piece: `ENC-${fixture.saleId}-cheque`,
       },
       {
-        compte_debit: "4111",
-        compte_credit: "511",
+        compte_debit: COMPTE_CLIENT,
+        compte_credit: COMPTE_CAISSE,
         montant_fcfa: 115_000,
         source: "encaissement",
         source_id: fixture.chequeId,
@@ -2212,16 +2217,16 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
       await expect(bankBalance()).resolves.toBe(String(bankBefore));
       await expect(accountingState(fixture)).resolves.toEqual([
         {
-          compte_debit: "511",
-          compte_credit: "4111",
+          compte_debit: COMPTE_CAISSE,
+          compte_credit: COMPTE_CLIENT,
           montant_fcfa: 125_000,
           source: "encaissement",
           source_id: fixture.saleId,
           numero_piece: `ENC-${fixture.saleId}-cheque`,
         },
         {
-          compte_debit: "4111",
-          compte_credit: "511",
+          compte_debit: COMPTE_CLIENT,
+          compte_credit: COMPTE_CAISSE,
           montant_fcfa: 125_000,
           source: "encaissement",
           source_id: fixture.chequeId,
@@ -2258,16 +2263,16 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
     });
     await expect(accountingState(fixture)).resolves.toEqual([
       {
-        compte_debit: "511",
-        compte_credit: "4111",
+        compte_debit: COMPTE_CAISSE,
+        compte_credit: COMPTE_CLIENT,
         montant_fcfa: 75_000,
         source: "encaissement",
         source_id: fixture.saleId,
         numero_piece: `ENC-${fixture.saleId}-cheque`,
       },
       {
-        compte_debit: "4111",
-        compte_credit: "511",
+        compte_debit: COMPTE_CLIENT,
+        compte_credit: COMPTE_CAISSE,
         montant_fcfa: 75_000,
         source: "encaissement",
         source_id: fixture.chequeId,
@@ -2316,8 +2321,8 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
     });
     await expect(accountingState(fixture)).resolves.toEqual([
       {
-        compte_debit: "511",
-        compte_credit: "4111",
+        compte_debit: COMPTE_CAISSE,
+        compte_credit: COMPTE_CLIENT,
         montant_fcfa: 90_000,
         source: "encaissement",
         source_id: fixture.saleId,
@@ -2366,8 +2371,8 @@ describe.skipIf(!enabled)("rejet de chèque reçu atomique sur PostgreSQL", () =
     });
     await expect(accountingState(fixture)).resolves.toEqual([
       {
-        compte_debit: "511",
-        compte_credit: "4111",
+        compte_debit: COMPTE_CAISSE,
+        compte_credit: COMPTE_CLIENT,
         montant_fcfa: 80_000,
         source: "encaissement",
         source_id: fixture.saleId,
