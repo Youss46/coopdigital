@@ -62,6 +62,7 @@ describe.skipIf(!enabled)("virements banque-caisse concurrents sur PostgreSQL", 
   let compteBancaireId: number;
   let caisseId: number;
   let sessionId: number;
+  let userId: number;
 
   const objectSuffix = `${process.pid}_${Date.now()}`;
   const delayFunction = `task80_delay_${objectSuffix}`;
@@ -119,6 +120,15 @@ describe.skipIf(!enabled)("virements banque-caisse concurrents sur PostgreSQL", 
       [`Task 80 treasury concurrency ${objectSuffix}`, "Test", "Test"],
     );
     cooperativeId = cooperative.rows[0].id;
+
+    const user = await client.query(
+      `INSERT INTO users
+         (cooperative_id, nom, prenoms, email, password_hash, role)
+       VALUES ($1, 'Auteur', 'Intégration', $2, 'integration-only', 'comptable')
+       RETURNING id`,
+      [cooperativeId, `treasury-transfer-${objectSuffix}@example.test`],
+    );
+    userId = user.rows[0].id;
 
     await client.query(
       `INSERT INTO config_comptable (cooperative_id, auto_banque, auto_caisse)
@@ -218,6 +228,7 @@ describe.skipIf(!enabled)("virements banque-caisse concurrents sur PostgreSQL", 
     await client.query(`DELETE FROM config_comptable WHERE cooperative_id = $1`, [
       cooperativeId,
     ]);
+    await client.query(`DELETE FROM users WHERE id = $1`, [userId]);
     await client.query(`DELETE FROM cooperatives WHERE id = $1`, [
       cooperativeId,
     ]);
@@ -235,12 +246,14 @@ describe.skipIf(!enabled)("virements banque-caisse concurrents sur PostgreSQL", 
           montantFcfa: 175_000,
           reference: `TASK80-BANK-TO-CASH-${objectSuffix}`,
           dateOperation: postgresPreviousDate,
+          userId,
         }),
         virementVersBanque(caisseId, cooperativeId, {
           compteBancaireId,
           montantFcfa: 125_000,
           reference: `TASK80-CASH-TO-BANK-${objectSuffix}`,
           dateOperation: postgresPreviousDate,
+          userId,
         }),
       ]);
     } finally {
@@ -262,14 +275,16 @@ describe.skipIf(!enabled)("virements banque-caisse concurrents sur PostgreSQL", 
       [compteBancaireId, caisseId],
     );
     const bankMovements = await client.query(
-      `SELECT type, motif, montant_fcfa, solde_apres_fcfa, date_operation::text
+      `SELECT type, motif, montant_fcfa, solde_apres_fcfa, date_operation::text,
+              enregistre_par
        FROM mouvements_banque
        WHERE compte_id = $1
        ORDER BY id`,
       [compteBancaireId],
     );
     const cashMovements = await client.query(
-      `SELECT type, motif, montant_fcfa, solde_apres_fcfa, date_operation::text
+      `SELECT type, motif, montant_fcfa, solde_apres_fcfa, date_operation::text,
+              enregistre_par
        FROM mouvements_caisse
        WHERE caisse_id = $1
        ORDER BY id`,
@@ -291,12 +306,14 @@ describe.skipIf(!enabled)("virements banque-caisse concurrents sur PostgreSQL", 
           motif: "virement_sortant",
           montant_fcfa: "175000",
           date_operation: postgresPreviousDate,
+          enregistre_par: userId,
         }),
         expect.objectContaining({
           type: "credit",
           motif: "virement_entrant",
           montant_fcfa: "125000",
           date_operation: postgresPreviousDate,
+          enregistre_par: userId,
         }),
       ]),
     );
@@ -318,12 +335,14 @@ describe.skipIf(!enabled)("virements banque-caisse concurrents sur PostgreSQL", 
           motif: "virement_banque",
           montant_fcfa: "175000",
           date_operation: postgresPreviousDate,
+          enregistre_par: userId,
         }),
         expect.objectContaining({
           type: "sortie",
           motif: "depot_banque",
           montant_fcfa: "125000",
           date_operation: postgresPreviousDate,
+          enregistre_par: userId,
         }),
       ]),
     );
@@ -357,6 +376,28 @@ describe.skipIf(!enabled)("virements banque-caisse concurrents sur PostgreSQL", 
     expect(bankMovements.rows).toHaveLength(2);
     expect(cashMovements.rows).toHaveLength(2);
     expect(accounting.rows).toHaveLength(2);
+  });
+
+  it("conserve NULL pour un virement historique sans utilisateur", async () => {
+    await virementVersCaisse(compteBancaireId, cooperativeId, {
+      caisseId,
+      montantFcfa: 10_000,
+      reference: `TASK80-SYSTEM-${objectSuffix}`,
+      dateOperation: postgresPreviousDate,
+    });
+
+    const movements = await client.query(
+      `SELECT mb.enregistre_par AS bank_author, mc.enregistre_par AS cash_author
+       FROM mouvements_banque mb
+       JOIN mouvements_caisse mc
+         ON mc.reference_operation = mb.reference
+       WHERE mb.reference = $1`,
+      [`TASK80-SYSTEM-${objectSuffix}`],
+    );
+
+    expect(movements.rows).toEqual([
+      { bank_author: null, cash_author: null },
+    ]);
   });
 
   it("rollbacke les mouvements et les soldes si PostgreSQL refuse l'écriture comptable", async () => {

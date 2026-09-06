@@ -36,6 +36,7 @@ describe.skipIf(!enabled)("octroi d'avances et trésorerie sur PostgreSQL", () =
   let membreId: number;
   let foreignAccountId: number;
   let campagneId: number;
+  let userId: number;
 
   const suffix = `${process.pid}_${Date.now()}`;
 
@@ -49,6 +50,15 @@ describe.skipIf(!enabled)("octroi d'avances et trésorerie sur PostgreSQL", () =
       [`Avances trésorerie ${suffix}`],
     );
     cooperativeId = cooperative.rows[0].id;
+
+    const user = await client.query(
+      `INSERT INTO users
+         (cooperative_id, nom, prenoms, email, password_hash, role)
+       VALUES ($1, 'Auteur', 'Intégration', $2, 'integration-only', 'comptable')
+       RETURNING id`,
+      [cooperativeId, `avances-treasury-${suffix}@example.test`],
+    );
+    userId = user.rows[0].id;
 
     const foreignCooperative = await client.query(
       `INSERT INTO cooperatives (nom, ville, region)
@@ -91,7 +101,7 @@ describe.skipIf(!enabled)("octroi d'avances et trésorerie sur PostgreSQL", () =
     const app = express();
     app.use(express.json());
     app.use((req, _res, next) => {
-      req.user = { role: "comptable", cooperativeId } as NonNullable<typeof req.user>;
+      req.user = { role: "comptable", cooperativeId, id: userId } as NonNullable<typeof req.user>;
       req.log = { error: () => undefined } as unknown as typeof req.log;
       next();
     });
@@ -214,6 +224,7 @@ describe.skipIf(!enabled)("octroi d'avances et trésorerie sur PostgreSQL", () =
         [cooperativeId, foreignCooperativeId],
       );
       await client.query(`DELETE FROM membres WHERE cooperative_id = $1`, [cooperativeId]);
+      await client.query(`DELETE FROM users WHERE id = $1`, [userId]);
       await client.query(`DELETE FROM campagnes WHERE id = $1`, [campagneId]);
       await client.query(`DELETE FROM cooperatives WHERE id IN ($1, $2)`, [
         cooperativeId,
@@ -344,6 +355,7 @@ describe.skipIf(!enabled)("octroi d'avances et trésorerie sur PostgreSQL", () =
         type: kind === "caisse" ? "sortie" : "debit",
         motif: "avance",
         montant_fcfa: "300",
+        enregistre_par: userId,
       }));
       if (kind === "caisse") {
         expect(movement.rows[0].caisse_id).toBe(selectedAccountId);
