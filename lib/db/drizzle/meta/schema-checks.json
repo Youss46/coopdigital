@@ -143,6 +143,23 @@
           "name": "reglements_cartes_producteurs_cooperative_statut_idx"
         }
       ]
+    },
+    {
+      "migration": "0166_reparer_index_sessions_pesee",
+      "objects": [
+        {
+          "kind": "index",
+          "schema": "public",
+          "table": "sessions_pesee",
+          "name": "sessions_pesee_unique_en_cours"
+        },
+        {
+          "kind": "index",
+          "schema": "public",
+          "table": "sessions_pesee",
+          "name": "sessions_pesee_bon_reception_unique"
+        }
+      ]
     }
   ]
 }

@@ -104,8 +104,7 @@ describe.skipIf(!enabled)("contrôles du schéma PostgreSQL", () => {
           ON ${qualifiedIdentifier(schemaName, "reglements_cartes_producteurs")} (paiement_id);
         CREATE INDEX ${quoteIdentifier("reglements_cartes_producteurs_cooperative_statut_idx")}
           ON ${qualifiedIdentifier(schemaName, "reglements_cartes_producteurs")}
-          (cooperative_id, statut)
-       );`,
+           (cooperative_id, statut);`,
     );
   });
 
