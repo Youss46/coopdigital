@@ -11,6 +11,7 @@ import {
   resetRhStorageReadFailureState,
 } from "../lib/logger.js";
 import ressourcesHumainesRouter from "../routes/ressourcesHumaines.js";
+import salairesRouter from "../routes/salaires.js";
 
 const enabled = process.env.RUN_POSTGRES_INTEGRATION === "1" && Boolean(process.env.DATABASE_URL);
 
@@ -525,5 +526,192 @@ describe.skipIf(!enabled)("décisions de congés RH sur PostgreSQL", () => {
         process.env["RH_STORAGE_FAILURE_ALERT_WINDOW_SECONDS"] = previousWindow;
       }
     }
+  });
+});
+
+describe.skipIf(!enabled)("auteur des sorties de salaires sur PostgreSQL", () => {
+  let server: Server;
+  let baseUrl: string;
+  let cooperativeId: number;
+  let userId: number;
+  let personnelId: number;
+  let caisseId: number;
+  let sessionId: number;
+  let compteBancaireId: number;
+  let bulletinCaisseId: number;
+  let bulletinBanqueId: number;
+  const suffix = `${process.pid}-${Date.now()}`;
+
+  beforeAll(async () => {
+    const cooperative = await pool.query(
+      `INSERT INTO cooperatives (nom, ville, region)
+       VALUES ($1, 'Test', 'Test')
+       RETURNING id`,
+      [`Auteurs salaires ${suffix}`],
+    );
+    cooperativeId = cooperative.rows[0].id;
+
+    const user = await pool.query(
+      `INSERT INTO users
+         (cooperative_id, nom, prenoms, email, password_hash, role)
+       VALUES ($1, 'Comptable', 'Salaires', $2, 'integration-test', 'responsable_rh')
+       RETURNING id`,
+      [cooperativeId, `salary-actor-${suffix}@test.invalid`],
+    );
+    userId = user.rows[0].id;
+
+    const personnel = await pool.query(
+      `INSERT INTO personnel
+         (cooperative_id, nom, prenoms, poste, date_embauche, salaire_base_fcfa)
+       VALUES ($1, 'Salarié', 'Test', 'Assistant', '2025-01-01', 100000)
+       RETURNING id`,
+      [cooperativeId],
+    );
+    personnelId = personnel.rows[0].id;
+
+    const caisse = await pool.query(
+      `INSERT INTO caisses
+         (cooperative_id, nom, type_caisse, solde_actuel_fcfa,
+          fond_caisse_minimum_fcfa, actif)
+       VALUES ($1, $2, 'centrale', 10000, 0, true)
+       RETURNING id`,
+      [cooperativeId, `Caisse salaires ${suffix}`],
+    );
+    caisseId = caisse.rows[0].id;
+
+    const session = await pool.query(
+      `INSERT INTO sessions_caisse
+         (caisse_id, cooperative_id, date_session, solde_ouverture_fcfa, statut)
+       VALUES ($1, $2, CURRENT_DATE, 10000, 'ouverte')
+       RETURNING id`,
+      [caisseId, cooperativeId],
+    );
+    sessionId = session.rows[0].id;
+
+    const banque = await pool.query(
+      `INSERT INTO comptes_bancaires
+         (cooperative_id, nom, banque, solde_actuel_fcfa,
+          solde_mini_alerte_fcfa, actif)
+       VALUES ($1, $2, 'Banque test', 10000, 0, true)
+       RETURNING id`,
+      [cooperativeId, `Banque salaires ${suffix}`],
+    );
+    compteBancaireId = banque.rows[0].id;
+
+    const bulletins = await pool.query(
+      `INSERT INTO bulletins_paie
+         (personnel_id, cooperative_id, mois, annee, periode,
+          salaire_base_fcfa, salaire_brut_fcfa, salaire_net_fcfa,
+          cout_total_employeur_fcfa, statut)
+       VALUES
+         ($1, $2, 1, 2026, 'janvier 2026', 1000, 1000, 1000, 1000, 'valide'),
+         ($1, $2, 2, 2026, 'février 2026', 2000, 2000, 2000, 2000, 'valide')
+       RETURNING id, mois`,
+      [personnelId, cooperativeId],
+    );
+    bulletinCaisseId = bulletins.rows.find((row: { mois: number }) => row.mois === 1).id;
+    bulletinBanqueId = bulletins.rows.find((row: { mois: number }) => row.mois === 2).id;
+
+    await pool.query(
+      `INSERT INTO mouvements_caisse
+         (caisse_id, session_id, cooperative_id, type, motif,
+          montant_fcfa, libelle, solde_apres_fcfa, enregistre_par)
+       VALUES ($1, $2, $3, 'sortie', 'paiement_salaire',
+               50, 'Paiement historique', 9950, NULL)`,
+      [caisseId, sessionId, cooperativeId],
+    );
+    await pool.query(
+      `INSERT INTO mouvements_banque
+         (compte_id, cooperative_id, type, motif, montant_fcfa,
+          libelle, date_operation, solde_apres_fcfa, enregistre_par)
+       VALUES ($1, $2, 'debit', 'paiement_salaire',
+               50, 'Paiement historique', CURRENT_DATE, 9950, NULL)`,
+      [compteBancaireId, cooperativeId],
+    );
+
+    const app = express();
+    app.use(express.json());
+    app.use(salairesRouter);
+    await new Promise<void>((resolve, reject) => {
+      server = app.listen(0, "127.0.0.1", (error?: Error) => {
+        if (error) reject(error);
+        else resolve();
+      });
+    });
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Serveur de test indisponible");
+    baseUrl = `http://127.0.0.1:${address.port}`;
+  });
+
+  afterAll(async () => {
+    if (server) {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+      });
+    }
+    await pool.query(`DELETE FROM ecritures_en_attente WHERE cooperative_id = $1`, [cooperativeId]);
+    await pool.query(`DELETE FROM ecritures_comptables WHERE cooperative_id = $1`, [cooperativeId]);
+    await pool.query(`DELETE FROM mouvements_caisse WHERE cooperative_id = $1`, [cooperativeId]);
+    await pool.query(`DELETE FROM mouvements_banque WHERE cooperative_id = $1`, [cooperativeId]);
+    await pool.query(`DELETE FROM sessions_caisse WHERE cooperative_id = $1`, [cooperativeId]);
+    await pool.query(`DELETE FROM caisses WHERE cooperative_id = $1`, [cooperativeId]);
+    await pool.query(`DELETE FROM comptes_bancaires WHERE cooperative_id = $1`, [cooperativeId]);
+    await pool.query(`DELETE FROM bulletins_paie WHERE cooperative_id = $1`, [cooperativeId]);
+    await pool.query(`DELETE FROM personnel WHERE cooperative_id = $1`, [cooperativeId]);
+    await pool.query(`DELETE FROM users WHERE id = $1`, [userId]);
+    await pool.query(`DELETE FROM cooperatives WHERE id = $1`, [cooperativeId]);
+  });
+
+  function token(): string {
+    const secret = process.env["JWT_SECRET"] ?? process.env["SESSION_SECRET"];
+    if (!secret) throw new Error("JWT_SECRET et SESSION_SECRET non configurés");
+    return jwt.sign({ id: userId, role: "responsable_rh", cooperativeId }, secret);
+  }
+
+  async function pay(bulletinId: number, compteSourceType: "caisse" | "banque", compteSourceId: number) {
+    return fetch(`${baseUrl}/salaires/bulletins/${bulletinId}/payer`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token()}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        compteSourceType,
+        compteSourceId,
+        referencePaiement: `SAL-${compteSourceType}-${suffix}`,
+      }),
+    });
+  }
+
+  it("conserve l'auteur authentifié pour les paiements caisse et banque, sans réécrire les historiques NULL", async () => {
+    const caisseResponse = await pay(bulletinCaisseId, "caisse", caisseId);
+    expect(caisseResponse.status).toBe(200);
+
+    const banqueResponse = await pay(bulletinBanqueId, "banque", compteBancaireId);
+    expect(banqueResponse.status).toBe(200);
+
+    const caisseMovements = await pool.query(
+      `SELECT enregistre_par
+       FROM mouvements_caisse
+       WHERE cooperative_id = $1 AND motif = 'paiement_salaire'
+       ORDER BY id`,
+      [cooperativeId],
+    );
+    expect(caisseMovements.rows).toEqual([
+      { enregistre_par: null },
+      { enregistre_par: userId },
+    ]);
+
+    const banqueMovements = await pool.query(
+      `SELECT enregistre_par
+       FROM mouvements_banque
+       WHERE cooperative_id = $1 AND motif = 'paiement_salaire'
+       ORDER BY id`,
+      [cooperativeId],
+    );
+    expect(banqueMovements.rows).toEqual([
+      { enregistre_par: null },
+      { enregistre_par: userId },
+    ]);
   });
 });
