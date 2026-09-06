@@ -37,7 +37,6 @@ import CampagnesPage from "@/pages/CampagnesPage";
 import FournisseursPage from "@/pages/FournisseursPage";
 import RefusPage from "@/pages/RefusPage";
 import ReglementsPage from "@/pages/ReglementsPage";
-import ReglementsCartesProducteursPage from "@/pages/ReglementsCartesProducteursPage";
 import IntrantsPage from "@/pages/IntrantsPage";
 import EmpruntsPage from "@/pages/EmpruntsPage";
 import BudgetPage from "@/pages/BudgetPage";
@@ -248,9 +247,6 @@ function AppRoutes() {
       </Route>
       <Route path="/reglements">
         <ProtectedRoute component={ReglementsPage} />
-      </Route>
-      <Route path="/reglements-cartes-producteurs">
-        <ProtectedRoute component={ReglementsCartesProducteursPage} roles={["pca", "directeur", "comptable", "caissier", "auditeur"]} />
       </Route>
       <Route path="/refus">
         <ProtectedRoute component={RefusPage} roles={["pca", "directeur", "magasinier", "responsable_tracabilite", "auditeur"]} />

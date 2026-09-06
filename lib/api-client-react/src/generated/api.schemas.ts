@@ -1005,6 +1005,7 @@ export const ValiderPaiementInputModePaiement = {
   orange_money: 'orange_money',
   mtn_momo: 'mtn_momo',
   wave: 'wave',
+  carte_producteur: 'carte_producteur',
 } as const;
 
 export type VentilationPaiementInputModePaiement = typeof VentilationPaiementInputModePaiement[keyof typeof VentilationPaiementInputModePaiement];
@@ -1042,6 +1043,8 @@ export interface ValiderPaiementInput {
   numeroCheque?: string | null;
   banque?: string | null;
   dateEcheance?: string | null;
+  /** Compte bancaire local à débiter pour un paiement par carte producteur. */
+  compteBancaireId?: number | null;
   /**
      * Montant de ce versement. Pour une livraison différée, il doit être strictement positif et ne pas dépasser le solde restant.
 

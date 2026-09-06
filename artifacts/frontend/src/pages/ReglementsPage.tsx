@@ -392,6 +392,7 @@ const MODES_CARBURANT = [
 
 export function ModalValidation({
   paiement,
+  comptesBancaires = [],
   onClose,
   onConfirm,
   loading,
@@ -399,8 +400,9 @@ export function ModalValidation({
   isDelegue,
 }: {
   paiement: PaiementListItem;
+  comptesBancaires?: CompteBancaireTransport[];
   onClose: () => void;
-  onConfirm: (ref: string, telephone: string, montant: number, mode?: string, ventilations?: VentilationPaiementInput[], cheque?: { numero: string; banque: string }, inclureFraisCollecte?: boolean) => void;
+  onConfirm: (ref: string, telephone: string, montant: number, mode?: string, ventilations?: VentilationPaiementInput[], cheque?: { numero: string; banque: string }, inclureFraisCollecte?: boolean, compteBancaireId?: number) => void;
   loading: boolean;
   sessionCaisseOuverte?: boolean | null;
   isDelegue?: boolean;
@@ -435,6 +437,7 @@ export function ModalValidation({
   const [multiMoyens, setMultiMoyens] = useState(false);
   const [numeroCheque, setNumeroCheque] = useState("");
   const [banque, setBanque] = useState("");
+  const [compteBancaireId, setCompteBancaireId] = useState("");
   const [ventilations, setVentilations] = useState<Array<{
     modePaiement: VentilationPaiementInput["modePaiement"];
     montantFcfa: string;
@@ -458,7 +461,9 @@ export function ModalValidation({
   const modeManquant = !selectedMode;
   const isMobile = selectedMode === "orange_money" || selectedMode === "mtn_momo" || selectedMode === "wave";
   const isEspeces = selectedMode === "especes";
+  const isCarteProducteur = selectedMode === "carte_producteur";
   const sessionBloquee = isEspeces && sessionCaisseOuverte === false;
+  const compteBancaireManquant = isCarteProducteur && !compteBancaireId;
   const refManquante = isMobile && !ref.trim();
   const totalVentile = ventilations.reduce((total, ligne) => total + parseMontantSaisi(ligne.montantFcfa), 0);
   const ventilationIncorrecte = multiMoyens && totalVentile !== montantTotalAttendu;
@@ -551,11 +556,29 @@ export function ModalValidation({
     if (modeManquant) { setTouched(true); return; }
     if (sessionBloquee) return;
     if (refManquante) { setTouched(true); return; }
-    if (selectedMode === "carte_producteur" && !(paiement as PaiementListItem & { membreCarteProducteur?: string | null }).membreCarteProducteur) {
-      setTouched(true);
-      return;
+    if (compteBancaireManquant) { setTouched(true); return; }
+    if (isCarteProducteur) {
+      onConfirm(
+        ref,
+        telephone,
+        montantConfirme,
+        selectedMode,
+        undefined,
+        { numero: numeroCheque, banque },
+        inclureFraisCollecte,
+        Number(compteBancaireId),
+      );
+    } else {
+      onConfirm(
+        ref,
+        telephone,
+        montantConfirme,
+        selectedMode || undefined,
+        undefined,
+        { numero: numeroCheque, banque },
+        inclureFraisCollecte,
+      );
     }
-    onConfirm(ref, telephone, montantConfirme, selectedMode || undefined, undefined, { numero: numeroCheque, banque }, inclureFraisCollecte);
   }
 
   return (
@@ -826,7 +849,34 @@ export function ModalValidation({
 
           {selectedMode === "carte_producteur" && (
             <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800">
-              Le numéro de la carte officielle du producteur est conservé avec ce règlement. Aucun TPE n’est appelé : le compte bancaire sera débité lorsque le règlement sera marqué payé.
+              La carte identifie le producteur. Le compte bancaire sélectionné sera débité immédiatement lors de la validation.
+            </div>
+          )}
+
+          {isCarteProducteur && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Compte bancaire à débiter <span className="text-red-500 font-semibold">*</span>
+              </label>
+              <select
+                value={compteBancaireId}
+                onChange={(event) => { setCompteBancaireId(event.target.value); setTouched(false); }}
+                className={`w-full border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 ${
+                  touched && compteBancaireManquant
+                    ? "border-red-400 focus:ring-red-400 bg-red-50"
+                    : "border-gray-200 focus:ring-green-400"
+                }`}
+              >
+                <option value="">Sélectionner un compte bancaire</option>
+                {comptesBancaires.map((compte) => (
+                  <option key={compte.id} value={compte.id}>
+                    {compte.nom} — {compte.banque} ({Number(compte.solde_actuel_fcfa).toLocaleString("fr-FR")} FCFA)
+                  </option>
+                ))}
+              </select>
+              {touched && compteBancaireManquant && (
+                <p className="text-xs text-red-500 mt-1">Sélectionnez le compte bancaire à débiter.</p>
+              )}
             </div>
           )}
 
@@ -903,9 +953,9 @@ export function ModalValidation({
           </button>
           <button
             onClick={handleConfirm}
-            disabled={loading || (multiMoyens ? ventilationEspecesBloquee : sessionBloquee || modeManquant)}
+            disabled={loading || (multiMoyens ? ventilationEspecesBloquee : sessionBloquee || modeManquant || compteBancaireManquant)}
             className="flex-1 py-2.5 rounded-xl text-white text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-1.5"
-            style={{ backgroundColor: (multiMoyens ? ventilationEspecesBloquee : sessionBloquee || modeManquant) ? "#9ca3af" : "#1a4731" }}
+            style={{ backgroundColor: (multiMoyens ? ventilationEspecesBloquee : sessionBloquee || modeManquant || compteBancaireManquant) ? "#9ca3af" : "#1a4731" }}
           >
             {loading ? (
               <Loader2 size={15} className="animate-spin" />
@@ -1478,6 +1528,12 @@ export default function ReglementsPage() {
     enabled: peutValider && lotCarburantOuvert && !isDelegue,
     staleTime: 30_000,
   });
+  const { data: comptesBancairesPaiement = [] } = useQuery<CompteBancaireTransport[]>({
+    queryKey: ["comptes-bancaires-validation-paiement"],
+    queryFn: () => apiFetchChecked<CompteBancaireTransport[]>("/api/banque"),
+    enabled: peutValider && !isDelegue && modal?.type === "valider",
+    staleTime: 30_000,
+  });
 
   const validerMut = useValiderPaiement();
   const rejeterMut = useRejeterPaiement();
@@ -1555,6 +1611,7 @@ export default function ReglementsPage() {
     ventilations?: VentilationPaiementInput[],
     cheque?: { numero: string; banque: string },
     inclureFraisCollecte = false,
+    compteBancaireId?: number,
   ) {
     if (modal?.type !== "valider") return;
     // Le mode peut aussi être choisi pour chaque versement d'une livraison différée.
@@ -1577,6 +1634,7 @@ export default function ReglementsPage() {
             numeroCheque: cheque.numero || null,
             banque: cheque.banque || null,
           } : {}),
+          ...(mode === "carte_producteur" && compteBancaireId ? { compteBancaireId } : {}),
           ...(ventilations ? { ventilations } : {}),
         },
       });
@@ -1590,6 +1648,9 @@ export default function ReglementsPage() {
       // Rafraîchir le statut session Caisse Centrale après validation
       if (!isDelegue && contientEspeces) {
         qc.invalidateQueries({ queryKey: ["caisse-centrale-session"] });
+      }
+      if (modeEffectif === "carte_producteur") {
+        qc.invalidateQueries({ queryKey: ["comptes-bancaires-validation-paiement"] });
       }
       setModal(null);
       toast({ title: "Paiement validé", description: "Le producteur a été notifié." });
@@ -2099,8 +2160,9 @@ export default function ReglementsPage() {
       {modal?.type === "valider" && (
         <ModalValidation
           paiement={modal.paiement}
+          comptesBancaires={comptesBancairesPaiement}
           onClose={() => setModal(null)}
-           onConfirm={(ref, telephone, montant, mode, ventilations, cheque, inclureFraisCollecte) => void handleValider(ref, telephone, montant, mode ?? undefined, ventilations, cheque, inclureFraisCollecte)}
+          onConfirm={(ref, telephone, montant, mode, ventilations, cheque, inclureFraisCollecte, compteBancaireId) => void handleValider(ref, telephone, montant, mode ?? undefined, ventilations, cheque, inclureFraisCollecte, compteBancaireId)}
           loading={validerMut.isPending}
           sessionCaisseOuverte={isDelegue ? sessionDelegueOuverte : sessionCentraleOuverte}
           isDelegue={isDelegue}

@@ -7926,6 +7926,10 @@ components:
         dateEcheance:
           type: string
           nullable: true
+        compteBancaireId:
+          type: integer
+          nullable: true
+          description: Compte bancaire local à débiter pour un paiement par carte producteur.
         montantReglementFcfa:
           type: integer
           minimum: 1
@@ -7941,7 +7945,7 @@ components:
         modePaiement:
           type: string
           nullable: true
-          enum: [especes, cheque, virement, orange_money, mtn_momo, wave]
+          enum: [especes, cheque, virement, orange_money, mtn_momo, wave, carte_producteur]
           description: >
             Permet de corriger le mode de règlement au moment de la validation.
             Accepté pour les paiements liés à un bon carburant, sans mode

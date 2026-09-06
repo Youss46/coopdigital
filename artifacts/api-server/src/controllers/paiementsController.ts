@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { db, paiementsTable, paiementLignesTable, membresTable, livraisonsTable, fournisseursTable, usersTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable, caissesTable, chequesEmisTable, reglementsCartesProducteursTable, bonsCarburantTable, campagnesTable, sessionsPeseeTable, commissionsMembresDelaguesTable, depensesVehiculeTable } from "@workspace/db";
+import { db, paiementsTable, paiementLignesTable, membresTable, livraisonsTable, fournisseursTable, usersTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable, caissesTable, chequesEmisTable, bonsCarburantTable, campagnesTable, sessionsPeseeTable, commissionsMembresDelaguesTable, depensesVehiculeTable } from "@workspace/db";
 import { eq, desc, and, or, sql, gte, lt, lte, inArray, isNull, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { envoyerPushGroupePortail, envoyerPushGroupe } from "../services/pushService";
@@ -901,6 +901,7 @@ async function debiterMobileDansTransaction(
     numeroCheque?: string | null;
     banque?: string | null;
     dateEcheance?: string | null;
+    compteBancaireId?: number | null;
     modePaiement?: string | null;
     ventilations?: Array<{
       modePaiement?: string;
@@ -1100,13 +1101,6 @@ async function debiterMobileDansTransaction(
         });
         return;
       }
-      if (lignes.some((ligne) => ligne.modePaiement === "carte_producteur")) {
-        res.status(400).json({
-          erreur: "La carte producteur doit être utilisée comme moyen unique pour créer son règlement différé.",
-        });
-        return;
-      }
-
       const isBonCarburant = !!row.paiement.bonCarburantId;
       const isDepenseVehicule = !!row.paiement.depenseVehiculeId;
       const compteDebitPaiement = isBonCarburant
@@ -1408,6 +1402,14 @@ async function debiterMobileDansTransaction(
     const isMobileMarchand = mode === "orange_money" || mode === "mtn_momo" || mode === "wave";
     const isCarteProducteur = mode === "carte_producteur";
 
+    if (isCarteProducteur && (!body.compteBancaireId || !Number.isInteger(Number(body.compteBancaireId)))) {
+      res.status(400).json({ erreur: "Sélectionnez le compte bancaire à débiter pour un paiement par carte producteur." });
+      return;
+    }
+    if (isCarteProducteur && (!row.membreCarteProducteur?.trim() || !row.paiement.membreId)) {
+      throw new PaiementMontantInvalideError("Ce producteur ne possède pas de carte producteur enregistrée.");
+    }
+
     // Un délégué ne peut valider que les paiements en espèces (toutes sources confondues)
     if (req.user?.role === "delegue" && mode !== "especes") {
       res.status(403).json({
@@ -1423,7 +1425,7 @@ async function debiterMobileDansTransaction(
       return;
     }
 
-    const nouveauStatut = mode === "especes" ? "effectue" : "confirme";
+    const nouveauStatut = mode === "especes" || isCarteProducteur ? "effectue" : "confirme";
     const isDelegueEspeces = req.user?.role === "delegue" && mode === "especes";
 
     // 1. Pré-vérifier la caisse avant la transaction pour éviter un état incohérent
@@ -1659,6 +1661,24 @@ async function debiterMobileDansTransaction(
         );
       }
 
+      if (isCarteProducteur) {
+        await enregistrerMouvementBanque(
+          Number(body.compteBancaireId),
+          cooperativeId,
+          {
+            type: "debit",
+            motif: "paiement_carte_producteur",
+            montantFcfa: montantTotalPaiement,
+            libelle: `Paiement carte producteur — ${beneficiairePaiement}`,
+            reference: `CARTE-${id}`,
+            dateOperation: new Date().toISOString().slice(0, 10),
+            userId,
+            skipAccounting: true,
+          },
+          tx,
+        );
+      }
+
       const [ligneInseree] = await tx.insert(paiementLignesTable).values({
         paiementId: id,
         modePaiement: mode as "especes" | "cheque" | "virement" | "orange_money" | "mtn_momo" | "wave" | "carte_producteur",
@@ -1682,26 +1702,6 @@ async function debiterMobileDansTransaction(
           dateEmission: new Date().toISOString().slice(0, 10),
           dateEcheance: body.dateEcheance ?? null,
           statut: "emis",
-          createdBy: userId ?? null,
-        });
-      }
-
-      if (isCarteProducteur) {
-        const numeroCarte = row.membreCarteProducteur?.trim();
-        if (!numeroCarte || !row.paiement.membreId) {
-          throw new PaiementMontantInvalideError("Ce producteur ne possède pas de carte producteur enregistrée.");
-        }
-        await tx.insert(reglementsCartesProducteursTable).values({
-          cooperativeId,
-          paiementId: id,
-          paiementLigneId: ligneInseree!.id,
-          membreId: row.paiement.membreId,
-          livraisonId: row.paiement.livraisonId ?? null,
-          numeroCarteSnapshot: numeroCarte,
-          beneficiaire: beneficiairePaiement,
-          montantFcfa: montantTotalPaiement,
-          dateCreation: new Date().toISOString().slice(0, 10),
-          statut: "en_attente",
           createdBy: userId ?? null,
         });
       }
@@ -1762,7 +1762,7 @@ async function debiterMobileDansTransaction(
     // Notifier le producteur (best-effort)
     if (row.paiement.membreId) void envoyerPushGroupePortail([row.paiement.membreId], {
       title: "✅ Paiement validé",
-      body: `${new Intl.NumberFormat("fr-FR").format(montantTotalPaiement)} FCFA — ${mode === "orange_money" ? "Orange Money" : mode === "mtn_momo" ? "MTN MoMo" : mode === "wave" ? "Wave" : mode === "cheque" ? "Chèque" : "Espèces"}`,
+      body: `${new Intl.NumberFormat("fr-FR").format(montantTotalPaiement)} FCFA — ${mode === "orange_money" ? "Orange Money" : mode === "mtn_momo" ? "MTN MoMo" : mode === "wave" ? "Wave" : mode === "cheque" ? "Chèque" : mode === "carte_producteur" ? "Carte producteur" : "Espèces"}`,
       url: "/paiements",
     });
 

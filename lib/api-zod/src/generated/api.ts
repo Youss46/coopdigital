@@ -3660,9 +3660,10 @@ export const ValiderPaiementBody = zod.object({
   "numeroCheque": zod.string().nullish(),
   "banque": zod.string().nullish(),
   "dateEcheance": zod.string().nullish(),
+  "compteBancaireId": zod.number().nullish().describe('Compte bancaire local à débiter pour un paiement par carte producteur.'),
   "montantReglementFcfa": zod.number().min(1).nullish().describe('Montant de ce versement. Pour une livraison différée, il doit être strictement positif et ne pas dépasser le solde restant.\n'),
   "inclureFraisCollecte": zod.boolean().optional().describe('Pour un règlement d\'un membre délégué de localités, indique si la commission de collecte liée doit être payée avec le net du cacao.\n'),
-  "modePaiement": zod.enum(['especes', 'cheque', 'virement', 'orange_money', 'mtn_momo', 'wave']).nullish().describe('Permet de corriger le mode de règlement au moment de la validation. Accepté pour les paiements liés à un bon carburant, sans mode prédéfini, ou pour un versement d\'une livraison différée.\n'),
+  "modePaiement": zod.enum(['especes', 'cheque', 'virement', 'orange_money', 'mtn_momo', 'wave', 'carte_producteur']).nullish().describe('Permet de corriger le mode de règlement au moment de la validation. Accepté pour les paiements liés à un bon carburant, sans mode prédéfini, ou pour un versement d\'une livraison différée.\n'),
   "ventilations": zod.array(zod.object({
   "modePaiement": zod.enum(['especes', 'cheque', 'virement', 'orange_money', 'mtn_momo', 'wave']),
   "montantFcfa": zod.number().min(1),
