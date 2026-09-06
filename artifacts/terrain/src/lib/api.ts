@@ -60,7 +60,7 @@ function throwApiError(
   const endpoint = getEndpoint(path);
   const diagnostic = `${detail} [HTTP ${res.status}${body.code ? ` · ${body.code}` : ""} · ${endpoint}]`;
   const publicMessage =
-    body.code === "COMPTE_DESACTIVE"
+    body.code === "COMPTE_DESACTIVE" || body.code === "ROLE_DISABLED"
       ? COMPTE_DESACTIVE_MESSAGE
       : body.code === "COOPERATIVE_MISSING" || body.erreur?.includes("Coopérative non associée")
         ? "Ce compte terrain n’est rattaché à aucune coopérative. Contactez l’administration."
@@ -75,7 +75,7 @@ function throwApiError(
     console.error("[Terrain API]", diagnostic);
   }
 
-  if (body.code === "COMPTE_DESACTIVE") {
+  if (body.code === "COMPTE_DESACTIVE" || body.code === "ROLE_DISABLED") {
     markAccountDisabled(publicMessage);
     window.location.href = `${import.meta.env.BASE_URL ?? "/"}login`;
     throw error;

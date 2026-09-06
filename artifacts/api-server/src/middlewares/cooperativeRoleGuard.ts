@@ -1,8 +1,8 @@
 import { type NextFunction, type Request, type Response } from "express";
 import { assertRoleActive, CooperativeRoleDisabledError } from "../services/cooperativeRolesService.js";
+import { ROLE_DISABLED_CODE, ROLE_DISABLED_MESSAGE } from "../lib/accountAccess.js";
 
-export const ROLE_DISABLED_CODE = "ROLE_DISABLED";
-export const ROLE_DISABLED_MESSAGE = "Votre rôle est désactivé pour cette coopérative. Contactez l’administration.";
+export { ROLE_DISABLED_CODE, ROLE_DISABLED_MESSAGE } from "../lib/accountAccess.js";
 
 export async function cooperativeRoleGuard(req: Request, res: Response, next: NextFunction): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;

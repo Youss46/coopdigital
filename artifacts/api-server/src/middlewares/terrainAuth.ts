@@ -3,10 +3,11 @@ import jwt from "jsonwebtoken";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { isRoleActive } from "../services/cooperativeRolesService.js";
+import { ROLE_DISABLED_CODE, ROLE_DISABLED_MESSAGE } from "../lib/accountAccess.js";
 
 export const COMPTE_DESACTIVE_CODE = "COMPTE_DESACTIVE";
 export const COMPTE_DESACTIVE_MESSAGE =
-  "Votre compte a été désactivé par l’administration. Contactez votre responsable.";
+  "Votre compte est désactivé. Veuillez contacter le PCA.";
 
 export interface TerrainJwtPayload {
   id: number;
@@ -43,8 +44,8 @@ function refuserCompteDesactive(res: Response): void {
 
 function refuserRoleDesactive(res: Response): void {
   res.status(403).json({
-    code: "ROLE_DISABLED",
-    erreur: "Votre rôle est désactivé pour cette coopérative. Contactez l’administration.",
+    code: ROLE_DISABLED_CODE,
+    erreur: ROLE_DISABLED_MESSAGE,
   });
 }
 

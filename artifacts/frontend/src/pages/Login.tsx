@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
-import { useAuth } from "@/contexts/AuthContext";
-import { useLogin } from "@workspace/api-client-react";
+import { AUTH_MESSAGE_KEY, ROLE_DISABLED_MESSAGE, useAuth } from "@/contexts/AuthContext";
+import { ApiError, useLogin } from "@workspace/api-client-react";
 import { Eye, EyeOff, Fingerprint } from "lucide-react";
 import { authentificateurPlateformeDisponible, connexionBiometrique } from "@/lib/webauthn";
 
@@ -92,7 +92,7 @@ export default function Login() {
   const [email, setEmail] = useState(() => localStorage.getItem(DERNIER_EMAIL_KEY) ?? "");
   const [motDePasse, setMotDePasse] = useState("");
   const [afficherMdp, setAfficherMdp] = useState(false);
-  const [erreur, setErreur] = useState("");
+  const [erreur, setErreur] = useState(() => localStorage.getItem(AUTH_MESSAGE_KEY) ?? "");
   const [biometrieSupportee, setBiometrieSupportee] = useState(false);
   const [biometrieEnCours, setBiometrieEnCours] = useState(false);
 
@@ -181,8 +181,14 @@ export default function Login() {
         traiterConnexionReussie(data, email);
       },
       onError: (err: unknown) => {
-        const status = (err as { response?: { status?: number } })?.response?.status;
-        if (!status) {
+        const apiError = err instanceof ApiError ? err : null;
+        const status = apiError?.status ?? (err as { response?: { status?: number } })?.response?.status;
+        const errorData = apiError?.data && typeof apiError.data === "object"
+          ? apiError.data as { code?: unknown }
+          : null;
+        if (errorData?.code === "ROLE_DISABLED") {
+          setErreur(ROLE_DISABLED_MESSAGE);
+        } else if (!status) {
           setErreur("Impossible de contacter le serveur. Vérifiez votre connexion.");
         } else if (status === 401) {
           setErreur("Email ou mot de passe incorrect");
@@ -196,6 +202,7 @@ export default function Login() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErreur("");
+    localStorage.removeItem(AUTH_MESSAGE_KEY);
     if (!email || !motDePasse) {
       setErreur("Veuillez remplir tous les champs");
       return;

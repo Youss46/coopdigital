@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
-import { setAuthTokenGetter, setBaseUrl, setOnUnauthorized } from "@workspace/api-client-react";
+import { ApiError, setAuthTokenGetter, setBaseUrl, setOnUnauthorized } from "@workspace/api-client-react";
 
 // Strip trailing /api if present — VITE_API_URL must point to the server root,
 // not /api, because Orval already prepends /api to every generated path.
@@ -8,6 +8,8 @@ setBaseUrl((import.meta.env.VITE_API_URL ?? "").replace(/\/api\/?$/, ""));
 const TOKEN_KEY = "coop_token";
 const USER_KEY  = "coop_user";
 const ACTIVITY_KEY = "coop_last_activity_at";
+export const AUTH_MESSAGE_KEY = "coop_auth_message";
+export const ROLE_DISABLED_MESSAGE = "Votre compte est désactivé. Veuillez contacter le PCA.";
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 min
 
 function recordActivity(at = Date.now()) {
@@ -24,9 +26,17 @@ setAuthTokenGetter(() => localStorage.getItem(TOKEN_KEY));
 
 // Quand le serveur répond 401 (token expiré ou invalide), on efface la session
 // et on redirige vers la page de connexion plutôt que d'afficher un tableau vide.
-setOnUnauthorized(() => {
+setOnUnauthorized((error) => {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  const data = error instanceof ApiError && error.data && typeof error.data === "object"
+    ? error.data as { code?: unknown }
+    : null;
+  if (data?.code === "ROLE_DISABLED") {
+    localStorage.setItem(AUTH_MESSAGE_KEY, ROLE_DISABLED_MESSAGE);
+  } else {
+    localStorage.removeItem(AUTH_MESSAGE_KEY);
+  }
   const base = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
   window.location.href = `${base}/login`;
 });
@@ -81,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = (newToken: string, newUser: Utilisateur) => {
     localStorage.setItem(TOKEN_KEY, newToken);
     localStorage.setItem(USER_KEY, JSON.stringify(newUser));
+    localStorage.removeItem(AUTH_MESSAGE_KEY);
     recordActivity();
     setToken(newToken);
     setUtilisateur(newUser);

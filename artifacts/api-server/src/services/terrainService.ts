@@ -37,7 +37,7 @@ export async function loginTerrain(telephone: string, motDePasse: string) {
   const [user] = await db
     .select()
     .from(usersTable)
-    .where(and(eq(usersTable.telephone, tel), eq(usersTable.actif, true)))
+    .where(eq(usersTable.telephone, tel))
     .limit(1);
 
   const rolesAutorisés = ["delegue", "agent_terrain", "peseur", "chauffeur"];
@@ -45,6 +45,10 @@ export async function loginTerrain(telephone: string, motDePasse: string) {
 
   const ok = await bcrypt.compare(motDePasse, user.passwordHash);
   if (!ok) return null;
+
+  if (!user.actif) {
+    return { blockedAccount: "disabled" as const };
+  }
 
   // Un compte terrain sans coopérative ne peut pas utiliser le moindre
   // endpoint métier. Ne pas lui remettre un JWT qui provoquerait ensuite un

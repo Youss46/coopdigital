@@ -17,14 +17,15 @@ const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
 
 let _baseUrl: string | null = null;
 let _authTokenGetter: AuthTokenGetter | null = null;
-let _onUnauthorized: (() => void) | null = null;
+let _onUnauthorized: ((error: ApiError<unknown>) => void) | null = null;
 
 /**
- * Register a callback that is invoked whenever the server returns HTTP 401.
+ * Register a callback that is invoked whenever the server returns an expired
+ * session (401) or a disabled account (403 ROLE_DISABLED).
  * Use this to clear the stored token and redirect to the login page.
  * Pass `null` to unregister the current callback.
  */
-export function setOnUnauthorized(callback: (() => void) | null): void {
+export function setOnUnauthorized(callback: ((error: ApiError<unknown>) => void) | null): void {
   _onUnauthorized = callback;
 }
 
@@ -374,11 +375,16 @@ export async function customFetch<T = unknown>(
   const response = await fetch(input, { ...init, method, headers });
 
   if (!response.ok) {
-    if (response.status === 401 && _onUnauthorized) {
-      _onUnauthorized();
-    }
     const errorData = await parseErrorBody(response, method);
-    throw new ApiError(response, errorData, requestInfo);
+    const error = new ApiError(response, errorData, requestInfo);
+    const errorCode = getStringField(errorData, "code");
+    if (
+      _onUnauthorized &&
+      (response.status === 401 || (response.status === 403 && errorCode === "ROLE_DISABLED"))
+    ) {
+      _onUnauthorized(error);
+    }
+    throw error;
   }
 
   return (await parseSuccessBody(response, responseType, requestInfo)) as T;

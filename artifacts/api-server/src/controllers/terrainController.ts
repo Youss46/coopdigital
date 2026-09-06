@@ -30,7 +30,14 @@ export async function loginTerrainHandler(req: Request, res: Response): Promise<
     if ("blockedRole" in result && result.blockedRole === "disabled") {
       res.status(403).json({
         code: "ROLE_DISABLED",
-        erreur: "Votre rôle est désactivé pour cette coopérative. Contactez l’administration.",
+        erreur: "Votre compte est désactivé. Veuillez contacter le PCA.",
+      });
+      return;
+    }
+    if ("blockedAccount" in result && result.blockedAccount === "disabled") {
+      res.status(403).json({
+        code: "COMPTE_DESACTIVE",
+        erreur: "Votre compte est désactivé. Veuillez contacter le PCA.",
       });
       return;
     }

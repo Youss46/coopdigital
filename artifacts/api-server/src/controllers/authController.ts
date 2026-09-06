@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { LoginBody } from "@workspace/api-zod";
 import * as auditService from "../services/auditService";
 import { isRoleActive } from "../services/cooperativeRolesService.js";
+import { ROLE_DISABLED_CODE, ROLE_DISABLED_MESSAGE } from "../lib/accountAccess.js";
 
 export async function changerMotDePasse(req: Request, res: Response): Promise<void> {
   const userId = req.user?.id;
@@ -58,7 +59,7 @@ export async function login(req: Request, res: Response): Promise<void> {
       .where(eq(usersTable.email, email))
       .limit(1);
 
-    if (!user || !user.actif) {
+    if (!user) {
       res.status(401).json({ erreur: "Email ou mot de passe incorrect" });
       return;
     }
@@ -69,10 +70,18 @@ export async function login(req: Request, res: Response): Promise<void> {
       return;
     }
 
+    if (!user.actif) {
+      res.status(403).json({
+        code: ROLE_DISABLED_CODE,
+        erreur: ROLE_DISABLED_MESSAGE,
+      });
+      return;
+    }
+
     if (user.cooperativeId && !await isRoleActive(user.cooperativeId, user.role)) {
       res.status(403).json({
-        code: "ROLE_DISABLED",
-        erreur: "Votre rôle est désactivé pour cette coopérative. Contactez l’administration.",
+        code: ROLE_DISABLED_CODE,
+        erreur: ROLE_DISABLED_MESSAGE,
       });
       return;
     }

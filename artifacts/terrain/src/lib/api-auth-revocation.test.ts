@@ -72,6 +72,25 @@ describe("révocation terrain côté client", () => {
     expect((globalThis.window as { location: { href: string } }).location.href).toBe("/login");
   });
 
+  it("traite ROLE_DISABLED comme une désactivation de compte", async () => {
+    saveAuth("jwt-encore-valide", user);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      json: async () => ({
+        code: "ROLE_DISABLED",
+        erreur: "Votre compte est désactivé. Veuillez contacter le PCA.",
+      }),
+    }));
+
+    await expect(apiGet("/profil")).rejects.toThrow(COMPTE_DESACTIVE_MESSAGE);
+
+    expect(getToken()).toBeNull();
+    expect(isAccountDisabled()).toBe(true);
+    expect(getAuthMessage()).toBe(COMPTE_DESACTIVE_MESSAGE);
+    expect((globalThis.window as { location: { href: string } }).location.href).toBe("/login");
+  });
+
   it("conserve le détail réel d'un 401 Non autorisé", async () => {
     saveAuth("jwt-encore-valide", user);
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
