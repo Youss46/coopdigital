@@ -400,6 +400,7 @@ export async function payerCommissions(
         reference:      referencePaiement ?? null,
         dateOperation:  today,
         soldeApresFcfa: String(nouveauSolde),
+        enregistrePar:  userId ?? null,
       });
     }
 
@@ -451,6 +452,7 @@ export async function payerCommissions(
           reference:      referencePaiement ?? null,
           dateOperation:  today,
           soldeApresFcfa: String(nouveauSolde),
+          enregistrePar:  userId ?? null,
         })
         .returning({ id: mouvementsBanqueTable.id });
 
