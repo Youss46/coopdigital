@@ -39,7 +39,9 @@ type Compte = {
 type Mouvement = {
   id: number; type: string; motif: string; montant_fcfa: string;
   libelle: string | null; reference: string | null;
-  date_operation: string; solde_apres_fcfa: string | null; created_at: string;
+  date_operation: string; solde_apres_fcfa: string | null;
+  enregistre_par: number | null; enregistre_par_nom: string | null;
+  created_at: string;
 };
 
 async function apiFetch(path: string) {
@@ -234,6 +236,7 @@ export default function MobileMarchandPage() {
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium text-gray-800">{m.libelle ?? m.motif}</p>
                       <p className="text-xs text-gray-400">{DATE_FR(m.date_operation)} · {m.created_at?.slice(11, 16)}{m.reference && ` · ${m.reference}`}</p>
+                       <p className="text-xs text-gray-400">Effectué par : {m.enregistre_par_nom?.trim() || "Système"}</p>
                     </div>
                     <div className="text-right flex-shrink-0">
                       <p className={`text-sm font-semibold ${m.type === "credit" ? "text-green-600" : "text-red-500"}`}>

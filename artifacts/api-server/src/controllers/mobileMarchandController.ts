@@ -4,6 +4,7 @@ import {
   comptesMobilesMarchandsTable, mouvementsMobileMarchandTable,
   comptesBancairesTable, mouvementsBanqueTable,
   caissesTable, sessionsCaisseTable, mouvementsCaisseTable,
+  usersTable,
 } from "@workspace/db";
 import { proposerEcriture } from "../services/comptabiliteService.js";
 import { eq, and, desc, sql } from "drizzle-orm";
@@ -160,8 +161,21 @@ export async function getJournal(req: Request, res: Response): Promise<void> {
   const compteId = parseInt(String(req.params["id"]), 10);
   try {
     const rows = await db
-      .select()
+      .select({
+        id:              mouvementsMobileMarchandTable.id,
+        type:            mouvementsMobileMarchandTable.type,
+        motif:           mouvementsMobileMarchandTable.motif,
+        montantFcfa:     mouvementsMobileMarchandTable.montantFcfa,
+        libelle:         mouvementsMobileMarchandTable.libelle,
+        reference:       mouvementsMobileMarchandTable.reference,
+        dateOperation:   mouvementsMobileMarchandTable.dateOperation,
+        soldeApresFcfa:  mouvementsMobileMarchandTable.soldeApresFcfa,
+        enregistrePar:   mouvementsMobileMarchandTable.enregistrePar,
+        enregistreParNom: usersTable.nom,
+        createdAt:       mouvementsMobileMarchandTable.createdAt,
+      })
       .from(mouvementsMobileMarchandTable)
+      .leftJoin(usersTable, eq(mouvementsMobileMarchandTable.enregistrePar, usersTable.id))
       .where(and(
         eq(mouvementsMobileMarchandTable.compteId, compteId),
         eq(mouvementsMobileMarchandTable.cooperativeId, cid),
@@ -176,6 +190,8 @@ export async function getJournal(req: Request, res: Response): Promise<void> {
       reference:       r.reference,
       date_operation:  r.dateOperation,
       solde_apres_fcfa:r.soldeApresFcfa,
+       enregistre_par:     r.enregistrePar,
+       enregistre_par_nom: r.enregistreParNom,
       created_at:      r.createdAt,
     })));
   } catch (err) {
