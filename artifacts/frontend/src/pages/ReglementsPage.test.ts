@@ -95,6 +95,71 @@ describe("modale de validation d'un règlement", () => {
     );
   });
 
+  it("transmet le compte bancaire choisi pour une carte producteur", async () => {
+    const onConfirm = vi.fn();
+    const paiement = {
+      id: 45,
+      membreNom: "Kouassi",
+      membrePrenoms: "Awa",
+      montantFcfa: 125_000,
+      montantNetFcfa: 125_000,
+      statut: "en_attente",
+      modePaiement: "carte_producteur",
+      livraisonId: null,
+      livraisonStatutPaiement: null,
+      livraisonMontantRestant: null,
+    } as PaiementListItem;
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root.render(createElement(ModalValidation, {
+        paiement,
+        comptesBancaires: [
+          { id: 11, nom: "Compte principal", banque: "Banque A", solde_actuel_fcfa: "500000" },
+          { id: 12, nom: "Compte campagne", banque: "Banque B", solde_actuel_fcfa: "300000" },
+        ],
+        onClose: vi.fn(),
+        onConfirm,
+        loading: false,
+        sessionCaisseOuverte: true,
+      }));
+    });
+
+    const selects = Array.from(container.querySelectorAll<HTMLSelectElement>("select"));
+    expect(selects).toHaveLength(1);
+    expect(selects[0]?.options).toHaveLength(3);
+    expect(selects[0]?.textContent).toContain("Compte campagne");
+
+    await act(async () => {
+      const setValue = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+      setValue?.call(selects[0], "12");
+      selects[0]!.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    const confirmButton = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Confirmer et payer"),
+    );
+    expect(confirmButton).toBeDefined();
+
+    await act(async () => {
+      confirmButton!.click();
+    });
+
+    expect(onConfirm).toHaveBeenCalledWith(
+      "",
+      "",
+      125_000,
+      "carte_producteur",
+      undefined,
+      { numero: "", banque: "" },
+      false,
+      12,
+    );
+  });
+
   it("affiche et transmet le total avec le seul reliquat de commission quand l'avance est partielle", async () => {
     const onConfirm = vi.fn();
     const paiement = {
