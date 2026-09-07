@@ -747,34 +747,49 @@ export async function virementVersBanque(
   };
 }
 
-// ─── Rapport PDF journalier ───────────────────────────────────────────────────
+// ─── Rapport PDF du journal ───────────────────────────────────────────────────
 
-export async function genererRapportPdf(caisseId: number, dateSession?: string): Promise<Buffer> {
-  const dateStr = dateSession ?? today();
+export async function genererRapportPdf(
+  caisseId: number,
+  dateDebutOuOptions?: string | { dateDebut?: string; dateFin?: string },
+  dateFinArg?: string,
+): Promise<Buffer> {
+  // Le second argument string conserve la compatibilité avec l'ancien rapport
+  // quotidien. Les options permettent maintenant de couvrir une période.
+  const options = typeof dateDebutOuOptions === "object" ? dateDebutOuOptions : undefined;
+  const dateDebut = typeof dateDebutOuOptions === "string"
+    ? dateDebutOuOptions
+    : options?.dateDebut;
+  const dateD = dateDebut ?? today();
+  const dateF = typeof dateDebutOuOptions === "string"
+    ? dateFinArg ?? dateD
+    : options?.dateFin ?? dateD;
   const caisse = await getCaisse(caisseId);
   if (!caisse) throw new Error("Caisse introuvable");
 
-  const journal = await getJournal(caisseId, { dateDebut: dateStr, dateFin: dateStr });
+  const journal = await getJournal(caisseId, { dateDebut: dateD, dateFin: dateF });
   const coopNom = await getCoopNom(caisse.cooperativeId);
 
-  // Infos session
+  // Une période peut contenir plusieurs sessions. On les affiche dans le
+  // résumé sans limiter le rapport à la session du premier jour.
   const sessionResult = await db.execute<{
-    id: number; statut: string; solde_ouverture_fcfa: string;
+    id: number; date_session: string; statut: string; solde_ouverture_fcfa: string;
     solde_fermeture_theorique_fcfa: string | null; solde_fermeture_reel_fcfa: string | null;
     ecart_fcfa: string | null; heure_ouverture: string; heure_fermeture: string | null;
     ouvert_par_nom: string | null; ferme_par_nom: string | null;
   }>(sql`
-    SELECT s.id, s.statut, s.solde_ouverture_fcfa,
+    SELECT s.id, s.date_session::text, s.statut, s.solde_ouverture_fcfa,
       s.solde_fermeture_theorique_fcfa, s.solde_fermeture_reel_fcfa, s.ecart_fcfa,
       s.heure_ouverture::text, s.heure_fermeture::text,
       u1.nom AS ouvert_par_nom, u2.nom AS ferme_par_nom
     FROM sessions_caisse s
     LEFT JOIN users u1 ON u1.id = s.ouvert_par
     LEFT JOIN users u2 ON u2.id = s.ferme_par
-    WHERE s.caisse_id = ${caisseId} AND s.date_session = ${dateStr}
-    LIMIT 1
+    WHERE s.caisse_id = ${caisseId}
+      AND s.date_session BETWEEN ${dateD} AND ${dateF}
+    ORDER BY s.date_session
   `);
-  const session = sessionResult.rows[0];
+  const sessions = sessionResult.rows;
 
   const FCFA = formatMontantPdf;
 
@@ -784,7 +799,7 @@ export async function genererRapportPdf(caisseId: number, dateSession?: string):
 
   await drawHeader(doc, caisse.cooperativeId, {
     titre_document: "RAPPORT DE CAISSE",
-    reference: dateStr,
+    reference: dateD === dateF ? dateD : `${dateD} → ${dateF}`,
     hauteur_reservee: 90,
   });
 
@@ -797,19 +812,40 @@ export async function genererRapportPdf(caisseId: number, dateSession?: string):
     .font("Helvetica-Bold").fontSize(13).fillColor("#1a4731")
     .text(caisse.nom, margin, doc.y, { width: cW });
   doc.font("Helvetica").fontSize(9).fillColor("#555555")
-    .text(`Date : ${new Date(dateStr + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}`, margin, doc.y, { width: cW });
+    .text(
+      dateD === dateF
+        ? `Date : ${new Date(dateD + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}`
+        : `Période : ${dateD} → ${dateF}`,
+      margin,
+      doc.y,
+      { width: cW },
+    );
 
-  if (session) {
-    const lignes = [
-      [`Ouverture`, `${session.heure_ouverture?.slice(11, 16) ?? "—"} par ${session.ouvert_par_nom ?? "—"}`],
-      [`Solde ouverture`, FCFA(session.solde_ouverture_fcfa)],
-    ];
-    if (session.statut === "fermee") {
-      if (session.heure_fermeture) lignes.push([`Fermeture`, session.heure_fermeture.slice(11, 16) + ` par ${session.ferme_par_nom ?? "—"}`]);
-      if (session.solde_fermeture_theorique_fcfa) lignes.push([`Solde théorique`, FCFA(session.solde_fermeture_theorique_fcfa)]);
-      if (session.solde_fermeture_reel_fcfa) lignes.push([`Solde réel`, FCFA(session.solde_fermeture_reel_fcfa)]);
-      const ecart = parseFloat(session.ecart_fcfa ?? "0");
-      if (ecart !== 0) lignes.push([`Écart`, FCFA(ecart)]);
+  if (sessions.length > 0) {
+    const lignes: string[][] = [];
+    if (dateD === dateF) {
+      const session = sessions[0]!;
+      lignes.push(
+        [`Ouverture`, `${session.heure_ouverture?.slice(11, 16) ?? "—"} par ${session.ouvert_par_nom ?? "—"}`],
+        [`Solde ouverture`, FCFA(session.solde_ouverture_fcfa)],
+      );
+      if (session.statut === "fermee") {
+        if (session.heure_fermeture) lignes.push([`Fermeture`, session.heure_fermeture.slice(11, 16) + ` par ${session.ferme_par_nom ?? "—"}`]);
+        if (session.solde_fermeture_theorique_fcfa) lignes.push([`Solde théorique`, FCFA(session.solde_fermeture_theorique_fcfa)]);
+        if (session.solde_fermeture_reel_fcfa) lignes.push([`Solde réel`, FCFA(session.solde_fermeture_reel_fcfa)]);
+        const ecart = parseFloat(session.ecart_fcfa ?? "0");
+        if (ecart !== 0) lignes.push([`Écart`, FCFA(ecart)]);
+      }
+    } else {
+      lignes.push([`Sessions`, `${sessions.length} jour${sessions.length > 1 ? "s" : ""}`]);
+      sessions.forEach((session) => {
+        const dateLabel = new Date(session.date_session + "T00:00:00").toLocaleDateString("fr-FR");
+        const ouverture = session.heure_ouverture?.slice(11, 16) ?? "—";
+        lignes.push([
+          dateLabel,
+          `${session.statut === "fermee" ? "Fermée" : "Ouverte"} — ouverture ${ouverture}, ${FCFA(session.solde_ouverture_fcfa)}`,
+        ]);
+      });
     }
 
     doc.moveDown(0.5);

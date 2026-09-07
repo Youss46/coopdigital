@@ -771,24 +771,27 @@ function JournalCaisse({
   const [pdfLoading, setPdfLoading] = useState(false);
 
   const telechargerPdf = async () => {
-    if (!caisseId || pdfLoading) return;
-    if (!dateUnique) {
-      toast({
-        title: "Rapport PDF quotidien",
-        description: "Sélectionnez une seule date pour télécharger le rapport PDF. Pour une période, utilisez le tableur.",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!caisseId || pdfLoading || periodeInvalide) return;
     setPdfLoading(true);
     try {
-      const url = `${BASE}/api/caisse/${caisseId}/rapport-pdf?date=${dateDebut}`;
+      const params = new URLSearchParams({
+        date_debut: dateDebut,
+        date_fin: dateFin,
+      });
+      const url = `${BASE}/api/caisse/${caisseId}/rapport-pdf?${params.toString()}`;
       const r = await fetch(url, { headers: { Authorization: `Bearer ${tok()}` } });
-      if (!r.ok) throw new Error(`Erreur ${r.status}`);
+      if (!r.ok) {
+        const json = await r.json().catch(() => null) as { error?: string } | null;
+        throw new Error(json?.error ?? `Erreur ${r.status}`);
+      }
       const blob = await r.blob();
-      openPdfViewer(URL.createObjectURL(blob), `rapport-caisse-${dateDebut}.pdf`);
-    } catch {
-      // erreur silencieuse
+      openPdfViewer(URL.createObjectURL(blob), `rapport-caisse-${dateDebut}-${dateFin}.pdf`);
+    } catch (e) {
+      toast({
+        title: "Export impossible",
+        description: e instanceof Error ? e.message : "Erreur lors du téléchargement",
+        variant: "destructive",
+      });
     } finally {
       setPdfLoading(false);
     }
@@ -900,8 +903,7 @@ function JournalCaisse({
           {journal && (
             <>
               <button onClick={() => void telechargerPdf()}
-                disabled={pdfLoading || !dateUnique}
-                title={!dateUnique ? "Disponible pour une seule journée" : undefined}
+                disabled={pdfLoading || periodeInvalide}
                 className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
                 {pdfLoading
                   ? <RefreshCw size={14} className="animate-spin" />

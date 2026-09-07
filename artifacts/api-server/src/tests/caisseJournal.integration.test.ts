@@ -1,6 +1,7 @@
 import { pool } from "@workspace/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { getJournal } from "../services/caisseService.js";
+import zlib from "zlib";
+import { genererRapportPdf, getJournal } from "../services/caisseService.js";
 
 const enabled =
   process.env.RUN_POSTGRES_INTEGRATION === "1" &&
@@ -13,6 +14,33 @@ describe.skipIf(!enabled)("journal de caisse sur une période PostgreSQL", () =>
 
   const dateDebut = "2026-08-28";
   const dateFin = "2026-08-30";
+
+  function extractPdfText(buffer: Buffer): string {
+    const text: string[] = [buffer.toString("latin1")];
+    let position = 0;
+    while (position < buffer.length) {
+      let marker = buffer.indexOf(Buffer.from("stream\r\n"), position);
+      let delimiterLength = 8;
+      const unixMarker = buffer.indexOf(Buffer.from("stream\n"), position);
+      if (marker === -1 || (unixMarker !== -1 && unixMarker < marker)) {
+        marker = unixMarker;
+        delimiterLength = 7;
+      }
+      if (marker === -1) break;
+      const end = buffer.indexOf(Buffer.from("endstream"), marker + delimiterLength);
+      if (end === -1) break;
+      try {
+        const stream = zlib.inflateSync(buffer.subarray(marker + delimiterLength, end)).toString("latin1");
+        text.push(stream);
+        text.push(stream.replace(/<([0-9A-Fa-f]{2,})>/g, (_match, hex: string) =>
+          Buffer.from(hex, "hex").toString("latin1")));
+      } catch {
+        // Les flux non compressés sont déjà couverts par le contenu brut.
+      }
+      position = end + 9;
+    }
+    return text.join("");
+  }
 
   beforeAll(async () => {
     client = await pool.connect();
@@ -73,6 +101,17 @@ describe.skipIf(!enabled)("journal de caisse sur une période PostgreSQL", () =>
     ]);
     expect(journal.totalEntrees).toBe(100);
     expect(journal.totalSorties).toBe(25);
+  });
+
+  it("inclut les mouvements et totaux des deux bornes dans le PDF", async () => {
+    const pdf = await genererRapportPdf(caisseId, { dateDebut, dateFin });
+    const text = extractPdfText(pdf);
+
+    expect(pdf.subarray(0, 4).toString()).toBe("%PDF");
+    expect(text).toContain(dateDebut);
+    expect(text).toContain(dateFin);
+    expect(text).toContain("100 FCFA");
+    expect(text).toContain("25 FCFA");
   });
 
   it("refuse une période inversée avant toute requête SQL", async () => {

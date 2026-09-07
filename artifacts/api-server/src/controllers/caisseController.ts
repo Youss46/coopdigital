@@ -166,10 +166,14 @@ export async function getJournal(req: Request, res: Response): Promise<void> {
 export async function getRapportPdf(req: Request, res: Response): Promise<void> {
   try {
     const id   = parseInt(String(req.params["id"]), 10);
-    const date = (req.query["date"] as string | undefined) ?? new Date().toISOString().slice(0, 10);
-    const buffer = await svc.genererRapportPdf(id, date);
+    const fallbackDate = new Date().toISOString().slice(0, 10);
+    const date = req.query["date"] as string | undefined;
+    const date_debut = (req.query["date_debut"] as string | undefined) ?? date ?? fallbackDate;
+    const date_fin = (req.query["date_fin"] as string | undefined) ?? date ?? date_debut;
+    const buffer = await svc.genererRapportPdf(id, { dateDebut: date_debut, dateFin: date_fin });
+    const suffix = date_debut === date_fin ? date_debut : `${date_debut}-${date_fin}`;
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="rapport-caisse-${date}.pdf"`);
+    res.setHeader("Content-Disposition", `attachment; filename="rapport-caisse-${suffix}.pdf"`);
     res.send(buffer);
   } catch (err) { req.log.error({ err }, "getRapportPdf"); res.status(500).json({ error: "Erreur serveur" }); }
 }
