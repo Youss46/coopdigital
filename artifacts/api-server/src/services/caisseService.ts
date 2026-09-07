@@ -431,6 +431,9 @@ export async function fermerSession(
 export async function getJournal(caisseId: number, opts?: { dateDebut?: string; dateFin?: string }) {
   const dateD = opts?.dateDebut ?? today();
   const dateF = opts?.dateFin   ?? today();
+  if (dateD > dateF) {
+    throw new Error("La date de fin doit être postérieure ou égale à la date de début.");
+  }
 
   const result = await db.execute<{
     id: number; type: string; motif: string; montant_fcfa: string;

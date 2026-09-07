@@ -724,7 +724,11 @@ function JournalCaisse({
 
   const charger = useCallback(async (id?: number | "") => {
     const cid = id ?? caisseId;
-    if (!cid || periodeInvalide) return;
+    if (periodeInvalide) {
+      setJournal(null);
+      return;
+    }
+    if (!cid) return;
     setLoading(true);
     try {
       const params = new URLSearchParams({
@@ -791,7 +795,7 @@ function JournalCaisse({
   };
 
   const telechargerExcel = async () => {
-    if (!caisseId || excelLoading) return;
+    if (!caisseId || excelLoading || periodeInvalide) return;
     setExcelLoading(true);
     try {
       const params = new URLSearchParams({
@@ -905,7 +909,7 @@ function JournalCaisse({
                 Télécharger PDF
               </button>
               <button onClick={() => void telechargerExcel()}
-                disabled={excelLoading}
+                disabled={excelLoading || periodeInvalide}
                 className="flex items-center gap-1.5 px-3 py-2 border border-green-200 rounded-lg text-sm text-green-700 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed">
                 {excelLoading
                   ? <RefreshCw size={14} className="animate-spin" />
