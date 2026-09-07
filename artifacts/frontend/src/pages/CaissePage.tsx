@@ -685,10 +685,14 @@ function ModalTransfert({
 function JournalCaisse({
   caisses,
   initCaisseId,
+  date,
+  onDateChange,
   onCaissesChanged,
 }: {
   caisses: Caisse[] | null;
   initCaisseId?: number;
+  date: string;
+  onDateChange: (date: string) => void;
   onCaissesChanged: () => Promise<void>;
 }) {
   const { toast } = useToast();
@@ -696,7 +700,6 @@ function JournalCaisse({
   const peutEcrire = ["pca", "directeur", "comptable", "caissier", "delegue"].includes(utilisateur?.role ?? "");
   const today = new Date().toISOString().slice(0, 10);
   const [caisseId, setCaisseId] = useState<number | "">(initCaisseId ?? (caisses?.[0]?.id ?? ""));
-  const [date, setDate] = useState(today);
   const [journal, setJournal] = useState<Journal | null>(null);
   const [loading, setLoading] = useState(false);
   const [modalMvt, setModalMvt] = useState(false);
@@ -822,7 +825,7 @@ function JournalCaisse({
           <option value="">Sélectionner une caisse</option>
           {caisses?.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
         </select>
-        <input type="date" value={date} onChange={e => setDate(e.target.value)}
+        <input type="date" value={date} onChange={e => onDateChange(e.target.value)}
           className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
         <button onClick={() => charger()} disabled={!caisseId || loading}
           className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50">
@@ -1506,6 +1509,7 @@ export default function CaissePage() {
 
   const [tab, setTab] = useState<"etat" | "journal" | "historique" | "delegues">("etat");
   const [journalCaisseId, setJournalCaisseId] = useState<number | undefined>();
+  const [journalDate, setJournalDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [caisses, setCaisses] = useState<Caisse[] | null>(null);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -1575,6 +1579,8 @@ export default function CaissePage() {
         <JournalCaisse
           caisses={caisses}
           initCaisseId={journalCaisseId}
+          date={journalDate}
+          onDateChange={setJournalDate}
           onCaissesChanged={chargerCaisses}
         />
       )}
