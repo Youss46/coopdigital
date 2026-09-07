@@ -685,14 +685,18 @@ function ModalTransfert({
 function JournalCaisse({
   caisses,
   initCaisseId,
-  date,
-  onDateChange,
+  dateDebut,
+  dateFin,
+  onDateDebutChange,
+  onDateFinChange,
   onCaissesChanged,
 }: {
   caisses: Caisse[] | null;
   initCaisseId?: number;
-  date: string;
-  onDateChange: (date: string) => void;
+  dateDebut: string;
+  dateFin: string;
+  onDateDebutChange: (date: string) => void;
+  onDateFinChange: (date: string) => void;
   onCaissesChanged: () => Promise<void>;
 }) {
   const { toast } = useToast();
@@ -706,6 +710,8 @@ function JournalCaisse({
   const [modalFermer, setModalFermer] = useState(false);
   const [modalVirementBanque, setModalVirementBanque] = useState(false);
   const [excelLoading, setExcelLoading] = useState(false);
+  const periodeInvalide = dateDebut > dateFin;
+  const dateUnique = dateDebut === dateFin;
 
   // La liste des caisses arrive après le premier rendu. Sans cette
   // synchronisation, l'onglet ouvert directement reste sans caisse sélectionnée.
@@ -716,13 +722,16 @@ function JournalCaisse({
     }
   }, [caisses, initCaisseId]);
 
-  const charger = useCallback(async (id?: number | "", d?: string) => {
+  const charger = useCallback(async (id?: number | "") => {
     const cid = id ?? caisseId;
-    const dt  = d  ?? date;
-    if (!cid) return;
+    if (!cid || periodeInvalide) return;
     setLoading(true);
     try {
-      const r = await fetch(`${BASE}/api/caisse/${cid}/journal?date_debut=${dt}&date_fin=${dt}`,
+      const params = new URLSearchParams({
+        date_debut: dateDebut,
+        date_fin: dateFin,
+      });
+      const r = await fetch(`${BASE}/api/caisse/${cid}/journal?${params.toString()}`,
         { headers: { Authorization: `Bearer ${tok()}` } });
       const json = await r.json();
       if (!r.ok) throw new Error(json.error ?? "Erreur");
@@ -731,7 +740,7 @@ function JournalCaisse({
       if (!navigator.onLine) return;
       toast({ title: "Erreur", description: e instanceof Error ? e.message : "Erreur", variant: "destructive" });
     } finally { setLoading(false); }
-  }, [caisseId, date]);
+  }, [caisseId, dateDebut, dateFin, periodeInvalide]);
 
   // Le journal doit être visible après navigation ou changement de filtre,
   // pas uniquement après un clic manuel sur « Charger ».
@@ -759,13 +768,21 @@ function JournalCaisse({
 
   const telechargerPdf = async () => {
     if (!caisseId || pdfLoading) return;
+    if (!dateUnique) {
+      toast({
+        title: "Rapport PDF quotidien",
+        description: "Sélectionnez une seule date pour télécharger le rapport PDF. Pour une période, utilisez le tableur.",
+        variant: "destructive",
+      });
+      return;
+    }
     setPdfLoading(true);
     try {
-      const url = `${BASE}/api/caisse/${caisseId}/rapport-pdf?date=${date}`;
+      const url = `${BASE}/api/caisse/${caisseId}/rapport-pdf?date=${dateDebut}`;
       const r = await fetch(url, { headers: { Authorization: `Bearer ${tok()}` } });
       if (!r.ok) throw new Error(`Erreur ${r.status}`);
       const blob = await r.blob();
-      openPdfViewer(URL.createObjectURL(blob), `rapport-caisse-${date}.pdf`);
+      openPdfViewer(URL.createObjectURL(blob), `rapport-caisse-${dateDebut}.pdf`);
     } catch {
       // erreur silencieuse
     } finally {
@@ -777,7 +794,11 @@ function JournalCaisse({
     if (!caisseId || excelLoading) return;
     setExcelLoading(true);
     try {
-      const url = `${BASE}/api/caisse/${caisseId}/journal/export?date_debut=${encodeURIComponent(date)}&date_fin=${encodeURIComponent(date)}`;
+      const params = new URLSearchParams({
+        date_debut: dateDebut,
+        date_fin: dateFin,
+      });
+      const url = `${BASE}/api/caisse/${caisseId}/journal/export?${params.toString()}`;
       const r = await fetch(url, { headers: { Authorization: `Bearer ${tok()}` } });
       if (!r.ok) {
         const json = await r.json().catch(() => null) as { error?: string } | null;
@@ -787,7 +808,7 @@ function JournalCaisse({
       const objectUrl = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = objectUrl;
-      anchor.download = `journal-caisse-${date}.xlsx`;
+      anchor.download = `journal-caisse-${dateDebut}-${dateFin}.xlsx`;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
@@ -825,19 +846,32 @@ function JournalCaisse({
           <option value="">Sélectionner une caisse</option>
           {caisses?.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
         </select>
-        <input type="date" value={date} onChange={e => onDateChange(e.target.value)}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-        <button onClick={() => charger()} disabled={!caisseId || loading}
+        <label className="flex items-center gap-2 text-sm text-gray-600">
+          <span>Du</span>
+          <input type="date" value={dateDebut} onChange={e => onDateDebutChange(e.target.value)}
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+        </label>
+        <label className="flex items-center gap-2 text-sm text-gray-600">
+          <span>Au</span>
+          <input type="date" value={dateFin} onChange={e => onDateFinChange(e.target.value)}
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+        </label>
+        <button onClick={() => charger()} disabled={!caisseId || loading || periodeInvalide}
           className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50">
           {loading ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" /> : <RefreshCw size={14} />}
           Charger
         </button>
       </div>
+      {periodeInvalide && (
+        <p className="text-xs text-red-600 -mt-3 mb-4">
+          La date de fin doit être postérieure ou égale à la date de début.
+        </p>
+      )}
 
       {/* Actions session */}
       {caisseId && (
         <div className="flex flex-wrap gap-2 mb-4">
-          {peutEcrire && !sessionOuverte && date === today && (
+          {peutEcrire && !sessionOuverte && dateUnique && dateDebut === today && (
             <button onClick={ouvrirSession}
               className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">
               <Unlock size={14} /> Ouvrir la session du jour
@@ -862,7 +896,8 @@ function JournalCaisse({
           {journal && (
             <>
               <button onClick={() => void telechargerPdf()}
-                disabled={pdfLoading}
+                disabled={pdfLoading || !dateUnique}
+                title={!dateUnique ? "Disponible pour une seule journée" : undefined}
                 className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
                 {pdfLoading
                   ? <RefreshCw size={14} className="animate-spin" />
@@ -909,7 +944,7 @@ function JournalCaisse({
       {journal ? (
         journal.mouvements.length === 0 ? (
           <div className="text-center py-12 text-gray-400 bg-gray-50 rounded-xl">
-            <p>Aucun mouvement pour cette journée.</p>
+            <p>Aucun mouvement pour cette période.</p>
           </div>
         ) : (
           <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
@@ -953,7 +988,7 @@ function JournalCaisse({
         )
       ) : !loading && (
         <div className="text-center py-12 text-gray-400 bg-gray-50 rounded-xl">
-          <p>Sélectionnez une caisse et une date, puis cliquez sur Charger.</p>
+          <p>Sélectionnez une caisse et une période, puis cliquez sur Charger.</p>
         </div>
       )}
 
@@ -1509,7 +1544,8 @@ export default function CaissePage() {
 
   const [tab, setTab] = useState<"etat" | "journal" | "historique" | "delegues">("etat");
   const [journalCaisseId, setJournalCaisseId] = useState<number | undefined>();
-  const [journalDate, setJournalDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [journalDateDebut, setJournalDateDebut] = useState(() => new Date().toISOString().slice(0, 10));
+  const [journalDateFin, setJournalDateFin] = useState(() => new Date().toISOString().slice(0, 10));
   const [caisses, setCaisses] = useState<Caisse[] | null>(null);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -1579,8 +1615,10 @@ export default function CaissePage() {
         <JournalCaisse
           caisses={caisses}
           initCaisseId={journalCaisseId}
-          date={journalDate}
-          onDateChange={setJournalDate}
+          dateDebut={journalDateDebut}
+          dateFin={journalDateFin}
+          onDateDebutChange={setJournalDateDebut}
+          onDateFinChange={setJournalDateFin}
           onCaissesChanged={chargerCaisses}
         />
       )}
