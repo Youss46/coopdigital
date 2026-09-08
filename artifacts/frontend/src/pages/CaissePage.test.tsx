@@ -1,0 +1,121 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { act, createElement } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import CaissePage from "./CaissePage";
+
+vi.mock("@/contexts/AuthContext", () => ({
+  useAuth: () => ({
+    utilisateur: {
+      id: 1,
+      nom: "Kouassi",
+      prenoms: "Awa",
+      role: "comptable",
+      cooperativeId: 1,
+    },
+  }),
+}));
+
+vi.mock("@/hooks/use-toast", () => ({
+  useToast: () => ({ toast: vi.fn() }),
+}));
+
+const caisse = {
+  id: 7,
+  nom: "Caisse principale",
+  type_caisse: "centrale",
+  responsable_id: null,
+  responsable_nom: null,
+  solde_actuel_fcfa: "100000",
+  fond_caisse_minimum_fcfa: "0",
+  actif: true,
+  session_id: null,
+  session_statut: null,
+  heure_ouverture: null,
+  solde_ouverture_fcfa: null,
+};
+
+const ancienJournal = {
+  mouvements: [{
+    id: 1,
+    type: "entree",
+    motif: "don",
+    montant_fcfa: "10000",
+    libelle: "Ancienne opération",
+    solde_apres_fcfa: "110000",
+    date_operation: "2026-09-06",
+    created_at: "2026-09-06T10:00:00.000Z",
+    enregistre_par_nom: "Awa Kouassi",
+    session_id: 1,
+  }],
+  totalEntrees: 10000,
+  totalSorties: 0,
+};
+
+describe("plage du journal de caisse", () => {
+  let container: HTMLDivElement;
+  let root: Root;
+
+  afterEach(() => {
+    act(() => root?.unmount());
+    container?.remove();
+    vi.unstubAllGlobals();
+  });
+
+  it("n'émet aucun appel journal ou export et retire l'ancien résultat pour une plage inversée", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/caisse")) {
+        return Promise.resolve(new Response(JSON.stringify([caisse]), { status: 200 }));
+      }
+      if (url.includes("/journal?")) {
+        return Promise.resolve(new Response(JSON.stringify(ancienJournal), { status: 200 }));
+      }
+      throw new Error(`Appel inattendu: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root.render(createElement(CaissePage));
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    const journalButton = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Journal de caisse"),
+    );
+    expect(journalButton).toBeDefined();
+
+    await act(async () => {
+      journalButton!.click();
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    expect(container.textContent).toContain("Ancienne opération");
+    const journalCallsBeforeInvalidPeriod = fetchMock.mock.calls.filter(([input]) =>
+      String(input).includes("/journal?"),
+    ).length;
+    expect(journalCallsBeforeInvalidPeriod).toBe(1);
+
+    const dateInputs = Array.from(container.querySelectorAll<HTMLInputElement>('input[type="date"]'));
+    expect(dateInputs).toHaveLength(2);
+    await act(async () => {
+      const setInputValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setInputValue?.call(dateInputs[1], "2026-09-01");
+      dateInputs[1]!.dispatchEvent(new Event("input", { bubbles: true }));
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    expect(container.textContent).toContain(
+      "La date de fin doit être postérieure ou égale à la date de début.",
+    );
+    expect(container.textContent).not.toContain("Ancienne opération");
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).includes("/journal?"))).toHaveLength(
+      journalCallsBeforeInvalidPeriod,
+    );
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/rapport-pdf?"))).toBe(false);
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/journal/export?"))).toBe(false);
+  });
+});
