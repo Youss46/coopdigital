@@ -733,6 +733,7 @@ export async function corrigerDateApplicationAvance(req: Request, res: Response)
         .filter((value): value is number => value !== null))];
 
       const reverseParLivraison = new Map<number, number>();
+      const motifRejetParLivraison = new Map<number, string>();
       for (const livraisonId of livraisonIds) {
         const [livraison] = await tx
           .select()
@@ -755,6 +756,13 @@ export async function corrigerDateApplicationAvance(req: Request, res: Response)
             `La livraison du ${livraison.dateLivraison} est déjà payée. Utilisez une régularisation comptable.`,
           );
         }
+        const motifsRejet = paiements
+          .filter((paiement) => paiement.statut === "rejete" || paiement.statut === "echec")
+          .map((paiement) => paiement.motifRejet?.trim())
+          .filter((motif): motif is string => Boolean(motif));
+        if (motifsRejet.length > 0) {
+          motifRejetParLivraison.set(livraisonId, [...new Set(motifsRejet)].join(" | "));
+        }
 
         const montant = remboursementsActifs
           .filter((row) => row.livraisonId === livraisonId)
@@ -771,10 +779,15 @@ export async function corrigerDateApplicationAvance(req: Request, res: Response)
 
       for (const row of remboursementsActifs) {
         if (!row.livraisonId || !reverseParLivraison.has(row.livraisonId)) continue;
+        const motifRejet = motifRejetParLivraison.get(row.livraisonId);
         await tx.update(remboursementsAvancesMembresTable)
           .set({
             montantFcfa: 0,
-            note: `Déduction annulée — ${row.montantFcfa.toLocaleString("fr-FR")} FCFA — ${motifCorrection}`,
+            note: [
+              `Déduction annulée — ${row.montantFcfa.toLocaleString("fr-FR")} FCFA`,
+              motifCorrection,
+              motifRejet ? `Rejet précédent : ${motifRejet}` : null,
+            ].filter(Boolean).join(" — "),
           })
           .where(eq(remboursementsAvancesMembresTable.id, row.id));
       }
