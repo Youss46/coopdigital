@@ -80,58 +80,81 @@ describe.skipIf(!enabled)("correction d'avance rejetée sur PostgreSQL", () => {
     }
   });
 
-  async function createFixture(paymentAmount: number): Promise<Fixture> {
-    const avance = await client.query(
-      `INSERT INTO avances
-         (membre_id, montant_octroye_fcfa, montant_rembourse_fcfa,
-          solde_restant_fcfa, date_octroi, statut)
-       VALUES ($1, 10000, 4000, 6000, '2026-08-01', 'en_cours')
-       RETURNING id`,
-      [membreId],
-    );
-    const avanceId = avance.rows[0].id;
+  async function createFixture(
+    paymentAmount: number,
+    paymentStatus: "rejete" | "confirme" | "effectue" = "rejete",
+  ): Promise<Fixture> {
+    const paiementEffectue = paymentStatus === "confirme" || paymentStatus === "effectue";
+    const numeroPesee = fixtures.length + 1;
 
-    const livraison = await client.query(
-      `INSERT INTO livraisons
-         (cooperative_id, membre_id, poids_kg, prix_unitaire_fcfa,
-          montant_brut_fcfa, avance_deduite_fcfa, intrants_deduits_fcfa,
-          montant_net_fcfa, date_livraison, numero_pesee, annee_numero_pesee,
-          statut_paiement, montant_restant)
-       VALUES ($1, $2, 10, 1000, 10000, 4000, 0, 6000,
-               '2026-08-01', $3, 2026, 'EN_ATTENTE', '6000')
-       RETURNING id`,
-      [cooperativeId, membreId, fixtures.length + 1],
-    );
-    const livraisonId = livraison.rows[0].id;
+    await client.query("BEGIN");
+    try {
+      const avance = await client.query(
+        `INSERT INTO avances
+           (membre_id, montant_octroye_fcfa, montant_rembourse_fcfa,
+            solde_restant_fcfa, date_octroi, statut)
+         VALUES ($1, 10000, 4000, 6000, '2026-08-01', 'en_cours')
+         RETURNING id`,
+        [membreId],
+      );
+      const avanceId = avance.rows[0].id;
 
-    const paiement = await client.query(
-      `INSERT INTO paiements
-         (cooperative_id, livraison_id, membre_id, montant_fcfa,
-          numero_recu, mode_paiement, statut, motif_rejet)
-       VALUES ($1, $2, $3, $4, $5, 'especes', 'rejete', 'Provision insuffisante')
-       RETURNING id`,
-      [
-        cooperativeId,
-        livraisonId,
-        membreId,
-        paymentAmount,
-        `INT-${suffix}-${fixtures.length + 1}`,
-      ],
-    );
-    const paiementId = paiement.rows[0].id;
+      const livraison = await client.query(
+        `INSERT INTO livraisons
+           (cooperative_id, membre_id, poids_kg, prix_unitaire_fcfa,
+            montant_brut_fcfa, avance_deduite_fcfa, intrants_deduits_fcfa,
+            montant_net_fcfa, date_livraison, numero_pesee, annee_numero_pesee,
+            statut_paiement, montant_restant)
+         VALUES ($1, $2, 10, 1000, 10000, 4000, 0, 6000,
+                  '2026-08-01', $3, 2026, $4, $5)
+         RETURNING id`,
+        [
+          cooperativeId,
+          membreId,
+          numeroPesee,
+          paiementEffectue ? "PAYE" : "EN_ATTENTE",
+          paiementEffectue ? "0" : "6000",
+        ],
+      );
+      const livraisonId = livraison.rows[0].id;
 
-    const remboursement = await client.query(
-      `INSERT INTO remboursements_avances_membres
-         (avance_id, livraison_id, montant_fcfa, note)
-       VALUES ($1, $2, 4000, NULL)
-       RETURNING id`,
-      [avanceId, livraisonId],
-    );
-    const remboursementId = remboursement.rows[0].id;
+      const paiement = await client.query(
+        `INSERT INTO paiements
+           (cooperative_id, livraison_id, membre_id, montant_fcfa,
+            numero_recu, mode_paiement, statut, motif_rejet, date_validation)
+         VALUES ($1, $2, $3, $4, $5, 'especes', $6, $7,
+                  CASE WHEN $8::boolean THEN CURRENT_TIMESTAMP ELSE NULL END)
+         RETURNING id`,
+        [
+          cooperativeId,
+          livraisonId,
+          membreId,
+          paymentAmount,
+          `INT-${suffix}-${numeroPesee}`,
+          paymentStatus,
+          paymentStatus === "rejete" ? "Provision insuffisante" : null,
+          paiementEffectue,
+        ],
+      );
+      const paiementId = paiement.rows[0].id;
 
-    const fixture = { avanceId, livraisonId, paiementId, remboursementId };
-    fixtures.push(fixture);
-    return fixture;
+      const remboursement = await client.query(
+        `INSERT INTO remboursements_avances_membres
+           (avance_id, livraison_id, montant_fcfa, note)
+         VALUES ($1, $2, 4000, NULL)
+         RETURNING id`,
+        [avanceId, livraisonId],
+      );
+      const remboursementId = remboursement.rows[0].id;
+
+      await client.query("COMMIT");
+      const fixture = { avanceId, livraisonId, paiementId, remboursementId };
+      fixtures.push(fixture);
+      return fixture;
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    }
   }
 
   function makeRequest(avanceId: number): Request {
@@ -237,4 +260,21 @@ describe.skipIf(!enabled)("correction d'avance rejetée sur PostgreSQL", () => {
     });
     expect(await readState(fixture)).toEqual(initialState);
   });
+
+  it.each(["confirme", "effectue"] as const)(
+    "refuse la correction sans modifier les quatre états lorsqu'un paiement est %s",
+    async (paymentStatus) => {
+      const fixture = await createFixture(6000, paymentStatus);
+      const initialState = await readState(fixture);
+      const res = makeResponse();
+
+      await corrigerDateApplicationAvance(makeRequest(fixture.avanceId), res);
+
+      expect(res.status).toHaveBeenCalledWith(409);
+      expect(res.json).toHaveBeenCalledWith({
+        erreur: "La livraison du 2026-08-01 est déjà payée. Utilisez une régularisation comptable.",
+      });
+      expect(await readState(fixture)).toEqual(initialState);
+    },
+  );
 });
