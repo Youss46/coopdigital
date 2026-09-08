@@ -2105,3 +2105,152 @@ export async function rejeterPaiement(req: Request, res: Response): Promise<void
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }
+
+// ─── POST /paiements/:id/annuler-rejet ───────────────────────────────────────
+
+/**
+ * Annule un rejet pendant les 24 heures qui suivent sa date de validation.
+ * L'opération est volontairement transactionnelle : le paiement rejeté et
+ * l'éventuel paiement de remplacement d'un versement partiel sont verrouillés
+ * ensemble afin de ne jamais laisser deux règlements actionnables en doublon.
+ */
+export async function annulerRejetPaiement(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  const userId = req.user?.id;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
+  const id = parseInt(String(req.params["id"]));
+  if (isNaN(id)) {
+    res.status(400).json({ erreur: "ID invalide" });
+    return;
+  }
+
+  let membreIdNotification: number | null = null;
+  try {
+    await db.transaction(async (tx) => {
+      const [paiement] = await tx
+        .select()
+        .from(paiementsTable)
+        .where(eq(paiementsTable.id, id))
+        .for("update")
+        .limit(1);
+
+      if (!paiement) throw new Error("Paiement introuvable");
+      membreIdNotification = paiement.membreId;
+
+      const [ownership] = await tx
+        .select({
+          membreCoopId: membresTable.cooperativeId,
+          fournisseurCoopId: fournisseursTable.cooperativeId,
+          bonCarburantCoopId: bonsCarburantTable.cooperativeId,
+          depenseVehiculeCoopId: depensesVehiculeTable.cooperativeId,
+        })
+        .from(paiementsTable)
+        .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
+        .leftJoin(livraisonsTable, eq(paiementsTable.livraisonId, livraisonsTable.id))
+        .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
+        .leftJoin(bonsCarburantTable, eq(paiementsTable.bonCarburantId, bonsCarburantTable.id))
+        .leftJoin(depensesVehiculeTable, eq(paiementsTable.depenseVehiculeId, depensesVehiculeTable.id))
+        .where(eq(paiementsTable.id, id))
+        .limit(1);
+
+      if (
+        ownership?.membreCoopId !== cooperativeId
+        && ownership?.fournisseurCoopId !== cooperativeId
+        && ownership?.bonCarburantCoopId !== cooperativeId
+        && ownership?.depenseVehiculeCoopId !== cooperativeId
+      ) {
+        throw new Error("Ce paiement n'appartient pas à votre coopérative");
+      }
+      if (paiement.statut !== "rejete") {
+        throw new Error(`Statut actuel : ${paiement.statut}. Seuls les paiements rejetés peuvent être réouverts.`);
+      }
+      if (!paiement.dateValidation) {
+        throw new Error("Ce rejet ne possède pas de date de validation et ne peut pas être réouvert.");
+      }
+
+      const maintenant = new Date();
+      const ageRejetMs = maintenant.getTime() - paiement.dateValidation.getTime();
+      if (ageRejetMs < 0 || ageRejetMs > 24 * 60 * 60 * 1000) {
+        throw new Error("Le délai de 24 heures pour annuler ce rejet est dépassé.");
+      }
+
+      const [paiementRouvre] = await tx
+        .update(paiementsTable)
+        .set({
+          statut: "en_attente",
+          motifRejet: null,
+          dateValidation: null,
+          validePar: null,
+        })
+        .where(and(eq(paiementsTable.id, id), eq(paiementsTable.statut, "rejete")))
+        .returning({ id: paiementsTable.id });
+      if (!paiementRouvre) throw new PaiementDejaTraiteError();
+
+      // Lors du rejet d'un versement partiel, rejeter crée un paiement de
+      // remplacement. Il ne doit pas rester en attente lorsque l'original est
+      // rouvert, sinon le même reliquat serait payable deux fois.
+      const [livraison] = paiement.livraisonId
+        ? await tx
+          .select()
+          .from(livraisonsTable)
+          .where(eq(livraisonsTable.id, paiement.livraisonId))
+          .for("update")
+          .limit(1)
+        : [];
+      if (paiement.livraisonId && livraison && estLivraisonAvecSolde(livraison.statutPaiement)) {
+        const montantRemplacement = Math.max(0, Math.round(Number(
+          livraison.montantRestant ?? livraison.montantNetFcfa ?? 0,
+        )));
+        if (montantRemplacement > 0) {
+          const remplacements = await tx
+            .select()
+            .from(paiementsTable)
+            .where(and(
+              eq(paiementsTable.livraisonId, paiement.livraisonId),
+              eq(paiementsTable.statut, "en_attente"),
+              gte(paiementsTable.createdAt, paiement.dateValidation),
+            ))
+            .for("update");
+
+          for (const remplacement of remplacements) {
+            if (remplacement.id === id || remplacement.montantFcfa !== montantRemplacement) continue;
+            await tx.update(paiementsTable)
+              .set({
+                statut: "echec",
+                motifRejet: "Règlement de remplacement annulé avec la réouverture du rejet initial",
+                dateValidation: maintenant,
+                validePar: userId ?? null,
+              })
+              .where(and(
+                eq(paiementsTable.id, remplacement.id),
+                eq(paiementsTable.statut, "en_attente"),
+              ));
+          }
+        }
+      }
+    });
+
+    if (membreIdNotification) {
+      void envoyerPushGroupePortail([membreIdNotification], {
+        title: "Rejet de paiement annulé",
+        body: "Votre règlement est de nouveau en attente de validation.",
+        url: "/paiements",
+      });
+    }
+
+    res.json(await fetchEnrichedPaiement(id));
+  } catch (err) {
+    if (err instanceof PaiementDejaTraiteError) {
+      res.status(err.status).json({ erreur: err.message });
+      return;
+    }
+    const message = err instanceof Error ? err.message : "Impossible d'annuler le rejet";
+    const status = /introuvable/i.test(message) ? 404 : /24 heures|Statut actuel|coopérative|date de validation/i.test(message) ? 409 : 500;
+    if (status === 500) req.log.error({ err, paiementId: id }, "Erreur annulerRejetPaiement");
+    res.status(status).json({ erreur: message });
+  }
+}

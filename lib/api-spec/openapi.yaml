@@ -3274,6 +3274,28 @@ paths:
               schema:
                 $ref: "#/components/schemas/PaiementListItem"
 
+  /paiements/{id}/annuler-rejet:
+    post:
+      operationId: annulerRejetPaiement
+      tags: [paiements]
+      summary: Annuler le rejet d'un paiement dans les 24 heures
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Rejet annulé, paiement remis en attente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaiementListItem"
+        "409":
+          description: Rejet définitif ou paiement déjà traité
+
 
   /intrants/categories:
     get:

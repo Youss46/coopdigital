@@ -3804,6 +3804,70 @@ export const RejeterPaiementResponse = zod.object({
 
 
 /**
+ * @summary Annuler le rejet d'un paiement dans les 24 heures
+ */
+export const AnnulerRejetPaiementParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const AnnulerRejetPaiementResponse = zod.object({
+  "id": zod.number(),
+  "livraisonId": zod.number().nullish(),
+  "bonCarburantId": zod.number().nullish(),
+  "bonCarburantNumero": zod.string().nullish(),
+  "depenseVehiculeId": zod.number().nullish(),
+  "depenseVehiculeLibelle": zod.string().nullish(),
+  "depenseVehiculeFournisseur": zod.string().nullish(),
+  "membreId": zod.number().nullish(),
+  "montantFcfa": zod.number(),
+  "modePaiement": zod.union([zod.literal('orange_money'),zod.literal('mtn_momo'),zod.literal('especes'),zod.literal('wave'),zod.literal('cheque'),zod.literal('virement'),zod.literal(null)]).nullish(),
+  "referenceTransaction": zod.string().nullish(),
+  "statut": zod.enum(['en_attente', 'confirme', 'echec', 'rejete', 'en_cours', 'effectue']),
+  "createdAt": zod.string(),
+  "motifRejet": zod.string().nullish(),
+  "dateValidation": zod.string().nullish(),
+  "membreNom": zod.string().nullish(),
+  "membrePrenoms": zod.string().nullish(),
+  "telephone": zod.string().nullish(),
+  "fournisseurNom": zod.string().nullish(),
+  "fournisseurPrenoms": zod.string().nullish(),
+  "fournisseurTelephone": zod.string().nullish(),
+  "dateLivraison": zod.string().nullish(),
+  "poidsNetKg": zod.string().nullish(),
+  "poidsKg": zod.string().nullish(),
+  "montantBrutFcfa": zod.number().nullish(),
+  "avanceDeduiteFcfa": zod.number().nullish(),
+  "intrantsDeduitsFcfa": zod.number().nullish(),
+  "fraisCarburantDeduitsFcfa": zod.number().nullish(),
+  "autresChargesDeduitesFcfa": zod.number().nullish(),
+  "montantNetFcfa": zod.number().nullish(),
+  "livraisonStatutPaiement": zod.string().nullish().describe('Statut global de règlement de la livraison liée.'),
+  "livraisonMontantRestant": zod.number().nullish().describe('Solde restant à payer sur la livraison liée.'),
+  "agentId": zod.number().nullish(),
+  "agentSaisiseurId": zod.number().nullish(),
+  "agentSaisiseurNom": zod.string().nullish(),
+  "commissionCollecteId": zod.number().nullish(),
+  "commissionCollecteFcfa": zod.number().nullish(),
+  "commissionCollecteStatut": zod.string().nullish(),
+  "commissionCollecteRetenueAvancesFcfa": zod.number().nullish(),
+  "commissionCollecteMembreId": zod.number().nullish(),
+  "commissionCollecteFrequencePaiement": zod.union([zod.literal('chaque_paiement'),zod.literal('fin_campagne'),zod.literal(null)]).nullish(),
+  "commissionCollecteAvanceDisponibleFcfa": zod.number().nullish().describe('Montant d\'avance pouvant être retenu sur la commission en attente.'),
+  "lignes": zod.array(zod.object({
+  "id": zod.number(),
+  "paiementId": zod.number(),
+  "modePaiement": zod.enum(['especes', 'cheque', 'virement', 'orange_money', 'mtn_momo', 'wave']),
+  "montantFcfa": zod.number(),
+  "referenceTransaction": zod.string().nullish(),
+  "telephone": zod.string().nullish(),
+  "numeroCheque": zod.string().nullish(),
+  "banque": zod.string().nullish(),
+  "dateEcheance": zod.string().nullish()
+})).optional()
+})
+
+
+/**
  * @summary Liste des catégories d'intrants
  */
 export const ListCategoriesIntrantsResponseItem = zod.object({

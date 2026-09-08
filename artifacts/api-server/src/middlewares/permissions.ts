@@ -100,6 +100,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     confirmer:["pca", "directeur", "caissier", "delegue"],
     valider:  ["pca", "directeur", "comptable", "caissier", "delegue"],
     rejeter:  ["pca", "directeur", "comptable", "caissier", "delegue"],
+    annuler_rejet: ["pca", "directeur", "comptable", "caissier", "delegue"],
     annuler:  ["pca", "directeur"],
   },
 

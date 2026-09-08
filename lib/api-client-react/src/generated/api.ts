@@ -11192,6 +11192,76 @@ export const useRejeterPaiement = <TError = ErrorType<unknown>,
       return useMutation(getRejeterPaiementMutationOptions(options));
     }
 
+export const getAnnulerRejetPaiementUrl = (id: number,) => {
+
+
+
+
+  return `/api/paiements/${id}/annuler-rejet`
+}
+
+/**
+ * @summary Annuler le rejet d'un paiement dans les 24 heures
+ */
+export const annulerRejetPaiement = async (id: number, options?: RequestInit): Promise<PaiementListItem> => {
+
+  return customFetch<PaiementListItem>(getAnnulerRejetPaiementUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getAnnulerRejetPaiementMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof annulerRejetPaiement>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof annulerRejetPaiement>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['annulerRejetPaiement'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof annulerRejetPaiement>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  annulerRejetPaiement(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AnnulerRejetPaiementMutationResult = NonNullable<Awaited<ReturnType<typeof annulerRejetPaiement>>>
+
+    export type AnnulerRejetPaiementMutationError = ErrorType<void>
+
+    /**
+ * @summary Annuler le rejet d'un paiement dans les 24 heures
+ */
+export const useAnnulerRejetPaiement = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof annulerRejetPaiement>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof annulerRejetPaiement>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getAnnulerRejetPaiementMutationOptions(options));
+    }
+
 export const getListCategoriesIntrantsUrl = () => {
 
 

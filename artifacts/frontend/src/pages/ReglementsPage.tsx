@@ -1,14 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   CheckCircle2, Clock, XCircle, Loader2, CreditCard, Search,
   CheckCheck, AlertCircle, Banknote, Smartphone, ChevronDown,
   Receipt, Package, User, Calendar, TrendingUp, X, Wallet,
-  AlertTriangle, Lock, FileDown, Printer, Fuel, Ship,
+  AlertTriangle, Lock, FileDown, Printer, Fuel, Ship, Undo2,
 } from "lucide-react";
 import {
   useListPaiements,
   useValiderPaiement,
   useRejeterPaiement,
+  useAnnulerRejetPaiement,
   useGetPaiementsStats,
   ListPaiementsStatut,
   ListPaiementsPeriode,
@@ -1409,6 +1410,7 @@ export default function ReglementsPage() {
   const peutLire = usePermission("paiements", "lire");
   const peutValider = usePermission("paiements", "valider");
   const peutRejeter = usePermission("paiements", "rejeter");
+  const peutAnnulerRejet = usePermission("paiements", "annuler_rejet");
   const { utilisateur } = useAuth();
   const isDelegue = utilisateur?.role === "delegue";
 
@@ -1423,6 +1425,12 @@ export default function ReglementsPage() {
   const [transportModal, setTransportModal] = useState<FraisTransportARegler | null>(null);
   const [lotCarburantOuvert, setLotCarburantOuvert] = useState(false);
   const [paiementsCarburantSelectionnes, setPaiementsCarburantSelectionnes] = useState<number[]>([]);
+  const [maintenant, setMaintenant] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setMaintenant(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -1537,6 +1545,7 @@ export default function ReglementsPage() {
 
   const validerMut = useValiderPaiement();
   const rejeterMut = useRejeterPaiement();
+  const annulerRejetMut = useAnnulerRejetPaiement();
   const reglementTransportMut = useMutation({
     mutationFn: (input: {
       expeditionId: number;
@@ -1672,6 +1681,24 @@ export default function ReglementsPage() {
       toast({ title: "Paiement rejeté", description: `Motif : ${motif}` });
     } catch {
       toast({ title: "Erreur", description: "Impossible de rejeter le paiement", variant: "destructive" });
+    }
+  }
+
+  async function handleAnnulerRejet(paiement: PaiementListItem) {
+    if (!window.confirm("Annuler ce rejet et remettre le règlement en attente ?")) return;
+    try {
+      await annulerRejetMut.mutateAsync({ id: paiement.id });
+      invalidateAll();
+      toast({
+        title: "Rejet annulé",
+        description: "Le règlement est de nouveau disponible pour validation.",
+      });
+    } catch (err) {
+      toast({
+        title: "Impossible d'annuler le rejet",
+        description: err instanceof Error ? err.message : "Le délai de 24 heures est peut-être dépassé.",
+        variant: "destructive",
+      });
     }
   }
 
@@ -2144,12 +2171,15 @@ export default function ReglementsPage() {
               paiement={p}
               peutValider={peutValider}
               peutRejeter={peutRejeter}
+              peutAnnulerRejet={peutAnnulerRejet}
+              maintenant={maintenant}
               isDelegue={isDelegue}
               selectable={p.statut === "en_attente" && isBonCarburant(p)}
               selected={paiementsCarburantSelectionnes.includes(p.id)}
               onToggle={() => basculerSelectionCarburant(p.id)}
               onValider={() => setModal({ type: "valider", paiement: p })}
               onRejeter={() => setModal({ type: "rejeter", paiement: p })}
+              onAnnulerRejet={() => void handleAnnulerRejet(p)}
               onRecu={() => setModal({ type: "recu", paiement: p })}
             />
           ))}
@@ -2250,23 +2280,29 @@ function PaiementRow({
   paiement: p,
   peutValider,
   peutRejeter,
+  peutAnnulerRejet,
+  maintenant,
   isDelegue,
   selectable = false,
   selected = false,
   onToggle,
   onValider,
   onRejeter,
+  onAnnulerRejet,
   onRecu,
 }: {
   paiement: PaiementListItem;
   peutValider: boolean;
   peutRejeter: boolean;
+  peutAnnulerRejet: boolean;
+  maintenant: number;
   isDelegue: boolean;
   selectable?: boolean;
   selected?: boolean;
   onToggle?: () => void;
   onValider: () => void;
   onRejeter: () => void;
+  onAnnulerRejet: () => void;
   onRecu: () => void;
 }) {
   const poids = p.poidsNetKg ?? p.poidsKg;
@@ -2276,6 +2312,11 @@ function PaiementRow({
   const showActions = p.statut === "en_attente";
   const showRecu = p.statut === "confirme" || p.statut === "effectue" || p.statut === "en_cours";
   const showRejet = p.statut === "rejete";
+  const rejetAt = p.dateValidation ? new Date(p.dateValidation).getTime() : null;
+  const rejetAnnulable = showRejet
+    && rejetAt !== null
+    && maintenant >= rejetAt
+    && maintenant - rejetAt <= 24 * 60 * 60 * 1000;
   const isSoldePartiel = livraisonAvecSolde(p) && montantDejaPaye > 0;
   const isMobileMarchand = !!p.modePaiement && MODES_MOBILE_MARCHAND.has(p.modePaiement);
   const delegueBloque = isDelegue && isMobileMarchand;
@@ -2345,6 +2386,13 @@ function PaiementRow({
           {showRejet && p.motifRejet && (
             <p className="text-xs text-red-500 italic mt-1">Motif : {p.motifRejet}</p>
           )}
+          {showRejet && rejetAt !== null && (
+            <p className={`text-xs mt-1 ${rejetAnnulable ? "text-amber-700" : "text-gray-400"}`}>
+              {rejetAnnulable
+                ? `Annulation possible jusqu'au ${new Date(rejetAt + 24 * 60 * 60 * 1000).toLocaleString("fr-FR")}`
+                : "Rejet définitif (délai de 24 heures dépassé)"}
+            </p>
+          )}
           {/* Info restriction délégué Mobile Marchand */}
           {showActions && delegueBloque && (
             <div className="flex items-center gap-1.5 mt-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
@@ -2379,6 +2427,15 @@ function PaiementRow({
               >
                 <XCircle size={12} />
                 Rejeter
+              </button>
+            )}
+            {showRejet && peutAnnulerRejet && rejetAnnulable && (
+              <button
+                onClick={onAnnulerRejet}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-amber-800 bg-amber-100 hover:bg-amber-200 whitespace-nowrap"
+              >
+                <Undo2 size={12} />
+                Annuler le rejet
               </button>
             )}
             {showRecu && (
