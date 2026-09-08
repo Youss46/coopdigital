@@ -4,6 +4,8 @@ import {
   db,
   avancesTable,
   membresTable,
+  livraisonsTable,
+  paiementsTable,
   campagnesTable,
   remboursementsAvancesMembresTable,
   sessionsPeseeTable,
@@ -661,6 +663,195 @@ export async function updatePlanAvanceMembre(req: Request, res: Response): Promi
   } catch (err) {
     req.log.error({ err }, "updatePlanAvanceMembre");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+// ─── Correction d'une date de retenue négociée après une pesée ───────────────
+/**
+ * Reporte la première date d'application d'une avance.
+ *
+ * Une retenue déjà appliquée à une livraison antérieure à cette date est
+ * annulée uniquement si le règlement lié n'a pas encore été payé. La pesée
+ * reste intacte : seul son montant net et son règlement en attente sont
+ * recalculés. Une livraison déjà payée doit passer par une régularisation
+ * comptable séparée et bloque donc toute correction automatique.
+ */
+export async function corrigerDateApplicationAvance(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée" });
+    return;
+  }
+
+  const id = parseInt(String(req.params["id"] ?? "0"));
+  const { date_application, motif } = req.body as {
+    date_application?: unknown;
+    motif?: unknown;
+  };
+
+  if (!Number.isInteger(id) || id <= 0) {
+    res.status(400).json({ erreur: "Identifiant d'avance invalide" });
+    return;
+  }
+  if (typeof date_application !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date_application)) {
+    res.status(400).json({ erreur: "Une date d'application valide est requise" });
+    return;
+  }
+  const motifCorrection = typeof motif === "string" ? motif.trim().slice(0, 500) : "";
+  if (!motifCorrection) {
+    res.status(400).json({ erreur: "Le motif de la correction est obligatoire" });
+    return;
+  }
+
+  try {
+    const result = await db.transaction(async (tx) => {
+      const [avance] = await tx
+        .select({ avance: avancesTable, cooperativeId: membresTable.cooperativeId })
+        .from(avancesTable)
+        .innerJoin(membresTable, eq(membresTable.id, avancesTable.membreId))
+        .where(eq(avancesTable.id, id))
+        .for("update")
+        .limit(1);
+
+      if (!avance) throw new Error("Avance introuvable");
+      if (avance.cooperativeId !== cooperativeId) throw new Error("Cette avance n'appartient pas à votre coopérative");
+      if (avance.avance.statut === "rembourse") throw new Error("Cette avance est déjà remboursée");
+
+      const historiques = await tx
+        .select()
+        .from(remboursementsAvancesMembresTable)
+        .where(eq(remboursementsAvancesMembresTable.avanceId, id))
+        .for("update");
+
+      const remboursementsActifs = historiques.filter((row) =>
+        row.livraisonId !== null
+        && row.montantFcfa > 0
+        && !String(row.note ?? "").startsWith("Déduction annulée —"),
+      );
+      const livraisonIds = [...new Set(remboursementsActifs
+        .map((row) => row.livraisonId)
+        .filter((value): value is number => value !== null))];
+
+      const reverseParLivraison = new Map<number, number>();
+      for (const livraisonId of livraisonIds) {
+        const [livraison] = await tx
+          .select()
+          .from(livraisonsTable)
+          .where(and(
+            eq(livraisonsTable.id, livraisonId),
+            eq(livraisonsTable.cooperativeId, cooperativeId),
+          ))
+          .for("update")
+          .limit(1);
+        if (!livraison || livraison.dateLivraison >= date_application) continue;
+
+        const paiements = await tx
+          .select()
+          .from(paiementsTable)
+          .where(eq(paiementsTable.livraisonId, livraisonId))
+          .for("update");
+        if (paiements.some((paiement) => paiement.statut === "confirme" || paiement.statut === "effectue")) {
+          throw new Error(
+            `La livraison du ${livraison.dateLivraison} est déjà payée. Utilisez une régularisation comptable.`,
+          );
+        }
+
+        const montant = remboursementsActifs
+          .filter((row) => row.livraisonId === livraisonId)
+          .reduce((total, row) => total + row.montantFcfa, 0);
+        if (montant > 0) reverseParLivraison.set(livraisonId, montant);
+      }
+
+      const montantRestaure = [...reverseParLivraison.values()].reduce((total, montant) => total + montant, 0);
+      const nouveauRembourse = Math.max(0, avance.avance.montantRembourse_fcfa - montantRestaure);
+      const nouveauSolde = Math.min(
+        avance.avance.montantOctroyeFcfa,
+        avance.avance.soldeRestantFcfa + montantRestaure,
+      );
+
+      for (const row of remboursementsActifs) {
+        if (!row.livraisonId || !reverseParLivraison.has(row.livraisonId)) continue;
+        await tx.update(remboursementsAvancesMembresTable)
+          .set({
+            montantFcfa: 0,
+            note: `Déduction annulée — ${row.montantFcfa.toLocaleString("fr-FR")} FCFA — ${motifCorrection}`,
+          })
+          .where(eq(remboursementsAvancesMembresTable.id, row.id));
+      }
+
+      let reglementsRecalcules = 0;
+      for (const [livraisonId, montant] of reverseParLivraison) {
+        const [livraison] = await tx
+          .select()
+          .from(livraisonsTable)
+          .where(eq(livraisonsTable.id, livraisonId))
+          .for("update")
+          .limit(1);
+        if (!livraison) continue;
+
+        const nouveauNet = livraison.montantNetFcfa + montant;
+        const nouveauRestant = Number(livraison.montantRestant ?? livraison.montantNetFcfa) + montant;
+        await tx.update(livraisonsTable)
+          .set({
+            avanceDeduiteFcfa: Math.max(0, livraison.avanceDeduiteFcfa - montant),
+            montantNetFcfa: nouveauNet,
+            montantRestant: String(nouveauRestant),
+            statutPaiement: "EN_ATTENTE",
+          })
+          .where(eq(livraisonsTable.id, livraisonId));
+
+        const paiements = await tx
+          .select()
+          .from(paiementsTable)
+          .where(eq(paiementsTable.livraisonId, livraisonId))
+          .orderBy(desc(paiementsTable.createdAt))
+          .for("update");
+        const paiementARecalculer = paiements.find((paiement) =>
+          paiement.statut !== "confirme" && paiement.statut !== "effectue",
+        );
+        if (paiementARecalculer) {
+          await tx.update(paiementsTable)
+            .set({
+              montantFcfa: paiementARecalculer.montantFcfa + montant,
+              statut: "en_attente",
+              motifRejet: null,
+              dateValidation: null,
+              validePar: null,
+            })
+            .where(eq(paiementsTable.id, paiementARecalculer.id));
+          reglementsRecalcules += 1;
+        }
+      }
+
+      const [updated] = await tx.update(avancesTable)
+        .set({
+          planType: "reporte",
+          reportDate: date_application,
+          montantRembourse_fcfa: nouveauRembourse,
+          soldeRestantFcfa: nouveauSolde,
+          statut: nouveauSolde === 0 ? "rembourse" : "en_cours",
+        })
+        .where(eq(avancesTable.id, id))
+        .returning();
+
+      return {
+        avance: updated,
+        montantRestaure,
+        reglementsRecalcules,
+      };
+    });
+
+    res.json({
+      ...result,
+      message: result.reglementsRecalcules > 0
+        ? `${result.reglementsRecalcules} règlement(s) remis en attente avec le montant recalculé.`
+        : "La date d'application a été reportée.",
+    });
+  } catch (err) {
+    req.log.error({ err, avanceId: id }, "Erreur corrigerDateApplicationAvance");
+    const erreur = apiError(err);
+    const status = erreur.includes("déjà payée") ? 409 : erreur === "Avance introuvable" ? 404 : 400;
+    res.status(status).json({ erreur });
   }
 }
 

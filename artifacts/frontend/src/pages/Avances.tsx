@@ -776,6 +776,7 @@ function PlanAvanceMembreModal({
     avance.montantPartielFcfa ? String(avance.montantPartielFcfa) : "",
   );
   const [reportDate, setReportDate] = useState<string>(avance.reportDate ?? "");
+  const [motifCorrection, setMotifCorrection] = useState("");
   const [erreur, setErreur] = useState<string | null>(null);
 
   // Historique de déductions
@@ -794,9 +795,22 @@ function PlanAvanceMembreModal({
   const saveMutation = useMutation({
     mutationFn: async () => {
       const token = localStorage.getItem("coop_token") ?? "";
+      if (planType === "reporte") {
+        if (!reportDate) throw new Error("Choisissez la date à partir de laquelle les retenues reprendront.");
+        if (!motifCorrection.trim()) throw new Error("Indiquez le motif du report négocié.");
+        const r = await fetch(`${BASE}/api/avances/${avance.id}/date-application`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            date_application: reportDate,
+            motif: motifCorrection.trim(),
+          }),
+        });
+        if (!r.ok) throw new Error((await r.json() as { erreur?: string }).erreur ?? "Erreur");
+        return;
+      }
       const body: Record<string, unknown> = { plan_type: planType };
       if (planType === "partiel") body["montant_partiel_fcfa"] = Number(montantPartiel) || null;
-      if (planType === "reporte") body["report_date"] = reportDate || null;
       const r = await fetch(`${BASE}/api/avances/${avance.id}/plan`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -877,15 +891,30 @@ function PlanAvanceMembreModal({
           )}
 
           {planType === "reporte" && (
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-gray-600">Reprendre les déductions à partir du</label>
-              <input
-                type="date"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-green-700"
-                value={reportDate}
-                onChange={(e) => setReportDate(e.target.value)}
-              />
-              <p className="text-xs text-gray-400">Aucune déduction ne sera effectuée sur les livraisons antérieures à cette date.</p>
+            <div className="space-y-3 bg-amber-50 border border-amber-200 rounded-xl p-3">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-amber-900">Reprendre les déductions à partir du</label>
+                <input
+                  type="date"
+                  className="w-full border border-amber-200 bg-white rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  value={reportDate}
+                  onChange={(e) => setReportDate(e.target.value)}
+                />
+                <p className="text-xs text-amber-700">
+                  Les retenues d’une pesée antérieure à cette date seront annulées si son règlement n’est pas encore payé.
+                </p>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-amber-900">Motif du report négocié *</label>
+                <textarea
+                  value={motifCorrection}
+                  onChange={(e) => setMotifCorrection(e.target.value)}
+                  maxLength={500}
+                  rows={2}
+                  placeholder="Ex. Report négocié avec les délégués avant la pesée"
+                  className="w-full border border-amber-200 bg-white rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500 resize-none"
+                />
+              </div>
             </div>
           )}
 
@@ -900,15 +929,20 @@ function PlanAvanceMembreModal({
               <p className="text-xs text-gray-400 italic">Aucune déduction enregistrée</p>
             ) : (
               <div className="divide-y divide-gray-50 border border-gray-100 rounded-lg overflow-hidden">
-                {historique.map((h) => (
-                  <div key={h.id} className="flex items-center justify-between px-3 py-2 text-xs">
+                {historique.map((h) => {
+                  const estAnnulee = h.note?.startsWith("Déduction annulée —") ?? false;
+                  return (
+                  <div key={h.id} className={`flex items-center justify-between px-3 py-2 text-xs ${estAnnulee ? "bg-amber-50" : ""}`}>
                     <span className="text-gray-500">
                       {new Date(h.createdAt).toLocaleDateString("fr-FR")}
                       {h.note && <span className="ml-1 text-gray-400">· {h.note}</span>}
                     </span>
-                    <span className="font-semibold text-green-700">−&nbsp;{h.montantFcfa.toLocaleString("fr-FR")} FCFA</span>
+                    <span className={`font-semibold ${estAnnulee ? "text-amber-700" : "text-green-700"}`}>
+                      {estAnnulee ? "Annulée" : `− ${h.montantFcfa.toLocaleString("fr-FR")} FCFA`}
+                    </span>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -929,7 +963,7 @@ function PlanAvanceMembreModal({
             style={{ backgroundColor: "#1a4731" }}
           >
             {saveMutation.isPending && <Loader2 size={16} className="animate-spin" />}
-            Enregistrer le plan
+            {planType === "reporte" ? "Confirmer le report" : "Enregistrer le plan"}
           </button>
         </div>
       </div>

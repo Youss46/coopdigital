@@ -9,6 +9,7 @@ import {
   getAvancesReportees,
   rembourserAvance,
   updatePlanAvanceMembre,
+  corrigerDateApplicationAvance,
   getRemboursementsAvanceMembre,
 } from "../controllers/avancesController";
 
@@ -22,6 +23,7 @@ router.get("/avances", checkPermission("avances", "lire"), listAvances);
 router.post("/avances", checkPermission("avances", "octroyer"), auditMiddleware("avances", "CREATE", { entiteType: "avance" }), createAvance);
 router.put("/avances/:id/rembourser", checkPermission("avances", "rembourser"), auditMiddleware("avances", "UPDATE", { entiteIdParam: "id", entiteType: "avance" }), rembourserAvance);
 router.patch("/avances/:id/plan", checkPermission("avances", "rembourser"), updatePlanAvanceMembre);
+router.patch("/avances/:id/date-application", checkPermission("avances", "modifier_plan"), auditMiddleware("avances", "UPDATE", { entiteIdParam: "id", entiteType: "correction_date_avance" }), corrigerDateApplicationAvance);
 router.get("/avances/:id/remboursements", checkPermission("avances", "lire"), getRemboursementsAvanceMembre);
 
 export default router;
