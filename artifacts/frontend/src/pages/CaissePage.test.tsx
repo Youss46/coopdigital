@@ -206,4 +206,70 @@ describe("plage du journal de caisse", () => {
     expect(container.textContent).toContain("Opération de la caisse secondaire");
     expect(container.textContent).not.toContain("Ancienne opération");
   });
+
+  it("ignore la réponse tardive d'une période précédemment sélectionnée", async () => {
+    let resolveAnciennePeriode!: (response: Response) => void;
+    let resolveNouvellePeriode!: (response: Response) => void;
+    const anciennePeriode = new Promise<Response>(resolve => {
+      resolveAnciennePeriode = resolve;
+    });
+    const nouvellePeriode = new Promise<Response>(resolve => {
+      resolveNouvellePeriode = resolve;
+    });
+
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/caisse")) {
+        return Promise.resolve(new Response(JSON.stringify([caisse]), { status: 200 }));
+      }
+      if (url.includes("date_debut=2026-09-08&date_fin=2026-09-08")) return anciennePeriode;
+      if (url.includes("date_debut=2026-09-07&date_fin=2026-09-08")) return nouvellePeriode;
+      throw new Error(`Appel inattendu: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root.render(createElement(CaissePage));
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    const journalButton = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Journal de caisse"),
+    );
+    expect(journalButton).toBeDefined();
+
+    await act(async () => {
+      journalButton!.click();
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    const dateInputs = Array.from(container.querySelectorAll<HTMLInputElement>('input[type="date"]'));
+    expect(dateInputs).toHaveLength(2);
+    await act(async () => {
+      const setInputValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setInputValue?.call(dateInputs[0], "2026-09-07");
+      dateInputs[0]!.dispatchEvent(new Event("input", { bubbles: true }));
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).includes("/journal?"))).toHaveLength(2);
+
+    await act(async () => {
+      resolveNouvellePeriode(new Response(JSON.stringify(nouveauJournal), { status: 200 }));
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+    expect(container.textContent).toContain("Opération de la caisse secondaire");
+    expect(container.textContent).not.toContain("Ancienne opération");
+
+    await act(async () => {
+      resolveAnciennePeriode(new Response(JSON.stringify(ancienJournal), { status: 200 }));
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+    expect(container.textContent).toContain("Opération de la caisse secondaire");
+    expect(container.textContent).not.toContain("Ancienne opération");
+  });
 });

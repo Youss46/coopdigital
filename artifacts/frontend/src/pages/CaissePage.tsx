@@ -714,6 +714,12 @@ function JournalCaisse({
   const periodeInvalide = dateDebut > dateFin;
   const dateUnique = dateDebut === dateFin;
 
+  const invaliderJournal = useCallback(() => {
+    journalRequestId.current += 1;
+    setJournal(null);
+    setLoading(false);
+  }, []);
+
   // La liste des caisses arrive après le premier rendu. Sans cette
   // synchronisation, l'onglet ouvert directement reste sans caisse sélectionnée.
   useEffect(() => {
@@ -728,6 +734,7 @@ function JournalCaisse({
     const requestId = ++journalRequestId.current;
     if (periodeInvalide) {
       setJournal(null);
+      setLoading(false);
       return;
     }
     if (!cid) return;
@@ -854,19 +861,19 @@ function JournalCaisse({
     <div>
       {/* Filtres */}
       <div className="flex flex-wrap gap-3 mb-5">
-        <select value={caisseId} onChange={e => { setCaisseId(Number(e.target.value)); }}
+        <select value={caisseId} onChange={e => { invaliderJournal(); setCaisseId(Number(e.target.value)); }}
           className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
           <option value="">Sélectionner une caisse</option>
           {caisses?.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
         </select>
         <label className="flex items-center gap-2 text-sm text-gray-600">
           <span>Du</span>
-          <input type="date" value={dateDebut} onChange={e => onDateDebutChange(e.target.value)}
+          <input type="date" value={dateDebut} onChange={e => { invaliderJournal(); onDateDebutChange(e.target.value); }}
             className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
         </label>
         <label className="flex items-center gap-2 text-sm text-gray-600">
           <span>Au</span>
-          <input type="date" value={dateFin} onChange={e => onDateFinChange(e.target.value)}
+          <input type="date" value={dateFin} onChange={e => { invaliderJournal(); onDateFinChange(e.target.value); }}
             className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
         </label>
         <button onClick={() => charger()} disabled={!caisseId || loading || periodeInvalide}
