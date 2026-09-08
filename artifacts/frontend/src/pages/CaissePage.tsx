@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { openPdfViewer } from "@/lib/pdfViewer";
 import { Wallet, Plus, RefreshCw, Lock, Unlock, Download, FileSpreadsheet, AlertTriangle, TrendingUp, TrendingDown, ChevronRight, X, CheckCircle2, Users, ArrowLeftRight, Building2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -710,6 +710,7 @@ function JournalCaisse({
   const [modalFermer, setModalFermer] = useState(false);
   const [modalVirementBanque, setModalVirementBanque] = useState(false);
   const [excelLoading, setExcelLoading] = useState(false);
+  const journalRequestId = useRef(0);
   const periodeInvalide = dateDebut > dateFin;
   const dateUnique = dateDebut === dateFin;
 
@@ -724,6 +725,7 @@ function JournalCaisse({
 
   const charger = useCallback(async (id?: number | "") => {
     const cid = id ?? caisseId;
+    const requestId = ++journalRequestId.current;
     if (periodeInvalide) {
       setJournal(null);
       return;
@@ -739,11 +741,15 @@ function JournalCaisse({
         { headers: { Authorization: `Bearer ${tok()}` } });
       const json = await r.json();
       if (!r.ok) throw new Error(json.error ?? "Erreur");
+      if (requestId !== journalRequestId.current) return;
       setJournal(json);
     } catch (e) {
+      if (requestId !== journalRequestId.current) return;
       if (!navigator.onLine) return;
       toast({ title: "Erreur", description: e instanceof Error ? e.message : "Erreur", variant: "destructive" });
-    } finally { setLoading(false); }
+    } finally {
+      if (requestId === journalRequestId.current) setLoading(false);
+    }
   }, [caisseId, dateDebut, dateFin, periodeInvalide]);
 
   // Le journal doit être visible après navigation ou changement de filtre,

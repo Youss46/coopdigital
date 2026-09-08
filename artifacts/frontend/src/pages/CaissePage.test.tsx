@@ -34,6 +34,12 @@ const caisse = {
   solde_ouverture_fcfa: null,
 };
 
+const autreCaisse = {
+  ...caisse,
+  id: 8,
+  nom: "Caisse secondaire",
+};
+
 const ancienJournal = {
   mouvements: [{
     id: 1,
@@ -49,6 +55,23 @@ const ancienJournal = {
   }],
   totalEntrees: 10000,
   totalSorties: 0,
+};
+
+const nouveauJournal = {
+  mouvements: [{
+    id: 2,
+    type: "sortie",
+    motif: "autre",
+    montant_fcfa: "2500",
+    libelle: "Opération de la caisse secondaire",
+    solde_apres_fcfa: "97500",
+    date_operation: "2026-09-08",
+    created_at: "2026-09-08T10:00:00.000Z",
+    enregistre_par_nom: "Awa Kouassi",
+    session_id: 2,
+  }],
+  totalEntrees: 0,
+  totalSorties: 2500,
 };
 
 describe("plage du journal de caisse", () => {
@@ -117,5 +140,70 @@ describe("plage du journal de caisse", () => {
     );
     expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/rapport-pdf?"))).toBe(false);
     expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/journal/export?"))).toBe(false);
+  });
+
+  it("ignore la réponse tardive d'une caisse précédemment sélectionnée", async () => {
+    let resolveCaissePrincipale!: (response: Response) => void;
+    let resolveCaisseSecondaire!: (response: Response) => void;
+    const journalCaissePrincipale = new Promise<Response>(resolve => {
+      resolveCaissePrincipale = resolve;
+    });
+    const journalCaisseSecondaire = new Promise<Response>(resolve => {
+      resolveCaisseSecondaire = resolve;
+    });
+
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/caisse")) {
+        return Promise.resolve(new Response(JSON.stringify([caisse, autreCaisse]), { status: 200 }));
+      }
+      if (url.includes("/api/caisse/7/journal?")) return journalCaissePrincipale;
+      if (url.includes("/api/caisse/8/journal?")) return journalCaisseSecondaire;
+      throw new Error(`Appel inattendu: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root.render(createElement(CaissePage));
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    const journalButton = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Journal de caisse"),
+    );
+    expect(journalButton).toBeDefined();
+
+    await act(async () => {
+      journalButton!.click();
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    const caisseSelect = container.querySelector<HTMLSelectElement>("select");
+    expect(caisseSelect).not.toBeNull();
+    await act(async () => {
+      const setSelectValue = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+      setSelectValue?.call(caisseSelect, "8");
+      caisseSelect!.dispatchEvent(new Event("change", { bubbles: true }));
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    await act(async () => {
+      resolveCaisseSecondaire(new Response(JSON.stringify(nouveauJournal), { status: 200 }));
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+    expect(caisseSelect!.value).toBe("8");
+    expect(container.textContent).toContain("Opération de la caisse secondaire");
+    expect(container.textContent).not.toContain("Ancienne opération");
+
+    await act(async () => {
+      resolveCaissePrincipale(new Response(JSON.stringify(ancienJournal), { status: 200 }));
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+    expect(container.textContent).toContain("Opération de la caisse secondaire");
+    expect(container.textContent).not.toContain("Ancienne opération");
   });
 });
