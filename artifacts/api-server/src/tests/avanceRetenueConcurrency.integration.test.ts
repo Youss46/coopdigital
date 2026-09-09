@@ -132,7 +132,7 @@ describe.skipIf(!enabled)("retenues d'avance concurrentes sur PostgreSQL", () =>
     expect(historiques.rows).toEqual([{ montant_fcfa: 80000 }]);
   });
 
-  it("relie la retenue de session à la livraison créée", async () => {
+  it("retient une avance échue sans dépasser le payable et la lie à la livraison", async () => {
     await client.query("BEGIN");
     try {
       await client.query(
@@ -141,9 +141,12 @@ describe.skipIf(!enabled)("retenues d'avance concurrentes sur PostgreSQL", () =>
       );
       await client.query(
         `UPDATE avances
-            SET montant_rembourse_fcfa = 0,
-                solde_restant_fcfa = 80000,
-                statut = 'en_cours'
+            SET montant_octroye_fcfa = 100000,
+                montant_rembourse_fcfa = 0,
+                solde_restant_fcfa = 100000,
+                date_echeance = '2026-09-05',
+                report_date = '2026-09-01',
+                statut = 'en_retard'
           WHERE id = $1`,
         [avanceId],
       );
@@ -177,6 +180,16 @@ describe.skipIf(!enabled)("retenues d'avance concurrentes sur PostgreSQL", () =>
       { montant_fcfa: 80000, livraison_id: terminee.livraisonId },
     ]);
 
+    const avance = await client.query(
+      `SELECT solde_restant_fcfa, montant_rembourse_fcfa, statut
+         FROM avances
+        WHERE id = $1`,
+      [avanceId],
+    );
+    expect(avance.rows).toEqual([
+      { solde_restant_fcfa: 20000, montant_rembourse_fcfa: 80000, statut: "en_retard" },
+    ]);
+
     const livraison = await client.query(
       `SELECT avance_deduite_fcfa, montant_net_fcfa
          FROM livraisons
@@ -185,6 +198,71 @@ describe.skipIf(!enabled)("retenues d'avance concurrentes sur PostgreSQL", () =>
     );
     expect(livraison.rows).toEqual([
       { avance_deduite_fcfa: 80000, montant_net_fcfa: 0 },
+    ]);
+  });
+
+  it("ignore une avance de session avant sa date de début", async () => {
+    await client.query("BEGIN");
+    try {
+      await client.query(
+        `DELETE FROM remboursements_avances_membres WHERE avance_id = $1`,
+        [avanceId],
+      );
+      await client.query(
+        `UPDATE avances
+            SET montant_octroye_fcfa = 50000,
+                montant_rembourse_fcfa = 0,
+                solde_restant_fcfa = 50000,
+                date_echeance = '2026-09-05',
+                report_date = '2099-01-01',
+                statut = 'en_cours'
+          WHERE id = $1`,
+        [avanceId],
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    }
+
+    const session = await createSession(cooperativeId, {
+      membreId,
+      operation: "reception",
+      certificationCacao: "ORDINAIRE",
+    });
+    await addLigne(cooperativeId, session.id, {
+      nbSacs: 1,
+      poidsBrutKg: 80,
+      tareKg: 0,
+    });
+
+    const terminee = await terminerSession(cooperativeId, session.id);
+    expect(terminee.livraisonId).toBeTypeOf("number");
+
+    const [avance, history, livraison] = await Promise.all([
+      client.query(
+        `SELECT solde_restant_fcfa, montant_rembourse_fcfa
+           FROM avances WHERE id = $1`,
+        [avanceId],
+      ),
+      client.query(
+        `SELECT count(*)::int AS count
+           FROM remboursements_avances_membres WHERE avance_id = $1`,
+        [avanceId],
+      ),
+      client.query(
+        `SELECT avance_deduite_fcfa, montant_net_fcfa
+           FROM livraisons WHERE id = $1`,
+        [terminee.livraisonId],
+      ),
+    ]);
+
+    expect(avance.rows).toEqual([
+      { solde_restant_fcfa: 50000, montant_rembourse_fcfa: 0 },
+    ]);
+    expect(history.rows).toEqual([{ count: 0 }]);
+    expect(livraison.rows).toEqual([
+      { avance_deduite_fcfa: 0, montant_net_fcfa: 80000 },
     ]);
   });
 });
