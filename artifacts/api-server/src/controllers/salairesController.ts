@@ -26,14 +26,38 @@ class TenantError extends Error {
   constructor() { super("TENANT_REQUIRED"); }
 }
 
+type GroupePaiementCause =
+  | "validation"
+  | "bulletin_introuvable"
+  | "solde_insuffisant"
+  | "compte_introuvable"
+  | "compte_inactif";
+
+type GroupePaiementDetail = {
+  id: number;
+  message: string;
+  cause: GroupePaiementCause;
+};
+
 class GroupePaiementError extends Error {
   readonly status = 400;
   constructor(
     message: string,
-    readonly erreurs?: { id: number; message: string }[],
+    readonly erreurs?: GroupePaiementDetail[],
+    readonly causeCode: GroupePaiementCause = "validation",
   ) {
     super(message);
   }
+}
+
+function causeErreurPaiement(message: string): GroupePaiementCause | undefined {
+  if (message.startsWith("Solde insuffisant")) return "solde_insuffisant";
+  if (message === "Caisse introuvable" || message === "Compte bancaire introuvable") {
+    return "compte_introuvable";
+  }
+  if (message === "Compte bancaire inactif") return "compte_inactif";
+  if (message.startsWith("Aucune session de caisse ouverte")) return "validation";
+  return undefined;
 }
 
 class PaiementBulletinError extends Error {
@@ -707,7 +731,12 @@ export async function payerBulletinsGroupe(req: Request, res: Response): Promise
         const absents = ids.filter((id) => !trouves.has(id));
         throw new GroupePaiementError(
           "Un ou plusieurs bulletins sont introuvables dans cette coopérative",
-          absents.map((id) => ({ id, message: "Bulletin introuvable" })),
+          absents.map((id) => ({
+            id,
+            message: "Bulletin introuvable",
+            cause: "bulletin_introuvable",
+          })),
+          "bulletin_introuvable",
         );
       }
 
@@ -721,6 +750,7 @@ export async function payerBulletinsGroupe(req: Request, res: Response): Promise
           erreurs: bulletins.map((b) => ({
             id: b.id,
             message: "Bulletin déjà payé",
+            cause: "validation" as const,
           })),
           totalPaye: 0,
         };
@@ -731,11 +761,13 @@ export async function payerBulletinsGroupe(req: Request, res: Response): Promise
         .map((b) => ({
           id: b.id,
           message: `Statut "${b.statut}" — seuls les bulletins validés peuvent être payés`,
+          cause: "validation" as const,
         }));
       if (invalides.length > 0) {
         throw new GroupePaiementError(
           "Le groupe contient des bulletins qui ne peuvent pas être payés",
           invalides,
+          "validation",
         );
       }
 
@@ -751,37 +783,57 @@ export async function payerBulletinsGroupe(req: Request, res: Response): Promise
 
         // Débit du compte de trésorerie
         if (compteSourceType && compteSourceId) {
-          if (compteSourceType === "caisse") {
-            await debitCaisseForSalaire(compteSourceId, cid, montant, libelle, ref, userId, tx);
-          } else if (compteSourceType === "banque") {
-            await debitBanqueForSalaire(compteSourceId, cid, montant, libelle, ref, userId, tx);
-          } else if (compteSourceType === "mobile") {
-            const [compte] = await tx.select()
-              .from(comptesMobilesMarchandsTable)
-              .where(and(
-                eq(comptesMobilesMarchandsTable.id, compteSourceId),
-                eq(comptesMobilesMarchandsTable.cooperativeId, cid),
-              ))
-              .for("update")
-              .limit(1);
-            if (!compte) throw new GroupePaiementError("Compte mobile introuvable", [{ id: b.id, message: "Compte mobile introuvable" }]);
-            const solde = parseFloat(compte.soldeActuelFcfa as string);
-            if (solde < montant) {
-              throw new GroupePaiementError(
-                `Solde mobile insuffisant (${solde.toLocaleString("fr-FR")} FCFA disponible)`,
-                [{ id: b.id, message: `Solde mobile insuffisant (${solde.toLocaleString("fr-FR")} FCFA disponible)` }],
-              );
+          try {
+            if (compteSourceType === "caisse") {
+              await debitCaisseForSalaire(compteSourceId, cid, montant, libelle, ref, userId, tx);
+            } else if (compteSourceType === "banque") {
+              await debitBanqueForSalaire(compteSourceId, cid, montant, libelle, ref, userId, tx);
+            } else if (compteSourceType === "mobile") {
+              const [compte] = await tx.select()
+                .from(comptesMobilesMarchandsTable)
+                .where(and(
+                  eq(comptesMobilesMarchandsTable.id, compteSourceId),
+                  eq(comptesMobilesMarchandsTable.cooperativeId, cid),
+                ))
+                .for("update")
+                .limit(1);
+              if (!compte) {
+                throw new GroupePaiementError(
+                  "Compte mobile introuvable",
+                  [{ id: b.id, message: "Compte mobile introuvable", cause: "compte_introuvable" }],
+                  "compte_introuvable",
+                );
+              }
+              const solde = parseFloat(compte.soldeActuelFcfa as string);
+              if (solde < montant) {
+                const message = `Solde mobile insuffisant (${solde.toLocaleString("fr-FR")} FCFA disponible)`;
+                throw new GroupePaiementError(
+                  message,
+                  [{ id: b.id, message, cause: "solde_insuffisant" }],
+                  "solde_insuffisant",
+                );
+              }
+              const newSolde = solde - montant;
+              await tx.insert(mouvementsMobileMarchandTable).values({
+                compteId: compteSourceId, cooperativeId: cid, type: "debit",
+                motif: "paiement_salaire", montantFcfa: montant.toString(),
+                libelle, reference: ref, dateOperation: today,
+                soldeApresFcfa: newSolde.toString(), enregistrePar: userId,
+              });
+              await tx.update(comptesMobilesMarchandsTable)
+                .set({ soldeActuelFcfa: newSolde.toString() })
+                .where(eq(comptesMobilesMarchandsTable.id, compteSourceId));
             }
-            const newSolde = solde - montant;
-            await tx.insert(mouvementsMobileMarchandTable).values({
-              compteId: compteSourceId, cooperativeId: cid, type: "debit",
-              motif: "paiement_salaire", montantFcfa: montant.toString(),
-              libelle, reference: ref, dateOperation: today,
-              soldeApresFcfa: newSolde.toString(), enregistrePar: userId,
-            });
-            await tx.update(comptesMobilesMarchandsTable)
-              .set({ soldeActuelFcfa: newSolde.toString() })
-              .where(eq(comptesMobilesMarchandsTable.id, compteSourceId));
+          } catch (err) {
+            if (err instanceof GroupePaiementError) throw err;
+            const message = err instanceof Error ? err.message : String(err);
+            const cause = causeErreurPaiement(message);
+            if (!cause) throw err;
+            throw new GroupePaiementError(
+              message,
+              [{ id: b.id, message, cause }],
+              cause,
+            );
           }
         }
 
@@ -831,7 +883,11 @@ export async function payerBulletinsGroupe(req: Request, res: Response): Promise
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     if (err instanceof GroupePaiementError) {
-      res.status(err.status).json({ erreur: err.message, erreurs: err.erreurs ?? [] });
+      res.status(err.status).json({
+        erreur: err.message,
+        cause: err.causeCode,
+        erreurs: err.erreurs ?? [],
+      });
       return;
     }
     req.log?.error({ err }, "payerBulletinsGroupe");

@@ -909,8 +909,16 @@ describe.skipIf(!enabled)("auteur des sorties de salaires sur PostgreSQL", () =>
     );
 
     const response = await payGroup(ids, "caisse", caisseId);
-    expect(response.status).toBe(500);
-    await expect(response.json()).resolves.toMatchObject({ erreur: "Erreur interne" });
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      erreur: "Solde insuffisant en caisse. Disponible : 500 FCFA",
+      cause: "solde_insuffisant",
+      erreurs: [{
+        id: ids[1],
+        message: "Solde insuffisant en caisse. Disponible : 500 FCFA",
+        cause: "solde_insuffisant",
+      }],
+    });
 
     const bulletinsApres = await pool.query(
       `SELECT id, statut
