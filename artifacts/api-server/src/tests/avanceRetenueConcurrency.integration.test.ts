@@ -265,4 +265,78 @@ describe.skipIf(!enabled)("retenues d'avance concurrentes sur PostgreSQL", () =>
       { avance_deduite_fcfa: 0, montant_net_fcfa: 80000 },
     ]);
   });
+
+  it("restaure l'avance et son historique si la livraison échoue après la retenue", async () => {
+    await client.query("BEGIN");
+    try {
+      await client.query(`DELETE FROM paiements WHERE cooperative_id = $1`, [cooperativeId]);
+      await client.query(`DELETE FROM livraisons WHERE cooperative_id = $1`, [cooperativeId]);
+      await client.query(
+        `DELETE FROM remboursements_avances_membres WHERE avance_id = $1`,
+        [avanceId],
+      );
+      await client.query(
+        `UPDATE avances
+            SET montant_octroye_fcfa = 80000,
+                montant_rembourse_fcfa = 0,
+                solde_restant_fcfa = 80000,
+                date_echeance = NULL,
+                report_date = NULL,
+                statut = 'en_cours'
+          WHERE id = $1`,
+        [avanceId],
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    }
+
+    const session = await createSession(cooperativeId, {
+      membreId,
+      operation: "reception",
+      certificationCacao: "ORDINAIRE",
+    });
+    await addLigne(cooperativeId, session.id, {
+      nbSacs: 1,
+      poidsBrutKg: 80,
+      tareKg: 0,
+    });
+
+    const constraintName = `test_livraison_failure_${process.pid}_${Date.now()}`;
+    await client.query(
+      `ALTER TABLE livraisons ADD CONSTRAINT "${constraintName}" CHECK (false)`,
+    );
+    try {
+      await expect(terminerSession(cooperativeId, session.id)).rejects.toThrow();
+    } finally {
+      await client.query(`ALTER TABLE livraisons DROP CONSTRAINT "${constraintName}"`);
+    }
+
+    const [avance, history, livraison] = await Promise.all([
+      client.query(
+        `SELECT solde_restant_fcfa, montant_rembourse_fcfa, statut
+           FROM avances WHERE id = $1`,
+        [avanceId],
+      ),
+      client.query(
+        `SELECT count(*)::int AS count
+           FROM remboursements_avances_membres WHERE avance_id = $1`,
+        [avanceId],
+      ),
+      client.query(
+        `SELECT count(*)::int AS count
+           FROM livraisons l
+          WHERE l.cooperative_id = $1
+            AND l.membre_id = $2`,
+        [cooperativeId, membreId],
+      ),
+    ]);
+
+    expect(avance.rows).toEqual([
+      { solde_restant_fcfa: 80000, montant_rembourse_fcfa: 0, statut: "en_cours" },
+    ]);
+    expect(history.rows).toEqual([{ count: 0 }]);
+    expect(livraison.rows).toEqual([{ count: 0 }]);
+  });
 });

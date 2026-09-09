@@ -969,6 +969,71 @@ type DeductionAvanceResult = {
   remboursementIds: number[];
 };
 
+type PeseeTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function deduireAvancesMembreDelegueDansTransaction(
+  tx: PeseeTransaction,
+  membreId: number,
+  plafondFcfa: number,
+  sessionId: number,
+  referencePesee: string,
+  dateLivraison: string,
+): Promise<DeductionAvanceResult> {
+  // Le verrou est détenu jusqu'à la validation de la transaction, y compris
+  // pendant l'écriture de l'historique et la création de la livraison.
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(${membreId})`);
+
+  const avances = await tx
+    .select()
+    .from(avancesTable)
+    .where(
+      and(
+        eq(avancesTable.membreId, membreId),
+        inArray(avancesTable.statut, ["en_cours", "en_retard"]),
+        eq(avancesTable.deductionSource, "livraison"),
+      ),
+    )
+    .orderBy(avancesTable.dateOctroi)
+    .for("update");
+
+  let restant = plafondFcfa;
+  let totalDeduit = 0;
+  const remboursementIds: number[] = [];
+  for (const avance of avances) {
+    if (restant <= 0) break;
+
+    const retenue = calculerRetenueAvanceLivraison(avance, dateLivraison, restant);
+    if (retenue <= 0) continue;
+
+    const nouveauSolde = avance.soldeRestantFcfa - retenue;
+    const nouveauRembourse = avance.montantRembourse_fcfa + retenue;
+
+    await tx
+      .update(avancesTable)
+      .set({
+        montantRembourse_fcfa: nouveauRembourse,
+        soldeRestantFcfa: nouveauSolde,
+        statut: nouveauSolde === 0 ? "rembourse" : avance.statut,
+      })
+      .where(eq(avancesTable.id, avance.id));
+
+    const [remboursement] = await tx
+      .insert(remboursementsAvancesMembresTable)
+      .values({
+        avanceId: avance.id,
+        montantFcfa: retenue,
+        note: `Retenue automatique — ${referencePesee}`,
+      })
+      .returning({ id: remboursementsAvancesMembresTable.id });
+    if (remboursement) remboursementIds.push(remboursement.id);
+
+    restant -= retenue;
+    totalDeduit += retenue;
+  }
+
+  return { montantDeduit: totalDeduit, remboursementIds };
+}
+
 export async function deduireAvancesMembreDelegue(
   membreId: number,
   plafondFcfa: number,
@@ -977,60 +1042,16 @@ export async function deduireAvancesMembreDelegue(
   dateLivraison: string,
 ): Promise<DeductionAvanceResult> {
   try {
-    return await db.transaction(async (tx) => {
-      // Le verrou est détenu jusqu'à la validation de la transaction, y
-      // compris pendant l'écriture de l'historique de retenue.
-      await tx.execute(sql`SELECT pg_advisory_xact_lock(${membreId})`);
-
-      const avances = await tx
-        .select()
-        .from(avancesTable)
-        .where(
-          and(
-            eq(avancesTable.membreId, membreId),
-            inArray(avancesTable.statut, ["en_cours", "en_retard"]),
-            eq(avancesTable.deductionSource, "livraison"),
-          ),
-        )
-        .orderBy(avancesTable.dateOctroi)
-        .for("update");
-
-      let restant = plafondFcfa;
-      let totalDeduit = 0;
-      const remboursementIds: number[] = [];
-      for (const avance of avances) {
-        if (restant <= 0) break;
-
-        const retenue = calculerRetenueAvanceLivraison(avance, dateLivraison, restant);
-        if (retenue <= 0) continue;
-
-        const nouveauSolde    = avance.soldeRestantFcfa - retenue;
-        const nouveauRembourse = avance.montantRembourse_fcfa + retenue;
-
-        await tx
-          .update(avancesTable)
-          .set({
-            montantRembourse_fcfa: nouveauRembourse,
-            soldeRestantFcfa:      nouveauSolde,
-            statut: nouveauSolde === 0 ? "rembourse" : avance.statut,
-          })
-          .where(eq(avancesTable.id, avance.id));
-
-        const [remboursement] = await tx
-          .insert(remboursementsAvancesMembresTable)
-          .values({
-            avanceId:    avance.id,
-            montantFcfa: retenue,
-            note:        `Retenue automatique — ${referencePesee}`,
-          })
-          .returning({ id: remboursementsAvancesMembresTable.id });
-        if (remboursement) remboursementIds.push(remboursement.id);
-
-        restant      -= retenue;
-        totalDeduit  += retenue;
-      }
-      return { montantDeduit: totalDeduit, remboursementIds };
-    });
+    return await db.transaction((tx) =>
+      deduireAvancesMembreDelegueDansTransaction(
+        tx,
+        membreId,
+        plafondFcfa,
+        sessionId,
+        referencePesee,
+        dateLivraison,
+      ),
+    );
   } catch (err) {
     // Non-fatal : log mais ne bloque pas la clôture de session
     logger.error({ err, membreId, sessionId }, "Erreur déduction avances membre délégué");
@@ -1212,8 +1233,6 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
         // Une avance configurée « sur livraison » est plafonnée par le montant
         // réellement payable après charges. La commission de collecte est une
         // source de déduction distincte et ne doit pas réduire ce plafond.
-        let avanceDeduiteFcfa = 0;
-        let remboursementAvanceIds: number[] = [];
         const valeurProduitPrevue = prixBordChampFcfa > 0
           ? Math.round(poidsKg * prixBordChampFcfa)
           : 0;
@@ -1221,38 +1240,14 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
           0,
           valeurProduitPrevue - fraisCarburantDeduitsFcfa - autresChargesDeduitesFcfa,
         );
-        if (plafondAvance > 0) {
-          const referencePesee = formatNumeroPesee(
-            detail.numeroPesee,
-            detail.anneeNumeroPesee ?? Number(String(detail.numeroSession).slice(4, 8)),
-          ) ?? detail.numeroSession;
-          const deductionAvance = await deduireAvancesMembreDelegue(
-            detail.membreId,
-            plafondAvance,
-            sessionId,
-            referencePesee,
-            dateStr,
-          );
-          avanceDeduiteFcfa = deductionAvance.montantDeduit;
-          remboursementAvanceIds = deductionAvance.remboursementIds;
-        }
 
         // ── Livraison officielle + paiement + écritures OHADA ─────────────────
         if (prixBordChampFcfa > 0) {
           try {
-            const montantBrut = Math.round(poidsKg * prixBordChampFcfa);
-            const reglement = calculerReglementMembreDelegue({
-              valeurProduitFcfa: montantBrut,
-              fraisCarburantFcfa: fraisCarburantDeduitsFcfa,
-              autresChargesFcfa: autresChargesDeduitesFcfa,
-              avanceDeduiteFcfa,
-            });
-            // Poids brut = somme des poidsBrutKg des lignes (avant déduction tare)
-            const [lignesBrut] = await db
-              .select({ total: sql<number>`coalesce(sum(${lignesPeseeTable.poidsBrutKg}::numeric), 0)::float` })
-              .from(lignesPeseeTable)
-              .where(eq(lignesPeseeTable.sessionId, sessionId));
-            const poidsBrutKg = (lignesBrut?.total ?? 0) > 0 ? lignesBrut!.total : null;
+            const referencePesee = formatNumeroPesee(
+              detail.numeroPesee,
+              detail.anneeNumeroPesee ?? Number(String(detail.numeroSession).slice(4, 8)),
+            ) ?? detail.numeroSession;
             const anneeLivraison = Number(dateStr.slice(0, 4));
             const anneeSession = detail.anneeNumeroPesee
               ?? Number(String(detail.numeroSession).slice(4, 8));
@@ -1264,40 +1259,73 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
               : await reserverNumeroPesee(cooperativeId, dateStr);
             const numeroPesee = reservationPesee.numero;
 
-            const [livraison] = await db
-              .insert(livraisonsTable)
-              .values({
-                cooperativeId,
-                membreId:            detail.membreId,
-                campagneId,
-                numeroPesee,
-                anneeNumeroPesee:    reservationPesee.annee,
-                poidsKg:             String(poidsKg),
-                produitBrutKg:       poidsBrutKg != null ? String(poidsBrutKg) : undefined,
-                prixUnitaireFcfa:    prixBordChampFcfa,
-                montantBrutFcfa:     montantBrut,
-                avanceDeduiteFcfa:   reglement.avanceDeduiteFcfa,
-                intrantsDeduitsFcfa: 0,
-                montantNetFcfa:      reglement.montantNetFcfa,
-                // Les avances de charges sont conservées pour audit comptable;
-                // seules les retenues effectives déterminent le règlement.
-                fraisCarburantAvancesFcfa: fraisCarburantDeduitsFcfa,
-                autresChargesAvanceesFcfa: autresChargesDeduitesFcfa,
-                fraisCarburantDeduitsFcfa: reglement.fraisCarburantFcfa,
-                autresChargesDeduitesFcfa: reglement.autresChargesFcfa,
-                retenueKg:           "0",
-                nombreSacs:          detail.nbSacsTotal ?? null,
-                produit:             "cacao",
-                certificationCacao:  detail.certificationCacao ?? null,
-                dateLivraison:       dateStr,
-                statutPaiement:      "EN_ATTENTE",
-                montantRestant:      String(reglement.montantNetFcfa),
-              })
-              .returning();
+            // La retenue, son historique et la livraison officielle partagent
+            // la même transaction : un échec d'insertion annule aussi la
+            // diminution de l'avance.
+            const { livraison, reglement, montantBrut } = await db.transaction(async (tx) => {
+              let avanceDeduiteFcfa = 0;
+              let remboursementAvanceIds: number[] = [];
+              if (plafondAvance > 0) {
+                const deductionAvance = await deduireAvancesMembreDelegueDansTransaction(
+                  tx,
+                  detail.membreId!,
+                  plafondAvance,
+                  sessionId,
+                  referencePesee,
+                  dateStr,
+                );
+                avanceDeduiteFcfa = deductionAvance.montantDeduit;
+                remboursementAvanceIds = deductionAvance.remboursementIds;
+              }
 
-            if (livraison) {
+              const montantBrut = Math.round(poidsKg * prixBordChampFcfa);
+              const reglement = calculerReglementMembreDelegue({
+                valeurProduitFcfa: montantBrut,
+                fraisCarburantFcfa: fraisCarburantDeduitsFcfa,
+                autresChargesFcfa: autresChargesDeduitesFcfa,
+                avanceDeduiteFcfa,
+              });
+              // Poids brut = somme des poidsBrutKg des lignes (avant déduction tare)
+              const [lignesBrut] = await tx
+                .select({ total: sql<number>`coalesce(sum(${lignesPeseeTable.poidsBrutKg}::numeric), 0)::float` })
+                .from(lignesPeseeTable)
+                .where(eq(lignesPeseeTable.sessionId, sessionId));
+              const poidsBrutKg = (lignesBrut?.total ?? 0) > 0 ? lignesBrut!.total : null;
+
+              const [livraison] = await tx
+                .insert(livraisonsTable)
+                .values({
+                  cooperativeId,
+                  membreId:            detail.membreId,
+                  campagneId,
+                  numeroPesee,
+                  anneeNumeroPesee:    reservationPesee.annee,
+                  poidsKg:             String(poidsKg),
+                  produitBrutKg:       poidsBrutKg != null ? String(poidsBrutKg) : undefined,
+                  prixUnitaireFcfa:   prixBordChampFcfa,
+                  montantBrutFcfa:     montantBrut,
+                  avanceDeduiteFcfa:  reglement.avanceDeduiteFcfa,
+                  intrantsDeduitsFcfa: 0,
+                  montantNetFcfa:      reglement.montantNetFcfa,
+                  // Les avances de charges sont conservées pour audit comptable;
+                  // seules les retenues effectives déterminent le règlement.
+                  fraisCarburantAvancesFcfa: fraisCarburantDeduitsFcfa,
+                  autresChargesAvanceesFcfa: autresChargesDeduitesFcfa,
+                  fraisCarburantDeduitsFcfa: reglement.fraisCarburantFcfa,
+                  autresChargesDeduitesFcfa: reglement.autresChargesFcfa,
+                  retenueKg:           "0",
+                  nombreSacs:          detail.nbSacsTotal ?? null,
+                  produit:             "cacao",
+                  certificationCacao:  detail.certificationCacao ?? null,
+                  dateLivraison:       dateStr,
+                  statutPaiement:      "EN_ATTENTE",
+                  montantRestant:      String(reglement.montantNetFcfa),
+                })
+                .returning();
+              if (!livraison) throw new Error("Impossible de créer la livraison officielle");
+
               if (remboursementAvanceIds.length > 0) {
-                await db
+                await tx
                   .update(remboursementsAvancesMembresTable)
                   .set({ livraisonId: livraison.id })
                   .where(inArray(
@@ -1307,73 +1335,74 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
               }
 
               // Lier la session à la livraison
-              await db
+              await tx
                 .update(sessionsPeseeTable)
                 .set({ livraisonId: livraison.id })
                 .where(eq(sessionsPeseeTable.id, sessionId));
-              livraisonId = livraison.id;
+              return { livraison, reglement, montantBrut };
+            });
+            livraisonId = livraison.id;
 
-              // ── Entrée stock entrepôt central ─────────────────────────────
-              // Le cacao du bon de réception entre directement au magasin central.
-              try {
-                const [entrepotCentral] = await db
-                  .select({ id: entrepotsTable.id })
-                  .from(entrepotsTable)
-                  .where(eq(entrepotsTable.cooperativeId, cooperativeId))
-                  .orderBy(entrepotsTable.id)
-                  .limit(1);
-                if (entrepotCentral) {
-                  await db.insert(mouvementsStockTable).values({
-                    entrepotId: entrepotCentral.id,
-                    type:       "entree",
-                    poidsKg:    String(poidsKg),
-                    nombreSacs: detail.nbSacsTotal ?? null,
-                    motif:      `Livraison membre-délégué — session #${sessionId}`,
-                    agentId:    null,
-                  });
-                }
-              } catch (stockErr) {
-                logger.warn({ stockErr, sessionId }, "[membreDelegue] Entrée stock central non créée (non bloquant)");
-              }
-
-              // Paiement en attente
-              const numeroRecu = await genererNumeroRecu(cooperativeId);
-              await db.insert(paiementsTable).values({
-                cooperativeId,
-                livraisonId: livraison.id,
-                membreId:    detail.membreId,
-                montantFcfa: reglement.montantNetFcfa,
-                numeroRecu,
-                statut:      "en_attente",
-              });
-
-              // Attendre les propositions : le règlement validé ne doit pas
-              // repartir avant que sa ventilation comptable ait été proposée.
-              const [membreRow] = await db
-                .select({ nom: membresTable.nom, prenoms: membresTable.prenoms })
-                .from(membresTable)
-                .where(eq(membresTable.id, detail.membreId!))
+            // ── Entrée stock entrepôt central ─────────────────────────────
+            // Le cacao du bon de réception entre directement au magasin central.
+            try {
+              const [entrepotCentral] = await db
+                .select({ id: entrepotsTable.id })
+                .from(entrepotsTable)
+                .where(eq(entrepotsTable.cooperativeId, cooperativeId))
+                .orderBy(entrepotsTable.id)
                 .limit(1);
-              await generateEcrituresLivraison(cooperativeId, {
-                livraisonId:       livraison.id,
-                membreId:          detail.membreId ?? undefined,
-                membreNom:         membreRow
-                  ? `${membreRow.nom} ${membreRow.prenoms ?? ""}`.trim()
-                  : "—",
-                montantBrutFcfa:   montantBrut,
-                avanceDeduiteFcfa: reglement.avanceDeduiteFcfa,
-                montantNetFcfa:    reglement.montantNetFcfa,
-                dateLivraison:     dateStr,
-                fraisCarburantAvancesFcfa: fraisCarburantDeduitsFcfa,
-                autresChargesAvanceesFcfa: autresChargesDeduitesFcfa,
-                fraisCarburantDeduitsFcfa: reglement.fraisCarburantFcfa,
-                autresChargesDeduitesFcfa: reglement.autresChargesFcfa,
-                autresChargesLibelle,
-              });
+              if (entrepotCentral) {
+                await db.insert(mouvementsStockTable).values({
+                  entrepotId: entrepotCentral.id,
+                  type:       "entree",
+                  poidsKg:    String(poidsKg),
+                  nombreSacs: detail.nbSacsTotal ?? null,
+                  motif:      `Livraison membre-délégué — session #${sessionId}`,
+                  agentId:    null,
+                });
+              }
+            } catch (stockErr) {
+              logger.warn({ stockErr, sessionId }, "[membreDelegue] Entrée stock central non créée (non bloquant)");
             }
+
+            // Paiement en attente
+            const numeroRecu = await genererNumeroRecu(cooperativeId);
+            await db.insert(paiementsTable).values({
+              cooperativeId,
+              livraisonId: livraison.id,
+              membreId:    detail.membreId,
+              montantFcfa: reglement.montantNetFcfa,
+              numeroRecu,
+              statut:      "en_attente",
+            });
+
+            // Attendre les propositions : le règlement validé ne doit pas
+            // repartir avant que sa ventilation comptable ait été proposée.
+            const [membreRow] = await db
+              .select({ nom: membresTable.nom, prenoms: membresTable.prenoms })
+              .from(membresTable)
+              .where(eq(membresTable.id, detail.membreId!))
+              .limit(1);
+            await generateEcrituresLivraison(cooperativeId, {
+              livraisonId:       livraison.id,
+              membreId:          detail.membreId ?? undefined,
+              membreNom:         membreRow
+                ? `${membreRow.nom} ${membreRow.prenoms ?? ""}`.trim()
+                : "—",
+              montantBrutFcfa:   montantBrut,
+              avanceDeduiteFcfa: reglement.avanceDeduiteFcfa,
+              montantNetFcfa:    reglement.montantNetFcfa,
+              dateLivraison:     dateStr,
+              fraisCarburantAvancesFcfa: fraisCarburantDeduitsFcfa,
+              autresChargesAvanceesFcfa: autresChargesDeduitesFcfa,
+              fraisCarburantDeduitsFcfa: reglement.fraisCarburantFcfa,
+              autresChargesDeduitesFcfa: reglement.autresChargesFcfa,
+              autresChargesLibelle,
+            });
           } catch (err) {
-            // Non-fatal : la commission existe déjà, la livraison sera créée manuellement
             logger.error({ err, sessionId }, "Erreur création livraison automatique membre délégué");
+            throw err;
           }
         }
       }
