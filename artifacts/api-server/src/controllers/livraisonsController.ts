@@ -17,6 +17,7 @@ import { getEncoursMembre, enregistrerRemboursementParLivraison } from "../servi
 import { envoyerPushGroupePortail } from "../services/pushService";
 import { entrerStockSiDelegue, entrerStockLivraison } from "../services/entrepotDelegueService";
 import { genererNumeroRecu, genererNumeroLivraison, reserverNumeroPesee } from "../services/recuService.js";
+import { calculerRetenueAvanceLivraison } from "../services/peseeSessionService.js";
 
 export async function listLivraisons(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
@@ -254,16 +255,10 @@ export async function createLivraison(req: Request, res: Response): Promise<void
         let budgetRestant = montantBrut;
         for (const av of avancesEnCours) {
           if (budgetRestant <= 0) break;
-          const planType = av.planType ?? "integral";
-
-          // La date de début de retenue s'applique à tous les plans.
-          // L'échéance reste une date limite informative et ne déclenche
-          // jamais un débit sans livraison réelle.
-          if (av.reportDate && dateStr < av.reportDate) continue;
-
-          const montantCePeriode = planType === "partiel" && av.montantPartielFcfa
-            ? Math.min(av.montantPartielFcfa, av.soldeRestantFcfa, budgetRestant)
-            : Math.min(av.soldeRestantFcfa, budgetRestant);
+          // Utiliser le même calcul que la clôture d'une session de pesée :
+          // un plan reporté sans date ne doit jamais tomber sur le fallback
+          // historique « intégral ».
+          const montantCePeriode = calculerRetenueAvanceLivraison(av, dateStr, budgetRestant);
 
           if (montantCePeriode <= 0) continue;
           avanceDeduite += montantCePeriode;

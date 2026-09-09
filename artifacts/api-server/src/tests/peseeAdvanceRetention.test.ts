@@ -12,7 +12,7 @@ const avance = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-describe("retenues d'avance à la clôture d'une session de pesée", () => {
+describe("retenues d'avance sur une livraison réelle", () => {
   it("ignore une avance intégrale avant sa date de début", () => {
     expect(
       calculerRetenueAvanceLivraison(
