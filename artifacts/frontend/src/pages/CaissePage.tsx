@@ -7,6 +7,54 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok = () => localStorage.getItem("coop_token") ?? "";
+const JOURNAL_PERIOD_STORAGE_KEY = "coop.caisse.journal.period";
+
+type JournalPeriod = {
+  dateDebut: string;
+  dateFin: string;
+};
+
+const todayAsDateInput = () => new Date().toISOString().slice(0, 10);
+
+function isValidDateInput(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year
+    && date.getUTCMonth() === month - 1
+    && date.getUTCDate() === day;
+}
+
+function readJournalPeriod(): JournalPeriod {
+  const today = todayAsDateInput();
+  try {
+    const stored = localStorage.getItem(JOURNAL_PERIOD_STORAGE_KEY);
+    if (!stored) return { dateDebut: today, dateFin: today };
+
+    const parsed: unknown = JSON.parse(stored);
+    if (
+      typeof parsed === "object"
+      && parsed !== null
+      && "dateDebut" in parsed
+      && "dateFin" in parsed
+      && isValidDateInput(parsed.dateDebut)
+      && isValidDateInput(parsed.dateFin)
+    ) {
+      return { dateDebut: parsed.dateDebut, dateFin: parsed.dateFin };
+    }
+  } catch {
+    // Une valeur de stockage corrompue ne doit pas empêcher l'ouverture de la caisse.
+  }
+  return { dateDebut: today, dateFin: today };
+}
+
+function saveJournalPeriod(period: JournalPeriod) {
+  try {
+    localStorage.setItem(JOURNAL_PERIOD_STORAGE_KEY, JSON.stringify(period));
+  } catch {
+    // Le journal reste utilisable si le stockage local est indisponible.
+  }
+}
 
 const FCFA = (n: number | string) =>
   new Intl.NumberFormat("fr-FR").format(typeof n === "string" ? parseFloat(n) || 0 : n) + " FCFA";
@@ -1563,11 +1611,22 @@ export default function CaissePage() {
 
   const [tab, setTab] = useState<"etat" | "journal" | "historique" | "delegues">("etat");
   const [journalCaisseId, setJournalCaisseId] = useState<number | undefined>();
-  const [journalDateDebut, setJournalDateDebut] = useState(() => new Date().toISOString().slice(0, 10));
-  const [journalDateFin, setJournalDateFin] = useState(() => new Date().toISOString().slice(0, 10));
+  const [journalPeriod, setJournalPeriod] = useState<JournalPeriod>(readJournalPeriod);
   const [caisses, setCaisses] = useState<Caisse[] | null>(null);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+
+  const setJournalDateDebut = useCallback((dateDebut: string) => {
+    setJournalPeriod(period => ({ ...period, dateDebut }));
+  }, []);
+
+  const setJournalDateFin = useCallback((dateFin: string) => {
+    setJournalPeriod(period => ({ ...period, dateFin }));
+  }, []);
+
+  useEffect(() => {
+    saveJournalPeriod(journalPeriod);
+  }, [journalPeriod]);
 
   const chargerCaisses = useCallback(async () => {
     setLoading(true);
@@ -1634,8 +1693,8 @@ export default function CaissePage() {
         <JournalCaisse
           caisses={caisses}
           initCaisseId={journalCaisseId}
-          dateDebut={journalDateDebut}
-          dateFin={journalDateFin}
+          dateDebut={journalPeriod.dateDebut}
+           dateFin={journalPeriod.dateFin}
           onDateDebutChange={setJournalDateDebut}
           onDateFinChange={setJournalDateFin}
           onCaissesChanged={chargerCaisses}

@@ -129,3 +129,4 @@
 - [Idempotence des paiements groupés de salaires](salary-group-payment-idempotency.md) — verrouiller les bulletins avant tout débit et partager la transaction sur caisse, banque et mobile.
 - [Contrats des contrôles de schéma](schema-check-contracts.md) — chaque migration contrôlée doit avoir un contrat dans le manifeste et un objet représentatif dans la fixture isolée.
 - [Historique des rejets après correction d’avance](advance-rejection-history.md) — copier le motif dans l’historique avant de remettre le règlement rejeté en attente.
+- [Filtres persistés validés](persisted-filter-validation.md) — valider les filtres restaurés avant tout appel API et utiliser des dates explicites dans les tests pour éviter la dépendance à l’horloge du runner.

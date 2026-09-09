@@ -81,6 +81,7 @@ describe("plage du journal de caisse", () => {
   afterEach(() => {
     act(() => root?.unmount());
     container?.remove();
+    localStorage.clear();
     vi.unstubAllGlobals();
   });
 
@@ -208,6 +209,10 @@ describe("plage du journal de caisse", () => {
   });
 
   it("ignore la réponse tardive d'une période précédemment sélectionnée", async () => {
+    localStorage.setItem(
+      "coop.caisse.journal.period",
+      JSON.stringify({ dateDebut: "2026-09-08", dateFin: "2026-09-08" }),
+    );
     let resolveAnciennePeriode!: (response: Response) => void;
     let resolveNouvellePeriode!: (response: Response) => void;
     const anciennePeriode = new Promise<Response>(resolve => {
@@ -271,5 +276,110 @@ describe("plage du journal de caisse", () => {
     });
     expect(container.textContent).toContain("Opération de la caisse secondaire");
     expect(container.textContent).not.toContain("Ancienne opération");
+  });
+
+  it("restaure la période du journal après un remontage de la page", async () => {
+    localStorage.setItem(
+      "coop.caisse.journal.period",
+      JSON.stringify({ dateDebut: "2026-09-06", dateFin: "2026-09-08" }),
+    );
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/caisse")) {
+        return Promise.resolve(new Response(JSON.stringify([caisse]), { status: 200 }));
+      }
+      if (url.includes("date_debut=2026-09-06&date_fin=2026-09-08")) {
+        return Promise.resolve(new Response(JSON.stringify(ancienJournal), { status: 200 }));
+      }
+      throw new Error(`Appel inattendu: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root.render(createElement(CaissePage));
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    const journalButton = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Journal de caisse"),
+    );
+    expect(journalButton).toBeDefined();
+
+    await act(async () => {
+      journalButton!.click();
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    let dateInputs = Array.from(container.querySelectorAll<HTMLInputElement>('input[type="date"]'));
+    expect(dateInputs.map(input => input.value)).toEqual(["2026-09-06", "2026-09-08"]);
+    expect(fetchMock.mock.calls.some(([input]) =>
+      String(input).includes("date_debut=2026-09-06&date_fin=2026-09-08"),
+    )).toBe(true);
+
+    await act(async () => {
+      root.unmount();
+      root = createRoot(container);
+      root.render(createElement(CaissePage));
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    const remountedJournalButton = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Journal de caisse"),
+    );
+    expect(remountedJournalButton).toBeDefined();
+    await act(async () => {
+      remountedJournalButton!.click();
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    dateInputs = Array.from(container.querySelectorAll<HTMLInputElement>('input[type="date"]'));
+    expect(dateInputs.map(input => input.value)).toEqual(["2026-09-06", "2026-09-08"]);
+    expect(fetchMock.mock.calls.filter(([input]) =>
+      String(input).includes("date_debut=2026-09-06&date_fin=2026-09-08"),
+    ).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("ne charge pas le journal avec une période restaurée inversée", async () => {
+    localStorage.setItem(
+      "coop.caisse.journal.period",
+      JSON.stringify({ dateDebut: "2026-09-08", dateFin: "2026-09-06" }),
+    );
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/caisse")) {
+        return Promise.resolve(new Response(JSON.stringify([caisse]), { status: 200 }));
+      }
+      throw new Error(`Appel inattendu: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root.render(createElement(CaissePage));
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    const journalButton = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Journal de caisse"),
+    );
+    expect(journalButton).toBeDefined();
+    await act(async () => {
+      journalButton!.click();
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    const dateInputs = Array.from(container.querySelectorAll<HTMLInputElement>('input[type="date"]'));
+    expect(dateInputs.map(input => input.value)).toEqual(["2026-09-08", "2026-09-06"]);
+    expect(container.textContent).toContain(
+      "La date de fin doit être postérieure ou égale à la date de début.",
+    );
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/journal?"))).toBe(false);
   });
 });
