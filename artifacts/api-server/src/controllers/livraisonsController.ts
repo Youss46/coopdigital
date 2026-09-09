@@ -237,6 +237,10 @@ export async function createLivraison(req: Request, res: Response): Promise<void
       const avancesATraiter: AvancePasse[] = [];
 
       if (membreId) {
+        // Même verrou que la clôture d'une session de pesée : une livraison
+        // directe et une clôture concurrentes ne peuvent pas consommer le
+        // même solde d'avance.
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(${membreId})`);
         const avancesEnCours = await tx
           .select().from(avancesTable)
           .where(and(

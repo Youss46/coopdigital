@@ -964,7 +964,7 @@ export function calculerRetenueAvanceLivraison(
  * Enregistre un remboursement dans remboursements_avances_membres pour chaque déduction.
  * Même pattern que deduireAvancesApresCommission pour les délégués terrain.
  */
-async function deduireAvancesMembreDelegue(
+export async function deduireAvancesMembreDelegue(
   membreId: number,
   plafondFcfa: number,
   sessionId: number,
@@ -972,48 +972,55 @@ async function deduireAvancesMembreDelegue(
   dateLivraison: string,
 ): Promise<number> {
   try {
-    const avances = await db
-      .select()
-      .from(avancesTable)
-      .where(
-        and(
-          eq(avancesTable.membreId, membreId),
-          inArray(avancesTable.statut, ["en_cours", "en_retard"]),
-          eq(avancesTable.deductionSource, "livraison"),
-        ),
-      )
-      .orderBy(avancesTable.dateOctroi); // plus ancienne en premier
+    return await db.transaction(async (tx) => {
+      // Le verrou est détenu jusqu'à la validation de la transaction, y
+      // compris pendant l'écriture de l'historique de retenue.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${membreId})`);
 
-    let restant = plafondFcfa;
-    let totalDeduit = 0;
-    for (const avance of avances) {
-      if (restant <= 0) break;
+      const avances = await tx
+        .select()
+        .from(avancesTable)
+        .where(
+          and(
+            eq(avancesTable.membreId, membreId),
+            inArray(avancesTable.statut, ["en_cours", "en_retard"]),
+            eq(avancesTable.deductionSource, "livraison"),
+          ),
+        )
+        .orderBy(avancesTable.dateOctroi)
+        .for("update");
 
-      const retenue = calculerRetenueAvanceLivraison(avance, dateLivraison, restant);
-      if (retenue <= 0) continue;
+      let restant = plafondFcfa;
+      let totalDeduit = 0;
+      for (const avance of avances) {
+        if (restant <= 0) break;
 
-      const nouveauSolde    = avance.soldeRestantFcfa - retenue;
-      const nouveauRembourse = avance.montantRembourse_fcfa + retenue;
+        const retenue = calculerRetenueAvanceLivraison(avance, dateLivraison, restant);
+        if (retenue <= 0) continue;
 
-      await db
-        .update(avancesTable)
-        .set({
-          montantRembourse_fcfa: nouveauRembourse,
-          soldeRestantFcfa:      nouveauSolde,
-          statut: nouveauSolde === 0 ? "rembourse" : avance.statut,
-        })
-        .where(eq(avancesTable.id, avance.id));
+        const nouveauSolde    = avance.soldeRestantFcfa - retenue;
+        const nouveauRembourse = avance.montantRembourse_fcfa + retenue;
 
-      await db.insert(remboursementsAvancesMembresTable).values({
-        avanceId:    avance.id,
-        montantFcfa: retenue,
-        note:        `Retenue automatique — ${referencePesee}`,
-      });
+        await tx
+          .update(avancesTable)
+          .set({
+            montantRembourse_fcfa: nouveauRembourse,
+            soldeRestantFcfa:      nouveauSolde,
+            statut: nouveauSolde === 0 ? "rembourse" : avance.statut,
+          })
+          .where(eq(avancesTable.id, avance.id));
 
-      restant      -= retenue;
-      totalDeduit  += retenue;
-    }
-    return totalDeduit;
+        await tx.insert(remboursementsAvancesMembresTable).values({
+          avanceId:    avance.id,
+          montantFcfa: retenue,
+          note:        `Retenue automatique — ${referencePesee}`,
+        });
+
+        restant      -= retenue;
+        totalDeduit  += retenue;
+      }
+      return totalDeduit;
+    });
   } catch (err) {
     // Non-fatal : log mais ne bloque pas la clôture de session
     logger.error({ err, membreId, sessionId }, "Erreur déduction avances membre délégué");
