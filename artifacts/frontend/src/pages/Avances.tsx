@@ -28,7 +28,7 @@ function formaterDate(d: string) {
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 
-type ModePaiementAvance = "especes" | "mobile" | "banque";
+type ModePaiementAvance = "especes" | "mobile" | "banque" | "cheque";
 type TypeTresorerieAvance = "caisse" | "mobile_marchand" | "banque";
 
 interface TresorerieAvance {
@@ -124,6 +124,8 @@ export default function Avances() {
     compteTresorerieId: "",
     dateOctroi: new Date().toISOString().split("T")[0]!,
     dateEcheance: "",
+    numeroCheque: "",
+    dateEcheanceCheque: "",
     reportDate: "",
     motif: "",
   });
@@ -163,7 +165,7 @@ export default function Avances() {
         queryClient.invalidateQueries({ queryKey: getGetAvancesQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetAvancesEncoursQueryKey() });
         setModalOuvert(false);
-        setForm({ membreId: "", montantOctroyeFcfa: "", modePaiement: "especes", compteTresorerieId: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", reportDate: "", motif: "" });
+        setForm({ membreId: "", montantOctroyeFcfa: "", modePaiement: "especes", compteTresorerieId: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", numeroCheque: "", dateEcheanceCheque: "", reportDate: "", motif: "" });
         setMontantErreur(null);
         setMembreSearch("");
       },
@@ -208,13 +210,17 @@ export default function Avances() {
        compteTresorerieType: typeTresorerie,
       dateOctroi: form.dateOctroi,
       dateEcheance: form.dateEcheance || undefined,
+      numeroCheque: form.modePaiement === "cheque" ? form.numeroCheque.trim() : undefined,
+      dateEcheanceCheque: form.modePaiement === "cheque" && form.dateEcheanceCheque
+        ? form.dateEcheanceCheque
+        : undefined,
       reportDate: form.reportDate || undefined,
       motif: form.motif || undefined,
     };
     if (!navigator.onLine) {
       void queueOp({ localId: crypto.randomUUID(), type: "avance", data: payload });
       setModalOuvert(false);
-      setForm({ membreId: "", montantOctroyeFcfa: "", modePaiement: "especes", compteTresorerieId: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", reportDate: "", motif: "" });
+      setForm({ membreId: "", montantOctroyeFcfa: "", modePaiement: "especes", compteTresorerieId: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", numeroCheque: "", dateEcheanceCheque: "", reportDate: "", motif: "" });
       setMontantErreur(null);
       setMembreSearch("");
       setNotifHorsLigne("Avance enregistrée hors ligne — sera synchronisée dès le retour en ligne");
@@ -585,14 +591,41 @@ export default function Avances() {
                   <option value="especes">Espèces — caisse centrale (571)</option>
                   <option value="mobile">Mobile Marchand (552)</option>
                   <option value="banque">Banque — compte bancaire (521)</option>
+                  <option value="cheque">Chèque — débit bancaire à l’encaissement</option>
                 </select>
                 <p className="mt-1 text-xs text-gray-400">
-                  Le montant de l’avance sera débité de la trésorerie sélectionnée.
+                  {form.modePaiement === "cheque"
+                    ? "Le chèque sera enregistré comme émis ; la banque ne sera débitée qu’à son encaissement."
+                    : "Le montant de l’avance sera débité de la trésorerie sélectionnée."}
                 </p>
               </div>
+              {form.modePaiement === "cheque" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">N° du chèque *</label>
+                    <input
+                      required
+                      maxLength={50}
+                      value={form.numeroCheque}
+                      onChange={(e) => setForm({ ...form, numeroCheque: e.target.value })}
+                      placeholder="Numéro du chèque"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Échéance du chèque</label>
+                    <input
+                      type="date"
+                      value={form.dateEcheanceCheque}
+                      onChange={(e) => setForm({ ...form, dateEcheanceCheque: e.target.value })}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
+                    />
+                  </div>
+                </div>
+              )}
                <div>
                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                   {typeTresorerie === "caisse" ? "Caisse" : typeTresorerie === "mobile_marchand" ? "Compte Mobile Marchand" : "Compte bancaire"} *
+                   {typeTresorerie === "caisse" ? "Caisse" : typeTresorerie === "mobile_marchand" ? "Compte Mobile Marchand" : form.modePaiement === "cheque" ? "Compte bancaire du chèque" : "Compte bancaire"} *
                  </label>
                  <select
                    required

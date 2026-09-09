@@ -7840,12 +7840,20 @@ components:
           type: string
         modePaiement:
           type: string
-          enum: [especes, mobile, banque]
+          enum: [especes, mobile, banque, cheque]
         compteTresorerieId:
           type: integer
         compteTresorerieType:
           type: string
           enum: [caisse, mobile_marchand, banque]
+        numeroCheque:
+          type: string
+          maxLength: 50
+          description: Numéro du chèque lorsque le mode de décaissement est cheque.
+        dateEcheanceCheque:
+          type: string
+          format: date
+          description: Date d’échéance du chèque, distincte de la date limite de remboursement de l’avance.
         planType:
           type: string
           enum: [integral, partiel, reporte]

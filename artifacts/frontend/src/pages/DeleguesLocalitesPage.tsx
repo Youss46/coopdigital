@@ -355,8 +355,10 @@ export default function DeleguesLocalitesPage() {
   const [showOctroi, setShowOctroi] = useState(false);
   const [formOctroi, setFormOctroi] = useState({
     montant: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "",
-    modePaiement: "especes" as "especes" | "mobile" | "banque",
+    modePaiement: "especes" as "especes" | "mobile" | "banque" | "cheque",
     compteTresorerieId: "",
+    numeroCheque: "",
+    dateEcheanceCheque: "",
     planType: "integral" as Avance["planType"], montantPartiel: "", reportDate: "",
     deductionSource: "livraison" as Avance["deductionSource"],
   });
@@ -534,6 +536,10 @@ export default function DeleguesLocalitesPage() {
       modePaiement: formOctroi.modePaiement,
       compteTresorerieId: Number(formOctroi.compteTresorerieId),
       compteTresorerieType: typeTresorerieOctroi,
+      numeroCheque: formOctroi.modePaiement === "cheque" ? formOctroi.numeroCheque.trim() : undefined,
+      dateEcheanceCheque: formOctroi.modePaiement === "cheque" && formOctroi.dateEcheanceCheque
+        ? formOctroi.dateEcheanceCheque
+        : undefined,
       planType: formOctroi.planType,
       montantPartielFcfa: formOctroi.planType === "partiel" ? Number(formOctroi.montantPartiel) : undefined,
       reportDate: formOctroi.reportDate || undefined,
@@ -545,7 +551,7 @@ export default function DeleguesLocalitesPage() {
       qc.invalidateQueries({ queryKey: ["avances-delegues-localites"] });
       qc.invalidateQueries({ queryKey: ["avances-delegues-localites-reportees"] });
       setShowOctroi(false);
-      setFormOctroi({ montant: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "", modePaiement: "especes", compteTresorerieId: "", planType: "integral", montantPartiel: "", reportDate: "", deductionSource: "livraison" });
+      setFormOctroi({ montant: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "", modePaiement: "especes", compteTresorerieId: "", numeroCheque: "", dateEcheanceCheque: "", planType: "integral", montantPartiel: "", reportDate: "", deductionSource: "livraison" });
       setErrOctroi("");
     },
     onError: (e: Error) => setErrOctroi(e.message),
@@ -947,10 +953,40 @@ export default function DeleguesLocalitesPage() {
                         <option value="especes">Espèces — caisse (571)</option>
                         <option value="mobile">Mobile Marchand (552)</option>
                         <option value="banque">Banque (521)</option>
+                        <option value="cheque">Chèque — débit à l’encaissement</option>
                       </select>
                     </div>
+                    {formOctroi.modePaiement === "cheque" && (
+                      <>
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">N° du chèque *</label>
+                          <input
+                            required
+                            maxLength={50}
+                            value={formOctroi.numeroCheque}
+                            onChange={e => setFormOctroi(f => ({ ...f, numeroCheque: e.target.value }))}
+                            placeholder="Numéro du chèque"
+                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">Échéance du chèque</label>
+                          <input
+                            type="date"
+                            value={formOctroi.dateEcheanceCheque}
+                            onChange={e => setFormOctroi(f => ({ ...f, dateEcheanceCheque: e.target.value }))}
+                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]"
+                          />
+                        </div>
+                        <p className="sm:col-span-2 text-xs text-gray-400">
+                          Le chèque sera suivi dans « Chèques émis » et la banque sera débitée uniquement à l’encaissement.
+                        </p>
+                      </>
+                    )}
                     <div className="sm:col-span-2">
-                      <label className="block text-xs text-gray-600 mb-1">Trésorerie à débiter *</label>
+                      <label className="block text-xs text-gray-600 mb-1">
+                        {formOctroi.modePaiement === "cheque" ? "Compte bancaire du chèque *" : "Trésorerie à débiter *"}
+                      </label>
                       <select
                         value={formOctroi.compteTresorerieId}
                         onChange={e => setFormOctroi(f => ({ ...f, compteTresorerieId: e.target.value }))}
@@ -1781,10 +1817,40 @@ export default function DeleguesLocalitesPage() {
                       <option value="especes">Espèces — caisse (571)</option>
                       <option value="mobile">Mobile Marchand (552)</option>
                       <option value="banque">Banque (521)</option>
+                      <option value="cheque">Chèque — débit à l’encaissement</option>
                     </select>
                   </div>
+                  {formOctroi.modePaiement === "cheque" && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">N° du chèque *</label>
+                        <input
+                          required
+                          maxLength={50}
+                          value={formOctroi.numeroCheque}
+                          onChange={e => setFormOctroi(f => ({ ...f, numeroCheque: e.target.value }))}
+                          placeholder="Numéro du chèque"
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Échéance du chèque</label>
+                        <input
+                          type="date"
+                          value={formOctroi.dateEcheanceCheque}
+                          onChange={e => setFormOctroi(f => ({ ...f, dateEcheanceCheque: e.target.value }))}
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]"
+                        />
+                      </div>
+                      <p className="sm:col-span-2 text-xs text-gray-400">
+                        Le chèque sera suivi dans « Chèques émis » et la banque sera débitée uniquement à l’encaissement.
+                      </p>
+                    </div>
+                  )}
                   <div>
-                    <label className="block text-xs text-gray-600 mb-1">Trésorerie à débiter *</label>
+                    <label className="block text-xs text-gray-600 mb-1">
+                      {formOctroi.modePaiement === "cheque" ? "Compte bancaire du chèque *" : "Trésorerie à débiter *"}
+                    </label>
                     <select
                       value={formOctroi.compteTresorerieId}
                       onChange={e => setFormOctroi(f => ({ ...f, compteTresorerieId: e.target.value }))}

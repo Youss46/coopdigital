@@ -915,6 +915,7 @@ export const AvanceInputModePaiement = {
   especes: 'especes',
   mobile: 'mobile',
   banque: 'banque',
+  cheque: 'cheque',
 } as const;
 
 export type AvanceInputCompteTresorerieType = typeof AvanceInputCompteTresorerieType[keyof typeof AvanceInputCompteTresorerieType];
@@ -952,6 +953,13 @@ export interface AvanceInput {
   modePaiement: AvanceInputModePaiement;
   compteTresorerieId: number;
   compteTresorerieType: AvanceInputCompteTresorerieType;
+  /**
+     * Numéro du chèque lorsque le mode de décaissement est cheque.
+     * @maxLength 50
+     */
+  numeroCheque?: string;
+  /** Date d’échéance du chèque, distincte de la date limite de remboursement de l’avance. */
+  dateEcheanceCheque?: string;
   planType?: AvanceInputPlanType;
   montantPartielFcfa?: number;
   /** Première date à partir de laquelle la retenue est autorisée. */

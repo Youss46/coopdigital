@@ -149,6 +149,10 @@ describe.skipIf(!enabled)("octroi d'avances et trésorerie sur PostgreSQL", () =
         [cooperativeId],
       );
       await client.query(
+        `DELETE FROM cheques_emis WHERE cooperative_id IN ($1, $2)`,
+        [cooperativeId, foreignCooperativeId],
+      );
+      await client.query(
         `DELETE FROM remboursements_avances_membres
          WHERE avance_id IN (SELECT id FROM avances WHERE membre_id = $1)`,
         [membreId],
@@ -213,6 +217,10 @@ describe.skipIf(!enabled)("octroi d'avances et trésorerie sur PostgreSQL", () =
       await client.query(
         `DELETE FROM mouvements_banque WHERE cooperative_id = $1`,
         [cooperativeId],
+      );
+      await client.query(
+        `DELETE FROM cheques_emis WHERE cooperative_id IN ($1, $2)`,
+        [cooperativeId, foreignCooperativeId],
       );
       await client.query(
         `DELETE FROM remboursements_avances_membres
@@ -391,6 +399,56 @@ describe.skipIf(!enabled)("octroi d'avances et trésorerie sur PostgreSQL", () =
       }
     },
   );
+
+  it("enregistre un chèque émis sans débiter la banque immédiatement", async () => {
+    const accountId = await createTreasury("banque", 1_000);
+    const result = await fetch(`${baseUrl}/avances`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        membreId,
+        montantOctroyeFcfa: 300,
+        dateOctroi: "2026-09-04",
+        modePaiement: "cheque",
+        compteTresorerieId: accountId,
+        compteTresorerieType: "banque",
+        numeroCheque: `CHQ-AVA-${suffix}`,
+        dateEcheanceCheque: "2026-09-30",
+      }),
+    });
+
+    expect(result.status).toBe(201);
+    expect(await balance("banque", accountId)).toBe("1000");
+
+    const cheques = await client.query(
+      `SELECT numero_cheque, beneficiaire, montant_fcfa, compte_bancaire_id,
+              membre_id,
+              to_char(date_emission, 'YYYY-MM-DD') AS date_emission,
+              to_char(date_echeance, 'YYYY-MM-DD') AS date_echeance,
+              statut
+       FROM cheques_emis
+       WHERE cooperative_id = $1`,
+      [cooperativeId],
+    );
+    expect(cheques.rows).toEqual([{
+      numero_cheque: `CHQ-AVA-${suffix}`,
+      beneficiaire: "Test Producteur",
+      montant_fcfa: 300,
+      compte_bancaire_id: accountId,
+      membre_id: membreId,
+      date_emission: "2026-09-04",
+      date_echeance: "2026-09-30",
+      statut: "emis",
+    }]);
+
+    const movements = await client.query(
+      `SELECT count(*)::int AS count
+       FROM mouvements_banque
+       WHERE cooperative_id = $1`,
+      [cooperativeId],
+    );
+    expect(movements.rows).toEqual([{ count: 0 }]);
+  });
 
   it("attribue le remboursement manuel à l'opérateur sans attribuer artificiellement l'historique", async () => {
     const caisseId = await createTreasury("caisse", 1_000);

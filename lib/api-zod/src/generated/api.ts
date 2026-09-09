@@ -358,6 +358,8 @@ export const GetAvancesResponse = zod.object({
 /**
  * @summary Octroyer une avance
  */
+export const createAvanceBodyNumeroChequeMax = 50;
+
 export const createAvanceBodyPlanTypeDefault = `integral`;
 export const createAvanceBodyDeductionSourceDefault = `livraison`;
 
@@ -367,9 +369,11 @@ export const CreateAvanceBody = zod.object({
   "dateOctroi": zod.string(),
   "dateEcheance": zod.string().optional(),
   "motif": zod.string().optional(),
-  "modePaiement": zod.enum(['especes', 'mobile', 'banque']),
+  "modePaiement": zod.enum(['especes', 'mobile', 'banque', 'cheque']),
   "compteTresorerieId": zod.number(),
   "compteTresorerieType": zod.enum(['caisse', 'mobile_marchand', 'banque']),
+  "numeroCheque": zod.string().max(createAvanceBodyNumeroChequeMax).optional().describe('Numéro du chèque lorsque le mode de décaissement est cheque.'),
+  "dateEcheanceCheque": zod.coerce.date().optional().describe('Date d’échéance du chèque, distincte de la date limite de remboursement de l’avance.'),
   "planType": zod.enum(['integral', 'partiel', 'reporte']).default(createAvanceBodyPlanTypeDefault),
   "montantPartielFcfa": zod.number().optional(),
   "reportDate": zod.coerce.date().optional().describe('Première date à partir de laquelle la retenue est autorisée.'),

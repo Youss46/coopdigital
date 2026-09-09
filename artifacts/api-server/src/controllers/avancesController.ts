@@ -17,6 +17,7 @@ import {
   mouvementsMobileMarchandTable,
   comptesBancairesTable,
   mouvementsBanqueTable,
+  chequesEmisTable,
 } from "@workspace/db";
 import { eq, and, sql, desc, ne, isNull, isNotNull, or, lt, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -142,6 +143,8 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
     compteTresorerieId,
     compteTresorerieType,
   } = parse.data;
+  const numeroCheque = typeof body["numeroCheque"] === "string" ? body["numeroCheque"] : undefined;
+  const dateEcheanceCheque = body["dateEcheanceCheque"];
   const planType = body["planType"] ?? "integral";
   const montantPartielFcfa = body["montantPartielFcfa"];
   const reportDate = body["reportDate"];
@@ -159,7 +162,7 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
     res.status(400).json({ erreur: "Source de déduction invalide" });
     return;
   }
-  if (!["especes", "mobile", "banque"].includes(String(modePaiement))) {
+  if (!["especes", "mobile", "banque", "cheque"].includes(String(modePaiement))) {
     res.status(400).json({ erreur: "Mode de paiement invalide" });
     return;
   }
@@ -171,10 +174,11 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
     res.status(400).json({ erreur: "Type de trésorerie invalide" });
     return;
   }
-  const typeAttendu: Record<"especes" | "mobile" | "banque", "caisse" | "mobile_marchand" | "banque"> = {
+  const typeAttendu: Record<"especes" | "mobile" | "banque" | "cheque", "caisse" | "mobile_marchand" | "banque"> = {
     especes: "caisse",
     mobile: "mobile_marchand",
     banque: "banque",
+    cheque: "banque",
   };
   if (compteTresorerieType !== typeAttendu[modePaiement]) {
     res.status(400).json({ erreur: "La trésorerie sélectionnée ne correspond pas au moyen de décaissement" });
@@ -202,6 +206,28 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
   }
   if (typeof reportDate === "string" && reportDate < dateOctroi) {
     res.status(400).json({ erreur: "La date de début de retenue doit être postérieure ou égale à la date d'octroi" });
+    return;
+  }
+  if (modePaiement === "cheque" && (typeof numeroCheque !== "string" || !numeroCheque.trim())) {
+    res.status(400).json({ erreur: "Le numéro du chèque est obligatoire pour un octroi par chèque" });
+    return;
+  }
+  if (typeof numeroCheque === "string" && numeroCheque.trim().length > 50) {
+    res.status(400).json({ erreur: "Le numéro du chèque ne peut pas dépasser 50 caractères" });
+    return;
+  }
+  if (dateEcheanceCheque !== undefined && (
+    typeof dateEcheanceCheque !== "string" ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(dateEcheanceCheque)
+  )) {
+    res.status(400).json({ erreur: "La date d'échéance du chèque est invalide" });
+    return;
+  }
+  if (
+    typeof dateEcheanceCheque === "string" &&
+    dateEcheanceCheque < dateOctroi
+  ) {
+    res.status(400).json({ erreur: "La date d'échéance du chèque doit être postérieure ou égale à la date d'octroi" });
     return;
   }
 
@@ -361,7 +387,7 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
         await tx.update(comptesMobilesMarchandsTable)
           .set({ soldeActuelFcfa: String(nouveauSolde) })
           .where(eq(comptesMobilesMarchandsTable.id, compte.id));
-      } else {
+      } else if (modePaiement === "banque") {
         const [compte] = await tx
           .select()
           .from(comptesBancairesTable)
@@ -394,6 +420,30 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
         await tx.update(comptesBancairesTable)
           .set({ soldeActuelFcfa: String(nouveauSolde) })
           .where(eq(comptesBancairesTable.id, compte.id));
+      } else {
+        const [compte] = await tx
+          .select({ id: comptesBancairesTable.id })
+          .from(comptesBancairesTable)
+          .where(and(
+            eq(comptesBancairesTable.id, compteTresorerieId),
+            eq(comptesBancairesTable.cooperativeId, cooperativeId),
+            eq(comptesBancairesTable.actif, true),
+          ))
+          .limit(1);
+        if (!compte) throw new Error("Aucun compte bancaire actif n'est configuré pour ce chèque.");
+
+        await tx.insert(chequesEmisTable).values({
+          cooperativeId,
+          numeroCheque: numeroCheque!.trim(),
+          beneficiaire: `${membre.prenoms ?? ""} ${membre.nom}`.trim(),
+          montantFcfa: montant,
+          compteBancaireId: compte.id,
+          membreId,
+          dateEmission: dateOctroiEffective,
+          dateEcheance: typeof dateEcheanceCheque === "string" ? dateEcheanceCheque : null,
+          statut: "emis",
+          createdBy: userId,
+        });
       }
 
       return created!;
@@ -409,7 +459,7 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
       membreNom: `${membre.prenoms} ${membre.nom}`,
       montantFcfa: montantOctroyeFcfa,
       dateOctroi: avance.dateOctroi,
-      modePaiement: modePaiement as "especes" | "mobile" | "banque",
+      modePaiement: modePaiement as "especes" | "mobile" | "banque" | "cheque",
     });
 
     res.status(201).json(avance);

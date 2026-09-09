@@ -528,7 +528,7 @@ export async function generateEcrituresAvance(cooperativeId: number, params: {
   membreNom: string;
   montantFcfa: number;
   dateOctroi: string;
-  modePaiement?: "especes" | "mobile" | "banque";
+  modePaiement?: "especes" | "mobile" | "banque" | "cheque";
 }) {
   // Le mode de paiement indique quel actif diminue au décaissement.
   // 571 = caisse, 552 = Mobile Money/Marchand, 521 = banque.
@@ -536,6 +536,7 @@ export async function generateEcrituresAvance(cooperativeId: number, params: {
     especes: "571",
     mobile: "552",
     banque: "521",
+    cheque: "521",
   };
   const c = await resolveComptes(cooperativeId, "avances", "octroi_avance_producteur", "4091", "521");
   const compteCredit = params.modePaiement
