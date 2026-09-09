@@ -84,7 +84,12 @@ vi.mock("../services/recuService.js", () => ({ genererNumeroRecu: vi.fn() }));
 vi.mock("../lib/logger.js", () => ({ logger: { warn: vi.fn(), error: vi.fn() } }));
 
 import { getDashboard } from "../controllers/dashboardController.js";
-import { getPaiementTresorerieDescriptor, listPaiements, statsPaiements } from "../controllers/paiementsController.js";
+import {
+  getPaiementTresorerieDescriptor,
+  livraisonNecessitePaiementRemplacement,
+  listPaiements,
+  statsPaiements,
+} from "../controllers/paiementsController.js";
 
 type SelectChain = {
   from: ReturnType<typeof vi.fn>;
@@ -127,6 +132,16 @@ function response() {
     json: vi.fn(),
   } as unknown as Response;
 }
+
+describe("remplacement après rejet d'un règlement", () => {
+  it("ne recrée pas un paiement pour une livraison entièrement impayée", () => {
+    expect(livraisonNecessitePaiementRemplacement(2_704_000, 2_704_000)).toBe(false);
+  });
+
+  it("conserve un paiement de remplacement pour une livraison déjà partiellement payée", () => {
+    expect(livraisonNecessitePaiementRemplacement(2_704_000, 1_200_000)).toBe(true);
+  });
+});
 
 describe("date effective des règlements", () => {
   beforeEach(() => {

@@ -152,6 +152,15 @@ function estLivraisonAvecSolde(statut: string | null | undefined): boolean {
   return ["EN_ATTENTE", "PARTIEL", "DIFFERE", "IMPAYE", "EN_RETARD"].includes(normalise);
 }
 
+export function livraisonNecessitePaiementRemplacement(
+  montantNetFcfa: number | null | undefined,
+  montantRestantFcfa: number,
+): boolean {
+  const montantNet = Math.max(0, Math.round(Number(montantNetFcfa ?? 0)));
+  const montantRestant = Math.max(0, Math.round(montantRestantFcfa));
+  return montantNet > 0 && montantRestant > 0 && montantRestant < montantNet;
+}
+
 function startOfDay(d: Date) {
   const r = new Date(d);
   r.setHours(0, 0, 0, 0);
@@ -2046,6 +2055,7 @@ export async function rejeterPaiement(req: Request, res: Response): Promise<void
       // un règlement actionnable après le rejet du versement courant.
       if (row.paiement.livraisonId) {
         let reste = 0;
+        let livraisonDejaPartiellementPayee = false;
         if (livraisonAvecSolde) {
           const [livraisonVerrouillee] = await tx
             .select({
@@ -2061,6 +2071,12 @@ export async function rejeterPaiement(req: Request, res: Response): Promise<void
             ?? livraisonVerrouillee?.montantNetFcfa
             ?? 0,
           )));
+          const montantNetLivraison = Math.max(0, Math.round(Number(
+            livraisonVerrouillee?.montantNetFcfa
+            ?? row.livraisonMontantNetFcfa
+            ?? 0,
+          )));
+          livraisonDejaPartiellementPayee = livraisonNecessitePaiementRemplacement(montantNetLivraison, reste);
         }
         await tx
           .update(livraisonsTable)
@@ -2072,7 +2088,11 @@ export async function rejeterPaiement(req: Request, res: Response): Promise<void
             : { statutPaiement: "EN_ATTENTE" })
           .where(eq(livraisonsTable.id, row.paiement.livraisonId));
 
-        if (livraisonAvecSolde && reste > 0) {
+        // Un paiement complet rejeté ne doit pas créer une seconde ligne
+        // identique en attente. Pour une livraison déjà partiellement payée,
+        // le remplacement reste nécessaire afin de conserver le reliquat
+        // actionnable après la fin de la fenêtre de réouverture.
+        if (livraisonAvecSolde && livraisonDejaPartiellementPayee && reste > 0) {
           await tx.insert(paiementsTable).values({
             cooperativeId,
             livraisonId: row.paiement.livraisonId,
