@@ -7,7 +7,7 @@ const agentUserAlias = alias(usersTable, "agent_user");
 // Alias pour la jointure peseur saisie physique (proxy délégué central)
 const peseurUserAlias = alias(usersTable, "peseur_user");
 import { creerChequeDepuisLivraison } from "../services/chequesService.js";
-import { eq, and, desc, notInArray, or, sql, gte, lte } from "drizzle-orm";
+import { eq, and, desc, notInArray, or, sql, gte, lte, isNull } from "drizzle-orm";
 import { CampagneFermeeError, assertCampagneOuverte } from "../lib/campagneGuard";
 import { checkLivraison, creerAnomalies } from "../services/anomalieService";
 import { CreateLivraisonBody } from "@workspace/api-zod";
@@ -238,7 +238,17 @@ export async function createLivraison(req: Request, res: Response): Promise<void
       if (membreId) {
         const avancesEnCours = await tx
           .select().from(avancesTable)
-          .where(and(eq(avancesTable.membreId, membreId), eq(avancesTable.statut, "en_cours")))
+          .where(and(
+            eq(avancesTable.membreId, membreId),
+            eq(avancesTable.statut, "en_cours"),
+            // Une avance affectée à la commission ne doit jamais réduire
+            // le net d'une livraison. Les anciennes lignes sans source
+            // restent compatibles avec le comportement historique.
+            or(
+              isNull(avancesTable.deductionSource),
+              eq(avancesTable.deductionSource, "livraison"),
+            )!,
+          ))
           .orderBy(avancesTable.dateOctroi); // plus ancienne en premier
 
         let budgetRestant = montantBrut;
