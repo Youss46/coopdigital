@@ -330,6 +330,11 @@ function montantRetenableAvance(
   },
   datePaiement: string,
 ): number {
+  // La date de début est indépendante du plan : elle peut différer
+  // l'intégral comme le partiel, sans transformer l'échéance en débit.
+  if (avance.reportDate && datePaiement < String(avance.reportDate)) {
+    return 0;
+  }
   if (avance.planType === "integral") {
     return avance.soldeRestantFcfa;
   }

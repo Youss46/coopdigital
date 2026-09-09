@@ -124,6 +124,7 @@ export default function Avances() {
     compteTresorerieId: "",
     dateOctroi: new Date().toISOString().split("T")[0]!,
     dateEcheance: "",
+    reportDate: "",
     motif: "",
   });
   const [montantErreur, setMontantErreur] = useState<string | null>(null);
@@ -162,7 +163,7 @@ export default function Avances() {
         queryClient.invalidateQueries({ queryKey: getGetAvancesQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetAvancesEncoursQueryKey() });
         setModalOuvert(false);
-         setForm({ membreId: "", montantOctroyeFcfa: "", modePaiement: "especes", compteTresorerieId: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "" });
+        setForm({ membreId: "", montantOctroyeFcfa: "", modePaiement: "especes", compteTresorerieId: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", reportDate: "", motif: "" });
         setMontantErreur(null);
         setMembreSearch("");
       },
@@ -207,12 +208,13 @@ export default function Avances() {
        compteTresorerieType: typeTresorerie,
       dateOctroi: form.dateOctroi,
       dateEcheance: form.dateEcheance || undefined,
+      reportDate: form.reportDate || undefined,
       motif: form.motif || undefined,
     };
     if (!navigator.onLine) {
       void queueOp({ localId: crypto.randomUUID(), type: "avance", data: payload });
       setModalOuvert(false);
-       setForm({ membreId: "", montantOctroyeFcfa: "", modePaiement: "especes", compteTresorerieId: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "" });
+      setForm({ membreId: "", montantOctroyeFcfa: "", modePaiement: "especes", compteTresorerieId: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", reportDate: "", motif: "" });
       setMontantErreur(null);
       setMembreSearch("");
       setNotifHorsLigne("Avance enregistrée hors ligne — sera synchronisée dès le retour en ligne");
@@ -637,13 +639,23 @@ export default function Avances() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Date d'échéance</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Date limite de remboursement</label>
                   <input
                     type="date"
                     value={form.dateEcheance}
                     onChange={(e) => setForm({ ...form, dateEcheance: e.target.value })}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
                   />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Début de la retenue</label>
+                  <input
+                    type="date"
+                    value={form.reportDate}
+                    onChange={(e) => setForm({ ...form, reportDate: e.target.value })}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none"
+                  />
+                  <p className="text-[11px] text-gray-400 mt-1">Facultatif. Avant cette date, l’avance n’est pas retenue.</p>
                 </div>
               </div>
               <div>

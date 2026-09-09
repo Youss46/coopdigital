@@ -358,6 +358,7 @@ export const GetAvancesResponse = zod.object({
 /**
  * @summary Octroyer une avance
  */
+export const createAvanceBodyPlanTypeDefault = `integral`;
 export const createAvanceBodyDeductionSourceDefault = `livraison`;
 
 export const CreateAvanceBody = zod.object({
@@ -369,6 +370,9 @@ export const CreateAvanceBody = zod.object({
   "modePaiement": zod.enum(['especes', 'mobile', 'banque']),
   "compteTresorerieId": zod.number(),
   "compteTresorerieType": zod.enum(['caisse', 'mobile_marchand', 'banque']),
+  "planType": zod.enum(['integral', 'partiel', 'reporte']).default(createAvanceBodyPlanTypeDefault),
+  "montantPartielFcfa": zod.number().optional(),
+  "reportDate": zod.coerce.date().optional().describe('Première date à partir de laquelle la retenue est autorisée.'),
   "deductionSource": zod.enum(['livraison', 'commission']).default(createAvanceBodyDeductionSourceDefault)
 })
 

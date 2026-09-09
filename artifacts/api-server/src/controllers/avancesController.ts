@@ -18,7 +18,7 @@ import {
   comptesBancairesTable,
   mouvementsBanqueTable,
 } from "@workspace/db";
-import { eq, and, sql, desc, ne, isNull, or, lt, inArray } from "drizzle-orm";
+import { eq, and, sql, desc, ne, isNull, isNotNull, or, lt, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { formatNumeroPesee } from "../services/recuService";
 
@@ -61,7 +61,6 @@ export async function listAvances(req: Request, res: Response): Promise<void> {
             ne(membresTable.categorieMembre, CATEGORIE_DELEGUE_LOCALITE),
           )!,
     ];
-    if (statut) conditions.push(eq(avancesTable.statut, statut as "en_cours" | "rembourse" | "en_retard"));
     if (membreId) conditions.push(eq(avancesTable.membreId, membreId));
     // Un délégué ne voit que les avances des membres qui lui sont rattachés
     if (req.user?.role === "delegue" && req.user?.id) {
@@ -96,7 +95,20 @@ export async function listAvances(req: Request, res: Response): Promise<void> {
       .where(and(...conditions))
       .orderBy(desc(avancesTable.createdAt));
 
-    res.json({ avances, total: avances.length });
+    const today = new Date().toISOString().split("T")[0]!;
+    const avancesAvecStatut = avances.map((avance) => ({
+      ...avance,
+      statut: avance.statut !== "rembourse"
+        && avance.dateEcheance !== null
+        && avance.dateEcheance < today
+        ? "en_retard" as const
+        : avance.statut,
+    }));
+    const avancesFiltres = statut
+      ? avancesAvecStatut.filter((avance) => avance.statut === statut)
+      : avancesAvecStatut;
+
+    res.json({ avances: avancesFiltres, total: avancesFiltres.length });
   } catch (err) {
     req.log.error({ err }, "Erreur listAvances");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
@@ -176,6 +188,22 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
     res.status(400).json({ erreur: "Une date de reprise valide est requise pour un plan reporté" });
     return;
   }
+  if (dateEcheance && !/^\d{4}-\d{2}-\d{2}$/.test(dateEcheance)) {
+    res.status(400).json({ erreur: "La date d'échéance est invalide" });
+    return;
+  }
+  if (typeof reportDate === "string" && !/^\d{4}-\d{2}-\d{2}$/.test(reportDate)) {
+    res.status(400).json({ erreur: "La date de début de retenue est invalide" });
+    return;
+  }
+  if (dateEcheance && dateEcheance < dateOctroi) {
+    res.status(400).json({ erreur: "La date d'échéance doit être postérieure ou égale à la date d'octroi" });
+    return;
+  }
+  if (typeof reportDate === "string" && reportDate < dateOctroi) {
+    res.status(400).json({ erreur: "La date de début de retenue doit être postérieure ou égale à la date d'octroi" });
+    return;
+  }
 
   try {
     const [membre] = await db.select().from(membresTable).where(eq(membresTable.id, membreId)).limit(1);
@@ -245,7 +273,7 @@ export async function createAvance(req: Request, res: Response): Promise<void> {
           agentId: req.user?.id ?? null,
           planType: planType as "integral" | "partiel" | "reporte",
           montantPartielFcfa: planType === "partiel" ? Number(montantPartielFcfa) : null,
-          reportDate: planType === "reporte" ? String(reportDate) : null,
+          reportDate: typeof reportDate === "string" ? reportDate : null,
           deductionSource: deductionSource as "livraison" | "commission",
         })
         .returning();
@@ -885,8 +913,8 @@ export async function getAvancesReportees(req: Request, res: Response): Promise<
             isNull(membresTable.categorieMembre),
             ne(membresTable.categorieMembre, CATEGORIE_DELEGUE_LOCALITE),
           )!,
-      eq(avancesTable.planType, "reporte"),
       ne(avancesTable.statut, "rembourse"),
+      eq(avancesTable.planType, "reporte"),
       or(isNull(avancesTable.reportDate), lt(avancesTable.reportDate, today))!,
     ];
 

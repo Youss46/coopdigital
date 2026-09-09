@@ -926,6 +926,15 @@ export const AvanceInputCompteTresorerieType = {
   banque: 'banque',
 } as const;
 
+export type AvanceInputPlanType = typeof AvanceInputPlanType[keyof typeof AvanceInputPlanType];
+
+
+export const AvanceInputPlanType = {
+  integral: 'integral',
+  partiel: 'partiel',
+  reporte: 'reporte',
+} as const;
+
 export type AvanceInputDeductionSource = typeof AvanceInputDeductionSource[keyof typeof AvanceInputDeductionSource];
 
 
@@ -943,6 +952,10 @@ export interface AvanceInput {
   modePaiement: AvanceInputModePaiement;
   compteTresorerieId: number;
   compteTresorerieType: AvanceInputCompteTresorerieType;
+  planType?: AvanceInputPlanType;
+  montantPartielFcfa?: number;
+  /** Première date à partir de laquelle la retenue est autorisée. */
+  reportDate?: string;
   deductionSource?: AvanceInputDeductionSource;
 }
 

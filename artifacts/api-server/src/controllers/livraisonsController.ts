@@ -256,10 +256,10 @@ export async function createLivraison(req: Request, res: Response): Promise<void
           if (budgetRestant <= 0) break;
           const planType = av.planType ?? "integral";
 
-          // Reporté : sauter si la livraison est avant la date de report
-          if (planType === "reporte" && av.reportDate) {
-            if (dateStr < av.reportDate) continue;
-          }
+          // La date de début de retenue s'applique à tous les plans.
+          // L'échéance reste une date limite informative et ne déclenche
+          // jamais un débit sans livraison réelle.
+          if (av.reportDate && dateStr < av.reportDate) continue;
 
           const montantCePeriode = planType === "partiel" && av.montantPartielFcfa
             ? Math.min(av.montantPartielFcfa, av.soldeRestantFcfa, budgetRestant)

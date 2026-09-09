@@ -535,7 +535,7 @@ export default function DeleguesLocalitesPage() {
       compteTresorerieType: typeTresorerieOctroi,
       planType: formOctroi.planType,
       montantPartielFcfa: formOctroi.planType === "partiel" ? Number(formOctroi.montantPartiel) : undefined,
-      reportDate: formOctroi.planType === "reporte" ? formOctroi.reportDate : undefined,
+      reportDate: formOctroi.reportDate || undefined,
       deductionSource: formOctroi.deductionSource,
     }),
     onSuccess: () => {
@@ -710,16 +710,18 @@ export default function DeleguesLocalitesPage() {
 
   const totalEnAttente = recapCommissions.reduce((s, r) => s + r.enAttenteFcfa, 0);
   const membreAvancesSelectionne = membres.find(m => m.id === membreAvancesId) ?? null;
-  const planLibelle = (avance: Pick<Avance, "planType" | "montantPartielFcfa" | "reportDate" | "deductionSource">) => {
+  const planLibelle = (avance: Pick<Avance, "planType" | "montantPartielFcfa" | "reportDate" | "dateEcheance" | "deductionSource">) => {
     const source = avance.deductionSource === "commission" ? "commission" : "livraison";
     const sourceLabel = source === "commission" ? "commission" : "livraison";
+    const debut = avance.reportDate ? ` dès le ${formaterDate(avance.reportDate)}` : "";
+    const echeance = avance.dateEcheance ? ` · limite ${formaterDate(avance.dateEcheance)}` : "";
     if (avance.planType === "partiel") {
-      return `Partiel — ${formaterMontant(avance.montantPartielFcfa ?? 0)} par ${sourceLabel}`;
+      return `Partiel — ${formaterMontant(avance.montantPartielFcfa ?? 0)} par ${sourceLabel}${debut}${echeance}`;
     }
     if (avance.planType === "reporte") {
-      return `Reporté jusqu’au ${avance.reportDate ? formaterDate(avance.reportDate) : "nouvel ordre"} — ${sourceLabel}`;
+      return `Reporté${debut || " jusqu’à nouvel ordre"} — ${sourceLabel}${echeance}`;
     }
-    return `Intégral — prochaine ${source}`;
+    return `Intégral — prochaine ${source}${debut}${echeance}`;
   };
 
   return (
@@ -903,7 +905,7 @@ export default function DeleguesLocalitesPage() {
                   <div>
                     <p className="text-sm font-semibold text-[#1a4731]">Nouvelle avance</p>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      La retenue sera appliquée uniquement lors du paiement des commissions de {membreAvancesSelectionne?.prenoms} {membreAvancesSelectionne?.nom}.
+                      La retenue sera appliquée uniquement lors du paiement des commissions de {membreAvancesSelectionne?.prenoms} {membreAvancesSelectionne?.nom}. La date limite signale un retard ; elle ne déclenche pas de débit automatique.
                     </p>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -918,9 +920,15 @@ export default function DeleguesLocalitesPage() {
                         className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]" />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-600 mb-1">Échéance (facultative)</label>
+                      <label className="block text-xs text-gray-600 mb-1">Date limite de remboursement (facultative)</label>
                       <input type="date" value={formOctroi.dateEcheance} onChange={e => setFormOctroi(f => ({ ...f, dateEcheance: e.target.value }))}
                         className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Début de la retenue (facultatif)</label>
+                      <input type="date" value={formOctroi.reportDate} onChange={e => setFormOctroi(f => ({ ...f, reportDate: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]" />
+                      <p className="text-[11px] text-gray-400 mt-1">Avant cette date, aucune commission ne rembourse l’avance.</p>
                     </div>
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Motif (facultatif)</label>
@@ -976,20 +984,13 @@ export default function DeleguesLocalitesPage() {
                         className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]">
                         <option value="integral">Intégral — retenir le maximum au prochain paiement</option>
                         <option value="partiel">Partiel — retenir un montant défini à chaque paiement</option>
-                        <option value="reporte">Reporté — ne retenir qu’à partir d’une date</option>
+                        <option value="reporte">Reporté — retenir intégralement à partir de la date choisie</option>
                       </select>
                     </div>
                     {formOctroi.planType === "partiel" && (
                       <div>
                         <label className="block text-xs text-gray-600 mb-1">Montant par paiement (FCFA) *</label>
                         <MoneyInput min="1" value={formOctroi.montantPartiel} onChange={value => setFormOctroi(f => ({ ...f, montantPartiel: value }))}
-                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]" />
-                      </div>
-                    )}
-                    {formOctroi.planType === "reporte" && (
-                      <div>
-                        <label className="block text-xs text-gray-600 mb-1">Date de reprise *</label>
-                        <input type="date" value={formOctroi.reportDate} onChange={e => setFormOctroi(f => ({ ...f, reportDate: e.target.value }))}
                           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a4731]" />
                       </div>
                     )}

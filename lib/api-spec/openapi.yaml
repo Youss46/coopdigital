@@ -7846,6 +7846,16 @@ components:
         compteTresorerieType:
           type: string
           enum: [caisse, mobile_marchand, banque]
+        planType:
+          type: string
+          enum: [integral, partiel, reporte]
+          default: integral
+        montantPartielFcfa:
+          type: integer
+        reportDate:
+          type: string
+          format: date
+          description: Première date à partir de laquelle la retenue est autorisée.
         deductionSource:
           type: string
           enum: [livraison, commission]
