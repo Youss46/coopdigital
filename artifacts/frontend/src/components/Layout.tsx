@@ -216,6 +216,8 @@ function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout:
   const estDelegue = utilisateur?.role === "delegue";
   const REGLEMENTS_ROLES = ["pca", "directeur", "comptable", "caissier", "delegue"];
   const peutVoirReglements = REGLEMENTS_ROLES.includes(utilisateur?.role ?? "");
+  const CHEQUES_ROLES = ["pca", "directeur", "comptable", "caissier", "auditeur"];
+  const peutVoirCheques = CHEQUES_ROLES.includes(utilisateur?.role ?? "");
   const { data: paiementsStats } = useGetPaiementsStats(undefined, {
     query: {
       queryKey: getGetPaiementsStatsQueryKey(),
@@ -225,6 +227,31 @@ function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout:
     },
   });
   const nbReglementsEnAttente = peutVoirReglements ? (paiementsStats?.en_attente?.count ?? 0) : 0;
+  const { data: chequesBadgeData } = useQuery({
+    queryKey: ["cheques-nav-badge"],
+    queryFn: async () => {
+      const token = localStorage.getItem("coop_token") ?? "";
+      const requestHeaders = { Authorization: `Bearer ${token}` };
+      const [emisResponse, recusResponse] = await Promise.all([
+        fetch(`${BASE}/api/cheques?statut=emis`, { headers: requestHeaders }),
+        fetch(`${BASE}/api/cheques-recus?statut=a_deposer`, { headers: requestHeaders }),
+      ]);
+      if (!emisResponse.ok || !recusResponse.ok) return { count: 0 };
+      const [emis, recus] = await Promise.all([
+        emisResponse.json() as Promise<unknown>,
+        recusResponse.json() as Promise<unknown>,
+      ]);
+      return {
+        count: (Array.isArray(emis) ? emis.length : 0) +
+          (Array.isArray(recus) ? recus.length : 0),
+      };
+    },
+    enabled: peutVoirCheques,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    retry: false,
+  });
+  const nbChequesEnAttente = peutVoirCheques ? (chequesBadgeData?.count ?? 0) : 0;
 
   return (
     <div className="flex flex-col h-full" style={{ backgroundColor: "#1a4731" }}>
@@ -255,7 +282,7 @@ function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout:
         {(navItems as NavItem[])
           .filter(({ roles, href }) => !roles || roles.includes(utilisateur?.role ?? ""))
           .filter(({ href }) => isFeatureLoading || features.find((feature) => feature.key === featureKeyForPath(href))?.mode !== "disabled")
-          .map(({ href, label, icon: Icon, showBadge: hasBadge, showAnomaliesBadge: hasAnomaliesBadge, showEudrAlerteBadge: hasEudrAlerteBadge, showMessagesBadge: hasMessagesBadge, showPendingOpsBadge: hasPendingOpsBadge, showReglementsBadge: hasReglementsBadge }) => {
+           .map(({ href, label, icon: Icon, showBadge: hasBadge, showAnomaliesBadge: hasAnomaliesBadge, showEudrAlerteBadge: hasEudrAlerteBadge, showMessagesBadge: hasMessagesBadge, showPendingOpsBadge: hasPendingOpsBadge, showReglementsBadge: hasReglementsBadge, showChequesBadge: hasChequesBadge }) => {
             const isActive = location === href || location.startsWith(href + "/");
             const badgeCount = hasAnomaliesBadge && showAnomaliesBadge ? nbCritiques
               : hasBadge && showBadge ? nbEnAttente
@@ -263,6 +290,7 @@ function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout:
               : hasMessagesBadge ? nbMessagesNonLus
               : hasPendingOpsBadge ? pendingCount
               : hasReglementsBadge ? nbReglementsEnAttente
+              : hasChequesBadge ? nbChequesEnAttente
               : 0;
             return (
               <Link
