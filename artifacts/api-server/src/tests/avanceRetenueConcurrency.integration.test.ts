@@ -1,6 +1,11 @@
 import { pool } from "@workspace/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { deduireAvancesMembreDelegue } from "../services/peseeSessionService.js";
+import {
+  addLigne,
+  createSession,
+  deduireAvancesMembreDelegue,
+  terminerSession,
+} from "../services/peseeSessionService.js";
 
 const enabled =
   process.env.RUN_POSTGRES_INTEGRATION === "1" &&
@@ -9,6 +14,7 @@ const enabled =
 describe.skipIf(!enabled)("retenues d'avance concurrentes sur PostgreSQL", () => {
   let client: any;
   let cooperativeId: number;
+  let campagneId: number;
   let membreId: number;
   let avanceId: number;
   const suffix = `${process.pid}_${Date.now()}`;
@@ -24,10 +30,23 @@ describe.skipIf(!enabled)("retenues d'avance concurrentes sur PostgreSQL", () =>
     );
     cooperativeId = cooperative.rows[0].id;
 
+    const campagne = await client.query(
+      `INSERT INTO campagnes
+         (cooperative_id, libelle, annee_debut, annee_fin,
+          date_ouverture, statut)
+       VALUES ($1, 'Campagne retenue session', 2026, 2027,
+               '2026-01-01', 'ouverte')
+       RETURNING id`,
+      [cooperativeId],
+    );
+    campagneId = campagne.rows[0].id;
+
     const member = await client.query(
       `INSERT INTO membres
-         (cooperative_id, nom, prenoms, telephone, superficie_ha, date_adhesion)
-       VALUES ($1, 'Producteur', 'Concurrent', $2, 1, CURRENT_DATE)
+         (cooperative_id, nom, prenoms, telephone, superficie_ha, date_adhesion,
+          categorie_membre, statut_membre)
+       VALUES ($1, 'Producteur', 'Concurrent', $2, 1, CURRENT_DATE,
+               'délégué de localités', 'actif')
        RETURNING id`,
       [cooperativeId, `+2250702${process.pid}`.slice(0, 14)],
     );
@@ -55,8 +74,17 @@ describe.skipIf(!enabled)("retenues d'avance concurrentes sur PostgreSQL", () =>
         `DELETE FROM remboursements_avances_membres WHERE avance_id = $1`,
         [avanceId],
       );
+      await client.query(`DELETE FROM paiements WHERE cooperative_id = $1`, [cooperativeId]);
+      await client.query(`DELETE FROM livraisons WHERE cooperative_id = $1`, [cooperativeId]);
+      await client.query(
+        `DELETE FROM lignes_pesee
+         WHERE session_id IN (SELECT id FROM sessions_pesee WHERE cooperative_id = $1)`,
+        [cooperativeId],
+      );
+      await client.query(`DELETE FROM sessions_pesee WHERE cooperative_id = $1`, [cooperativeId]);
       await client.query(`DELETE FROM avances WHERE id = $1`, [avanceId]);
       await client.query(`DELETE FROM membres WHERE id = $1`, [membreId]);
+      await client.query(`DELETE FROM campagnes WHERE id = $1`, [campagneId]);
       await client.query(`DELETE FROM cooperatives WHERE id = $1`, [cooperativeId]);
       await client.query("COMMIT");
     } catch (error) {
@@ -85,7 +113,7 @@ describe.skipIf(!enabled)("retenues d'avance concurrentes sur PostgreSQL", () =>
       ),
     ]);
 
-    expect(results.sort((a, b) => a - b)).toEqual([0, 80_000]);
+    expect(results.map((result) => result.montantDeduit).sort((a, b) => a - b)).toEqual([0, 80_000]);
 
     const avance = await client.query(
       `SELECT solde_restant_fcfa, montant_rembourse_fcfa, statut
@@ -102,5 +130,61 @@ describe.skipIf(!enabled)("retenues d'avance concurrentes sur PostgreSQL", () =>
       [avanceId],
     );
     expect(historiques.rows).toEqual([{ montant_fcfa: 80000 }]);
+  });
+
+  it("relie la retenue de session à la livraison créée", async () => {
+    await client.query("BEGIN");
+    try {
+      await client.query(
+        `DELETE FROM remboursements_avances_membres WHERE avance_id = $1`,
+        [avanceId],
+      );
+      await client.query(
+        `UPDATE avances
+            SET montant_rembourse_fcfa = 0,
+                solde_restant_fcfa = 80000,
+                statut = 'en_cours'
+          WHERE id = $1`,
+        [avanceId],
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    }
+
+    const session = await createSession(cooperativeId, {
+      membreId,
+      operation: "reception",
+      certificationCacao: "ORDINAIRE",
+    });
+    await addLigne(cooperativeId, session.id, {
+      nbSacs: 1,
+      poidsBrutKg: 80,
+      tareKg: 0,
+    });
+
+    const terminee = await terminerSession(cooperativeId, session.id);
+    expect(terminee.livraisonId).toBeTypeOf("number");
+
+    const history = await client.query(
+      `SELECT montant_fcfa, livraison_id
+         FROM remboursements_avances_membres
+        WHERE avance_id = $1`,
+      [avanceId],
+    );
+    expect(history.rows).toEqual([
+      { montant_fcfa: 80000, livraison_id: terminee.livraisonId },
+    ]);
+
+    const livraison = await client.query(
+      `SELECT avance_deduite_fcfa, montant_net_fcfa
+         FROM livraisons
+        WHERE id = $1`,
+      [terminee.livraisonId],
+    );
+    expect(livraison.rows).toEqual([
+      { avance_deduite_fcfa: 80000, montant_net_fcfa: 0 },
+    ]);
   });
 });

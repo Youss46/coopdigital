@@ -964,13 +964,18 @@ export function calculerRetenueAvanceLivraison(
  * Enregistre un remboursement dans remboursements_avances_membres pour chaque déduction.
  * Même pattern que deduireAvancesApresCommission pour les délégués terrain.
  */
+type DeductionAvanceResult = {
+  montantDeduit: number;
+  remboursementIds: number[];
+};
+
 export async function deduireAvancesMembreDelegue(
   membreId: number,
   plafondFcfa: number,
   sessionId: number,
   referencePesee: string,
   dateLivraison: string,
-): Promise<number> {
+): Promise<DeductionAvanceResult> {
   try {
     return await db.transaction(async (tx) => {
       // Le verrou est détenu jusqu'à la validation de la transaction, y
@@ -992,6 +997,7 @@ export async function deduireAvancesMembreDelegue(
 
       let restant = plafondFcfa;
       let totalDeduit = 0;
+      const remboursementIds: number[] = [];
       for (const avance of avances) {
         if (restant <= 0) break;
 
@@ -1010,21 +1016,25 @@ export async function deduireAvancesMembreDelegue(
           })
           .where(eq(avancesTable.id, avance.id));
 
-        await tx.insert(remboursementsAvancesMembresTable).values({
-          avanceId:    avance.id,
-          montantFcfa: retenue,
-          note:        `Retenue automatique — ${referencePesee}`,
-        });
+        const [remboursement] = await tx
+          .insert(remboursementsAvancesMembresTable)
+          .values({
+            avanceId:    avance.id,
+            montantFcfa: retenue,
+            note:        `Retenue automatique — ${referencePesee}`,
+          })
+          .returning({ id: remboursementsAvancesMembresTable.id });
+        if (remboursement) remboursementIds.push(remboursement.id);
 
         restant      -= retenue;
         totalDeduit  += retenue;
       }
-      return totalDeduit;
+      return { montantDeduit: totalDeduit, remboursementIds };
     });
   } catch (err) {
     // Non-fatal : log mais ne bloque pas la clôture de session
     logger.error({ err, membreId, sessionId }, "Erreur déduction avances membre délégué");
-    return 0;
+    return { montantDeduit: 0, remboursementIds: [] };
   }
 }
 
@@ -1203,6 +1213,7 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
         // réellement payable après charges. La commission de collecte est une
         // source de déduction distincte et ne doit pas réduire ce plafond.
         let avanceDeduiteFcfa = 0;
+        let remboursementAvanceIds: number[] = [];
         const valeurProduitPrevue = prixBordChampFcfa > 0
           ? Math.round(poidsKg * prixBordChampFcfa)
           : 0;
@@ -1215,13 +1226,15 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
             detail.numeroPesee,
             detail.anneeNumeroPesee ?? Number(String(detail.numeroSession).slice(4, 8)),
           ) ?? detail.numeroSession;
-          avanceDeduiteFcfa = await deduireAvancesMembreDelegue(
+          const deductionAvance = await deduireAvancesMembreDelegue(
             detail.membreId,
             plafondAvance,
             sessionId,
             referencePesee,
             dateStr,
           );
+          avanceDeduiteFcfa = deductionAvance.montantDeduit;
+          remboursementAvanceIds = deductionAvance.remboursementIds;
         }
 
         // ── Livraison officielle + paiement + écritures OHADA ─────────────────
@@ -1283,6 +1296,16 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
               .returning();
 
             if (livraison) {
+              if (remboursementAvanceIds.length > 0) {
+                await db
+                  .update(remboursementsAvancesMembresTable)
+                  .set({ livraisonId: livraison.id })
+                  .where(inArray(
+                    remboursementsAvancesMembresTable.id,
+                    remboursementAvanceIds,
+                  ));
+              }
+
               // Lier la session à la livraison
               await db
                 .update(sessionsPeseeTable)
