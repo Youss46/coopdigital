@@ -174,6 +174,7 @@ describe.skipIf(!enabled)(
     async function createAdvance(values: {
       amount: number;
       reportDate: string | null;
+      grantDate?: string;
       dueDate?: string;
       status?: "en_cours" | "en_retard";
     }): Promise<number> {
@@ -182,11 +183,12 @@ describe.skipIf(!enabled)(
            (membre_id, montant_octroye_fcfa, montant_rembourse_fcfa,
             solde_restant_fcfa, date_octroi, date_echeance, statut,
             plan_type, report_date, deduction_source)
-         VALUES ($1, $2, 0, $2, '2026-08-01', $3, $4, 'integral', $5, 'livraison')
+         VALUES ($1, $2, 0, $2, $3, $4, $5, 'integral', $6, 'livraison')
          RETURNING id`,
         [
           membreId,
           values.amount,
+          values.grantDate ?? "2026-08-01",
           values.dueDate ?? null,
           values.status ?? "en_cours",
           values.reportDate,
@@ -282,6 +284,71 @@ describe.skipIf(!enabled)(
       expect(history.rows[0].montant_fcfa).toBe(10_000);
       expect(history.rows[0].note).toBe("Déduction automatique sur livraison");
       expect(history.rows[0].livraison_id).toBe(body.livraison.id);
+    });
+
+    it("retient plusieurs avances dans l'ordre d'octroi sans dépasser le brut", async () => {
+      const ancienneAvanceId = await createAdvance({
+        amount: 7_000,
+        grantDate: "2026-08-01",
+        reportDate: "2026-08-01",
+      });
+      const nouvelleAvanceId = await createAdvance({
+        amount: 9_000,
+        grantDate: "2026-08-05",
+        reportDate: "2026-08-05",
+      });
+
+      const response = await postLivraison("2026-09-10");
+      expect(response.status).toBe(201);
+      const body = await response.json() as {
+        livraison: { id: number; avanceDeduiteFcfa: number; montantBrutFcfa: number; montantNetFcfa: number };
+      };
+
+      expect(body.livraison.montantBrutFcfa).toBe(10_000);
+      expect(body.livraison.avanceDeduiteFcfa).toBe(10_000);
+      expect(body.livraison.montantNetFcfa).toBe(0);
+
+      const advances = await client.query(
+        `SELECT id, solde_restant_fcfa, montant_rembourse_fcfa, statut
+           FROM avances
+          WHERE id IN ($1, $2)
+          ORDER BY date_octroi, id`,
+        [ancienneAvanceId, nouvelleAvanceId],
+      );
+      expect(advances.rows).toEqual([
+        {
+          id: ancienneAvanceId,
+          solde_restant_fcfa: 0,
+          montant_rembourse_fcfa: 7_000,
+          statut: "rembourse",
+        },
+        {
+          id: nouvelleAvanceId,
+          solde_restant_fcfa: 6_000,
+          montant_rembourse_fcfa: 3_000,
+          statut: "en_cours",
+        },
+      ]);
+
+      const history = await client.query(
+        `SELECT avance_id, montant_fcfa, livraison_id
+           FROM remboursements_avances_membres
+          WHERE avance_id IN ($1, $2)
+          ORDER BY id`,
+        [ancienneAvanceId, nouvelleAvanceId],
+      );
+      expect(history.rows).toEqual([
+        {
+          avance_id: ancienneAvanceId,
+          montant_fcfa: 7_000,
+          livraison_id: body.livraison.id,
+        },
+        {
+          avance_id: nouvelleAvanceId,
+          montant_fcfa: 3_000,
+          livraison_id: body.livraison.id,
+        },
+      ]);
     });
   },
 );
