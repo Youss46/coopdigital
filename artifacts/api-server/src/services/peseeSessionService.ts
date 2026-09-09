@@ -917,6 +917,48 @@ export async function deleteLigne(cooperativeId: number, sessionId: number, lign
 
 // ─── Déduction automatique des avances d'un membre-délégué ───────────────────
 /**
+ * Calcule la retenue d'une avance destinée à une livraison.
+ *
+ * `reportDate` est la date de début d'éligibilité, quel que soit le plan.
+ * `dateEcheance` n'intervient volontairement pas : une échéance dépassée ne
+ * crée pas de débit autonome, mais l'avance reste retenable sur une livraison
+ * réelle si sa date de début est atteinte.
+ */
+export function calculerRetenueAvanceLivraison(
+  avance: Pick<
+    typeof avancesTable.$inferSelect,
+    "planType" | "montantPartielFcfa" | "soldeRestantFcfa" | "reportDate"
+  >,
+  dateLivraison: string,
+  plafondRestantFcfa: number,
+): number {
+  if (plafondRestantFcfa <= 0 || avance.soldeRestantFcfa <= 0) return 0;
+
+  if (avance.reportDate && dateLivraison < String(avance.reportDate)) {
+    return 0;
+  }
+
+  const planType = avance.planType ?? "integral";
+  if (planType === "partiel" && avance.montantPartielFcfa) {
+    return Math.min(
+      avance.montantPartielFcfa,
+      avance.soldeRestantFcfa,
+      plafondRestantFcfa,
+    );
+  }
+
+  if (planType === "integral") {
+    return Math.min(avance.soldeRestantFcfa, plafondRestantFcfa);
+  }
+
+  if (planType === "reporte" && avance.reportDate) {
+    return Math.min(avance.soldeRestantFcfa, plafondRestantFcfa);
+  }
+
+  return 0;
+}
+
+/**
  * Itère toutes les avances en_cours / en_retard du membre-délégué (par dateOctroi ASC)
  * et déduit jusqu'au montant payable de la livraison après charges.
  * Enregistre un remboursement dans remboursements_avances_membres pour chaque déduction.
@@ -927,6 +969,7 @@ async function deduireAvancesMembreDelegue(
   plafondFcfa: number,
   sessionId: number,
   referencePesee: string,
+  dateLivraison: string,
 ): Promise<number> {
   try {
     const avances = await db
@@ -946,13 +989,7 @@ async function deduireAvancesMembreDelegue(
     for (const avance of avances) {
       if (restant <= 0) break;
 
-      // Respect du plan : si partiel, ne retenir que montantPartielFcfa ce cycle
-      const montantMaxCycle =
-        avance.planType === "partiel" && avance.montantPartielFcfa
-          ? avance.montantPartielFcfa
-          : avance.soldeRestantFcfa;
-
-      const retenue = Math.min(montantMaxCycle, avance.soldeRestantFcfa, restant);
+      const retenue = calculerRetenueAvanceLivraison(avance, dateLivraison, restant);
       if (retenue <= 0) continue;
 
       const nouveauSolde    = avance.soldeRestantFcfa - retenue;
@@ -1149,6 +1186,12 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
           autresChargesLibelle = bon?.autresChargesLibelle ?? null;
         }
 
+        const dateStr = updated?.dateFin
+          ? (updated.dateFin instanceof Date
+              ? updated.dateFin.toISOString().split("T")[0]!
+              : String(updated.dateFin).split("T")[0]!)
+          : new Date().toISOString().split("T")[0]!;
+
         // Une avance configurée « sur livraison » est plafonnée par le montant
         // réellement payable après charges. La commission de collecte est une
         // source de déduction distincte et ne doit pas réduire ce plafond.
@@ -1170,6 +1213,7 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
             plafondAvance,
             sessionId,
             referencePesee,
+            dateStr,
           );
         }
 
@@ -1183,12 +1227,6 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
               autresChargesFcfa: autresChargesDeduitesFcfa,
               avanceDeduiteFcfa,
             });
-            const dateStr = updated?.dateFin
-              ? (updated.dateFin instanceof Date
-                  ? updated.dateFin.toISOString().split("T")[0]!
-                  : String(updated.dateFin).split("T")[0]!)
-              : new Date().toISOString().split("T")[0]!;
-
             // Poids brut = somme des poidsBrutKg des lignes (avant déduction tare)
             const [lignesBrut] = await db
               .select({ total: sql<number>`coalesce(sum(${lignesPeseeTable.poidsBrutKg}::numeric), 0)::float` })
