@@ -47,7 +47,7 @@ router.get("/delegues-localites/avances", checkPermission("avances", "lire"), sc
 router.get("/delegues-localites/:membreId/avances", checkPermission("avances", "lire"), scopeDelegueLocalite, listAvances);
 router.post("/delegues-localites/:membreId/avances", checkPermission("avances", "octroyer"), scopeDelegueLocalite, createAvance);
 router.post("/delegues-localites/:membreId/avances/:id/rembourser", checkPermission("avances", "rembourser"), scopeDelegueLocalite, rembourserAvance);
-router.patch("/delegues-localites/:membreId/avances/:id/plan", checkPermission("avances", "rembourser"), scopeDelegueLocalite, updatePlanAvanceMembre);
+router.patch("/delegues-localites/:membreId/avances/:id/plan", checkPermission("avances", "modifier_plan"), scopeDelegueLocalite, updatePlanAvanceMembre);
 router.get("/delegues-localites/:membreId/avances/:id/remboursements", checkPermission("avances", "lire"), scopeDelegueLocalite, getRemboursementsAvanceMembre);
 
 // Par membre délégué

@@ -341,6 +341,7 @@ export default function DeleguesLocalitesPage() {
   const peutLireAvances = usePermission("avances", "lire");
   const peutOctroyer   = usePermission("avances", "octroyer");
   const peutRembourser = usePermission("avances", "rembourser");
+  const peutModifierPlan = usePermission("avances", "modifier_plan");
   const peutCreerBonReception = usePermission("bons_reception", "creer");
   const peutPayerCommissions = usePermission("commissions_delegues", "payer");
   const peutGererTaux = usePermission("commissions_delegues", "gerer_taux");
@@ -1055,8 +1056,7 @@ export default function DeleguesLocalitesPage() {
                                   <button onClick={() => setAvanceHistoriqueId(historiqueOuvert ? null : a.id)} className="text-xs font-medium text-gray-500 hover:text-[#1a4731]">
                                     <History size={13} className="inline mr-1" /> Historique
                                   </button>
-                                  {active && peutRembourser && (
-                                    <>
+                                  {active && peutModifierPlan && (
                                       <button
                                         onClick={() => {
                                           setAvancePlanEdition(a);
@@ -1067,13 +1067,22 @@ export default function DeleguesLocalitesPage() {
                                       >
                                         Plan
                                       </button>
+                                  )}
+                                  {active && peutRembourser && (
                                       <button
                                         onClick={() => { setRembourserAvanceId(rembourseEnCours ? null : a.id); setFormRembours({ montant: String(a.soldeRestantFcfa), note: "" }); setErrRembours(""); }}
                                         className="text-xs font-medium text-[#1a4731] hover:underline"
                                       >
                                         Rembourser
                                       </button>
-                                    </>
+                                  )}
+                                  {!active && peutModifierPlan && (
+                                    <span
+                                      title="Le plan ne peut plus être modifié après le remboursement complet de l’avance."
+                                      className="text-xs text-gray-400"
+                                    >
+                                      Plan verrouillé
+                                    </span>
                                   )}
                                 </div>
                               </td>
