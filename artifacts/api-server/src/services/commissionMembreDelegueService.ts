@@ -574,7 +574,7 @@ export async function payerCommissionsMembreDelegue(
     // Mettre à jour le solde de l'avance
     const nouveauSolde     = avance.soldeRestantFcfa - retenueAppliquee;
     const nouveauRembourse = avance.montantRembourse_fcfa + retenueAppliquee;
-    const nouveauStatut    = nouveauSolde === 0 ? "rembourse" : "en_cours";
+    const nouveauStatut    = nouveauSolde === 0 ? "rembourse" : avance.statut;
     await tx.update(avancesTable).set({
       montantRembourse_fcfa: nouveauRembourse,
       soldeRestantFcfa:      nouveauSolde,

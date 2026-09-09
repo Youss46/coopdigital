@@ -363,4 +363,88 @@ describe("appliquerRetenueAvanceSurCommissionDansTransaction", () => {
       note: "Retenue automatique — commission de délégué de localités",
     });
   });
+
+  it("laisse une avance intégrale inactive avant sa date de début de retenue", async () => {
+    const tx = {
+      execute: vi.fn().mockResolvedValue(undefined),
+      select: vi.fn()
+        .mockImplementationOnce(() => selectChain([
+          { id: 92, montantFcfa: "45000" },
+        ]))
+        .mockImplementationOnce(() => selectChain([
+          {
+            id: 4,
+            planType: "integral",
+            montantPartielFcfa: null,
+            soldeRestantFcfa: 200_000,
+            montantRembourse_fcfa: 0,
+            reportDate: "2026-09-10",
+            statut: "en_cours",
+          },
+        ])),
+      update: vi.fn().mockImplementation(() => updateChain()),
+      insert: vi.fn().mockImplementation(() => ({
+        values: vi.fn().mockResolvedValue(undefined),
+      })),
+    };
+
+    const result = await appliquerRetenueAvanceSurCommissionDansTransaction(
+      tx as never,
+      92,
+      17,
+      "2026-09-09",
+    );
+
+    expect(result).toEqual({
+      montantCommissionFcfa: 45_000,
+      retenueFcfa: 0,
+      montantNetFcfa: 45_000,
+    });
+    expect(tx.update).not.toHaveBeenCalled();
+    expect(tx.insert).not.toHaveBeenCalled();
+  });
+
+  it("rend une avance partielle éligible le jour du report et conserve un retard jusqu'au solde nul", async () => {
+    const tx = {
+      execute: vi.fn().mockResolvedValue(undefined),
+      select: vi.fn()
+        .mockImplementationOnce(() => selectChain([
+          { id: 92, montantFcfa: "45000" },
+        ]))
+        .mockImplementationOnce(() => selectChain([
+          {
+            id: 4,
+            planType: "partiel",
+            montantPartielFcfa: 60_000,
+            soldeRestantFcfa: 200_000,
+            montantRembourse_fcfa: 0,
+            reportDate: "2026-09-10",
+            dateEcheance: "2026-09-01",
+            statut: "en_retard",
+          },
+        ])),
+      update: vi.fn().mockImplementation(() => updateChain()),
+      insert: vi.fn().mockImplementation(() => ({
+        values: vi.fn().mockResolvedValue(undefined),
+      })),
+    };
+
+    const result = await appliquerRetenueAvanceSurCommissionDansTransaction(
+      tx as never,
+      92,
+      17,
+      "2026-09-10",
+    );
+
+    expect(result).toEqual({
+      montantCommissionFcfa: 45_000,
+      retenueFcfa: 45_000,
+      montantNetFcfa: 0,
+    });
+    expect(tx.update.mock.results[0]?.value.set).toHaveBeenCalledWith({
+      montantRembourse_fcfa: 45_000,
+      soldeRestantFcfa: 155_000,
+      statut: "en_retard",
+    });
+  });
 });

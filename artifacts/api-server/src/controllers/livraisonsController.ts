@@ -7,7 +7,7 @@ const agentUserAlias = alias(usersTable, "agent_user");
 // Alias pour la jointure peseur saisie physique (proxy délégué central)
 const peseurUserAlias = alias(usersTable, "peseur_user");
 import { creerChequeDepuisLivraison } from "../services/chequesService.js";
-import { eq, and, desc, notInArray, or, sql, gte, lte, isNull } from "drizzle-orm";
+import { eq, and, desc, notInArray, or, sql, gte, lte, isNull, inArray } from "drizzle-orm";
 import { CampagneFermeeError, assertCampagneOuverte } from "../lib/campagneGuard";
 import { checkLivraison, creerAnomalies } from "../services/anomalieService";
 import { CreateLivraisonBody } from "@workspace/api-zod";
@@ -240,7 +240,7 @@ export async function createLivraison(req: Request, res: Response): Promise<void
           .select().from(avancesTable)
           .where(and(
             eq(avancesTable.membreId, membreId),
-            eq(avancesTable.statut, "en_cours"),
+            inArray(avancesTable.statut, ["en_cours", "en_retard"] as const),
             // Une avance affectée à la commission ne doit jamais réduire
             // le net d'une livraison. Les anciennes lignes sans source
             // restent compatibles avec le comportement historique.
@@ -332,7 +332,7 @@ export async function createLivraison(req: Request, res: Response): Promise<void
         const nouveauSolde = av.soldeRestantFcfa - montant;
         const [updated] = await tx
           .update(avancesTable)
-          .set({ montantRembourse_fcfa: nouveauRembourse, soldeRestantFcfa: nouveauSolde, statut: nouveauSolde === 0 ? "rembourse" : "en_cours" })
+          .set({ montantRembourse_fcfa: nouveauRembourse, soldeRestantFcfa: nouveauSolde, statut: nouveauSolde === 0 ? "rembourse" : av.statut })
           .where(eq(avancesTable.id, av.id))
           .returning();
         if (!avanceMaj) avanceMaj = updated;
