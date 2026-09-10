@@ -782,23 +782,6 @@ async function deduireStockChargementDansTransaction(
   }
 }
 
-async function deduireStockChargement(
-  expeditionId: number,
-  cooperativeId: number,
-  userId: number,
-  numeroExpedition: string,
-): Promise<void> {
-  await db.transaction(async (tx: ComptabiliteTransaction) => {
-    await deduireStockChargementDansTransaction(
-      tx,
-      expeditionId,
-      cooperativeId,
-      userId,
-      numeroExpedition,
-    );
-  });
-}
-
 // ── Changement de statut ────────────────────────────────────────────────────
 
 const TRANSITIONS_VALIDES: Record<string, string[]> = {
@@ -867,6 +850,59 @@ export async function changerStatut(
       );
     }
 
+    if (nouveauStatut === "charge") {
+      // Le chargement, les sorties stock, le passage des lots en transit et
+      // l'écriture de transfert doivent réussir ensemble. Toute erreur
+      // déclenche le rollback de la transition et de son historique.
+      await deduireStockChargementDansTransaction(
+        tx,
+        expeditionId,
+        cooperativeId,
+        userId,
+        lockedExpedition.numeroExpedition,
+      );
+
+      const lotsChargement = await tx
+        .select({
+          lotId:      expeditionLotsTable.lotId,
+          nombreSacs: expeditionLotsTable.nombreSacs,
+        })
+        .from(expeditionLotsTable)
+        .where(eq(expeditionLotsTable.expeditionId, expeditionId));
+
+      const totalSacs = lotsChargement.reduce((sum, lot) => sum + (lot.nombreSacs ?? 0), 0);
+      if (totalSacs > 0) {
+        updateValues.nombreSacs = totalSacs;
+      }
+
+      const lotIds = lotsChargement
+        .map((lot) => lot.lotId)
+        .filter((id): id is number => id !== null);
+      if (lotIds.length > 0) {
+        await tx
+          .update(lotsTable)
+          .set({ statut: "transit" })
+          .where(inArray(lotsTable.id, lotIds));
+      }
+
+      if (lockedExpedition.poidsChargeKg) {
+        const prixKg = await getPrixUnitaireExpedition(tx, expeditionId);
+        if (prixKg > 0) {
+          const montant = Math.round(parseFloat(String(lockedExpedition.poidsChargeKg)) * prixKg);
+          await proposerEcrituresDansTransaction(tx, cooperativeId, [{
+            source:       "stock",
+            sourceId:     expeditionId,
+            libelle:      `Départ ${lockedExpedition.numeroExpedition} vers Port ${lockedExpedition.port}`,
+            compteDebit:  "381",
+            compteCredit: "311",
+            montantFcfa:  montant,
+            date:         new Date().toISOString().split("T")[0]!,
+            numeroPiece:  lockedExpedition.numeroExpedition,
+          }]);
+        }
+      }
+    }
+
     await tx.update(expeditionsTable).set(updateValues).where(eq(expeditionsTable.id, expeditionId));
 
     await tx.insert(expeditionHistoriqueTable).values({
@@ -880,71 +916,6 @@ export async function changerStatut(
 
     return lockedExpedition;
   });
-
-  // Déduction stock + écriture comptable au chargement (en_preparation → charge)
-  if (nouveauStatut === "charge") {
-    // 1. Mouvement de sortie dans les entrepôts sources (non-bloquant)
-    try {
-      await deduireStockChargement(expeditionId, cooperativeId, userId, exp.numeroExpedition);
-    } catch (err) {
-      logger.error({ err }, "Erreur déduction stock chargement");
-    }
-
-    // 2. Mettre à jour expeditionsTable.nombreSacs avec le total des lots rattachés
-    //    et passer le statut des lots en "transit"
-    try {
-      const lotsChargement = await db
-        .select({
-          lotId:      expeditionLotsTable.lotId,
-          nombreSacs: expeditionLotsTable.nombreSacs,
-        })
-        .from(expeditionLotsTable)
-        .where(eq(expeditionLotsTable.expeditionId, expeditionId));
-
-      const totalSacs = lotsChargement.reduce((sum, l) => sum + (l.nombreSacs ?? 0), 0);
-      if (totalSacs > 0) {
-        await db
-          .update(expeditionsTable)
-          .set({ nombreSacs: totalSacs })
-          .where(eq(expeditionsTable.id, expeditionId));
-      }
-
-      const lotIds = lotsChargement
-        .map(l => l.lotId)
-        .filter((id): id is number => id !== null);
-      if (lotIds.length > 0) {
-        await db
-          .update(lotsTable)
-          .set({ statut: "transit" })
-          .where(inArray(lotsTable.id, lotIds));
-      }
-    } catch (err) {
-      logger.error({ err }, "Erreur mise à jour sacs/statut lots au chargement");
-    }
-
-    // 3. Écriture comptable si prix unitaire connu (vente exportateur déjà saisie)
-    if (exp.poidsChargeKg) {
-      const dateStr = new Date().toISOString().split("T")[0]!;
-      const prixKg = await getPrixUnitaireExpedition(db, expeditionId);
-      if (prixKg > 0) {
-        const montant = Math.round(parseFloat(String(exp.poidsChargeKg)) * prixKg);
-        try {
-          await proposerEcriture(cooperativeId, {
-            source:       "stock",
-            sourceId:     expeditionId,
-            libelle:      `Départ ${exp.numeroExpedition} vers Port ${exp.port}`,
-            compteDebit:  "381",
-            compteCredit: "311",
-            montantFcfa:  montant,
-            date:         dateStr,
-            numeroPiece:  exp.numeroExpedition,
-          });
-        } catch (err) {
-          logger.error({ err }, "Erreur écriture comptable chargement");
-        }
-      }
-    }
-  }
 
   // Une réception passée en litige peut être résolue ultérieurement. Si des
   // frais de transport avaient été saisis à la réception, leur dette est

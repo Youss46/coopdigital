@@ -505,6 +505,161 @@ describe.skipIf(!enabled)(
       expect(accounting.rows[0].count).toBe(1);
     });
 
+    it("annule le chargement, les sorties et l'historique si l'écriture comptable échoue", async () => {
+      await setControleChargementObligatoire(false);
+
+      const id = await createTransitionExpedition(1000);
+      const expedition = await client.query(
+        `SELECT numero_expedition FROM expeditions WHERE id = $1`,
+        [id],
+      );
+      const numeroExpedition = expedition.rows[0].numero_expedition;
+      const entrepotA = await client.query(
+        `INSERT INTO entrepots
+          (cooperative_id, nom, ville, capacite_kg)
+         VALUES ($1, $2, 'Test', 5000)
+         RETURNING id`,
+        [cooperativeId, `Entrepôt atomique A ${id}`],
+      );
+      const entrepotB = await client.query(
+        `INSERT INTO entrepots
+          (cooperative_id, nom, ville, capacite_kg)
+         VALUES ($1, $2, 'Test', 5000)
+         RETURNING id`,
+        [cooperativeId, `Entrepôt atomique B ${id}`],
+      );
+      const lotA = await client.query(
+        `INSERT INTO lots
+          (cooperative_id, campagne_id, poids_total_kg, entrepot, nombre_sacs)
+         VALUES ($1, $2, 600, $3, 12)
+         RETURNING id`,
+        [cooperativeId, campaignId, `Entrepôt atomique A ${id}`],
+      );
+      const lotB = await client.query(
+        `INSERT INTO lots
+          (cooperative_id, campagne_id, poids_total_kg, entrepot, nombre_sacs)
+         VALUES ($1, $2, 400, $3, 8)
+         RETURNING id`,
+        [cooperativeId, campaignId, `Entrepôt atomique B ${id}`],
+      );
+      await client.query(
+        `INSERT INTO expedition_lots
+          (expedition_id, lot_id, poids_kg, nombre_sacs)
+         VALUES ($1, $2, 600, 12), ($1, $3, 400, 8)`,
+        [id, lotA.rows[0].id, lotB.rows[0].id],
+      );
+      const exportateur = await client.query(
+        `INSERT INTO exportateurs
+          (cooperative_id, nom)
+         VALUES ($1, $2)
+         RETURNING id`,
+        [cooperativeId, `Exportateur atomique ${id}`],
+      );
+      const vente = await client.query(
+        `INSERT INTO ventes_exportateurs
+          (exportateur_id, lot_id, expedition_id, campagne_id,
+           poids_kg, prix_unitaire_fcfa, montant_total_fcfa,
+           date_vente, solde_du_fcfa)
+         VALUES ($1, $2, $3, $4, 600, 2000000000, 2000000000,
+                 CURRENT_DATE, 2000000000)
+         RETURNING id`,
+        [exportateur.rows[0].id, lotA.rows[0].id, id, campaignId],
+      );
+      await client.query(
+        `UPDATE config_comptable
+            SET auto_stocks = true
+          WHERE cooperative_id = $1`,
+        [cooperativeId],
+      );
+
+      // Le montant calculé dépasse numeric(14,2). L'erreur survient après
+      // les sorties stock et le passage des lots en transit dans la transaction.
+      await expect(
+        changerStatut(cooperativeId, id, testUserId, "charge"),
+      ).rejects.toThrow();
+
+      const rollback = await client.query(
+        `SELECT
+           (SELECT statut FROM expeditions WHERE id = $1) AS statut,
+           (SELECT nombre_sacs FROM expeditions WHERE id = $1) AS nombre_sacs,
+           (SELECT count(*)::int
+              FROM expedition_historique
+             WHERE expedition_id = $1
+               AND statut_nouveau = 'charge') AS historiques,
+           (SELECT count(*)::int
+              FROM mouvements_stock
+             WHERE motif = $2) AS sorties,
+           (SELECT count(*)::int
+              FROM lots
+             WHERE id IN ($3, $4) AND statut = 'transit') AS lots_transit,
+           (SELECT count(*)::int
+              FROM ecritures_comptables
+             WHERE cooperative_id = $5 AND source_id = $1) AS ecritures`,
+        [
+          id,
+          `Chargement expédition ${numeroExpedition}`,
+          lotA.rows[0].id,
+          lotB.rows[0].id,
+          cooperativeId,
+        ],
+      );
+      expect(rollback.rows[0]).toEqual({
+        statut: "en_preparation",
+        nombre_sacs: null,
+        historiques: 0,
+        sorties: 0,
+        lots_transit: 0,
+        ecritures: 0,
+      });
+
+      await client.query(
+        `UPDATE ventes_exportateurs
+            SET prix_unitaire_fcfa = 500,
+                montant_total_fcfa = 300000,
+                solde_du_fcfa = 300000
+          WHERE id = $1`,
+        [vente.rows[0].id],
+      );
+
+      await expect(
+        changerStatut(cooperativeId, id, testUserId, "charge"),
+      ).resolves.toMatchObject({ ok: true, statut: "charge" });
+
+      const success = await client.query(
+        `SELECT
+           (SELECT statut FROM expeditions WHERE id = $1) AS statut,
+           (SELECT nombre_sacs FROM expeditions WHERE id = $1) AS nombre_sacs,
+           (SELECT count(*)::int
+              FROM expedition_historique
+             WHERE expedition_id = $1
+               AND statut_nouveau = 'charge') AS historiques,
+           (SELECT count(*)::int
+              FROM mouvements_stock
+             WHERE motif = $2) AS sorties,
+           (SELECT count(*)::int
+              FROM lots
+             WHERE id IN ($3, $4) AND statut = 'transit') AS lots_transit,
+           (SELECT count(*)::int
+              FROM ecritures_comptables
+             WHERE cooperative_id = $5 AND source_id = $1) AS ecritures`,
+        [
+          id,
+          `Chargement expédition ${numeroExpedition}`,
+          lotA.rows[0].id,
+          lotB.rows[0].id,
+          cooperativeId,
+        ],
+      );
+      expect(success.rows[0]).toEqual({
+        statut: "charge",
+        nombre_sacs: 20,
+        historiques: 1,
+        sorties: 2,
+        lots_transit: 2,
+        ecritures: 1,
+      });
+    });
+
     it("répare une sortie manquante à la réception et normalise le nom de l'entrepôt", async () => {
       await setControleChargementObligatoire(false);
 
