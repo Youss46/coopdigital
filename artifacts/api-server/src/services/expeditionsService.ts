@@ -681,6 +681,12 @@ export interface CreateExpeditionInput {
   certificatPhytoDateExpiration?: string;
   certificatPhytoOrganisme?: string;
   documents?: unknown[];
+  /**
+   * Lots sélectionnés depuis le formulaire de création.
+   * Ils sont rattachés dans la même transaction que l'expédition afin qu'une
+   * expédition ne puisse pas être créée avec une sélection partiellement perdue.
+   */
+  lotIds?: number[];
   lots?: Array<{
     membreId?: number;
     livraisonId?: number;
@@ -781,7 +787,44 @@ export async function createExpedition(cooperativeId: number, userId: number, in
       const [exp] = await tx.insert(expeditionsTable).values({ numeroExpedition: numero, ...values }).returning();
       if (!exp) throw new Error("Échec création expédition");
 
-      if (input.lots && input.lots.length > 0) {
+      if (input.lotIds && input.lotIds.length > 0) {
+        const requestedLotIds = [...new Set(input.lotIds)]
+          .filter((lotId) => Number.isInteger(lotId) && lotId > 0);
+        if (requestedLotIds.length !== input.lotIds.length) {
+          throw new Error("La sélection des lots est invalide");
+        }
+
+        const selectedLots = await tx
+          .select({
+            id: lotsTable.id,
+            poidsTotalKg: lotsTable.poidsTotalKg,
+            nombreSacs: lotsTable.nombreSacs,
+          })
+          .from(lotsTable)
+          .where(and(
+            eq(lotsTable.cooperativeId, cooperativeId),
+            inArray(lotsTable.id, requestedLotIds),
+            inArray(lotsTable.statut, ["en_stock", "vendu"]),
+          ));
+
+        if (selectedLots.length !== requestedLotIds.length) {
+          throw new Error("Un ou plusieurs lots ne sont plus disponibles");
+        }
+
+        const lotsById = new Map(selectedLots.map((lot) => [lot.id, lot]));
+        await tx.insert(expeditionLotsTable).values(
+          requestedLotIds.map((lotId) => {
+            const lot = lotsById.get(lotId);
+            if (!lot) throw new Error("Lot sélectionné introuvable");
+            return {
+              expeditionId: exp.id,
+              lotId: lot.id,
+              poidsKg: lot.poidsTotalKg,
+              nombreSacs: lot.nombreSacs ?? null,
+            };
+          }),
+        );
+      } else if (input.lots && input.lots.length > 0) {
         await tx.insert(expeditionLotsTable).values(
           input.lots.map(l => ({
             expeditionId:    exp.id,
@@ -866,7 +909,7 @@ async function getPrixUnitaireExpedition(
 // ── Déduction stock lors du chargement ──────────────────────────────────────
 // Appelé lors de la transition en_preparation → charge.
 // Pour chaque lot attaché à l'expédition, crée un mouvement de sortie dans
-// l'entrepôt source du lot. Non-bloquant : les erreurs sont loguées seulement.
+// l'entrepôt source du lot. Toute erreur bloque la transition et annule ses effets.
 
 async function deduireStockChargementDansTransaction(
   tx: ComptabiliteTransaction,

@@ -7,7 +7,11 @@ import {
   terminerSession,
   SessionExpeditionExistanteError,
 } from "../services/peseeSessionService.js";
-import { changerStatut, confirmerReception } from "../services/expeditionsService.js";
+import {
+  changerStatut,
+  confirmerReception,
+  createExpedition,
+} from "../services/expeditionsService.js";
 
 const enabled =
   process.env.RUN_POSTGRES_INTEGRATION === "1" &&
@@ -1426,6 +1430,59 @@ describe.skipIf(!enabled)(
         [cooperativeId, concurrentExpeditionId],
       );
       expect(persisted.rows[0].count).toBe(1);
+    });
+
+    it("rattache les lots sélectionnés à la création et débite le stock au chargement", async () => {
+      const suffix = `${process.pid}-${Date.now()}`;
+      const entrepot = await client.query(
+        `INSERT INTO entrepots
+          (cooperative_id, nom, ville, capacite_kg)
+         VALUES ($1, $2, 'Test', 5000)
+         RETURNING id`,
+        [cooperativeId, `Entrepôt création ${suffix}`],
+      );
+      const lot = await client.query(
+        `INSERT INTO lots
+          (cooperative_id, campagne_id, statut, poids_total_kg, entrepot, nombre_sacs)
+         VALUES ($1, $2, 'en_stock', 750, $3, 15)
+         RETURNING id`,
+        [cooperativeId, campaignId, `Entrepôt création ${suffix}`],
+      );
+
+      await setControleChargementObligatoire(false);
+      const expedition = await createExpedition(cooperativeId, testUserId, {
+        campagneId: campaignId,
+        typeVehicule: "location",
+        immatriculation: "TEST-EXP",
+        nomChauffeur: "Chauffeur test",
+        dateDepart: "2026-09-10",
+        poidsChargeKg: 750,
+        nombreSacs: 15,
+        numeroLots: "LOT-TEST",
+        port: "San Pedro",
+        lotIds: [lot.rows[0].id],
+      });
+
+      const rattachement = await client.query(
+        `SELECT lot_id, poids_kg, nombre_sacs
+           FROM expedition_lots
+          WHERE expedition_id = $1`,
+        [expedition.id],
+      );
+      expect(rattachement.rows).toEqual([
+        { lot_id: lot.rows[0].id, poids_kg: "750.00", nombre_sacs: 15 },
+      ]);
+
+      await changerStatut(cooperativeId, expedition.id, testUserId, "charge");
+
+      const sortie = await client.query(
+        `SELECT count(*)::int AS count, coalesce(sum(poids_kg), 0)::numeric AS poids
+           FROM mouvements_stock
+          WHERE motif = $1`,
+        [`Chargement expédition ${expedition.numeroExpedition}`],
+      );
+      expect(sortie.rows[0].count).toBe(1);
+      expect(Number(sortie.rows[0].poids)).toBe(750);
     });
   },
 );

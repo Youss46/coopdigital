@@ -186,15 +186,7 @@ export default function NouvelleExpeditionPage() {
 
   const mutation = useMutation({
     mutationFn: (body: unknown) => apiPost<{ id: number; numeroExpedition: string }>("/api/expeditions", token, body),
-    onSuccess: async (exp) => {
-      // Attacher les lots sélectionnés
-      if (selectedLotIds.size > 0) {
-        await Promise.allSettled(
-          Array.from(selectedLotIds).map(lotId =>
-            apiPost(`/api/expeditions/${exp.id}/lots`, token, { lotId })
-          )
-        );
-      }
+    onSuccess: (exp) => {
       toast({ title: "Expédition créée", description: exp.numeroExpedition });
       navigate("/expeditions");
     },
@@ -245,6 +237,7 @@ export default function NouvelleExpeditionPage() {
       poidsChargeKg:  parseFloat(poidsCharge),
       nombreSacs:     nombreSacsInt,
       numeroLots:     numeroLots || undefined,
+       lotIds:         Array.from(selectedLotIds),
       port: portFinal,
       entrepotDestination: entrepotDestination || undefined,
       exportateurId:  !isLibre && exportateurId ? parseInt(exportateurId, 10) : undefined,
