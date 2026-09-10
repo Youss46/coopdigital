@@ -8485,6 +8485,7 @@ components:
           enum: [en_preparation, charge, en_transit, arrive_port, receptionne, litige]
         dateChangement:
           type: string
+          format: date-time
         notes:
           type: string
           nullable: true

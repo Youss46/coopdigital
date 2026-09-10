@@ -827,7 +827,7 @@ export const GetLotTracabiliteResponse = zod.object({
   "expeditionHistorique": zod.array(zod.object({
   "statutPrecedent": zod.string().nullish(),
   "statutNouveau": zod.enum(['en_preparation', 'charge', 'en_transit', 'arrive_port', 'receptionne', 'litige']),
-  "dateChangement": zod.string(),
+  "dateChangement": zod.coerce.date(),
   "notes": zod.string().nullish(),
   "faitPar": zod.number().nullable(),
   "faitParNom": zod.string().nullable(),

@@ -233,6 +233,10 @@ describe.skipIf(!enabled)(
           },
         ],
       });
+      const historique = (response.body as {
+        expeditionHistorique: Array<{ dateChangement: string | Date }>;
+      }).expeditionHistorique;
+      expect(new Date(historique[0]!.dateChangement).toISOString()).toBe("2026-02-10T09:00:00.000Z");
     });
 
     it("conserve des statuts d'expédition nuls pour un lot sans expédition", async () => {

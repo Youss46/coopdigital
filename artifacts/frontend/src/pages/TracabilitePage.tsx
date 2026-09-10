@@ -50,6 +50,16 @@ function formaterDate(d: string) {
     year: "numeric",
   });
 }
+export function formaterDateHeure(d: string) {
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(new Date(d));
+}
 function formaterPoids(kg: string | number) {
   const v = parseFloat(String(kg));
   return v >= 1000 ? `${(v / 1000).toFixed(2)} T` : `${v.toFixed(1)} kg`;
@@ -629,7 +639,9 @@ function DetailModal({
                                 <p className="text-sm font-medium text-gray-800">
                                   {precedent ? `${precedent} → ${nouveau}` : nouveau}
                                 </p>
-                                <p className="text-xs text-gray-400">{formaterDate(etape.dateChangement)}</p>
+                                <p className="text-xs text-gray-400">
+                                  Validé le {formaterDateHeure(etape.dateChangement)}
+                                </p>
                                 <p className="text-xs text-gray-500 mt-0.5">
                                   Validé par : {auteur || "Système"}
                                 </p>
