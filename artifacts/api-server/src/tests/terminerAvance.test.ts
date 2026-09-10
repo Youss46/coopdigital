@@ -48,16 +48,19 @@ function request(body: unknown = { raison: "Décision du comité" }) {
   } as unknown as Request;
 }
 
-function queryChain<T>(rows: T[]) {
+function queryChain<T>(rows: T[], resolveAtWhere = false) {
   const chain: Record<string, unknown> = {};
-  for (const method of ["from", "innerJoin", "where", "for"]) chain[method] = vi.fn(() => chain);
+  for (const method of ["from", "innerJoin", "for"]) chain[method] = vi.fn(() => chain);
+  chain.where = resolveAtWhere
+    ? vi.fn().mockResolvedValue(rows)
+    : vi.fn(() => chain);
   chain.limit = vi.fn().mockResolvedValue(rows);
   return chain;
 }
 
 function setup(avance: Record<string, unknown>, repayments: unknown[] = []) {
   const advanceSelect = queryChain([{ avance, categorie: null }]);
-  const historySelect = queryChain(repayments);
+  const historySelect = queryChain(repayments, true);
   const set = vi.fn().mockReturnValue({
     where: vi.fn().mockReturnValue({ returning: vi.fn().mockResolvedValue([{ ...avance, soldeRestantFcfa: 0 }]) }),
   });
@@ -112,7 +115,11 @@ describe("terminaison des avances membres", () => {
     expect(wrongAction.status).toHaveBeenCalledWith(400);
     expect(wrongAction.json).toHaveBeenCalledWith(expect.objectContaining({ erreur: expect.stringContaining("partiellement") }));
 
-    const remboursement = { id: 1 };
+    const remboursement = {
+      id: 1,
+      montantFcfa: 4_000,
+      note: "Remboursement manuel",
+    };
     setup(untouched(), [remboursement]);
     const res = response();
     await annulerAvance(request(), res);
@@ -124,5 +131,47 @@ describe("terminaison des avances membres", () => {
     await cloturerSoldeAvance(request(), terminal);
     expect(terminal.status).toHaveBeenCalledWith(400);
     expect(terminal.json).toHaveBeenCalledWith(expect.objectContaining({ erreur: expect.stringContaining("terminée") }));
+  });
+
+  it("ignore une ancienne retenue automatique déjà annulée", async () => {
+    const avance = untouched();
+    const { set } = setup(avance, [{
+      id: 1,
+      montantFcfa: 0,
+      note: "Déduction annulée — 10 000 FCFA — Report négocié",
+    }]);
+    const res = response();
+
+    await annulerAvance(request(), res);
+
+    expect(set).toHaveBeenCalledWith(expect.objectContaining({
+      statut: "annulee",
+      soldeRestantFcfa: 0,
+      montantAbandonneFcfa: 10_000,
+    }));
+    expect(res.json).toHaveBeenCalled();
+  });
+
+  it("refuse encore l'annulation si une retenue active suit une ancienne retenue annulée", async () => {
+    setup(untouched(), [
+      {
+        id: 1,
+        montantFcfa: 0,
+        note: "Déduction annulée — 10 000 FCFA — Report négocié",
+      },
+      {
+        id: 2,
+        montantFcfa: 2_000,
+        note: "Retenue automatique — PES-S-12",
+      },
+    ]);
+    const res = response();
+
+    await annulerAvance(request(), res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      erreur: expect.stringContaining("remboursement"),
+    }));
   });
 });

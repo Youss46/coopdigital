@@ -726,12 +726,19 @@ export async function terminerAvance(req: Request, res: Response, forcedAction?:
       if (statut === "annulee" || statut === "cloturee") throw new Error("Cette avance est déjà terminée");
 
       const remboursements = await tx
-        .select({ id: remboursementsAvancesMembresTable.id })
+        .select({
+          id: remboursementsAvancesMembresTable.id,
+          montantFcfa: remboursementsAvancesMembresTable.montantFcfa,
+          note: remboursementsAvancesMembresTable.note,
+        })
         .from(remboursementsAvancesMembresTable)
-        .where(eq(remboursementsAvancesMembresTable.avanceId, id))
-        .limit(1);
+        .where(eq(remboursementsAvancesMembresTable.avanceId, id));
       if (action === "annuler") {
-        if (avance.avance.montantRembourse_fcfa !== 0 || remboursements.length > 0) {
+        const remboursementsActifs = remboursements.filter((remboursement) =>
+          remboursement.montantFcfa > 0
+          && !String(remboursement.note ?? "").startsWith("Déduction annulée —"),
+        );
+        if (avance.avance.montantRembourse_fcfa !== 0 || remboursementsActifs.length > 0) {
           throw new Error("Une avance ayant fait l'objet d'un remboursement ne peut pas être annulée");
         }
       } else if (avance.avance.montantRembourse_fcfa <= 0 || avance.avance.soldeRestantFcfa <= 0) {
