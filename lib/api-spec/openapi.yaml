@@ -8475,7 +8475,7 @@ components:
 
     ExpeditionHistoriqueLot:
       type: object
-      required: [statutNouveau, dateChangement]
+      required: [statutNouveau, dateChangement, faitPar, faitParNom, faitParPrenoms]
       properties:
         statutPrecedent:
           type: string
@@ -8486,6 +8486,15 @@ components:
         dateChangement:
           type: string
         notes:
+          type: string
+          nullable: true
+        faitPar:
+          type: integer
+          nullable: true
+        faitParNom:
+          type: string
+          nullable: true
+        faitParPrenoms:
           type: string
           nullable: true
 

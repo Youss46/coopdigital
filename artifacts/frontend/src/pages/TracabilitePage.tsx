@@ -618,6 +618,10 @@ function DetailModal({
                             ? EXPEDITION_STATUT_LABELS[etape.statutPrecedent] ?? etape.statutPrecedent
                             : null;
                           const nouveau = EXPEDITION_STATUT_LABELS[etape.statutNouveau] ?? etape.statutNouveau;
+                          const auteur = [etape.faitParPrenoms, etape.faitParNom]
+                            .map((nom) => nom?.trim())
+                            .filter(Boolean)
+                            .join(" ");
                           return (
                             <div key={`${etape.dateChangement}-${index}`} className="relative flex items-start gap-3">
                               <div className="absolute -left-4 w-3.5 h-3.5 rounded-full bg-white border-2 border-orange-500 flex-shrink-0 mt-0.5" />
@@ -626,6 +630,9 @@ function DetailModal({
                                   {precedent ? `${precedent} → ${nouveau}` : nouveau}
                                 </p>
                                 <p className="text-xs text-gray-400">{formaterDate(etape.dateChangement)}</p>
+                                <p className="text-xs text-gray-500 mt-0.5">
+                                  Validé par : {auteur || "Système"}
+                                </p>
                                 {etape.notes && (
                                   <p className="text-xs text-gray-500 mt-0.5">{etape.notes}</p>
                                 )}

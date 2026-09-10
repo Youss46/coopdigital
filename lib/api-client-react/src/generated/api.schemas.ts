@@ -1492,6 +1492,9 @@ export interface ExpeditionHistoriqueLot {
   statutNouveau: ExpeditionHistoriqueLotStatutNouveau;
   dateChangement: string;
   notes?: string | null;
+  faitPar: number | null;
+  faitParNom: string | null;
+  faitParPrenoms: string | null;
 }
 
 export type VenteDetailStatut = typeof VenteDetailStatut[keyof typeof VenteDetailStatut];

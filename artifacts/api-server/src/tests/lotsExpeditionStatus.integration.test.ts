@@ -35,6 +35,7 @@ describe.skipIf(!enabled)(
   () => {
     let client: any;
     let cooperativeId: number;
+    let actorUserId: number;
     let lotWithExpeditionId: number;
     let lotWithoutExpeditionId: number;
     let oldExpeditionId: number;
@@ -51,6 +52,15 @@ describe.skipIf(!enabled)(
         [`Statut expédition ${suffix}`],
       );
       cooperativeId = cooperative.rows[0].id;
+
+      const actor = await client.query(
+        `INSERT INTO users
+          (cooperative_id, nom, prenoms, email, password_hash, role)
+         VALUES ($1, 'Kouassi', 'Awa', $2, 'integration-test-hash', 'magasinier')
+         RETURNING id`,
+        [cooperativeId, `historique-expedition-${suffix}@example.test`],
+      );
+      actorUserId = actor.rows[0].id;
 
       const lotWithExpedition = await client.query(
         `INSERT INTO lots
@@ -103,6 +113,13 @@ describe.skipIf(!enabled)(
           ($1, 'charge', 'receptionne', '2026-02-10T11:00:00Z', 'Réception confirmée au port')`,
         [latestExpeditionId],
       );
+      await client.query(
+        `UPDATE expedition_historique
+            SET fait_par = $2
+          WHERE expedition_id = $1
+            AND statut_nouveau = 'charge'`,
+        [latestExpeditionId, actorUserId],
+      );
     });
 
     afterAll(async () => {
@@ -128,6 +145,11 @@ describe.skipIf(!enabled)(
           `DELETE FROM lots
             WHERE id IN ($1, $2)`,
           [lotWithExpeditionId, lotWithoutExpeditionId],
+        );
+        await client.query(
+          `DELETE FROM users
+            WHERE id = $1`,
+          [actorUserId],
         );
         await client.query(
           `DELETE FROM cooperatives
@@ -193,11 +215,20 @@ describe.skipIf(!enabled)(
           expeditionNumero: expect.stringContaining("EXP-LATEST-"),
         },
         expeditionHistorique: [
-          { statutPrecedent: null, statutNouveau: "en_preparation" },
-          { statutPrecedent: "en_preparation", statutNouveau: "charge" },
+          { statutPrecedent: null, statutNouveau: "en_preparation", faitPar: null },
+          {
+            statutPrecedent: "en_preparation",
+            statutNouveau: "charge",
+            faitPar: actorUserId,
+            faitParNom: "Kouassi",
+            faitParPrenoms: "Awa",
+          },
           {
             statutPrecedent: "charge",
             statutNouveau: "receptionne",
+            faitPar: null,
+            faitParNom: null,
+            faitParPrenoms: null,
             notes: "Réception confirmée au port",
           },
         ],

@@ -9,6 +9,7 @@ import {
   fournisseursTable,
   ventesExportateursTable,
   exportateursTable,
+  usersTable,
   parcellesTable,
   entrepotsTable,
   expeditionsTable,
@@ -722,8 +723,18 @@ export async function getLotTracabilite(req: Request, res: Response): Promise<vo
             statutNouveau: expeditionHistoriqueTable.statutNouveau,
             dateChangement: expeditionHistoriqueTable.dateChangement,
             notes: expeditionHistoriqueTable.notes,
+            faitPar: expeditionHistoriqueTable.faitPar,
+            faitParNom: usersTable.nom,
+            faitParPrenoms: usersTable.prenoms,
           })
           .from(expeditionHistoriqueTable)
+          .leftJoin(
+            usersTable,
+            and(
+              eq(usersTable.id, expeditionHistoriqueTable.faitPar),
+              eq(usersTable.cooperativeId, cooperativeId),
+            ),
+          )
           .where(eq(expeditionHistoriqueTable.expeditionId, derniereExpedition.id))
           .orderBy(expeditionHistoriqueTable.dateChangement, expeditionHistoriqueTable.id)
       : [];
