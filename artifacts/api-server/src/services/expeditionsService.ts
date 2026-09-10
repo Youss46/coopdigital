@@ -1,7 +1,7 @@
 import { db, expeditionsTable, expeditionLotsTable, expeditionHistoriqueTable, campagnesTable, membresTable, livraisonsTable, exportateursTable, vehiculesTable, chauffeursTable, lotsTable, lotLivraisonsTable, parcellesTable, ventesExportateursTable, entrepotsTable, mouvementsStockTable, traitementsRefusTable, sessionsPeseeTable, configPeseeTable, configCooperativeTable } from "@workspace/db";
 import { calculerPoidsAcceptePort } from "./venteReceptionService";
 import { eq, and, desc, sql, count, notInArray, inArray } from "drizzle-orm";
-import { proposerEcriture, proposerEcrituresDansTransaction } from "./comptabiliteService";
+import { proposerEcrituresDansTransaction } from "./comptabiliteService";
 import { enregistrerMouvement as enregistrerMouvementCaisse } from "./caisseService.js";
 import { enregistrerMouvement as enregistrerMouvementBanque } from "./banqueService.js";
 import type { ComptabiliteTransaction } from "./comptabiliteService.js";
@@ -816,7 +816,7 @@ export async function changerStatut(
   // La lecture doit être sérialisée avec la transition. Sans verrou, deux
   // requêtes peuvent toutes deux lire "en_preparation", puis chacune créer
   // un historique et déclencher les effets du chargement.
-  const exp = await db.transaction(async (tx) => {
+  await db.transaction(async (tx) => {
     const rows = await tx
       .select()
       .from(expeditionsTable)
@@ -915,6 +915,27 @@ export async function changerStatut(
       }
     }
 
+    // Une résolution de litige constate la dette de transport avec le même
+    // client transactionnel que le statut et son historique. Une erreur
+    // comptable doit donc annuler toute la résolution.
+    if (
+      nouveauStatut === "receptionne" &&
+      lockedExpedition.statut === "litige" &&
+      lockedExpedition.fraisTransportFcfa &&
+      Number(lockedExpedition.fraisTransportFcfa) > 0
+    ) {
+      await proposerEcrituresDansTransaction(tx, cooperativeId, [{
+        source:      "transport",
+        sourceId:    expeditionId,
+        libelle:     `Frais transport ${lockedExpedition.numeroExpedition}`,
+        compteDebit:  "612",
+        compteCredit: "401",
+        montantFcfa:  Math.round(Number(lockedExpedition.fraisTransportFcfa)),
+        date:         new Date().toISOString().slice(0, 10),
+        numeroPiece:  lockedExpedition.numeroExpedition,
+      }]);
+    }
+
     await tx.update(expeditionsTable).set(updateValues).where(eq(expeditionsTable.id, expeditionId));
 
     await tx.insert(expeditionHistoriqueTable).values({
@@ -928,31 +949,6 @@ export async function changerStatut(
 
     return lockedExpedition;
   });
-
-  // Une réception passée en litige peut être résolue ultérieurement. Si des
-  // frais de transport avaient été saisis à la réception, leur dette est
-  // constatée au moment où la réception devient définitivement acceptée.
-  if (
-    nouveauStatut === "receptionne" &&
-    exp.statut === "litige" &&
-    exp.fraisTransportFcfa &&
-    Number(exp.fraisTransportFcfa) > 0
-  ) {
-    try {
-      await proposerEcriture(cooperativeId, {
-        source:      "transport",
-        sourceId:    expeditionId,
-        libelle:     `Frais transport ${exp.numeroExpedition}`,
-        compteDebit:  "612",
-        compteCredit: "401",
-        montantFcfa:  Math.round(Number(exp.fraisTransportFcfa)),
-        date:         new Date().toISOString().slice(0, 10),
-        numeroPiece:  exp.numeroExpedition,
-      });
-    } catch (err) {
-      logger.error({ err }, "Erreur écriture frais transport après résolution du litige");
-    }
-  }
 
   return { ok: true, statut: nouveauStatut };
 }

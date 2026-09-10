@@ -1003,6 +1003,143 @@ describe.skipIf(!enabled)(
       });
     });
 
+    it("annule la résolution du litige si l'écriture des frais de transport échoue, puis permet la reprise", async () => {
+      await setControleChargementObligatoire(false);
+
+      const id = await createTransitionExpedition(1000);
+      const expedition = await client.query(
+        `SELECT numero_expedition FROM expeditions WHERE id = $1`,
+        [id],
+      );
+      const numeroExpedition = expedition.rows[0].numero_expedition;
+      const nomEntrepot = `Entrepôt résolution litige ${id}`;
+      const entrepot = await client.query(
+        `INSERT INTO entrepots
+          (cooperative_id, nom, ville, capacite_kg)
+         VALUES ($1, $2, 'Test', 5000)
+         RETURNING id`,
+        [cooperativeId, nomEntrepot],
+      );
+      const lot = await client.query(
+        `INSERT INTO lots
+          (cooperative_id, campagne_id, poids_total_kg, entrepot, nombre_sacs)
+         VALUES ($1, $2, 1000, $3, 20)
+         RETURNING id`,
+        [cooperativeId, campaignId, nomEntrepot],
+      );
+      await client.query(
+        `INSERT INTO expedition_lots
+          (expedition_id, lot_id, poids_kg, nombre_sacs)
+         VALUES ($1, $2, 1000, 20)`,
+        [id, lot.rows[0].id],
+      );
+
+      await changerStatut(cooperativeId, id, testUserId, "charge");
+      await changerStatut(cooperativeId, id, testUserId, "en_transit");
+      await changerStatut(cooperativeId, id, testUserId, "arrive_port");
+      await client.query(
+        `UPDATE config_comptable
+            SET auto_transport = true
+          WHERE cooperative_id = $1`,
+        [cooperativeId],
+      );
+
+      await expect(
+        confirmerReception(cooperativeId, id, testUserId, {
+          poidsRecuPortKg: 900,
+          numeroRecepissePort: `REC-LITIGE-${id}`,
+          nomReceptionnaire: "Réception litige",
+          fraisTransportFcfa: 15_000,
+        }),
+      ).resolves.toMatchObject({ statut: "litige" });
+
+      const failureFunction = `force_transport_resolution_failure_${id}`;
+      const failureTrigger = `force_transport_resolution_failure_trigger_${id}`;
+      await client.query(`
+        CREATE FUNCTION "${failureFunction}"()
+        RETURNS trigger
+        LANGUAGE plpgsql
+        AS $$
+        BEGIN
+          RAISE EXCEPTION 'Erreur simulée pendant l''écriture des frais de transport';
+        END;
+        $$;
+
+        CREATE TRIGGER "${failureTrigger}"
+        BEFORE INSERT ON ecritures_comptables
+        FOR EACH ROW
+        WHEN (
+          NEW.cooperative_id = ${cooperativeId}
+          AND NEW.source_id = ${id}
+          AND NEW.compte_debit LIKE '612%'
+          AND NEW.compte_credit LIKE '401%'
+        )
+        EXECUTE FUNCTION "${failureFunction}"();
+      `);
+
+      try {
+        await expect(
+          changerStatut(cooperativeId, id, testUserId, "receptionne"),
+        ).rejects.toThrow();
+      } finally {
+        await client.query(`
+          DROP TRIGGER IF EXISTS "${failureTrigger}" ON ecritures_comptables;
+          DROP FUNCTION IF EXISTS "${failureFunction}"();
+        `);
+      }
+
+      const rollback = await client.query(
+        `SELECT
+           (SELECT statut FROM expeditions WHERE id = $1) AS statut,
+           (SELECT count(*)::int
+              FROM expedition_historique
+             WHERE expedition_id = $1
+               AND statut_nouveau = 'litige') AS historiques_litige,
+           (SELECT count(*)::int
+              FROM expedition_historique
+             WHERE expedition_id = $1
+               AND statut_nouveau = 'receptionne') AS historiques_reception,
+           (SELECT count(*)::int
+              FROM ecritures_comptables
+             WHERE cooperative_id = $2
+               AND source_id = $1
+               AND compte_debit LIKE '612%'
+               AND compte_credit LIKE '401%') AS ecritures_transport`,
+        [id, cooperativeId],
+      );
+      expect(rollback.rows[0]).toEqual({
+        statut: "litige",
+        historiques_litige: 1,
+        historiques_reception: 0,
+        ecritures_transport: 0,
+      });
+
+      await expect(
+        changerStatut(cooperativeId, id, testUserId, "receptionne"),
+      ).resolves.toMatchObject({ ok: true, statut: "receptionne" });
+
+      const reprise = await client.query(
+        `SELECT
+           (SELECT statut FROM expeditions WHERE id = $1) AS statut,
+           (SELECT count(*)::int
+              FROM expedition_historique
+             WHERE expedition_id = $1
+               AND statut_nouveau = 'receptionne') AS historiques_reception,
+           (SELECT count(*)::int
+              FROM ecritures_comptables
+             WHERE cooperative_id = $2
+               AND source_id = $1
+               AND compte_debit LIKE '612%'
+               AND compte_credit LIKE '401%') AS ecritures_transport`,
+        [id, cooperativeId],
+      );
+      expect(reprise.rows[0]).toEqual({
+        statut: "receptionne",
+        historiques_reception: 1,
+        ecritures_transport: 1,
+      });
+    });
+
     it("n'accepte qu'une réception concurrente et ne duplique aucun effet", async () => {
       await setControleChargementObligatoire(false);
 
