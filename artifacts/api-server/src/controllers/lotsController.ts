@@ -11,6 +11,9 @@ import {
   exportateursTable,
   parcellesTable,
   entrepotsTable,
+  expeditionsTable,
+  expeditionLotsTable,
+  expeditionHistoriqueTable,
 } from "@workspace/db";
 import { eq, inArray, sql, desc, and, or, isNull, isNotNull } from "drizzle-orm";
 import { CreateLotBody, UpdateLotStatutBody } from "@workspace/api-zod";
@@ -38,7 +41,7 @@ const lotExpeditionSelect = {
     FROM expedition_lots el
     INNER JOIN expeditions e ON e.id = el.expedition_id
     WHERE el.lot_id = ${lotsTable.id}
-    ORDER BY e.created_at DESC
+    ORDER BY e.created_at DESC, e.id DESC
     LIMIT 1
   )`,
   expeditionNumero: sql<string | null>`(
@@ -46,7 +49,7 @@ const lotExpeditionSelect = {
     FROM expedition_lots el
     INNER JOIN expeditions e ON e.id = el.expedition_id
     WHERE el.lot_id = ${lotsTable.id}
-    ORDER BY e.created_at DESC
+    ORDER BY e.created_at DESC, e.id DESC
     LIMIT 1
   )`,
 };
@@ -701,6 +704,30 @@ export async function getLotTracabilite(req: Request, res: Response): Promise<vo
       return;
     }
 
+    const [derniereExpedition] = await db
+      .select({ id: expeditionsTable.id })
+      .from(expeditionLotsTable)
+      .innerJoin(expeditionsTable, eq(expeditionsTable.id, expeditionLotsTable.expeditionId))
+      .where(and(
+        eq(expeditionLotsTable.lotId, id),
+        eq(expeditionsTable.cooperativeId, cooperativeId),
+      ))
+      .orderBy(desc(expeditionsTable.createdAt), desc(expeditionsTable.id))
+      .limit(1);
+
+    const expeditionHistorique = derniereExpedition
+      ? await db
+          .select({
+            statutPrecedent: expeditionHistoriqueTable.statutPrecedent,
+            statutNouveau: expeditionHistoriqueTable.statutNouveau,
+            dateChangement: expeditionHistoriqueTable.dateChangement,
+            notes: expeditionHistoriqueTable.notes,
+          })
+          .from(expeditionHistoriqueTable)
+          .where(eq(expeditionHistoriqueTable.expeditionId, derniereExpedition.id))
+          .orderBy(expeditionHistoriqueTable.dateChangement, expeditionHistoriqueTable.id)
+      : [];
+
     // Livraisons liées
     const livraisonLinks = await db
       .select({ livraisonId: lotLivraisonsTable.livraisonId })
@@ -766,7 +793,7 @@ export async function getLotTracabilite(req: Request, res: Response): Promise<vo
           .where(and(inArray(parcellesTable.membreId, membreIds), eq(parcellesTable.actif, true)))
       : [];
 
-    res.json({ lot, livraisons, membres, vente: vente ?? null, parcelles });
+    res.json({ lot, livraisons, membres, vente: vente ?? null, parcelles, expeditionHistorique });
   } catch (err) {
     req.log.error({ err }, "Erreur getLotTracabilite");
     res.status(500).json({ erreur: "Erreur interne du serveur" });

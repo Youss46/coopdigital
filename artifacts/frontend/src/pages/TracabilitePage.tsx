@@ -603,6 +603,49 @@ function DetailModal({
                 </div>
               )}
 
+              {/* ── SECTION HISTORIQUE EXPÉDITION ── */}
+              {data.lot.expeditionStatut && data.lot.expeditionNumero && (
+                <div className="px-6 py-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
+                    <Truck size={14} /> Étapes de l'expédition {data.lot.expeditionNumero}
+                  </h3>
+                  {data.expeditionHistorique.length > 0 ? (
+                    <div className="relative pl-4">
+                      <div className="absolute left-[7px] top-2 bottom-2 w-px bg-gray-200" />
+                      <div className="space-y-3">
+                        {data.expeditionHistorique.map((etape, index) => {
+                          const precedent = etape.statutPrecedent
+                            ? EXPEDITION_STATUT_LABELS[etape.statutPrecedent] ?? etape.statutPrecedent
+                            : null;
+                          const nouveau = EXPEDITION_STATUT_LABELS[etape.statutNouveau] ?? etape.statutNouveau;
+                          return (
+                            <div key={`${etape.dateChangement}-${index}`} className="relative flex items-start gap-3">
+                              <div className="absolute -left-4 w-3.5 h-3.5 rounded-full bg-white border-2 border-orange-500 flex-shrink-0 mt-0.5" />
+                              <div className="ml-2">
+                                <p className="text-sm font-medium text-gray-800">
+                                  {precedent ? `${precedent} → ${nouveau}` : nouveau}
+                                </p>
+                                <p className="text-xs text-gray-400">{formaterDate(etape.dateChangement)}</p>
+                                {etape.notes && (
+                                  <p className="text-xs text-gray-500 mt-0.5">{etape.notes}</p>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500">
+                      Aucune étape historisée. Statut courant :{" "}
+                      <span className="font-medium text-gray-700">
+                        {EXPEDITION_STATUT_LABELS[data.lot.expeditionStatut] ?? data.lot.expeditionStatut}
+                      </span>
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* ── SECTION CHAÎNE DE TRAÇABILITÉ ── */}
               {timeline.length > 0 && (
                 <div className="px-6 py-4">

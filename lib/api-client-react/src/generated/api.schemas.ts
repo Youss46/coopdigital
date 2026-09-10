@@ -1475,6 +1475,25 @@ export interface ParcelleEudr {
   eudrRisqueDeforestation?: string | null;
 }
 
+export type ExpeditionHistoriqueLotStatutNouveau = typeof ExpeditionHistoriqueLotStatutNouveau[keyof typeof ExpeditionHistoriqueLotStatutNouveau];
+
+
+export const ExpeditionHistoriqueLotStatutNouveau = {
+  en_preparation: 'en_preparation',
+  charge: 'charge',
+  en_transit: 'en_transit',
+  arrive_port: 'arrive_port',
+  receptionne: 'receptionne',
+  litige: 'litige',
+} as const;
+
+export interface ExpeditionHistoriqueLot {
+  statutPrecedent?: string | null;
+  statutNouveau: ExpeditionHistoriqueLotStatutNouveau;
+  dateChangement: string;
+  notes?: string | null;
+}
+
 export type VenteDetailStatut = typeof VenteDetailStatut[keyof typeof VenteDetailStatut];
 
 
@@ -1512,6 +1531,7 @@ export interface LotTracabilite {
   membres: Membre[];
   vente?: VenteDetail;
   parcelles?: ParcelleEudr[];
+  expeditionHistorique: ExpeditionHistoriqueLot[];
 }
 
 export interface EntrepotStock {

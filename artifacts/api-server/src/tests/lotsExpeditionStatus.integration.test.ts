@@ -93,12 +93,27 @@ describe.skipIf(!enabled)(
          VALUES ($1, $3, 8000), ($2, $3, 8000)`,
         [oldExpeditionId, latestExpeditionId, lotWithExpeditionId],
       );
+
+      await client.query(
+        `INSERT INTO expedition_historique
+          (expedition_id, statut_precedent, statut_nouveau, date_changement, notes)
+         VALUES
+          ($1, NULL, 'en_preparation', '2026-02-10T09:00:00Z', NULL),
+          ($1, 'en_preparation', 'charge', '2026-02-10T10:00:00Z', NULL),
+          ($1, 'charge', 'receptionne', '2026-02-10T11:00:00Z', 'Réception confirmée au port')`,
+        [latestExpeditionId],
+      );
     });
 
     afterAll(async () => {
       if (!client) return;
 
       try {
+        await client.query(
+          `DELETE FROM expedition_historique
+            WHERE expedition_id IN ($1, $2)`,
+          [oldExpeditionId, latestExpeditionId],
+        );
         await client.query(
           `DELETE FROM expedition_lots
             WHERE expedition_id IN ($1, $2)`,
@@ -177,6 +192,15 @@ describe.skipIf(!enabled)(
           expeditionStatut: "receptionne",
           expeditionNumero: expect.stringContaining("EXP-LATEST-"),
         },
+        expeditionHistorique: [
+          { statutPrecedent: null, statutNouveau: "en_preparation" },
+          { statutPrecedent: "en_preparation", statutNouveau: "charge" },
+          {
+            statutPrecedent: "charge",
+            statutNouveau: "receptionne",
+            notes: "Réception confirmée au port",
+          },
+        ],
       });
     });
 
@@ -199,6 +223,7 @@ describe.skipIf(!enabled)(
           expeditionStatut: null,
           expeditionNumero: null,
         },
+        expeditionHistorique: [],
       });
     });
   },

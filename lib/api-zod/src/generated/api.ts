@@ -823,7 +823,13 @@ export const GetLotTracabiliteResponse = zod.object({
   "superficieCalculeeHa": zod.string().nullish(),
   "eudrStatut": zod.string().nullish(),
   "eudrRisqueDeforestation": zod.string().nullish()
-})).optional()
+})).optional(),
+  "expeditionHistorique": zod.array(zod.object({
+  "statutPrecedent": zod.string().nullish(),
+  "statutNouveau": zod.enum(['en_preparation', 'charge', 'en_transit', 'arrive_port', 'receptionne', 'litige']),
+  "dateChangement": zod.string(),
+  "notes": zod.string().nullish()
+}))
 })
 
 

@@ -8473,9 +8473,25 @@ components:
         eudrRisqueDeforestation:
           type: ["string", "null"]
 
+    ExpeditionHistoriqueLot:
+      type: object
+      required: [statutNouveau, dateChangement]
+      properties:
+        statutPrecedent:
+          type: string
+          nullable: true
+        statutNouveau:
+          type: string
+          enum: [en_preparation, charge, en_transit, arrive_port, receptionne, litige]
+        dateChangement:
+          type: string
+        notes:
+          type: string
+          nullable: true
+
     LotTracabilite:
       type: object
-      required: [lot, livraisons, membres]
+      required: [lot, livraisons, membres, expeditionHistorique]
       properties:
         lot:
           $ref: "#/components/schemas/LotDetail"
@@ -8493,6 +8509,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ParcelleEudr"
+        expeditionHistorique:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExpeditionHistoriqueLot"
 
     # ── M03 Stocks ──────────────────────────────────────────────
     EntrepotStock:
