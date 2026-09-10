@@ -405,6 +405,7 @@ export default function Avances() {
               avances.map((a: Avance) => {
                 const planKey = a.planType ?? "integral";
                 const badge = PLAN_BADGE[planKey] ?? PLAN_BADGE["integral"]!;
+                const statut = String(a.statut);
                 return (
                   <tr key={a.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
@@ -445,7 +446,7 @@ export default function Avances() {
                     </td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-2">
-                        {peutRembourser && a.statut !== "rembourse" && a.soldeRestantFcfa > 0 && (
+                        {peutRembourser && statut !== "annulee" && statut !== "cloturee" && (
                           <>
                             <button
                               onClick={() => setPlanTarget(a)}
@@ -454,13 +455,17 @@ export default function Avances() {
                             >
                               <Settings2 size={13} /> Plan
                             </button>
-                            <span className="text-gray-200">|</span>
-                            <button
-                              onClick={() => ouvrirRemboursement(a.id, a.soldeRestantFcfa, `${a.membreNom ?? ""} ${a.membrePrenoms ?? ""}`)}
-                              className="text-xs text-green-700 hover:text-green-900 font-medium"
-                            >
-                              Rembourser
-                            </button>
+                            {statut !== "rembourse" && a.soldeRestantFcfa > 0 && (
+                              <>
+                                <span className="text-gray-200">|</span>
+                                <button
+                                  onClick={() => ouvrirRemboursement(a.id, a.soldeRestantFcfa, `${a.membreNom ?? ""} ${a.membrePrenoms ?? ""}`)}
+                                  className="text-xs text-green-700 hover:text-green-900 font-medium"
+                                >
+                                  Rembourser
+                                </button>
+                              </>
+                            )}
                           </>
                         )}
                         <button

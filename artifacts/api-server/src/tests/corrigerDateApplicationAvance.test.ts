@@ -121,14 +121,17 @@ function makeRequest() {
   } as unknown as Request;
 }
 
-function configureTransaction(paymentStatut: "rejete" | "confirme" | "effectue") {
+function configureTransaction(
+  paymentStatut: "rejete" | "confirme" | "effectue",
+  avanceStatut: "en_cours" | "rembourse" = "en_cours",
+) {
   const avance = {
     id: 5,
     membreId: 9,
     montantOctroyeFcfa: 10_000,
     montantRembourse_fcfa: 4_000,
     soldeRestantFcfa: 6_000,
-    statut: "en_cours",
+    statut: avanceStatut,
   };
   const historique = {
     id: 31,
@@ -234,6 +237,26 @@ describe("corrigerDateApplicationAvance", () => {
     );
     expect(historiqueUpdate?.values.note).toEqual(expect.stringContaining("Provision insuffisante"));
     expect(paiement.motifRejet).toBe("Provision insuffisante");
+  });
+
+  it("peut reporter une déduction d'une avance déjà marquée remboursée si la livraison reste impayée", async () => {
+    const { updates, updatedAvance } = configureTransaction("rejete", "rembourse");
+    const res = makeResponse();
+
+    await corrigerDateApplicationAvance(makeRequest(), res);
+
+    expect(res.status).not.toHaveBeenCalledWith(400);
+    expect(res.status).not.toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      montantRestaure: 4_000,
+      avance: updatedAvance,
+    }));
+    expect(updates).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        tableName: "remboursements_avances_membres",
+        values: expect.objectContaining({ montantFcfa: 0 }),
+      }),
+    ]));
   });
 
   it.each(["confirme", "effectue"] as const)(

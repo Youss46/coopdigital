@@ -810,9 +810,6 @@ export async function updatePlanAvanceMembre(req: Request, res: Response): Promi
     ) {
       res.status(404).json({ erreur: "Avance de délégué de localités introuvable" }); return;
     }
-    if (row.avance.statut === "rembourse") {
-      res.status(400).json({ erreur: "Cette avance est déjà remboursée" }); return;
-    }
     if (row.avance.statut === "annulee" || row.avance.statut === "cloturee") {
       res.status(400).json({ erreur: "Cette avance est déjà terminée" }); return;
     }
@@ -923,7 +920,6 @@ export async function corrigerDateApplicationAvance(req: Request, res: Response)
 
       if (!avance) throw new Error("Avance introuvable");
       if (avance.cooperativeId !== cooperativeId) throw new Error("Cette avance n'appartient pas à votre coopérative");
-      if (avance.avance.statut === "rembourse") throw new Error("Cette avance est déjà remboursée");
 
       const historiques = await tx
         .select()

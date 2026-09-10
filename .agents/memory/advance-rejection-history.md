@@ -8,3 +8,9 @@ Lorsqu’une correction d’avance remet un règlement rejeté en attente, le mo
 **Why:** le règlement courant doit redevenir actionnable, mais supprimer le motif sans le reporter dans l’historique détruit la traçabilité comptable du rejet précédent.
 
 **How to apply:** enregistrer un plan reporté doit inverser dans la même transaction les retenues tracées sur les livraisons antérieures à la date; verrouiller les paiements, bloquer les statuts confirmés/effectués, conserver les motifs rejetés dans l’historique, puis seulement remettre le paiement en attente.
+
+Une avance peut déjà être au statut `rembourse` lorsque sa dernière retenue vient d’une livraison encore impayée : le report doit alors pouvoir restaurer cette retenue et rouvrir le solde. Seules les livraisons déjà réglées bloquent la correction automatique.
+
+**Pourquoi:** le statut de l’avance décrit la déduction enregistrée, tandis que le paiement producteur est une étape distincte; les deux ne doivent pas empêcher une correction tant que l’argent n’a pas été versé.
+
+**Comment appliquer:** ne pas refuser le report uniquement sur le statut `rembourse`; recalculer le statut depuis les retenues restaurées, tout en excluant les avances annulées/clôturées.

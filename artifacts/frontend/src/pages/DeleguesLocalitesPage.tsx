@@ -1138,7 +1138,7 @@ export default function DeleguesLocalitesPage() {
                                   <button onClick={() => setAvanceHistoriqueId(historiqueOuvert ? null : a.id)} className="text-xs font-medium text-gray-500 hover:text-[#1a4731]">
                                     <History size={13} className="inline mr-1" /> Historique
                                   </button>
-                                  {active && peutModifierPlan && (
+                                   {peutModifierPlan && a.statut !== "annulee" && a.statut !== "cloturee" && (
                                       <button
                                         onClick={() => {
                                           setAvancePlanEdition(a);
@@ -1170,7 +1170,7 @@ export default function DeleguesLocalitesPage() {
                                       {a.montantRembourseFcfa > 0 ? "Clôturer le solde" : "Annuler"}
                                     </button>
                                   )}
-                                  {!active && peutModifierPlan && (
+                                   {!active && peutModifierPlan && a.statut !== "rembourse" && a.statut !== "annulee" && a.statut !== "cloturee" && (
                                     <span
                                       title="Le plan ne peut plus être modifié après le remboursement complet de l’avance."
                                       className="text-xs text-gray-400"
