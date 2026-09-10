@@ -1,6 +1,96 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, createElement } from "react";
+import { createRoot, type Root } from "react-dom/client";
 import type { LotTracabilite } from "@workspace/api-client-react";
-import { construireExportEudr } from "./TracabilitePage";
+import { construireExportEudr, DetailModal } from "./TracabilitePage";
+
+const { useGetLotTracabiliteMock } = vi.hoisted(() => ({
+  useGetLotTracabiliteMock: vi.fn(),
+}));
+
+vi.mock("@workspace/api-client-react", () => ({
+  useGetLots: vi.fn(),
+  useCreateLot: vi.fn(),
+  useGetLivraisonsNonLotees: vi.fn(),
+  useUpdateLotStatut: vi.fn(),
+  useGetLotTracabilite: useGetLotTracabiliteMock,
+  useGetEntrepots: vi.fn(),
+  useFusionnerLots: vi.fn(),
+  useExpedierLot: vi.fn(),
+  useGetVentes: vi.fn(),
+}));
+
+vi.mock("@/contexts/AuthContext", () => ({
+  useAuth: () => ({ token: null, utilisateur: null }),
+}));
+
+vi.mock("@tanstack/react-query", () => ({
+  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+}));
+
+vi.mock("@/hooks/usePermission", () => ({
+  usePermission: () => false,
+}));
+
+vi.mock("@/hooks/use-toast", () => ({
+  useToast: () => ({ toast: vi.fn() }),
+}));
+
+const lotData = {
+  lot: {
+    id: 7,
+    cooperativeId: 3,
+    qrCodeLot: "LOT-7",
+    statut: "transit",
+    poidsTotalKg: "1200",
+    dateCreation: "2026-09-10",
+    entrepot: "Entrepôt central",
+    nbProducteurs: 0,
+    nbLivraisons: 0,
+    expeditionNumero: "EXP-7",
+    expeditionStatut: "receptionne",
+  },
+  membres: [],
+  livraisons: [],
+  parcelles: [],
+  vente: null,
+  expeditions: [{
+    id: 9,
+    numeroExpedition: "EXP-7",
+    port: "Abidjan",
+    statut: "receptionne",
+    poidsRecuKg: "1200",
+    poidsAttribueKg: "1200",
+  }],
+  expeditionResume: {
+    receptionStatut: "complete",
+    nombreExpeditions: 1,
+    poidsRecuKg: "1200",
+    poidsAttenduKg: "1200",
+  },
+  expeditionHistorique: [
+    {
+      expeditionNumero: "EXP-7",
+      statutPrecedent: null,
+      statutNouveau: "charge",
+      dateChangement: "2026-09-10T09:00:00.000Z",
+      faitPar: null,
+      faitParNom: null,
+      faitParPrenoms: null,
+      notes: null,
+    },
+    {
+      expeditionNumero: "EXP-7",
+      statutPrecedent: "charge",
+      statutNouveau: "receptionne",
+      dateChangement: "2026-09-10T14:30:00.000Z",
+      faitPar: null,
+      faitParNom: null,
+      faitParPrenoms: null,
+      notes: "Réception confirmée",
+    },
+  ],
+} as unknown as LotTracabilite;
 
 describe("export EUDR de la traçabilité", () => {
   it("conserve les heures distinctes de transitions effectuées le même jour", () => {
@@ -45,5 +135,45 @@ describe("export EUDR de la traçabilité", () => {
       "2026-09-10T09:00:00.000Z",
       "2026-09-10T14:30:00.000Z",
     ]);
+  });
+});
+
+describe("timeline d'expédition sur mobile", () => {
+  let container: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    useGetLotTracabiliteMock.mockReturnValue({ data: lotData, isLoading: false });
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 360 });
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+    container.remove();
+    useGetLotTracabiliteMock.mockReset();
+  });
+
+  it("affiche l'heure complète et conserve les anciennes étapes sans auteur", async () => {
+    await act(async () => {
+      root.render(createElement(DetailModal, {
+        lotId: 7,
+        onClose: vi.fn(),
+        onStatutChange: vi.fn(),
+        peutModifier: false,
+      }));
+    });
+
+    expect(container.textContent).toContain("Validé le 10 sept. 2026, 09:00:00");
+    expect(container.textContent).toContain("Validé le 10 sept. 2026, 14:30:00");
+    expect(container.textContent).toContain("Validé par : Système");
+
+    const timestamp = Array.from(container.querySelectorAll("p")).find((p) =>
+      p.textContent?.includes("09:00:00"),
+    );
+    expect(timestamp?.className).toContain("break-words");
+    expect(timestamp?.parentElement?.className).toContain("min-w-0");
   });
 });

@@ -296,7 +296,7 @@ function ModalExpedier({
 }
 
 /* ── Modal Détail Lot ─────────────────────────────────────────── */
-function DetailModal({
+export function DetailModal({
   lotId,
   onClose,
   onStatutChange,
@@ -751,11 +751,11 @@ function DetailModal({
                           return (
                             <div key={`${etape.dateChangement}-${index}`} className="relative flex items-start gap-3">
                               <div className="absolute -left-4 w-3.5 h-3.5 rounded-full bg-white border-2 border-orange-500 flex-shrink-0 mt-0.5" />
-                              <div className="ml-2">
+                              <div className="ml-2 min-w-0">
                                 <p className="text-sm font-medium text-gray-800">
                                   {precedent ? `${precedent} → ${nouveau}` : nouveau}
                                 </p>
-                                <p className="text-xs text-gray-400">
+                                <p className="text-xs text-gray-400 break-words">
                                   {etape.expeditionNumero ? `${etape.expeditionNumero} · ` : ""}
                                   Validé le {formaterDateHeure(etape.dateChangement)}
                                 </p>
