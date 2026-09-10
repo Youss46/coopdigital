@@ -31,6 +31,7 @@ import {
   cooperativesTable,
   expeditionsTable,
   expeditionLotsTable,
+  expeditionHistoriqueTable,
   parcellesTable,
   lotsTable,
   lotLivraisonsTable,
@@ -77,6 +78,17 @@ function formaterNombre(n: number): string {
 }
 function formaterDate(d: string | Date): string {
   return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+function formaterDateHeureUtc(d: string | Date): string {
+  return new Intl.DateTimeFormat("fr-FR", {
+    timeZone: "UTC",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(new Date(d));
 }
 
 function formaterDateHeure(d: string | Date): string {
@@ -2304,6 +2316,14 @@ const EUDR_RISQUE_LABELS: Record<string, string> = {
   eleve:    "Eleve",
   inconnu:  "Inconnu",
 };
+const EXPEDITION_STATUT_LABELS: Record<string, string> = {
+  en_preparation: "En preparation d'expedition",
+  charge:         "Charge",
+  en_transit:     "En transit vers le port",
+  arrive_port:    "Arrive au port",
+  receptionne:    "Receptionne au port",
+  litige:         "Litige au port",
+};
 
 export async function generateRapportEudrPdf(expeditionId: number, cooperativeId: number): Promise<Buffer> {
   // ── 1. Expedition ─────────────────────────────────────────────────────────
@@ -3124,6 +3144,43 @@ export async function generateLotEudrPdf(lotId: number, cooperativeId: number): 
     .where(and(eq(lotsTable.id, lotId), eq(lotsTable.cooperativeId, cooperativeId)));
   if (!lot) throw new Error("Lot introuvable");
 
+  const [derniereExpedition] = await db
+    .select({
+      id: expeditionsTable.id,
+      numeroExpedition: expeditionsTable.numeroExpedition,
+      statut: expeditionsTable.statut,
+    })
+    .from(expeditionLotsTable)
+    .innerJoin(expeditionsTable, eq(expeditionsTable.id, expeditionLotsTable.expeditionId))
+    .where(and(
+      eq(expeditionLotsTable.lotId, lotId),
+      eq(expeditionsTable.cooperativeId, cooperativeId),
+    ))
+    .orderBy(desc(expeditionsTable.createdAt), desc(expeditionsTable.id))
+    .limit(1);
+
+  const historiqueExpedition = derniereExpedition
+    ? await db
+        .select({
+          statutPrecedent: expeditionHistoriqueTable.statutPrecedent,
+          statutNouveau: expeditionHistoriqueTable.statutNouveau,
+          dateChangement: expeditionHistoriqueTable.dateChangement,
+          faitParNom: usersTable.nom,
+          faitParPrenoms: usersTable.prenoms,
+          notes: expeditionHistoriqueTable.notes,
+        })
+        .from(expeditionHistoriqueTable)
+        .leftJoin(
+          usersTable,
+          and(
+            eq(usersTable.id, expeditionHistoriqueTable.faitPar),
+            eq(usersTable.cooperativeId, cooperativeId),
+          ),
+        )
+        .where(eq(expeditionHistoriqueTable.expeditionId, derniereExpedition.id))
+        .orderBy(asc(expeditionHistoriqueTable.dateChangement), asc(expeditionHistoriqueTable.id))
+    : [];
+
   const livraisonLinks = await db
     .select({ livraisonId: lotLivraisonsTable.livraisonId })
     .from(lotLivraisonsTable)
@@ -3285,6 +3342,73 @@ export async function generateLotEudrPdf(lotId: number, cooperativeId: number): 
       { width: QR_SIZE, align: "center", lineBreak: false });
 
   y += 20;
+
+  // ── Historique de l'expédition ────────────────────────────────────────────
+  if (derniereExpedition) {
+    if (y + 50 > 780) {
+      doc.addPage();
+      await drawHeader(doc, cooperativeId, {
+        titre_document: "FICHE EUDR — LOT (suite)",
+        reference: lot.qrCodeLot,
+      });
+      y = doc.y;
+    }
+
+    doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold")
+      .text(`HISTORIQUE EXPEDITION ${derniereExpedition.numeroExpedition}`, MARGIN, y);
+    y += 14;
+    doc.fontSize(7).fillColor(GRIS).font("Helvetica")
+      .text("Horodatage affiche en UTC", MARGIN, y);
+    y += 13;
+
+    if (historiqueExpedition.length === 0) {
+      doc.fontSize(8).fillColor(GRIS).font("Helvetica")
+        .text(
+          `Aucune etape historisee. Statut courant : ${EXPEDITION_STATUT_LABELS[derniereExpedition.statut] ?? derniereExpedition.statut}`,
+          MARGIN,
+          y,
+          { width: W, lineBreak: false },
+        );
+      y += 16;
+    } else {
+      for (const etape of historiqueExpedition) {
+        if (y + 30 > 780) {
+          doc.addPage();
+          await drawHeader(doc, cooperativeId, {
+            titre_document: "FICHE EUDR — LOT (suite)",
+            reference: lot.qrCodeLot,
+          });
+          y = doc.y;
+        }
+
+        const precedent = etape.statutPrecedent
+          ? EXPEDITION_STATUT_LABELS[etape.statutPrecedent] ?? etape.statutPrecedent
+          : null;
+        const nouveau = EXPEDITION_STATUT_LABELS[etape.statutNouveau] ?? etape.statutNouveau;
+        const auteur = [etape.faitParPrenoms, etape.faitParNom].filter(Boolean).join(" ") || "Systeme";
+        const transition = precedent ? `${precedent} -> ${nouveau}` : nouveau;
+
+        doc.fontSize(7.5).fillColor("black").font("Helvetica-Bold")
+          .text(transition, MARGIN, y, { width: W * 0.52, lineBreak: false });
+        doc.fontSize(7.5).fillColor(GRIS).font("Helvetica")
+          .text(`${formaterDateHeureUtc(etape.dateChangement)} UTC`, MARGIN + W * 0.52, y, {
+            width: W * 0.48,
+            align: "right",
+            lineBreak: false,
+          });
+        y += 12;
+        doc.fontSize(7).fillColor(GRIS).font("Helvetica")
+          .text(`Valide par : ${auteur}`, MARGIN + 8, y, { width: W - 16, lineBreak: false });
+        y += 11;
+        if (etape.notes) {
+          doc.fontSize(7).fillColor(GRIS).font("Helvetica")
+            .text(etape.notes, MARGIN + 8, y, { width: W - 16 });
+          y = doc.y + 3;
+        }
+      }
+    }
+    y += 12;
+  }
 
   // ── Tableau producteurs ────────────────────────────────────────────────────
   doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold")

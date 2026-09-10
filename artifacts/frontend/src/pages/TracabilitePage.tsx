@@ -10,6 +10,7 @@ import {
   useExpedierLot,
   useGetVentes,
 } from "@workspace/api-client-react";
+import type { LotTracabilite } from "@workspace/api-client-react";
 import {
   getGetLotsQueryKey,
   getGetLivraisonsNonLoteesQueryKey,
@@ -66,6 +67,45 @@ function formaterPoids(kg: string | number) {
 }
 function formaterMontant(v: number) {
   return new Intl.NumberFormat("fr-FR").format(v) + " FCFA";
+}
+
+export function construireExportEudr(data: LotTracabilite) {
+  const coop = data.membres[0] as unknown as Record<string, unknown> | undefined;
+  return {
+    lot_id: String(data.lot.id),
+    qr_code: data.lot.qrCodeLot,
+    poids_brut_kg: parseFloat(data.lot.poidsTotalKg),
+    producteurs: (data.parcelles ?? []).map((p) => ({
+      nom: `${p.membreNom ?? ""} ${p.membrePrenoms ?? ""}`.trim(),
+      parcelle_gps: p.coordonneesPoint ?? null,
+      polygone: p.polygone ?? null,
+      superficie_ha: p.superficieCalculeeHa
+        ? parseFloat(String(p.superficieCalculeeHa))
+        : p.superficieDeclareeHa
+        ? parseFloat(String(p.superficieDeclareeHa))
+        : null,
+      superficie_declaree_ha: p.superficieDeclareeHa ? parseFloat(String(p.superficieDeclareeHa)) : null,
+      poids_kg: data.livraisons
+        .filter((l) => l.membreId === p.membreId)
+        .reduce((s, l) => s + parseFloat(String(l.produitBrutKg ?? l.poidsKg)), 0),
+      eudr_statut: p.eudrStatut ?? "non_verifie",
+      eudr_risque: p.eudrRisqueDeforestation ?? "inconnu",
+    })),
+    date_collecte: data.lot.dateCreation,
+    cooperative: coop?.["cooperativeId"] ?? data.lot.cooperativeId,
+    pays: "Côte d'Ivoire",
+    expedition_numero: data.lot.expeditionNumero ?? null,
+    expedition_statut: data.lot.expeditionStatut ?? null,
+    historique_expedition: data.expeditionHistorique.map((etape) => ({
+      statut_precedent: etape.statutPrecedent ?? null,
+      statut_nouveau: etape.statutNouveau,
+      date_changement: etape.dateChangement,
+      fait_par: etape.faitPar ?? null,
+      fait_par_nom: etape.faitParNom ?? null,
+      fait_par_prenoms: etape.faitParPrenoms ?? null,
+      notes: etape.notes ?? null,
+    })),
+  };
 }
 
 const STATUT_COLORS: Record<string, string> = {
@@ -304,31 +344,7 @@ function DetailModal({
 
   const exporterEudr = () => {
     if (!data) return;
-    const coop = (data.membres[0] as unknown as Record<string, unknown> | undefined);
-    const payload = {
-      lot_id: String(data.lot.id),
-      qr_code: data.lot.qrCodeLot,
-      poids_brut_kg: parseFloat(data.lot.poidsTotalKg),
-      producteurs: (data.parcelles ?? []).map((p) => ({
-        nom: `${p.membreNom ?? ""} ${p.membrePrenoms ?? ""}`.trim(),
-        parcelle_gps: p.coordonneesPoint ?? null,
-        polygone: p.polygone ?? null,
-        superficie_ha: p.superficieCalculeeHa
-          ? parseFloat(String(p.superficieCalculeeHa))
-          : p.superficieDeclareeHa
-          ? parseFloat(String(p.superficieDeclareeHa))
-          : null,
-        superficie_declaree_ha: p.superficieDeclareeHa ? parseFloat(String(p.superficieDeclareeHa)) : null,
-        poids_kg: data.livraisons
-          .filter((l) => l.membreId === p.membreId)
-          .reduce((s, l) => s + parseFloat(String(l.produitBrutKg ?? l.poidsKg)), 0),
-        eudr_statut: p.eudrStatut ?? "non_verifie",
-        eudr_risque: p.eudrRisqueDeforestation ?? "inconnu",
-      })),
-      date_collecte: data.lot.dateCreation,
-      cooperative: coop?.["cooperativeId"] ?? data.lot.cooperativeId,
-      pays: "Côte d'Ivoire",
-    };
+    const payload = construireExportEudr(data);
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
