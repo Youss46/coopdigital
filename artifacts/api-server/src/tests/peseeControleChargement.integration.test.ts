@@ -7,7 +7,7 @@ import {
   terminerSession,
   SessionExpeditionExistanteError,
 } from "../services/peseeSessionService.js";
-import { changerStatut } from "../services/expeditionsService.js";
+import { changerStatut, confirmerReception } from "../services/expeditionsService.js";
 
 const enabled =
   process.env.RUN_POSTGRES_INTEGRATION === "1" &&
@@ -503,6 +503,92 @@ describe.skipIf(!enabled)(
         [cooperativeId, id],
       );
       expect(accounting.rows[0].count).toBe(1);
+    });
+
+    it("répare une sortie manquante à la réception et normalise le nom de l'entrepôt", async () => {
+      await setControleChargementObligatoire(false);
+
+      const id = await createTransitionExpedition(1000);
+      const expedition = await client.query(
+        `SELECT numero_expedition FROM expeditions WHERE id = $1`,
+        [id],
+      );
+      const numeroExpedition = expedition.rows[0].numero_expedition;
+      const nomEntrepot = `Entrepôt reprise ${id}`;
+
+      const entrepot = await client.query(
+        `INSERT INTO entrepots
+          (cooperative_id, nom, ville, capacite_kg)
+         VALUES ($1, $2, 'Test', 5000)
+         RETURNING id`,
+        [cooperativeId, nomEntrepot.toLowerCase()],
+      );
+      const lot = await client.query(
+        `INSERT INTO lots
+          (cooperative_id, campagne_id, poids_total_kg, entrepot, nombre_sacs)
+         VALUES ($1, $2, 1000, $3, 20)
+         RETURNING id`,
+        [cooperativeId, campaignId, nomEntrepot.toUpperCase()],
+      );
+      await client.query(
+        `INSERT INTO expedition_lots
+          (expedition_id, lot_id, poids_kg, nombre_sacs)
+         VALUES ($1, $2, 1000, 20)`,
+        [id, lot.rows[0].id],
+      );
+
+      await changerStatut(cooperativeId, id, testUserId, "charge");
+      await changerStatut(cooperativeId, id, testUserId, "en_transit");
+      await changerStatut(cooperativeId, id, testUserId, "arrive_port");
+
+      const motif = `Chargement expédition ${numeroExpedition}`;
+      const sortieAvantReprise = await client.query(
+        `SELECT count(*)::int AS count
+           FROM mouvements_stock
+          WHERE entrepot_id = $1 AND motif = $2`,
+        [entrepot.rows[0].id, motif],
+      );
+      expect(sortieAvantReprise.rows[0].count).toBe(1);
+
+      // Reproduire une ancienne expédition dont le chargement a été validé
+      // mais dont la sortie n'a pas été persistée.
+      await client.query(
+        `DELETE FROM mouvements_stock
+          WHERE entrepot_id = $1 AND motif = $2`,
+        [entrepot.rows[0].id, motif],
+      );
+
+      await expect(
+        confirmerReception(cooperativeId, id, testUserId, {
+          poidsRecuPortKg: 1000,
+          numeroRecepissePort: `REC-${id}`,
+          nomReceptionnaire: "Réception test",
+        }),
+      ).resolves.toMatchObject({ statut: "receptionne" });
+
+      const sortieApresReprise = await client.query(
+        `SELECT count(*)::int AS count, coalesce(sum(poids_kg), 0)::numeric AS poids
+           FROM mouvements_stock
+          WHERE entrepot_id = $1 AND motif = $2`,
+        [entrepot.rows[0].id, motif],
+      );
+      expect(sortieApresReprise.rows[0].count).toBe(1);
+      expect(Number(sortieApresReprise.rows[0].poids)).toBe(1000);
+
+      // Une confirmation rejouée ne doit pas créer de seconde sortie.
+      await confirmerReception(cooperativeId, id, testUserId, {
+        poidsRecuPortKg: 1000,
+        numeroRecepissePort: `REC-${id}`,
+        nomReceptionnaire: "Réception test",
+      });
+
+      const sortieApresRetry = await client.query(
+        `SELECT count(*)::int AS count
+           FROM mouvements_stock
+          WHERE entrepot_id = $1 AND motif = $2`,
+        [entrepot.rows[0].id, motif],
+      );
+      expect(sortieApresRetry.rows[0].count).toBe(1);
     });
 
     it("préserve le comportement historique quand le contrôle obligatoire est désactivé", async () => {

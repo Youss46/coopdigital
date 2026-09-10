@@ -696,19 +696,22 @@ async function deduireStockChargement(
 
   if (lotsAttaches.length === 0) return;
 
-  // Regrouper par nom d'entrepôt (un lot → un entrepôt)
+  // Regrouper par nom d'entrepôt (un lot → un entrepôt).
+  // Les noms peuvent différer uniquement par la casse ou les espaces
+  // entre la fiche du lot et celle de l'entrepôt.
   const parEntrepot = new Map<string, { poidsKg: number; nombreSacs: number; lotId: number | null }>();
   for (const lot of lotsAttaches) {
     const nom = (lot.entrepotNom ?? "").trim();
     if (!nom) continue;
+    const nomNormalise = nom.toLocaleLowerCase();
     const poids = parseFloat(String(lot.poidsKg ?? "0"));
     if (poids <= 0) continue;
-    const existing = parEntrepot.get(nom);
+    const existing = parEntrepot.get(nomNormalise);
     if (existing) {
       existing.poidsKg   += poids;
       existing.nombreSacs += lot.nombreSacs ?? 0;
     } else {
-      parEntrepot.set(nom, {
+      parEntrepot.set(nomNormalise, {
         poidsKg:    poids,
         nombreSacs: lot.nombreSacs ?? 0,
         lotId:      lot.lotId ?? null,
@@ -725,7 +728,7 @@ async function deduireStockChargement(
       .from(entrepotsTable)
       .where(and(
         eq(entrepotsTable.cooperativeId, cooperativeId),
-        eq(entrepotsTable.nom, nomEntrepot),
+        sql`lower(trim(${entrepotsTable.nom})) = ${nomEntrepot}`,
       ))
       .limit(1);
 
@@ -737,13 +740,28 @@ async function deduireStockChargement(
       continue;
     }
 
+    const motif = `Chargement expédition ${numeroExpedition}`;
+    const [mouvementExistant] = await db
+      .select({ id: mouvementsStockTable.id })
+      .from(mouvementsStockTable)
+      .where(and(
+        eq(mouvementsStockTable.entrepotId, entrepot.id),
+        eq(mouvementsStockTable.type, "sortie"),
+        eq(mouvementsStockTable.motif, motif),
+      ))
+      .limit(1);
+
+    // Aucun expedition_id n'existe dans mouvements_stock : le motif métier
+    // fournit l'identifiant d'idempotence lors d'une reprise.
+    if (mouvementExistant) continue;
+
     await db.insert(mouvementsStockTable).values({
       entrepotId:  entrepot.id,
       lotId:       data.lotId,
       type:        "sortie",
       poidsKg:     String(data.poidsKg.toFixed(2)),
       nombreSacs:  data.nombreSacs > 0 ? data.nombreSacs : null,
-      motif:       `Chargement expédition ${numeroExpedition}`,
+      motif,
       agentId:     userId,
     });
 
@@ -996,6 +1014,16 @@ export async function confirmerReception(
   const notesSacs = ecartSacs !== null
     ? `. Sacs reçus : ${sacsRecus}/${sacsCharges}. Écart sacs : ${ecartSacs > 0 ? "-" : "+"}${Math.abs(ecartSacs)} sac(s) (${((tauxEcartSacs ?? 0) * 100).toFixed(2)}%)`
     : "";
+
+  // La sortie est normalement créée au chargement. On rejoue toutefois la
+  // vérification ici pour réparer les anciennes expéditions réceptionnées
+  // avant la correction de résolution des entrepôts. L'opération est
+  // idempotente par motif.
+  try {
+    await deduireStockChargement(expeditionId, cooperativeId, userId, exp.numeroExpedition);
+  } catch (err) {
+    logger.error({ err, expeditionId }, "Erreur réparation sortie stock à la réception");
+  }
 
   await db.update(expeditionsTable).set({
     statut:             nouveauStatut,
