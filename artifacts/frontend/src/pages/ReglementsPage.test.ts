@@ -2,11 +2,54 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { PaiementListItem } from "@workspace/api-client-react";
-import { ModalValidation } from "./ReglementsPage";
+import {
+  ModalValidation,
+  classifyReglement,
+  currentPendingFuelIds,
+  filterReglementsByTab,
+} from "./ReglementsPage";
 
 function normaliserEspaces(value: string) {
   return value.replace(/[\u00a0\u202f]/g, " ");
 }
+
+function paiement(
+  id: number,
+  values: Partial<PaiementListItem>,
+): PaiementListItem {
+  return {
+    id,
+    montantFcfa: 10_000,
+    statut: "en_attente",
+    ...values,
+  } as PaiementListItem;
+}
+
+describe("séparation des files de règlements", () => {
+  const livraison = paiement(1, { livraisonId: 11 });
+  const carburant = paiement(2, { bonCarburantId: 22, bonCarburantNumero: "BC-22" });
+  const piece = paiement(3, { depenseVehiculeId: 33 });
+  const autre = paiement(4, {});
+
+  it("classe chaque origine sans assimiler les pièces aux livraisons", () => {
+    expect(classifyReglement(livraison)).toBe("livraison");
+    expect(classifyReglement(carburant)).toBe("carburant");
+    expect(classifyReglement(piece)).toBe("piece");
+    expect(classifyReglement(autre)).toBe("autre");
+  });
+
+  it("sépare les onglets tout en conservant toutes les origines dans Tous", () => {
+    const liste = [livraison, carburant, piece, autre];
+    expect(filterReglementsByTab(liste, "livraisons").map((p) => p.id)).toEqual([1]);
+    expect(filterReglementsByTab(liste, "carburant").map((p) => p.id)).toEqual([2]);
+    expect(filterReglementsByTab(liste, "tous").map((p) => p.id)).toEqual([1, 2, 3, 4]);
+  });
+
+  it("n'autorise à la sélection groupée que les carburants en attente", () => {
+    const carburantConfirme = paiement(5, { bonCarburantId: 55, statut: "confirme" });
+    expect([...currentPendingFuelIds([livraison, carburant, piece, carburantConfirme])]).toEqual([2]);
+  });
+});
 
 describe("modale de validation d'un règlement", () => {
   let container: HTMLDivElement;

@@ -38,6 +38,32 @@ function telProducteur(p: PaiementListItem) {
 function isBonCarburant(p: PaiementListItem) {
   return !!p.bonCarburantId;
 }
+export type ReglementType = "livraison" | "carburant" | "piece" | "autre";
+export type ReglementOnglet = "livraisons" | "carburant" | "tous";
+
+export function classifyReglement(p: PaiementListItem): ReglementType {
+  if (p.bonCarburantId) return "carburant";
+  if (p.livraisonId) return "livraison";
+  if (p.depenseVehiculeId) return "piece";
+  return "autre";
+}
+
+export function filterReglementsByTab(
+  paiements: PaiementListItem[],
+  tab: ReglementOnglet,
+) {
+  if (tab === "livraisons") return paiements.filter((p) => classifyReglement(p) === "livraison");
+  if (tab === "carburant") return paiements.filter((p) => classifyReglement(p) === "carburant");
+  return paiements;
+}
+
+export function currentPendingFuelIds(paiements: PaiementListItem[]) {
+  return new Set(
+    paiements
+      .filter((p) => p.statut === "en_attente" && classifyReglement(p) === "carburant")
+      .map((p) => p.id),
+  );
+}
 function livraisonAvecSolde(p: PaiementListItem) {
   const statut = (p.livraisonStatutPaiement ?? "").normalize("NFD").replace(/\p{Diacritic}/gu, "").toUpperCase();
   return !!p.livraisonId && ["EN_ATTENTE", "PARTIEL", "DIFFERE"].includes(statut);
@@ -193,6 +219,22 @@ function ModeBadge({
   return (
     <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${cfg.cls}`}>
       {cfg.icon}{cfg.label}
+    </span>
+  );
+}
+
+function TypeReglementBadge({ paiement }: { paiement: PaiementListItem }) {
+  const type = classifyReglement(paiement);
+  const config: Record<ReglementType, { label: string; cls: string }> = {
+    livraison: { label: "Livraison", cls: "bg-green-50 text-green-700 border-green-200" },
+    carburant: { label: "Bon de carburant", cls: "bg-amber-50 text-amber-700 border-amber-200" },
+    piece: { label: "Pièce de rechange", cls: "bg-purple-50 text-purple-700 border-purple-200" },
+    autre: { label: "Autre", cls: "bg-gray-50 text-gray-600 border-gray-200" },
+  };
+  const cfg = config[type];
+  return (
+    <span className={`inline-flex items-center text-[11px] px-2 py-0.5 rounded-full font-medium border ${cfg.cls}`}>
+      {cfg.label}
     </span>
   );
 }
@@ -1421,6 +1463,7 @@ export default function ReglementsPage() {
   const [filtreSansMode, setFiltreSansMode] = useState(false);
   const [filtreProxy, setFiltreProxy] = useState(false);
   const [recherche, setRecherche] = useState("");
+  const [onglet, setOnglet] = useState<ReglementOnglet>("livraisons");
   const [modal, setModal] = useState<ModalState>(null);
   const [transportModal, setTransportModal] = useState<FraisTransportARegler | null>(null);
   const [lotCarburantOuvert, setLotCarburantOuvert] = useState(false);
@@ -1713,14 +1756,30 @@ export default function ReglementsPage() {
       (p.bonCarburantNumero ?? "").toLowerCase().includes(r)
     );
   });
-  const bonsCarburantEnAttente = filtreStatut === "en_attente"
-    ? filtres.filter((p) => p.statut === "en_attente" && isBonCarburant(p))
+  const paiementsAffiches = filterReglementsByTab(filtres, onglet);
+  const countsOnglets = {
+    livraisons: filtres.filter((p) => classifyReglement(p) === "livraison").length,
+    carburant: filtres.filter((p) => classifyReglement(p) === "carburant").length,
+    tous: filtres.length,
+  };
+  const bonsCarburantEnAttente = filtreStatut === "en_attente" && onglet === "carburant"
+    ? paiementsAffiches.filter((p) => p.statut === "en_attente" && classifyReglement(p) === "carburant")
     : [];
   const bonsCarburantSelectionnes = bonsCarburantEnAttente.filter((p) => paiementsCarburantSelectionnes.includes(p.id));
   const tousLesBonsCarburantSontSelectionnes = bonsCarburantEnAttente.length > 0
     && bonsCarburantEnAttente.every((p) => paiementsCarburantSelectionnes.includes(p.id));
 
+  useEffect(() => {
+    const idsCourants = currentPendingFuelIds(filtres);
+    setPaiementsCarburantSelectionnes((current) => {
+      const next = current.filter((id) => idsCourants.has(id));
+      return next.length === current.length ? current : next;
+    });
+    if (onglet !== "carburant" && lotCarburantOuvert) setLotCarburantOuvert(false);
+  }, [filtres, onglet, lotCarburantOuvert]);
+
   function basculerSelectionCarburant(id: number) {
+    if (!currentPendingFuelIds(filtres).has(id) || onglet !== "carburant") return;
     setPaiementsCarburantSelectionnes((current) =>
       current.includes(id) ? current.filter((value) => value !== id) : [...current, id],
     );
@@ -2027,7 +2086,7 @@ export default function ReglementsPage() {
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="search"
-            placeholder="Rechercher par nom ou téléphone…"
+             placeholder={onglet === "carburant" ? "Rechercher un bon carburant…" : "Rechercher par nom ou téléphone…"}
             value={recherche}
             onChange={(e) => setRecherche(e.target.value)}
             className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-green-400"
@@ -2116,7 +2175,55 @@ export default function ReglementsPage() {
         </button>
       </div>
 
-      {peutValider && filtreStatut === "en_attente" && bonsCarburantEnAttente.length > 0 && (
+      <div className="flex flex-wrap gap-2 border-b border-gray-200">
+        {([
+          ["livraisons", "Livraisons"],
+          ["carburant", "Bons de carburant"],
+          ["tous", "Tous"],
+        ] as const).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => {
+              setOnglet(value);
+              setPaiementsCarburantSelectionnes([]);
+              setLotCarburantOuvert(false);
+            }}
+            className={`px-3 py-2 text-sm font-semibold border-b-2 ${
+              onglet === value
+                ? "border-green-700 text-green-800"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            {label} <span className="text-xs font-normal">({countsOnglets[value]})</span>
+          </button>
+        ))}
+      </div>
+
+      {(() => {
+        const enAttente = filtres.filter((p) => p.statut === "en_attente");
+        const pendingDelivery = enAttente
+          .filter((p) => classifyReglement(p) === "livraison")
+          .reduce((sum, p) => sum + montantRestantLivraison(p), 0);
+        const pendingFuel = enAttente
+          .filter((p) => classifyReglement(p) === "carburant")
+          .reduce((sum, p) => sum + p.montantFcfa, 0);
+        const pendingOverall = enAttente.reduce((sum, p) => sum + (
+          classifyReglement(p) === "livraison" ? montantRestantLivraison(p) : p.montantFcfa
+        ), 0);
+        return (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <StatCard icon={<Package size={16} className="text-green-700" />} bg="bg-green-50"
+              label="Livraisons en attente (chargées)" value={fmt(pendingDelivery)} sub="" subCls="" />
+            <StatCard icon={<Fuel size={16} className="text-amber-700" />} bg="bg-amber-50"
+              label="Carburant en attente (chargé)" value={fmt(pendingFuel)} sub="" subCls="" />
+            <StatCard icon={<TrendingUp size={16} className="text-gray-600" />} bg="bg-gray-50"
+              label="Total en attente (chargé)" value={fmt(pendingOverall)} sub="" subCls="" />
+          </div>
+        );
+      })()}
+
+      {peutValider && onglet === "carburant" && filtreStatut === "en_attente" && bonsCarburantEnAttente.length > 0 && (
         <section className="rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -2158,14 +2265,14 @@ export default function ReglementsPage() {
         <div className="flex justify-center py-16">
           <Loader2 className="animate-spin text-gray-300" size={32} />
         </div>
-      ) : filtres.length === 0 ? (
+      ) : paiementsAffiches.length === 0 ? (
         <div className="text-center py-16">
           <CheckCheck size={40} className="mx-auto text-gray-300 mb-3" />
           <p className="text-gray-400 text-sm">Aucun paiement{filtreStatut === "en_attente" ? " en attente" : ""}</p>
         </div>
       ) : (
         <div className="space-y-2">
-          {filtres.map((p) => (
+          {paiementsAffiches.map((p) => (
             <PaiementRow
               key={p.id}
               paiement={p}
@@ -2174,7 +2281,7 @@ export default function ReglementsPage() {
               peutAnnulerRejet={peutAnnulerRejet}
               maintenant={maintenant}
               isDelegue={isDelegue}
-              selectable={p.statut === "en_attente" && isBonCarburant(p)}
+              selectable={onglet === "carburant" && p.statut === "en_attente" && classifyReglement(p) === "carburant"}
               selected={paiementsCarburantSelectionnes.includes(p.id)}
               onToggle={() => basculerSelectionCarburant(p.id)}
               onValider={() => setModal({ type: "valider", paiement: p })}
@@ -2219,10 +2326,23 @@ export default function ReglementsPage() {
           sessionCaisseOuverte={isDelegue ? sessionDelegueOuverte : sessionCentraleOuverte}
           isDelegue={isDelegue}
           onClose={() => setLotCarburantOuvert(false)}
-          onConfirm={(input) => validerLotCarburantMut.mutate({
-            paiementIds: bonsCarburantSelectionnes.map((paiement) => paiement.id),
-            ...input,
-          })}
+          onConfirm={(input) => {
+            const idsDisponibles = currentPendingFuelIds(filtres);
+            const paiementIds = bonsCarburantSelectionnes
+              .map((paiement) => paiement.id)
+              .filter((id) => idsDisponibles.has(id));
+            if (paiementIds.length === 0 || paiementIds.length !== bonsCarburantSelectionnes.length) {
+              setPaiementsCarburantSelectionnes((current) => current.filter((id) => idsDisponibles.has(id)));
+              setLotCarburantOuvert(false);
+              toast({
+                title: "Sélection actualisée",
+                description: "Un ou plusieurs bons ne sont plus en attente. Veuillez vérifier la sélection.",
+                variant: "destructive",
+              });
+              return;
+            }
+            validerLotCarburantMut.mutate({ paiementIds, ...input });
+          }}
           loading={validerLotCarburantMut.isPending}
         />
       )}
@@ -2342,6 +2462,7 @@ function PaiementRow({
             <p className="font-semibold text-gray-900 text-sm">
               {nomProducteur(p)}
             </p>
+            <TypeReglementBadge paiement={p} />
             <StatutBadge statut={p.statut} />
             <ModeBadge
               mode={p.modePaiement ?? (p.lignes?.length === 1 ? p.lignes[0]?.modePaiement : null)}
