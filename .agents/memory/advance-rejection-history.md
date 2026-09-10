@@ -7,4 +7,4 @@ Lorsqu’une correction d’avance remet un règlement rejeté en attente, le mo
 
 **Why:** le règlement courant doit redevenir actionnable, mais supprimer le motif sans le reporter dans l’historique détruit la traçabilité comptable du rejet précédent.
 
-**How to apply:** lors de toute inversion automatique de retenue, verrouiller les paiements, bloquer les statuts confirmés/effectués, conserver les motifs rejetés dans l’historique, puis seulement remettre le paiement en attente.
+**How to apply:** enregistrer un plan reporté doit inverser dans la même transaction les retenues tracées sur les livraisons antérieures à la date; verrouiller les paiements, bloquer les statuts confirmés/effectués, conserver les motifs rejetés dans l’historique, puis seulement remettre le paiement en attente.

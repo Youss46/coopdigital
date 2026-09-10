@@ -1,7 +1,10 @@
 import { pool } from "@workspace/db";
 import type { Request, Response } from "express";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { corrigerDateApplicationAvance } from "../controllers/avancesController.js";
+import {
+  corrigerDateApplicationAvance,
+  updatePlanAvanceMembre,
+} from "../controllers/avancesController.js";
 
 const enabled =
   process.env.RUN_POSTGRES_INTEGRATION === "1" &&
@@ -23,6 +26,7 @@ function makeResponse(): TestResponse {
   const res = {
     status: vi.fn(),
     json: vi.fn(),
+    locals: {},
   };
   res.status.mockReturnValue(res);
   return res as unknown as TestResponse;
@@ -169,6 +173,19 @@ describe.skipIf(!enabled)("correction d'avance rejetée sur PostgreSQL", () => {
     } as unknown as Request;
   }
 
+  function makePlanRequest(avanceId: number): Request {
+    return {
+      params: { id: String(avanceId) },
+      body: {
+        plan_type: "reporte",
+        report_date: "2026-09-01",
+        deduction_source: "livraison",
+      },
+      user: { cooperativeId, id: 1 },
+      log: { error: () => undefined },
+    } as unknown as Request;
+  }
+
   async function readState(fixture: Fixture) {
     const avance = await client.query(
       `SELECT plan_type, report_date::text, montant_rembourse_fcfa,
@@ -245,6 +262,42 @@ describe.skipIf(!enabled)("correction d'avance rejetée sur PostgreSQL", () => {
     expect(
       (await readState(fixture)).remboursement.note,
     ).toContain("Correction après contrôle de la date");
+  });
+
+  it("recalcule automatiquement les livraisons existantes quand le plan est reporté", async () => {
+    const fixture = await createFixture(2000);
+    const res = makeResponse();
+
+    await updatePlanAvanceMembre(makePlanRequest(fixture.avanceId), res);
+
+    expect(res.status).not.toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        montantRestaure: 4000,
+        reglementsRecalcules: 1,
+      }),
+    );
+    const state = await readState(fixture);
+    expect(state.avance).toEqual(expect.objectContaining({
+      plan_type: "reporte",
+      report_date: "2026-09-01",
+      montant_rembourse_fcfa: 0,
+      solde_restant_fcfa: 10000,
+    }));
+    expect(state.livraison).toEqual(expect.objectContaining({
+      avance_deduite_fcfa: 0,
+      montant_net_fcfa: 10000,
+      montant_restant: "10000.00",
+      statut_paiement: "EN_ATTENTE",
+    }));
+    expect(state.paiement).toEqual(expect.objectContaining({
+      montant_fcfa: 6000,
+      statut: "en_attente",
+      motif_rejet: null,
+    }));
+    expect(state.remboursement.note).toContain(
+      "Recalcul automatique après modification du plan de retenue",
+    );
   });
 
   it("annule toutes les mises à jour si le recalcul du paiement échoue", async () => {

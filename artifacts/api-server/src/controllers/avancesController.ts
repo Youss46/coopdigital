@@ -726,6 +726,22 @@ export async function updatePlanAvanceMembre(req: Request, res: Response): Promi
       res.status(400).json({ erreur: "Une date de reprise valide est requise" }); return;
     }
 
+    // Le report d'une avance doit aussi corriger les livraisons déjà créées.
+    // On réutilise le parcours transactionnel de correction afin que le plan,
+    // les soldes, les historiques, les nets et les règlements restent cohérents.
+    if (finalPlan === "reporte" && finalReportDate) {
+      req.body = {
+        ...req.body,
+        date_application: finalReportDate,
+        motif: typeof req.body?.motif === "string" && req.body.motif.trim()
+          ? req.body.motif.trim()
+          : "Recalcul automatique après modification du plan de retenue",
+        deduction_source: deduction_source ?? row.avance.deductionSource ?? "livraison",
+      };
+      await corrigerDateApplicationAvance(req, res);
+      return;
+    }
+
     const [updated] = await db
       .update(avancesTable)
       .set({
@@ -762,9 +778,10 @@ export async function corrigerDateApplicationAvance(req: Request, res: Response)
   }
 
   const id = parseInt(String(req.params["id"] ?? "0"));
-  const { date_application, motif } = req.body as {
+  const { date_application, motif, deduction_source } = req.body as {
     date_application?: unknown;
     motif?: unknown;
+    deduction_source?: unknown;
   };
 
   if (!Number.isInteger(id) || id <= 0) {
@@ -778,6 +795,14 @@ export async function corrigerDateApplicationAvance(req: Request, res: Response)
   const motifCorrection = typeof motif === "string" ? motif.trim().slice(0, 500) : "";
   if (!motifCorrection) {
     res.status(400).json({ erreur: "Le motif de la correction est obligatoire" });
+    return;
+  }
+  if (
+    deduction_source !== undefined
+    && deduction_source !== "livraison"
+    && deduction_source !== "commission"
+  ) {
+    res.status(400).json({ erreur: "deduction_source invalide (livraison | commission)" });
     return;
   }
 
@@ -918,6 +943,10 @@ export async function corrigerDateApplicationAvance(req: Request, res: Response)
         .set({
           planType: "reporte",
           reportDate: date_application,
+          montantPartielFcfa: null,
+          deductionSource: deduction_source === "livraison" || deduction_source === "commission"
+            ? deduction_source
+            : avance.avance.deductionSource,
           montantRembourse_fcfa: nouveauRembourse,
           soldeRestantFcfa: nouveauSolde,
           statut: nouveauSolde === 0 ? "rembourse" : "en_cours",
