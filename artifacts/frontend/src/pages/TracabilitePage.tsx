@@ -757,19 +757,19 @@ export function DetailModal({
                           return (
                             <div key={`${etape.dateChangement}-${index}`} className="relative flex items-start gap-3">
                               <div className="absolute -left-4 w-3.5 h-3.5 rounded-full bg-white border-2 border-orange-500 flex-shrink-0 mt-0.5" />
-                              <div className="ml-2 min-w-0">
-                                <p className="text-sm font-medium text-gray-800">
+                              <div className="ml-2 min-w-0 break-words">
+                                <p className="text-sm font-medium text-gray-800 break-words">
                                   {precedent ? `${precedent} → ${nouveau}` : nouveau}
                                 </p>
                                 <p className="text-xs text-gray-400 break-words">
                                   {etape.expeditionNumero ? `${etape.expeditionNumero} · ` : ""}
                                   Validé le {formaterDateHeure(etape.dateChangement)}
                                 </p>
-                                <p className="text-xs text-gray-500 mt-0.5">
+                                <p className="text-xs text-gray-500 mt-0.5 break-words">
                                   Validé par : {auteur || "Système"}
                                 </p>
                                 {etape.notes && (
-                                  <p className="text-xs text-gray-500 mt-0.5">{etape.notes}</p>
+                                  <p className="text-xs text-gray-500 mt-0.5 break-words">{etape.notes}</p>
                                 )}
                               </div>
                             </div>
@@ -792,15 +792,15 @@ export function DetailModal({
                     <div className="absolute left-[7px] top-2 bottom-2 w-px bg-gray-200" />
                     <div className="space-y-3">
                       {timeline.map((ev, i) => (
-                        <div key={i} className="relative flex items-start gap-3">
+                        <div key={i} className="relative flex items-start gap-3 min-w-0">
                           <div className="absolute -left-4 w-3.5 h-3.5 rounded-full bg-white border-2 border-[#1a4731] flex-shrink-0 mt-0.5" />
-                          <div className="ml-2">
-                            <p className="text-sm font-medium text-gray-800">
+                          <div className="ml-2 min-w-0 break-words">
+                            <p className="text-sm font-medium text-gray-800 break-words">
                               {ev.icon} {ev.label}
                             </p>
-                            <p className="text-xs text-gray-400">{formaterDate(ev.date)}</p>
+                            <p className="text-xs text-gray-400 break-words">{formaterDate(ev.date)}</p>
                             {ev.detail && (
-                              <p className="text-xs text-red-500 mt-0.5">{ev.detail}</p>
+                              <p className="text-xs text-red-500 mt-0.5 break-words">{ev.detail}</p>
                             )}
                           </div>
                         </div>

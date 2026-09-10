@@ -179,4 +179,47 @@ describe("timeline d'expédition sur mobile", () => {
     expect(timestamp?.className).toContain("break-words");
     expect(timestamp?.parentElement?.className).toContain("min-w-0");
   });
+
+  it("replie les transitions, auteurs et notes à 320 px", async () => {
+    const narrowLotData = {
+      ...lotData,
+      expeditionHistorique: [
+        {
+          ...lotData.expeditionHistorique[0],
+          statutPrecedent: "en_attente_de_validation_du_chargement",
+          statutNouveau: "receptionne_apres_controle_qualite_complet",
+          faitParPrenoms: "Alexandrine",
+          faitParNom: "NomDeFamilleTresLongSansEspace",
+          notes:
+            "Note très longue qui doit rester dans la fiche même sur un écran compact de trois cent vingt pixels.",
+        },
+      ],
+    } as unknown as LotTracabilite;
+    useGetLotTracabiliteMock.mockReturnValue({ data: narrowLotData, isLoading: false });
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 320 });
+
+    await act(async () => {
+      root.render(createElement(DetailModal, {
+        lotId: 7,
+        onClose: vi.fn(),
+        onStatutChange: vi.fn(),
+        peutModifier: false,
+      }));
+    });
+
+    const transition = Array.from(container.querySelectorAll("p")).find((p) =>
+      p.textContent?.includes("→"),
+    );
+    const author = Array.from(container.querySelectorAll("p")).find((p) =>
+      p.textContent?.includes("Validé par : Alexandrine"),
+    );
+    const note = Array.from(container.querySelectorAll("p")).find((p) =>
+      p.textContent?.includes("Note très longue"),
+    );
+
+    expect(transition?.className).toContain("break-words");
+    expect(author?.className).toContain("break-words");
+    expect(note?.className).toContain("break-words");
+    expect(transition?.parentElement?.className).toContain("min-w-0");
+  });
 });
