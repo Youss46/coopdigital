@@ -177,6 +177,60 @@
           "name": "compte_source_id"
         }
       ]
+    },
+    {
+      "migration": "0168_avances_terminal_status",
+      "objects": [
+        {
+          "kind": "table",
+          "schema": "public",
+          "table": "avances"
+        }
+      ]
+    },
+    {
+      "migration": "0169_avances_terminal_metadata",
+      "objects": [
+        {
+          "kind": "column",
+          "schema": "public",
+          "table": "avances",
+          "name": "statut_action_reason"
+        },
+        {
+          "kind": "constraint",
+          "schema": "public",
+          "table": "avances",
+          "name": "avances_terminal_metadata_check"
+        }
+      ]
+    },
+    {
+      "migration": "0170_avances_delegues_terminal_status",
+      "objects": [
+        {
+          "kind": "table",
+          "schema": "public",
+          "table": "avances_delegues"
+        }
+      ]
+    },
+    {
+      "migration": "0171_avances_delegues_terminal_metadata",
+      "objects": [
+        {
+          "kind": "column",
+          "schema": "public",
+          "table": "avances_delegues",
+          "name": "statut_action_reason"
+        },
+        {
+          "kind": "constraint",
+          "schema": "public",
+          "table": "avances_delegues",
+          "name": "avances_delegues_terminal_metadata_check"
+        }
+      ]
     }
   ]
 }

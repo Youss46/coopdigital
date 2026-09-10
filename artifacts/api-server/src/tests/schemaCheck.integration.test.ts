@@ -109,7 +109,27 @@ describe.skipIf(!enabled)("contrôles du schéma PostgreSQL", () => {
           ON ${qualifiedIdentifier(schemaName, "reglements_cartes_producteurs")} (paiement_id);
         CREATE INDEX ${quoteIdentifier("reglements_cartes_producteurs_cooperative_statut_idx")}
           ON ${qualifiedIdentifier(schemaName, "reglements_cartes_producteurs")}
-           (cooperative_id, statut);`,
+           (cooperative_id, statut);
+
+        CREATE TABLE ${qualifiedIdentifier(schemaName, "avances")} (
+          id integer NOT NULL,
+          statut text NOT NULL,
+          solde_restant_fcfa integer NOT NULL,
+          statut_action_reason text
+        );
+        ALTER TABLE ${qualifiedIdentifier(schemaName, "avances")}
+          ADD CONSTRAINT ${quoteIdentifier("avances_terminal_metadata_check")}
+          CHECK (true);
+
+        CREATE TABLE ${qualifiedIdentifier(schemaName, "avances_delegues")} (
+          id integer NOT NULL,
+          statut text NOT NULL,
+          solde_restant_fcfa integer NOT NULL,
+          statut_action_reason text
+        );
+        ALTER TABLE ${qualifiedIdentifier(schemaName, "avances_delegues")}
+          ADD CONSTRAINT ${quoteIdentifier("avances_delegues_terminal_metadata_check")}
+          CHECK (true);`,
     );
   });
 
