@@ -984,6 +984,40 @@ export async function confirmerReception(
   }
 
   const poidsCharge = parseFloat(String(exp.poidsChargeKg ?? "0"));
+
+  // La première confirmation peut avoir validé toute la transaction pendant
+  // que cette requête attendait le verrou. Un rejeu doit rester idempotent :
+  // réparer uniquement une sortie de stock historique éventuellement absente,
+  // sans recréer l'événement métier ni ses effets comptables.
+  if (exp.statut === "receptionne" || exp.statut === "litige") {
+    await deduireStockChargementDansTransaction(
+      tx,
+      expeditionId,
+      cooperativeId,
+      userId,
+      exp.numeroExpedition,
+    );
+
+    const ecartPoidsExistant = Number(exp.ecartPoidsKg ?? 0);
+    const tauxEcartExistant = poidsCharge > 0
+      ? Math.abs(ecartPoidsExistant) / poidsCharge
+      : 0;
+
+    return {
+      statut:         exp.statut,
+      ecartKg:        ecartPoidsExistant,
+      tauxEcartPct:   tauxEcartExistant * 100,
+      provisionLitige: exp.provisionLitige,
+      niveauAlerte:    exp.statut === "litige"
+        ? "litige"
+        : tauxEcartExistant <= SEUIL_ACCEPTABLE
+          ? "acceptable"
+          : tauxEcartExistant <= SEUIL_LITIGE
+            ? "a_justifier"
+            : "litige",
+    };
+  }
+
   const poidsRecu   = input.poidsRecuPortKg;
   const poidsRefoule = input.poidsRefuleKg ?? 0;
   const poidsAccepte = calculerPoidsAcceptePort(poidsRecu, poidsRefoule);

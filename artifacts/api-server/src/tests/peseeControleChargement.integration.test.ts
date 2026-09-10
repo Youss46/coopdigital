@@ -213,6 +213,11 @@ describe.skipIf(!enabled)(
             [cooperativeId],
           );
           await client.query(
+            `DELETE FROM traitements_refus
+              WHERE cooperative_id = $1`,
+            [cooperativeId],
+          );
+          await client.query(
             `DELETE FROM config_comptable
               WHERE cooperative_id = $1`,
             [cooperativeId],
@@ -857,7 +862,7 @@ describe.skipIf(!enabled)(
       });
     });
 
-    it("crée une sortie par entrepôt avec les totaux de ses lots et résiste aux réparations concurrentes", async () => {
+    it("n'accepte qu'une réception concurrente et ne duplique aucun effet", async () => {
       await setControleChargementObligatoire(false);
 
       const id = await createTransitionExpedition(2200);
@@ -954,11 +959,17 @@ describe.skipIf(!enabled)(
           poidsRecuPortKg: 2200,
           numeroRecepissePort: `REC-MULTI-${id}`,
           nomReceptionnaire: "Réception concurrente",
+          poidsRefuleKg: 100,
+          nombreSacsRefoules: 1,
+          motifRefus: "Sac endommagé",
         }),
         confirmerReception(cooperativeId, id, testUserId, {
           poidsRecuPortKg: 2200,
           numeroRecepissePort: `REC-MULTI-${id}`,
           nomReceptionnaire: "Réception concurrente",
+          poidsRefuleKg: 100,
+          nombreSacsRefoules: 1,
+          motifRefus: "Sac endommagé",
         }),
       ]);
       expect(receptions).toHaveLength(2);
@@ -994,6 +1005,37 @@ describe.skipIf(!enabled)(
           },
         ]),
       );
+
+      const receptionEffects = await client.query(
+        `SELECT
+           (SELECT statut FROM expeditions WHERE id = $1) AS statut,
+           (SELECT count(*)::int
+              FROM expedition_historique
+             WHERE expedition_id = $1
+               AND statut_nouveau = 'receptionne') AS historiques,
+           (SELECT count(*)::int
+              FROM traitements_refus
+             WHERE expedition_id = $1
+               AND source_type = 'reception_port') AS refus,
+           ((SELECT count(*)
+               FROM ecritures_comptables
+              WHERE cooperative_id = $2
+                AND source = 'stock'
+                AND source_id = $1)
+            +
+            (SELECT count(*)
+               FROM ecritures_en_attente
+              WHERE cooperative_id = $2
+                AND source = 'stock'
+                AND source_id = $1))::int AS ecritures`,
+        [id, cooperativeId],
+      );
+      expect(receptionEffects.rows[0]).toEqual({
+        statut: "receptionne",
+        historiques: 1,
+        refus: 1,
+        ecritures: 1,
+      });
     });
 
     it("préserve le comportement historique quand le contrôle obligatoire est désactivé", async () => {
