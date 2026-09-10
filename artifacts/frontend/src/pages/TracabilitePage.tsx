@@ -61,6 +61,9 @@ export function formaterDateHeure(d: string) {
     second: "2-digit",
   }).format(new Date(d));
 }
+export function obtenirFuseauHoraireLocal() {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone ?? "fuseau local";
+}
 function formaterPoids(kg: string | number) {
   const v = parseFloat(String(kg));
   return v >= 1000 ? `${(v / 1000).toFixed(2)} T` : `${v.toFixed(1)} kg`;
@@ -735,6 +738,9 @@ export function DetailModal({
                   <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
                     <Truck size={14} /> Historique des expéditions liées
                   </h3>
+                  <p className="text-[11px] text-gray-400 mb-2">
+                    Heures affichées selon le fuseau de l’appareil : {obtenirFuseauHoraireLocal()}
+                  </p>
                   {data.expeditionHistorique.length > 0 ? (
                     <div className="relative pl-4">
                       <div className="absolute left-[7px] top-2 bottom-2 w-px bg-gray-200" />

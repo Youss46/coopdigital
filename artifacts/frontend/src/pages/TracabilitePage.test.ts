@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { LotTracabilite } from "@workspace/api-client-react";
-import { construireExportEudr, DetailModal } from "./TracabilitePage";
+import { construireExportEudr, DetailModal, obtenirFuseauHoraireLocal } from "./TracabilitePage";
 
 const { useGetLotTracabiliteMock } = vi.hoisted(() => ({
   useGetLotTracabiliteMock: vi.fn(),
@@ -169,6 +169,9 @@ describe("timeline d'expédition sur mobile", () => {
     expect(container.textContent).toContain("Validé le 10 sept. 2026, 09:00:00");
     expect(container.textContent).toContain("Validé le 10 sept. 2026, 14:30:00");
     expect(container.textContent).toContain("Validé par : Système");
+    expect(container.textContent).toContain(
+      `Heures affichées selon le fuseau de l’appareil : ${obtenirFuseauHoraireLocal()}`,
+    );
 
     const timestamp = Array.from(container.querySelectorAll("p")).find((p) =>
       p.textContent?.includes("09:00:00"),
