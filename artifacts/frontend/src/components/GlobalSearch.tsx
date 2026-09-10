@@ -47,19 +47,27 @@ function formatFcfa(n: number): string {
   return n.toLocaleString("fr-FR") + " FCFA";
 }
 
-const HISTORY_KEY = "coop_search_history";
+const HISTORY_KEY_PREFIX = "coop_search_history";
+const LEGACY_HISTORY_KEY = HISTORY_KEY_PREFIX;
 const HISTORY_MAX = 5;
 
-function loadHistory(): string[] {
-  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) ?? "[]") as string[]; }
+export function getHistoryKey(userId: number | null | undefined): string | null {
+  return userId == null ? null : `${HISTORY_KEY_PREFIX}:${userId}`;
+}
+
+export function loadHistory(userId: number | null | undefined): string[] {
+  const key = getHistoryKey(userId);
+  if (!key) return [];
+  try { return JSON.parse(localStorage.getItem(key) ?? "[]") as string[]; }
   catch { return []; }
 }
 
-function saveToHistory(q: string) {
+export function saveToHistory(userId: number | null | undefined, q: string) {
   const trimmed = q.trim();
-  if (!trimmed || trimmed.length < 2) return;
-  const prev = loadHistory().filter((h) => h !== trimmed);
-  localStorage.setItem(HISTORY_KEY, JSON.stringify([trimmed, ...prev].slice(0, HISTORY_MAX)));
+  const key = getHistoryKey(userId);
+  if (!key || !trimmed || trimmed.length < 2) return;
+  const prev = loadHistory(userId).filter((h) => h !== trimmed);
+  localStorage.setItem(key, JSON.stringify([trimmed, ...prev].slice(0, HISTORY_MAX)));
 }
 
 export default function GlobalSearch() {
@@ -77,6 +85,14 @@ export default function GlobalSearch() {
   const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const debouncedQ = useDebounce(query, 300);
+  const historyUserId = utilisateur?.id;
+  const historyKey = getHistoryKey(historyUserId);
+
+  // Les recherches de l’ancienne version étaient partagées par tous les comptes.
+  // Les supprimer évite de les réafficher après la mise à jour.
+  useEffect(() => {
+    localStorage.removeItem(LEGACY_HISTORY_KEY);
+  }, []);
 
   useEffect(() => {
     if (debouncedQ.length < 2) { setResults(null); setError(""); return; }
@@ -124,16 +140,16 @@ export default function GlobalSearch() {
 
   // Charger l'historique à l'ouverture
   useEffect(() => {
-    if (open) setHistory(loadHistory());
-  }, [open]);
+    setHistory(open ? loadHistory(historyUserId) : []);
+  }, [open, historyUserId]);
 
   const doNavigate = useCallback((action: () => void) => {
-    saveToHistory(query);
-    setHistory(loadHistory());
+    saveToHistory(historyUserId, query);
+    setHistory(loadHistory(historyUserId));
     action();
     close();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query]);
+  }, [historyUserId, query]);
 
   const close = useCallback(() => {
     setOpen(false);
@@ -271,7 +287,10 @@ export default function GlobalSearch() {
                       <div className="flex items-center justify-between mb-2">
                         <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Recherches récentes</p>
                         <button
-                          onClick={() => { localStorage.removeItem(HISTORY_KEY); setHistory([]); }}
+                          onClick={() => {
+                            if (historyKey) localStorage.removeItem(historyKey);
+                            setHistory([]);
+                          }}
                           className="text-xs text-gray-400 hover:text-red-500 transition-colors"
                         >
                           Effacer
