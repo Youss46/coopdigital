@@ -32,6 +32,25 @@ const livraisonSelect = {
   membrePrenoms: membresTable.prenoms,
 };
 
+const lotExpeditionSelect = {
+  expeditionStatut: sql<string | null>`(
+    SELECT e.statut
+    FROM expedition_lots el
+    INNER JOIN expeditions e ON e.id = el.expedition_id
+    WHERE el.lot_id = ${lotsTable.id}
+    ORDER BY e.created_at DESC
+    LIMIT 1
+  )`,
+  expeditionNumero: sql<string | null>`(
+    SELECT e.numero_expedition
+    FROM expedition_lots el
+    INNER JOIN expeditions e ON e.id = el.expedition_id
+    WHERE el.lot_id = ${lotsTable.id}
+    ORDER BY e.created_at DESC
+    LIMIT 1
+  )`,
+};
+
 export async function listLots(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
   if (!cooperativeId) {
@@ -65,6 +84,7 @@ export async function listLots(req: Request, res: Response): Promise<void> {
         venteExportateurId: lotsTable.venteExportateurId,
         parentLotIds: lotsTable.parentLotIds,
         nombreSacs: lotsTable.nombreSacs,
+        ...lotExpeditionSelect,
         nbLivraisons: sql<number>`count(${lotLivraisonsTable.livraisonId})::int`,
         nbProducteurs: sql<number>`count(distinct ${livraisonsTable.membreId})::int`,
       })
@@ -433,6 +453,7 @@ export async function createLot(req: Request, res: Response): Promise<void> {
         venteExportateurId: lotsTable.venteExportateurId,
         parentLotIds: lotsTable.parentLotIds,
         nombreSacs: lotsTable.nombreSacs,
+        ...lotExpeditionSelect,
         nbLivraisons: sql<number>`count(${lotLivraisonsTable.livraisonId})::int`,
         nbProducteurs: sql<number>`count(distinct ${livraisonsTable.membreId})::int`,
       })
@@ -471,6 +492,7 @@ export async function getLotByQr(req: Request, res: Response): Promise<void> {
         venteExportateurId: lotsTable.venteExportateurId,
         parentLotIds: lotsTable.parentLotIds,
         nombreSacs: lotsTable.nombreSacs,
+        ...lotExpeditionSelect,
         nbLivraisons: sql<number>`count(${lotLivraisonsTable.livraisonId})::int`,
         nbProducteurs: sql<number>`count(distinct ${livraisonsTable.membreId})::int`,
       })
@@ -624,6 +646,7 @@ export async function fusionnerLots(req: Request, res: Response): Promise<void> 
           venteExportateurId: lotsTable.venteExportateurId,
           parentLotIds: lotsTable.parentLotIds,
           nombreSacs: lotsTable.nombreSacs,
+          ...lotExpeditionSelect,
           nbLivraisons: sql<number>`count(${lotLivraisonsTable.livraisonId})::int`,
           nbProducteurs: sql<number>`count(distinct ${livraisonsTable.membreId})::int`,
         })
@@ -663,6 +686,7 @@ export async function getLotTracabilite(req: Request, res: Response): Promise<vo
         venteExportateurId: lotsTable.venteExportateurId,
         parentLotIds: lotsTable.parentLotIds,
         nombreSacs: lotsTable.nombreSacs,
+        ...lotExpeditionSelect,
         nbLivraisons: sql<number>`count(${lotLivraisonsTable.livraisonId})::int`,
         nbProducteurs: sql<number>`count(distinct ${livraisonsTable.membreId})::int`,
       })

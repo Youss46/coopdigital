@@ -1377,6 +1377,18 @@ export const LotDetailStatut = {
   fusionne: 'fusionne',
 } as const;
 
+export type LotDetailExpeditionStatut = typeof LotDetailExpeditionStatut[keyof typeof LotDetailExpeditionStatut] | null;
+
+
+export const LotDetailExpeditionStatut = {
+  en_preparation: 'en_preparation',
+  charge: 'charge',
+  en_transit: 'en_transit',
+  arrive_port: 'arrive_port',
+  receptionne: 'receptionne',
+  litige: 'litige',
+} as const;
+
 export interface LotDetail {
   id: number;
   cooperativeId: number;
@@ -1394,6 +1406,8 @@ export interface LotDetail {
   nbLivraisons?: number;
   /** @nullable */
   nombreSacs?: number | null;
+  expeditionStatut?: LotDetailExpeditionStatut;
+  expeditionNumero?: string | null;
 }
 
 export interface LotInput {

@@ -610,7 +610,9 @@ export const GetLotsResponseItem = zod.object({
   "createdAt": zod.string(),
   "nbProducteurs": zod.number().optional(),
   "nbLivraisons": zod.number().optional(),
-  "nombreSacs": zod.number().nullish()
+  "nombreSacs": zod.number().nullish(),
+  "expeditionStatut": zod.enum(['en_preparation', 'charge', 'en_transit', 'arrive_port', 'receptionne', 'litige']).nullish(),
+  "expeditionNumero": zod.string().nullish()
 })
 export const GetLotsResponse = zod.array(GetLotsResponseItem)
 
@@ -649,7 +651,9 @@ export const GetLotByQrResponse = zod.object({
   "createdAt": zod.string(),
   "nbProducteurs": zod.number().optional(),
   "nbLivraisons": zod.number().optional(),
-  "nombreSacs": zod.number().nullish()
+  "nombreSacs": zod.number().nullish(),
+  "expeditionStatut": zod.enum(['en_preparation', 'charge', 'en_transit', 'arrive_port', 'receptionne', 'litige']).nullish(),
+  "expeditionNumero": zod.string().nullish()
 })
 
 
@@ -678,7 +682,9 @@ export const UpdateLotStatutResponse = zod.object({
   "createdAt": zod.string(),
   "nbProducteurs": zod.number().optional(),
   "nbLivraisons": zod.number().optional(),
-  "nombreSacs": zod.number().nullish()
+  "nombreSacs": zod.number().nullish(),
+  "expeditionStatut": zod.enum(['en_preparation', 'charge', 'en_transit', 'arrive_port', 'receptionne', 'litige']).nullish(),
+  "expeditionNumero": zod.string().nullish()
 })
 
 
@@ -719,7 +725,9 @@ export const ExpedierLotResponse = zod.object({
   "createdAt": zod.string(),
   "nbProducteurs": zod.number().optional(),
   "nbLivraisons": zod.number().optional(),
-  "nombreSacs": zod.number().nullish()
+  "nombreSacs": zod.number().nullish(),
+  "expeditionStatut": zod.enum(['en_preparation', 'charge', 'en_transit', 'arrive_port', 'receptionne', 'litige']).nullish(),
+  "expeditionNumero": zod.string().nullish()
 })
 
 
@@ -744,7 +752,9 @@ export const GetLotTracabiliteResponse = zod.object({
   "createdAt": zod.string(),
   "nbProducteurs": zod.number().optional(),
   "nbLivraisons": zod.number().optional(),
-  "nombreSacs": zod.number().nullish()
+  "nombreSacs": zod.number().nullish(),
+  "expeditionStatut": zod.enum(['en_preparation', 'charge', 'en_transit', 'arrive_port', 'receptionne', 'litige']).nullish(),
+  "expeditionNumero": zod.string().nullish()
 }),
   "livraisons": zod.array(zod.object({
   "id": zod.number(),

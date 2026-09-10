@@ -8388,6 +8388,13 @@ components:
           type: integer
         nombreSacs:
           type: ["integer", "null"]
+        expeditionStatut:
+          type: string
+          enum: [en_preparation, charge, en_transit, arrive_port, receptionne, litige]
+          nullable: true
+        expeditionNumero:
+          type: string
+          nullable: true
 
     LotInput:
       type: object

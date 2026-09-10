@@ -74,6 +74,24 @@ const STATUT_LABELS: Record<string, string> = {
 };
 const STATUT_ORDER = ["en_stock", "transit", "vendu"];
 
+const EXPEDITION_STATUT_LABELS: Record<string, string> = {
+  en_preparation: "En préparation d'expédition",
+  charge: "Chargé",
+  en_transit: "En transit vers le port",
+  arrive_port: "Arrivé au port",
+  receptionne: "Réceptionné au port",
+  litige: "Litige au port",
+};
+
+const EXPEDITION_STATUT_COLORS: Record<string, string> = {
+  en_preparation: "bg-gray-100 text-gray-700",
+  charge: "bg-blue-100 text-blue-700",
+  en_transit: "bg-orange-100 text-orange-700",
+  arrive_port: "bg-purple-100 text-purple-700",
+  receptionne: "bg-green-100 text-green-700",
+  litige: "bg-red-100 text-red-700",
+};
+
 type LotStatut = "en_stock" | "transit" | "vendu" | "refoule" | "fusionne";
 
 function StatutTimeline({ statut }: { statut: LotStatut }) {
@@ -421,6 +439,20 @@ function DetailModal({
                       </button>
                     </div>
                     <StatutTimeline statut={statut ?? "en_stock"} />
+                    {data.lot.expeditionStatut && (
+                      <div className="mt-2 flex items-center gap-2 flex-wrap">
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            EXPEDITION_STATUT_COLORS[data.lot.expeditionStatut] ?? "bg-gray-100 text-gray-700"
+                          }`}
+                        >
+                          {EXPEDITION_STATUT_LABELS[data.lot.expeditionStatut] ?? data.lot.expeditionStatut}
+                        </span>
+                        {data.lot.expeditionNumero && (
+                          <span className="text-xs text-gray-500">{data.lot.expeditionNumero}</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="text-right">
                     <p className="text-2xl font-bold text-gray-900">{formaterPoids(data.lot.poidsTotalKg)}</p>
@@ -1236,6 +1268,20 @@ export default function TracabilitePage() {
                           >
                             {STATUT_LABELS[lot.statut]}
                           </span>
+                      {lot.expeditionStatut && (
+                        <div className="mt-1 flex flex-wrap items-center gap-1">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                              EXPEDITION_STATUT_COLORS[lot.expeditionStatut] ?? "bg-gray-100 text-gray-700"
+                            }`}
+                          >
+                            {EXPEDITION_STATUT_LABELS[lot.expeditionStatut] ?? lot.expeditionStatut}
+                          </span>
+                          {lot.expeditionNumero && (
+                            <span className="text-[11px] text-gray-400">{lot.expeditionNumero}</span>
+                          )}
+                        </div>
+                      )}
                         </td>
                         <td className="px-4 py-3">
                           <ChevronRight size={14} className="text-gray-400" />
