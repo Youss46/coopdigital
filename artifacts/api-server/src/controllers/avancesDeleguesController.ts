@@ -156,6 +156,10 @@ export async function rembourserAvanceDelegueHandler(req: Request, res: Response
       res.status(400).json({ erreur: "Avance déjà remboursée" });
       return;
     }
+    if (String(avance.statut) === "annulee" || String(avance.statut) === "cloturee") {
+      res.status(400).json({ erreur: "Cette avance est déjà terminée" });
+      return;
+    }
 
     const montant = Math.min(montantFcfa, avance.soldeRestantFcfa);
     const nouveauSolde = avance.soldeRestantFcfa - montant;
@@ -189,6 +193,16 @@ export async function getRemboursementsAvanceDelegueHandler(req: Request, res: R
   if (!cooperativeId) { res.status(403).json({ erreur: "Coopérative requise" }); return; }
   const avanceId = Number(req.params.avanceId);
   try {
+    const [owned] = await db.select({ id: avancesDeleguesTable.id })
+      .from(avancesDeleguesTable)
+      .innerJoin(usersTable, eq(usersTable.id, avancesDeleguesTable.delegueId))
+      .where(and(
+        eq(avancesDeleguesTable.id, avanceId),
+        eq(avancesDeleguesTable.delegueId, Number(req.params.agentId)),
+        eq(avancesDeleguesTable.cooperativeId, cooperativeId),
+        eq(usersTable.cooperativeId, cooperativeId),
+      )).limit(1);
+    if (!owned) { res.status(404).json({ erreur: "Avance introuvable" }); return; }
     const rows = await db
       .select()
       .from(remboursementsAvancesDeleguesTable)
@@ -225,7 +239,7 @@ export async function patchPlanAvanceDelegueHandler(req: Request, res: Response)
       .limit(1);
 
     if (!avance) { res.status(404).json({ erreur: "Avance introuvable" }); return; }
-    if (avance.statut === "rembourse") {
+    if (avance.statut === "rembourse" || String(avance.statut) === "annulee" || String(avance.statut) === "cloturee") {
       res.status(400).json({ erreur: "Impossible de modifier le plan d'une avance déjà remboursée" });
       return;
     }
@@ -254,7 +268,7 @@ export async function getAvancesDeleguesReporteesHandler(req: Request, res: Resp
     const conditions: ReturnType<typeof eq>[] = [
       eq(avancesDeleguesTable.cooperativeId, cooperativeId),
       eq(avancesDeleguesTable.planType, "reporte"),
-      ne(avancesDeleguesTable.statut, "rembourse"),
+      inArray(avancesDeleguesTable.statut, ["en_cours", "en_retard"]),
       or(isNull(avancesDeleguesTable.reportDate), lt(avancesDeleguesTable.reportDate, today))!,
     ];
 
@@ -289,6 +303,72 @@ export async function getAvancesDeleguesReporteesHandler(req: Request, res: Resp
     req.log.error(err, "getAvancesDeleguesReporteesHandler");
     res.status(500).json({ erreur: "Erreur lors de la récupération" });
   }
+}
+
+// ─── Annulation / clôture du solde (sans mouvement de trésorerie) ─────────────
+export async function terminerAvanceDelegueHandler(req: Request, res: Response, forcedAction?: "annuler" | "cloturer"): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(403).json({ erreur: "Coopérative requise" }); return; }
+  const avanceId = Number(req.params.avanceId);
+  const delegueId = Number(req.params.agentId);
+  const action = forcedAction ?? (req.path.endsWith("/annuler") ? "annuler" : "cloturer");
+  const motif = typeof req.body?.motif === "string" ? req.body.motif.trim()
+    : typeof req.body?.raison === "string" ? req.body.raison.trim() : "";
+  if (!Number.isInteger(avanceId) || !Number.isInteger(delegueId) || avanceId <= 0 || delegueId <= 0) {
+    res.status(400).json({ erreur: "Identifiant invalide" }); return;
+  }
+  if (!motif) { res.status(400).json({ erreur: "Le motif est obligatoire" }); return; }
+  if (motif.length > 500) { res.status(400).json({ erreur: "Le motif ne peut pas dépasser 500 caractères" }); return; }
+  try {
+    const updated = await db.transaction(async (tx) => {
+      const [row] = await tx.select({ avance: avancesDeleguesTable, agentCoop: usersTable.cooperativeId })
+        .from(avancesDeleguesTable)
+        .innerJoin(usersTable, eq(usersTable.id, avancesDeleguesTable.delegueId))
+        .where(and(
+          eq(avancesDeleguesTable.id, avanceId),
+          eq(avancesDeleguesTable.delegueId, delegueId),
+          eq(avancesDeleguesTable.cooperativeId, cooperativeId),
+          eq(usersTable.cooperativeId, cooperativeId),
+        ))
+        .for("update").limit(1);
+      if (!row) throw new Error("Avance introuvable");
+      const avance = row.avance;
+      if (avance.statut === "rembourse") throw new Error("Cette avance est déjà remboursée");
+      if (String(avance.statut) === "annulee" || String(avance.statut) === "cloturee") throw new Error("Cette avance est déjà terminée");
+      const history = await tx.select({ id: remboursementsAvancesDeleguesTable.id })
+        .from(remboursementsAvancesDeleguesTable)
+        .where(eq(remboursementsAvancesDeleguesTable.avanceId, avanceId)).limit(1);
+      if (action === "annuler" && (avance.montantRembourse !== 0 || history.length > 0)) {
+        throw new Error("Une avance ayant fait l'objet d'un remboursement ne peut pas être annulée");
+      }
+      if (action === "cloturer" && (avance.montantRembourse <= 0 || avance.soldeRestantFcfa <= 0)) {
+        throw new Error("La clôture du solde est réservée aux avances partiellement remboursées");
+      }
+      const [result] = await tx.update(avancesDeleguesTable).set({
+        statut: (action === "annuler" ? "annulee" : "cloturee") as any,
+        soldeRestantFcfa: 0,
+        statutActionAt: new Date(),
+        statutActionUserId: req.user?.id ?? null,
+        statutActionReason: motif,
+        montantAbandonneFcfa: avance.soldeRestantFcfa,
+      } as any).where(eq(avancesDeleguesTable.id, avanceId)).returning();
+      return result;
+    });
+    res.json(updated);
+  } catch (err) {
+    req.log.error({ err }, "Erreur terminerAvanceDelegue");
+    const message = err instanceof Error ? err.message : "Erreur interne du serveur";
+    const known = ["Avance introuvable", "déjà remboursée", "déjà terminée", "ne peut pas être annulée", "réservée"];
+    res.status(known.some((part) => message.includes(part)) ? (message === "Avance introuvable" ? 404 : 400) : 500).json({ erreur: message });
+  }
+}
+
+export function annulerAvanceDelegueHandler(req: Request, res: Response): Promise<void> {
+  return terminerAvanceDelegueHandler(req, res, "annuler");
+}
+
+export function cloturerSoldeAvanceDelegueHandler(req: Request, res: Response): Promise<void> {
+  return terminerAvanceDelegueHandler(req, res, "cloturer");
 }
 
 // ─── Résumé avances d'un délégué (solde total, nb en cours) ──────────────────

@@ -103,7 +103,7 @@ interface AvanceDelegue {
   dateOctroi: string;
   dateEcheance: string | null;
   motif: string | null;
-  statut: "en_cours" | "rembourse" | "en_retard";
+  statut: "en_cours" | "rembourse" | "en_retard" | "annulee" | "cloturee";
   planType: "integral" | "partiel" | "reporte";
   montantPartielFcfa: number | null;
   reportDate: string | null;
@@ -119,6 +119,7 @@ export default function DeleguesPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const peutGererTaux = usePermission("commissions_delegues", "gerer_taux");
+  const peutAnnulerAvance = usePermission("avances", "annuler");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showAppro, setShowAppro] = useState<number | null>(null);
   const [montant, setMontant] = useState("");
@@ -143,6 +144,8 @@ export default function DeleguesPage() {
   const [rembNote, setRembNote] = useState("");
   const [showPlanModal, setShowPlanModal] = useState<{ avanceId: number } | null>(null);
   const [editPlan, setEditPlan] = useState<{ planType: string; montantPartiel: string; reportDate: string }>({ planType: "integral", montantPartiel: "", reportDate: "" });
+  const [showTerminalModal, setShowTerminalModal] = useState<{ avanceId: number; action: "annuler" | "cloturer" } | null>(null);
+  const [terminalMotif, setTerminalMotif] = useState("");
 
   // ── Modal paiement commission ────────────────────────────────────────────
   const [showPayerModal, setShowPayerModal] = useState<{
@@ -337,6 +340,18 @@ export default function DeleguesPage() {
       toast({ title: "Remboursement enregistré" });
       setShowRembModal(null); setRembMontant(""); setRembNote("");
       qc.invalidateQueries({ queryKey: ["avances-delegue", avDelegueId] });
+    },
+    onError: (e) => toast({ title: (e as Error).message, variant: "destructive" }),
+  });
+
+  const terminalMut = useMutation({
+    mutationFn: ({ avanceId, action, motif }: { avanceId: number; action: "annuler" | "cloturer"; motif: string }) =>
+      apiFetch(`/delegues/${avDelegueId}/avances/${avanceId}/${action === "annuler" ? "annuler" : "cloturer-solde"}`, { method: "POST", body: JSON.stringify({ motif }) }),
+    onSuccess: () => {
+      toast({ title: "Avance clôturée" });
+      setShowTerminalModal(null); setTerminalMotif("");
+      qc.invalidateQueries({ queryKey: ["avances-delegue", avDelegueId] });
+      qc.invalidateQueries({ queryKey: ["avances-delegues-reportees"] });
     },
     onError: (e) => toast({ title: (e as Error).message, variant: "destructive" }),
   });
@@ -929,14 +944,14 @@ export default function DeleguesPage() {
                             <td style={{ padding: "10px 14px" }}>
                               <span style={{
                                 padding: "3px 9px", borderRadius: 10, fontSize: ".75rem", fontWeight: 700,
-                                background: a.statut === "rembourse" ? "#dcfce7" : a.statut === "en_retard" ? "#fee2e2" : "#fef3c7",
-                                color: a.statut === "rembourse" ? "#16a34a" : a.statut === "en_retard" ? "#dc2626" : "#92400e",
+                                background: a.statut === "rembourse" ? "#dcfce7" : a.statut === "annulee" ? "#f3f4f6" : a.statut === "cloturee" ? "#e0e7ff" : a.statut === "en_retard" ? "#fee2e2" : "#fef3c7",
+                                color: a.statut === "rembourse" ? "#16a34a" : a.statut === "annulee" ? "#6b7280" : a.statut === "cloturee" ? "#4338ca" : a.statut === "en_retard" ? "#dc2626" : "#92400e",
                               }}>
-                                {a.statut === "rembourse" ? "Remboursé" : a.statut === "en_retard" ? "En retard" : "En cours"}
+                                {a.statut === "rembourse" ? "Remboursé" : a.statut === "annulee" ? "Annulée" : a.statut === "cloturee" ? "Clôturée" : a.statut === "en_retard" ? "En retard" : "En cours"}
                               </span>
                             </td>
                             <td style={{ padding: "10px 14px" }}>
-                              {a.statut !== "rembourse" && (
+                              {a.statut !== "rembourse" && a.statut !== "annulee" && a.statut !== "cloturee" && (
                                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                                   <button
                                     onClick={() => { setShowRembModal({ avanceId: a.id, solde: a.soldeRestantFcfa }); setRembMontant(String(a.soldeRestantFcfa)); }}
@@ -953,6 +968,12 @@ export default function DeleguesPage() {
                                   >
                                     Plan
                                   </button>
+                                  {peutAnnulerAvance && a.montantRembourse === 0 && (
+                                    <button onClick={() => { setShowTerminalModal({ avanceId: a.id, action: "annuler" }); setTerminalMotif(""); }} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #dc2626", color: "#dc2626", background: "#fff", fontWeight: 600, cursor: "pointer", fontSize: ".8rem" }}>Annuler</button>
+                                  )}
+                                  {peutAnnulerAvance && a.montantRembourse > 0 && a.soldeRestantFcfa > 0 && (
+                                    <button onClick={() => { setShowTerminalModal({ avanceId: a.id, action: "cloturer" }); setTerminalMotif(""); }} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #4338ca", color: "#4338ca", background: "#fff", fontWeight: 600, cursor: "pointer", fontSize: ".8rem" }}>Clôturer</button>
+                                  )}
                                 </div>
                               )}
                             </td>
@@ -964,7 +985,7 @@ export default function DeleguesPage() {
                           <td style={{ padding: "10px 14px", fontSize: ".85rem" }}>Total</td>
                           <td style={{ padding: "10px 14px", fontSize: ".85rem" }}>{avancesDelegue.reduce((s, a) => s + a.montantOctroyeFcfa, 0).toLocaleString("fr-FR")} FCFA</td>
                           <td style={{ padding: "10px 14px", fontSize: ".85rem", color: "#16a34a" }}>{avancesDelegue.reduce((s, a) => s + a.montantRembourse, 0).toLocaleString("fr-FR")} FCFA</td>
-                          <td style={{ padding: "10px 14px", fontSize: ".85rem", color: "#dc2626" }}>{avancesDelegue.filter(a => a.statut !== "rembourse").reduce((s, a) => s + a.soldeRestantFcfa, 0).toLocaleString("fr-FR")} FCFA</td>
+                          <td style={{ padding: "10px 14px", fontSize: ".85rem", color: "#dc2626" }}>{avancesDelegue.filter(a => a.statut === "en_cours" || a.statut === "en_retard").reduce((s, a) => s + a.soldeRestantFcfa, 0).toLocaleString("fr-FR")} FCFA</td>
                           <td colSpan={4} />
                         </tr>
                       </tfoot>
@@ -975,6 +996,24 @@ export default function DeleguesPage() {
             )}
           </div>
         )}
+
+      {showTerminalModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
+          <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: "100%", maxWidth: 440 }}>
+            <div style={{ fontWeight: 800, fontSize: "1.05rem", marginBottom: 8 }}>
+              {showTerminalModal.action === "annuler" ? "Annuler l’avance" : "Clôturer le solde"}
+            </div>
+            <p style={{ color: "#6b7280", fontSize: ".85rem", marginBottom: 14 }}>Un motif est obligatoire. L’historique des remboursements est conservé.</p>
+            <textarea value={terminalMotif} onChange={(e) => setTerminalMotif(e.target.value)} placeholder="Motif" rows={4} style={{ width: "100%", padding: 10, border: "1px solid #d1d5db", borderRadius: 8, resize: "vertical" }} />
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
+              <button onClick={() => setShowTerminalModal(null)} style={{ padding: "9px 14px", border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", cursor: "pointer" }}>Annuler</button>
+              <button disabled={!terminalMotif.trim() || terminalMut.isPending} onClick={() => terminalMut.mutate({ avanceId: showTerminalModal.avanceId, action: showTerminalModal.action, motif: terminalMotif.trim() })} style={{ padding: "9px 14px", border: "none", borderRadius: 8, background: "#4338ca", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: !terminalMotif.trim() || terminalMut.isPending ? .5 : 1 }}>
+                {terminalMut.isPending ? "Enregistrement…" : "Confirmer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal octroi avance */}
       {showOctroiForm && (

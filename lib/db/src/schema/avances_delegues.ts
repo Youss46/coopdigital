@@ -2,7 +2,7 @@ import { pgTable, serial, integer, text, date, timestamp, pgEnum } from "drizzle
 import { usersTable } from "./users";
 import { commissionsDeleguesTable } from "./commissions_delegues";
 
-export const avanceDelegueStatutEnum = pgEnum("avance_delegue_statut", ["en_cours", "rembourse", "en_retard"]);
+export const avanceDelegueStatutEnum = pgEnum("avance_delegue_statut", ["en_cours", "rembourse", "en_retard", "annulee", "cloturee"]);
 export const avanceDeleaguePlanTypeEnum = pgEnum("avance_delegue_plan_type", ["integral", "partiel", "reporte"]);
 
 // ─── Avances accordées aux délégués de localité ──────────────────────────────
@@ -18,6 +18,10 @@ export const avancesDeleguesTable = pgTable("avances_delegues", {
   dateEcheance:         date("date_echeance"),
   motif:                text("motif"),
   statut:               avanceDelegueStatutEnum("statut").notNull().default("en_cours"),
+  statutActionAt:       timestamp("statut_action_at", { withTimezone: true }),
+  statutActionUserId:   integer("statut_action_user_id").references(() => usersTable.id),
+  statutActionReason:   text("statut_action_reason"),
+  montantAbandonneFcfa: integer("montant_abandonne_fcfa"),
   agentId:              integer("agent_id").references(() => usersTable.id),
   // Plan de retenue sur commission
   planType:             avanceDeleaguePlanTypeEnum("plan_type").notNull().default("integral"),

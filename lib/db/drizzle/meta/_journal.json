@@ -1191,6 +1191,20 @@
       "when": 1788544800000,
       "tag": "0169_avances_terminal_metadata",
       "breakpoints": true
+    },
+    {
+      "idx": 170,
+      "version": "7",
+      "when": 1788544900000,
+      "tag": "0170_avances_delegues_terminal_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 171,
+      "version": "7",
+      "when": 1788545000000,
+      "tag": "0171_avances_delegues_terminal_metadata",
+      "breakpoints": true
     }
   ]
 }

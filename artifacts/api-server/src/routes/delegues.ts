@@ -32,7 +32,10 @@ import {
   getAvancesDelegueResumeHandler,
   patchPlanAvanceDelegueHandler,
   getAvancesDeleguesReporteesHandler,
+  annulerAvanceDelegueHandler,
+  cloturerSoldeAvanceDelegueHandler,
 } from "../controllers/avancesDeleguesController.js";
+import { auditMiddleware } from "../middlewares/auditMiddleware.js";
 
 const router = Router();
 
@@ -52,7 +55,7 @@ router.use("/delegues", authMiddleware, tenantGuard, denyComptableRestrictedModu
 router.get("/delegues/alertes",            authMiddleware, getAlertesCaissesDeleguesHandler);
 router.get("/delegues/paiements-differes", authMiddleware, getPaiementsDifferesAdminHandler);
 router.get("/delegues/avances-reportees",  authMiddleware, checkPermission("avances", "lire"), getAvancesDeleguesReporteesHandler);
-router.get("/delegues",                    authMiddleware, listDeleguesHandler);
+router.get("/delegues",                    authMiddleware, checkPermission("commissions_delegues", "lire"), listDeleguesHandler);
 
 // ─── Taux de commission (admin) ───────────────────────────────────────────────
 router.get("/delegues/commissions/recap",         authMiddleware, checkPermission("commissions_delegues", "lire"),       getRecapCommissionsHandler);
@@ -66,12 +69,14 @@ router.get("/delegues/:agentId/commissions",                authMiddleware, getC
 router.get("/delegues/:agentId/commissions/releve",         authMiddleware, getAdminReleveCommissions);
 router.post("/delegues/:agentId/commissions/payer",         authMiddleware, payerCommissionsHandler);
 // ─── Avances délégués ─────────────────────────────────────────────────────────
-router.get("/delegues/:agentId/avances",                    authMiddleware, listAvancesDelegueHandler);
-router.get("/delegues/:agentId/avances/resume",             authMiddleware, getAvancesDelegueResumeHandler);
-router.post("/delegues/:agentId/avances",                   authMiddleware, createAvanceDelegueHandler);
-router.post("/delegues/:agentId/avances/:avanceId/rembourser", authMiddleware, rembourserAvanceDelegueHandler);
-router.patch("/delegues/:agentId/avances/:avanceId/plan",      authMiddleware, patchPlanAvanceDelegueHandler);
-router.get("/delegues/:agentId/avances/:avanceId/remboursements", authMiddleware, getRemboursementsAvanceDelegueHandler);
+router.get("/delegues/:agentId/avances",                    authMiddleware, checkPermission("avances", "lire"), listAvancesDelegueHandler);
+router.get("/delegues/:agentId/avances/resume",             authMiddleware, checkPermission("avances", "lire"), getAvancesDelegueResumeHandler);
+router.post("/delegues/:agentId/avances",                   authMiddleware, checkPermission("avances", "octroyer"), auditMiddleware("avances", "CREATE", { entiteType: "avance_delegue" }), createAvanceDelegueHandler);
+router.post("/delegues/:agentId/avances/:avanceId/rembourser", authMiddleware, checkPermission("avances", "rembourser"), auditMiddleware("avances", "UPDATE", { entiteIdParam: "avanceId", entiteType: "avance_delegue" }), rembourserAvanceDelegueHandler);
+router.post("/delegues/:agentId/avances/:avanceId/annuler", authMiddleware, checkPermission("avances", "annuler"), auditMiddleware("avances", "UPDATE", { entiteIdParam: "avanceId", entiteType: "avance_delegue_annulation" }), annulerAvanceDelegueHandler);
+router.post("/delegues/:agentId/avances/:avanceId/cloturer-solde", authMiddleware, checkPermission("avances", "annuler"), auditMiddleware("avances", "UPDATE", { entiteIdParam: "avanceId", entiteType: "avance_delegue_cloture_solde" }), cloturerSoldeAvanceDelegueHandler);
+router.patch("/delegues/:agentId/avances/:avanceId/plan",      authMiddleware, checkPermission("avances", "modifier_plan"), auditMiddleware("avances", "UPDATE", { entiteIdParam: "avanceId", entiteType: "avance_delegue" }), patchPlanAvanceDelegueHandler);
+router.get("/delegues/:agentId/avances/:avanceId/remboursements", authMiddleware, checkPermission("avances", "lire"), getRemboursementsAvanceDelegueHandler);
 
 router.post("/delegues/:agentId/approvisionner",    authMiddleware, approvisionnerHandler);
 router.post("/delegues/:agentId/alimenter",         authMiddleware, alimenterCaisseHandler);
