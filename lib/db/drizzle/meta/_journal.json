@@ -1177,6 +1177,20 @@
       "when": 1788544200000,
       "tag": "0167_source_tresorerie_bulletins_paie",
       "breakpoints": true
+    },
+    {
+      "idx": 168,
+      "version": "7",
+      "when": 1788544500000,
+      "tag": "0168_avances_terminal_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 169,
+      "version": "7",
+      "when": 1788544800000,
+      "tag": "0169_avances_terminal_metadata",
+      "breakpoints": true
     }
   ]
 }

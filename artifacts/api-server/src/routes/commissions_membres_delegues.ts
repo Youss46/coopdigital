@@ -13,11 +13,14 @@ import {
   getRemboursementsAvanceMembre,
   listAvances,
   rembourserAvance,
+  annulerAvance,
+  cloturerSoldeAvance,
   updatePlanAvanceMembre,
 } from "../controllers/avancesController.js";
 import { checkPermission } from "../middlewares/permissions.js";
 import { authMiddleware } from "../middlewares/auth.js";
 import { tenantGuard } from "../middlewares/tenantGuard.js";
+import { auditMiddleware } from "../middlewares/auditMiddleware.js";
 
 const router = Router();
 
@@ -47,6 +50,8 @@ router.get("/delegues-localites/avances", checkPermission("avances", "lire"), sc
 router.get("/delegues-localites/:membreId/avances", checkPermission("avances", "lire"), scopeDelegueLocalite, listAvances);
 router.post("/delegues-localites/:membreId/avances", checkPermission("avances", "octroyer"), scopeDelegueLocalite, createAvance);
 router.post("/delegues-localites/:membreId/avances/:id/rembourser", checkPermission("avances", "rembourser"), scopeDelegueLocalite, rembourserAvance);
+router.post("/delegues-localites/:membreId/avances/:id/annuler", checkPermission("avances", "annuler"), scopeDelegueLocalite, auditMiddleware("avances", "UPDATE", { entiteIdParam: "id", entiteType: "avance_annulation" }), annulerAvance);
+router.post("/delegues-localites/:membreId/avances/:id/cloturer-solde", checkPermission("avances", "annuler"), scopeDelegueLocalite, auditMiddleware("avances", "UPDATE", { entiteIdParam: "id", entiteType: "avance_cloture_solde" }), cloturerSoldeAvance);
 router.patch("/delegues-localites/:membreId/avances/:id/plan", checkPermission("avances", "modifier_plan"), scopeDelegueLocalite, updatePlanAvanceMembre);
 router.get("/delegues-localites/:membreId/avances/:id/remboursements", checkPermission("avances", "lire"), scopeDelegueLocalite, getRemboursementsAvanceMembre);
 

@@ -84,6 +84,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     octroyer:  ["pca", "directeur", "comptable", "caissier", "delegue"],
     rembourser:["pca", "directeur", "comptable", "caissier", "delegue"],
     modifier_plan: ["pca", "directeur", "comptable"],
+    annuler:   ["pca", "directeur", "comptable"],
     supprimer: ["pca", "directeur"],
   },
 

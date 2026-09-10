@@ -6,7 +6,7 @@ import { usersTable } from "./users";
 import { livraisonsTable } from "./livraisons";
 import { commissionsMembresDelaguesTable } from "./commissions_membres_delegues";
 
-export const avanceStatutEnum = pgEnum("avance_statut", ["en_cours", "rembourse", "en_retard"]);
+export const avanceStatutEnum = pgEnum("avance_statut", ["en_cours", "rembourse", "en_retard", "annulee", "cloturee"]);
 export const avancePlanTypeEnum = pgEnum("avance_plan_type", ["integral", "partiel", "reporte"]);
 export const avanceDeductionSourceEnum = pgEnum("avance_deduction_source", ["livraison", "commission"]);
 
@@ -22,6 +22,10 @@ export const avancesTable = pgTable("avances", {
   dateEcheance: date("date_echeance"),
   motif: text("motif"),
   statut: avanceStatutEnum("statut").notNull().default("en_cours"),
+  statutActionAt: timestamp("statut_action_at", { withTimezone: true }),
+  statutActionUserId: integer("statut_action_user_id").references(() => usersTable.id),
+  statutActionReason: text("statut_action_reason"),
+  montantAbandonneFcfa: integer("montant_abandonne_fcfa"),
   agentId: integer("agent_id").references(() => usersTable.id),
   /** Utilisateur réellement connecté ayant saisi l'opération (mode proxy gérant) */
   agentSaisiseurId: integer("agent_saisiseur_id").references(() => usersTable.id),

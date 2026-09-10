@@ -67,7 +67,7 @@ interface Avance {
   montantOctroyeFcfa: number;
   montantRembourseFcfa: number;
   soldeRestantFcfa: number;
-  statut: "en_cours" | "rembourse" | "en_retard";
+  statut: "en_cours" | "rembourse" | "en_retard" | "annulee" | "cloturee";
   dateOctroi: string;
   dateEcheance: string | null;
   motif: string | null;
@@ -75,6 +75,9 @@ interface Avance {
   montantPartielFcfa: number | null;
   reportDate: string | null;
   deductionSource: "livraison" | "commission";
+  motifCloture?: string | null;
+  clotureAt?: string | null;
+  montantAbandonneFcfa?: number | null;
 }
 
 interface RemboursementAvance {
@@ -176,6 +179,28 @@ function formaterMontant(n: number) {
 }
 function formaterDate(d: string) {
   return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function avanceEstActive(avance: Avance) {
+  return avance.statut === "en_cours" || avance.statut === "en_retard";
+}
+
+function libelleStatutAvance(statut: Avance["statut"]) {
+  return {
+    en_cours: "En cours",
+    en_retard: "En retard",
+    rembourse: "Remboursée",
+    annulee: "Annulée",
+    cloturee: "Solde clôturé",
+  }[statut];
+}
+
+function classeStatutAvance(statut: Avance["statut"]) {
+  if (statut === "en_retard") return "bg-red-100 text-red-600";
+  if (statut === "annulee") return "bg-red-50 text-red-700";
+  if (statut === "cloturee") return "bg-blue-50 text-blue-700";
+  if (statut === "rembourse") return "bg-gray-100 text-gray-500";
+  return "bg-amber-100 text-amber-700";
 }
 
 function TableauChargement({ colonnes }: { colonnes: number }) {
@@ -342,6 +367,7 @@ export default function DeleguesLocalitesPage() {
   const peutOctroyer   = usePermission("avances", "octroyer");
   const peutRembourser = usePermission("avances", "rembourser");
   const peutModifierPlan = usePermission("avances", "modifier_plan");
+  const peutAnnulerAvance = usePermission("avances", "annuler");
   const peutCreerBonReception = usePermission("bons_reception", "creer");
   const peutPayerCommissions = usePermission("commissions_delegues", "payer");
   const peutGererTaux = usePermission("commissions_delegues", "gerer_taux");
@@ -395,6 +421,9 @@ export default function DeleguesLocalitesPage() {
   });
   const [errPlan, setErrPlan] = useState("");
   const [avanceHistoriqueId, setAvanceHistoriqueId] = useState<number | null>(null);
+  const [avanceACloturer, setAvanceACloturer] = useState<Avance | null>(null);
+  const [motifCloture, setMotifCloture] = useState("");
+  const [errCloture, setErrCloture] = useState("");
 
   // ── Commission : modal paiement ───────────────────────────────────────────
   const [modalCommission, setModalCommission] = useState<CommissionRecap | null>(null);
@@ -454,7 +483,7 @@ export default function DeleguesLocalitesPage() {
 
   function soldeAvances(membreId: number): number {
     return (avancesParMembre.get(membreId) ?? [])
-      .filter(a => a.statut !== "rembourse")
+      .filter(avanceEstActive)
       .reduce((s, a) => s + a.soldeRestantFcfa, 0);
   }
 
@@ -573,6 +602,23 @@ export default function DeleguesLocalitesPage() {
       setErrRembours("");
     },
     onError: (e: Error) => setErrRembours(e.message),
+  });
+
+  const mutCloturerAvance = useMutation({
+    mutationFn: (avance: Avance) => apiPost(
+      `/api/delegues-localites/${avance.membreId}/avances/${avance.id}/${avance.montantRembourseFcfa > 0 ? "cloturer-solde" : "annuler"}`,
+      { motif: motifCloture.trim() },
+    ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["avances-membre"] });
+      qc.invalidateQueries({ queryKey: ["avances-delegue-localite"] });
+      qc.invalidateQueries({ queryKey: ["avances-delegues-localites"] });
+      qc.invalidateQueries({ queryKey: ["avances-delegues-localites-reportees"] });
+      setAvanceACloturer(null);
+      setMotifCloture("");
+      setErrCloture("");
+    },
+    onError: (e: Error) => setErrCloture(e.message),
   });
 
   const mutModifierPlan = useMutation({
@@ -1067,7 +1113,7 @@ export default function DeleguesLocalitesPage() {
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                       {avancesMembreSelectionne.map(a => {
-                        const active = a.statut !== "rembourse";
+                        const active = avanceEstActive(a);
                         const rembourseEnCours = rembourserAvanceId === a.id;
                         const historiqueOuvert = avanceHistoriqueId === a.id;
                         return (
@@ -1082,9 +1128,9 @@ export default function DeleguesLocalitesPage() {
                               <td className="px-4 py-3 text-right font-semibold text-amber-700">{formaterMontant(a.soldeRestantFcfa)}</td>
                               <td className="px-4 py-3 text-center">
                                 <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                                  a.statut === "rembourse" ? "bg-gray-100 text-gray-500" : a.statut === "en_retard" ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-700"
+                                  classeStatutAvance(a.statut)
                                 }`}>
-                                  {a.statut === "rembourse" ? "Remboursée" : a.statut === "en_retard" ? "En retard" : "En cours"}
+                                  {libelleStatutAvance(a.statut)}
                                 </span>
                               </td>
                               <td className="px-4 py-3 text-right">
@@ -1111,6 +1157,18 @@ export default function DeleguesLocalitesPage() {
                                       >
                                         Rembourser
                                       </button>
+                                  )}
+                                  {active && peutAnnulerAvance && (
+                                    <button
+                                      onClick={() => {
+                                        setAvanceACloturer(a);
+                                        setMotifCloture("");
+                                        setErrCloture("");
+                                      }}
+                                      className="text-xs font-medium text-red-600 hover:underline"
+                                    >
+                                      {a.montantRembourseFcfa > 0 ? "Clôturer le solde" : "Annuler"}
+                                    </button>
                                   )}
                                   {!active && peutModifierPlan && (
                                     <span
@@ -1174,7 +1232,7 @@ export default function DeleguesLocalitesPage() {
                       <tr className="bg-gray-50 border-t border-gray-200">
                         <td colSpan={2} className="px-4 py-3 text-xs font-medium text-gray-500">{avancesMembreSelectionne.length} avance{avancesMembreSelectionne.length > 1 ? "s" : ""}</td>
                         <td className="px-4 py-3 text-right font-semibold text-gray-700">{formaterMontant(avancesMembreSelectionne.reduce((s, a) => s + a.montantRembourseFcfa, 0))}</td>
-                        <td className="px-4 py-3 text-right font-bold text-amber-700">{formaterMontant(avancesMembreSelectionne.filter(a => a.statut !== "rembourse").reduce((s, a) => s + a.soldeRestantFcfa, 0))}</td>
+                        <td className="px-4 py-3 text-right font-bold text-amber-700">{formaterMontant(avancesMembreSelectionne.filter(avanceEstActive).reduce((s, a) => s + a.soldeRestantFcfa, 0))}</td>
                         <td colSpan={2} />
                       </tr>
                     </tfoot>
@@ -1895,15 +1953,15 @@ export default function DeleguesLocalitesPage() {
               ) : (
                 <div className="space-y-2">
                   {avancesModal.map(a => {
-                    const enCours = a.statut !== "rembourse";
+                    const enCours = avanceEstActive(a);
                     const isRembForm = rembourserAvanceId === a.id;
                     return (
                       <div
                         key={a.id}
                         className={`rounded-xl border p-3 ${
-                          a.statut === "en_retard"
+                           a.statut === "en_retard"
                             ? "border-red-200 bg-red-50"
-                            : a.statut === "rembourse"
+                             : !enCours
                             ? "border-gray-100 bg-gray-50"
                             : "border-amber-200 bg-amber-50"
                         }`}
@@ -1923,13 +1981,9 @@ export default function DeleguesLocalitesPage() {
                               </p>
                             )}
                             <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                              a.statut === "en_retard"
-                                ? "bg-red-100 text-red-600"
-                                : a.statut === "rembourse"
-                                ? "bg-gray-100 text-gray-500"
-                                : "bg-amber-100 text-amber-700"
+                              classeStatutAvance(a.statut)
                             }`}>
-                              {a.statut === "en_cours" ? "En cours" : a.statut === "rembourse" ? "Remboursé" : "En retard"}
+                              {libelleStatutAvance(a.statut)}
                             </span>
                             {enCours && peutRembourser && !isRembForm && (
                               <button
@@ -1941,6 +1995,19 @@ export default function DeleguesLocalitesPage() {
                                 className="mt-1 flex items-center gap-1 text-xs text-[#1a4731] font-medium hover:underline ml-auto"
                               >
                                 <ArrowDownCircle size={11} /> Rembourser
+                              </button>
+                            )}
+                            {enCours && peutAnnulerAvance && !isRembForm && (
+                              <button
+                                onClick={() => {
+                                  setAvanceACloturer(a);
+                                  setMotifCloture("");
+                                  setErrCloture("");
+                                }}
+                                className="mt-1 flex items-center gap-1 text-xs text-red-600 font-medium hover:underline ml-auto"
+                              >
+                                <Trash2 size={11} />
+                                {a.montantRembourseFcfa > 0 ? "Clôturer le solde" : "Annuler l’avance"}
                               </button>
                             )}
                           </div>
@@ -2168,6 +2235,92 @@ export default function DeleguesLocalitesPage() {
                   </button>
                 );
               })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {avanceACloturer && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-end sm:items-center justify-center p-2 sm:p-4">
+          <div className="w-full max-w-md rounded-t-2xl sm:rounded-2xl bg-white shadow-xl">
+            <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
+              <div>
+                <h3 className="font-bold text-gray-900">
+                  {avanceACloturer.montantRembourseFcfa > 0 ? "Clôturer le solde" : "Annuler l’avance"}
+                </h3>
+                <p className="mt-1 text-xs text-gray-500">
+                  Avance de {formaterMontant(avanceACloturer.montantOctroyeFcfa)}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setAvanceACloturer(null);
+                  setMotifCloture("");
+                  setErrCloture("");
+                }}
+                className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100"
+                aria-label="Fermer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-4 px-5 py-4">
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                {avanceACloturer.montantRembourseFcfa > 0 ? (
+                  <>
+                    Les {formaterMontant(avanceACloturer.montantRembourseFcfa)} déjà retenus restent acquis.
+                    Le solde de {formaterMontant(avanceACloturer.soldeRestantFcfa)} sera abandonné et aucune nouvelle retenue ne sera appliquée.
+                  </>
+                ) : (
+                  <>
+                    Cette avance n’a encore subi aucune retenue. Son solde de {formaterMontant(avanceACloturer.soldeRestantFcfa)} sera annulé
+                    et aucune retenue future ne sera appliquée.
+                  </>
+                )}
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-700">Motif obligatoire</label>
+                <textarea
+                  value={motifCloture}
+                  onChange={e => setMotifCloture(e.target.value)}
+                  rows={3}
+                  maxLength={500}
+                  placeholder={avanceACloturer.montantRembourseFcfa > 0 ? "Ex. : abandon du solde validé par la direction" : "Ex. : doublon de saisie"}
+                  className="w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-100"
+                />
+              </div>
+
+              {errCloture && (
+                <p className="flex items-center gap-1 text-xs text-red-600">
+                  <AlertCircle size={12} /> {errCloture}
+                </p>
+              )}
+
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button
+                  onClick={() => {
+                    setAvanceACloturer(null);
+                    setMotifCloture("");
+                    setErrCloture("");
+                  }}
+                  className="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100"
+                >
+                  Retour
+                </button>
+                <button
+                  onClick={() => mutCloturerAvance.mutate(avanceACloturer)}
+                  disabled={!motifCloture.trim() || mutCloturerAvance.isPending}
+                  className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                >
+                  {mutCloturerAvance.isPending
+                    ? "Traitement…"
+                    : avanceACloturer.montantRembourseFcfa > 0
+                      ? "Confirmer la clôture"
+                      : "Confirmer l’annulation"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

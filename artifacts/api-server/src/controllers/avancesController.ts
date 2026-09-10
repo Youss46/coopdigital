@@ -86,6 +86,10 @@ export async function listAvances(req: Request, res: Response): Promise<void> {
         agentId: avancesTable.agentId,
         agentSaisiseurId: avancesTable.agentSaisiseurId,
         agentSaisiseurNom: saisiseurAlias.nom,
+        statutActionAt: avancesTable.statutActionAt,
+        statutActionUserId: avancesTable.statutActionUserId,
+        statutActionReason: avancesTable.statutActionReason,
+        montantAbandonneFcfa: avancesTable.montantAbandonneFcfa,
         createdAt: avancesTable.createdAt,
         membreNom: membresTable.nom,
         membrePrenoms: membresTable.prenoms,
@@ -667,6 +671,104 @@ export async function rembourserAvance(req: Request, res: Response): Promise<voi
   }
 }
 
+/**
+ * Termine une avance sans supprimer son historique ni créer de mouvement de
+ * trésorerie. Le verrou de ligne est pris avant toute vérification métier afin
+ * qu'une retenue automatique concurrente ne puisse passer entre les contrôles.
+ */
+export async function terminerAvance(req: Request, res: Response, forcedAction?: "annuler" | "cloturer"): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+  const id = Number(req.params["id"]);
+  const raison = typeof req.body?.raison === "string"
+    ? req.body.raison.trim()
+    : typeof req.body?.motif === "string" ? req.body.motif.trim() : "";
+  // Le chemin peut être réécrit par le montage délégué-localité. Les routes
+  // publiques passent donc explicitement l'action; le fallback conserve la
+  // compatibilité avec les appels directs/tests du contrôleur.
+  const action = forcedAction ?? (req.path.endsWith("/annuler") ? "annuler" : "cloturer");
+  if (!Number.isInteger(id) || id <= 0) {
+    res.status(400).json({ erreur: "Identifiant d'avance invalide" });
+    return;
+  }
+  if (!raison) {
+    res.status(400).json({ erreur: "Le motif est obligatoire" });
+    return;
+  }
+  if (raison.length > 500) {
+    res.status(400).json({ erreur: "Le motif ne peut pas dépasser 500 caractères" });
+    return;
+  }
+
+  try {
+    const updated = await db.transaction(async (tx) => {
+      const [avance] = await tx
+        .select({ avance: avancesTable, cooperativeId: membresTable.cooperativeId, categorie: membresTable.categorieMembre })
+        .from(avancesTable)
+        .innerJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
+        .where(and(eq(avancesTable.id, id), eq(membresTable.cooperativeId, cooperativeId)))
+        .for("update")
+        .limit(1);
+      if (!avance) throw new Error("Avance introuvable");
+      if (
+        (estPorteeDelegueLocalite(res) && (
+          avance.categorie !== CATEGORIE_DELEGUE_LOCALITE
+          || (membreDelegueLocaliteCible(res) !== null && avance.avance.membreId !== membreDelegueLocaliteCible(res))
+        )) ||
+        (!estPorteeDelegueLocalite(res) && avance.categorie === CATEGORIE_DELEGUE_LOCALITE)
+      ) throw new Error("Avance introuvable");
+
+      const statut = avance.avance.statut;
+      if (statut === "rembourse") throw new Error("Cette avance est déjà remboursée");
+      if (statut === "annulee" || statut === "cloturee") throw new Error("Cette avance est déjà terminée");
+
+      const remboursements = await tx
+        .select({ id: remboursementsAvancesMembresTable.id })
+        .from(remboursementsAvancesMembresTable)
+        .where(eq(remboursementsAvancesMembresTable.avanceId, id))
+        .limit(1);
+      if (action === "annuler") {
+        if (avance.avance.montantRembourse_fcfa !== 0 || remboursements.length > 0) {
+          throw new Error("Une avance ayant fait l'objet d'un remboursement ne peut pas être annulée");
+        }
+      } else if (avance.avance.montantRembourse_fcfa <= 0 || avance.avance.soldeRestantFcfa <= 0) {
+        throw new Error("La clôture du solde est réservée aux avances partiellement remboursées");
+      }
+
+      const [result] = await tx.update(avancesTable)
+        .set({
+          statut: action === "annuler" ? "annulee" : "cloturee",
+          soldeRestantFcfa: 0,
+          statutActionAt: new Date(),
+          statutActionUserId: req.user?.id ?? null,
+          statutActionReason: raison,
+          montantAbandonneFcfa: avance.avance.soldeRestantFcfa,
+        })
+        .where(eq(avancesTable.id, id))
+        .returning();
+      return result;
+    });
+    res.json(updated);
+  } catch (err) {
+    req.log.error({ err }, "Erreur terminerAvance");
+    const message = err instanceof Error ? err.message : "Erreur interne du serveur";
+    const known = ["Avance introuvable", "déjà remboursée", "déjà terminée", "ne peut pas être annulée", "réservée"];
+    res.status(known.some((part) => message.includes(part)) ? (message === "Avance introuvable" ? 404 : 400) : 500)
+      .json({ erreur: message });
+  }
+}
+
+export function annulerAvance(req: Request, res: Response): Promise<void> {
+  return terminerAvance(req, res, "annuler");
+}
+
+export function cloturerSoldeAvance(req: Request, res: Response): Promise<void> {
+  return terminerAvance(req, res, "cloturer");
+}
+
 // ─── Plan de déduction ────────────────────────────────────────────────────────
 
 export async function updatePlanAvanceMembre(req: Request, res: Response): Promise<void> {
@@ -710,6 +812,9 @@ export async function updatePlanAvanceMembre(req: Request, res: Response): Promi
     }
     if (row.avance.statut === "rembourse") {
       res.status(400).json({ erreur: "Cette avance est déjà remboursée" }); return;
+    }
+    if (row.avance.statut === "annulee" || row.avance.statut === "cloturee") {
+      res.status(400).json({ erreur: "Cette avance est déjà terminée" }); return;
     }
     const finalPlan = plan_type ?? row.avance.planType;
     const finalMontantPartiel = plan_type === "partiel"
@@ -992,7 +1097,7 @@ export async function getAvancesReportees(req: Request, res: Response): Promise<
             isNull(membresTable.categorieMembre),
             ne(membresTable.categorieMembre, CATEGORIE_DELEGUE_LOCALITE),
           )!,
-      ne(avancesTable.statut, "rembourse"),
+      inArray(avancesTable.statut, ["en_cours", "en_retard"] as const),
       eq(avancesTable.planType, "reporte"),
       or(isNull(avancesTable.reportDate), lt(avancesTable.reportDate, today))!,
     ];
