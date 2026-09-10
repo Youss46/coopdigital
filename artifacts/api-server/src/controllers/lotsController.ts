@@ -19,7 +19,10 @@ import {
 import { eq, inArray, sql, desc, and, or, isNull, isNotNull } from "drizzle-orm";
 import { CreateLotBody, UpdateLotStatutBody } from "@workspace/api-zod";
 import { generateLotEudrPdf } from "../services/pdfService";
-import { getLotExpeditionSummary } from "../services/expeditionsService.js";
+import {
+  corrigerStatutLotAvecHistoriqueExpedition,
+  getLotExpeditionSummary,
+} from "../services/expeditionsService.js";
 
 const livraisonSelect = {
   id: livraisonsTable.id,
@@ -540,7 +543,8 @@ export async function getLotByQr(req: Request, res: Response): Promise<void> {
 
 export async function updateLotStatut(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
-  if (!cooperativeId) {
+  const userId = req.user?.id;
+  if (!cooperativeId || !userId) {
     res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
     return;
   }
@@ -553,17 +557,13 @@ export async function updateLotStatut(req: Request, res: Response): Promise<void
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const setData: any = { statut: parse.data.statut };
-    if (parse.data.venteExportateurId !== undefined) {
-      setData.venteExportateurId = parse.data.venteExportateurId;
-    }
-
-    const [lot] = await db
-      .update(lotsTable)
-      .set(setData)
-      .where(and(eq(lotsTable.id, id), eq(lotsTable.cooperativeId, cooperativeId)))
-      .returning();
+    const lot = await corrigerStatutLotAvecHistoriqueExpedition(
+      cooperativeId,
+      id,
+      userId,
+      parse.data.statut,
+      parse.data.venteExportateurId,
+    );
 
     if (!lot) {
       res.status(404).json({ erreur: "Lot non trouvé" });

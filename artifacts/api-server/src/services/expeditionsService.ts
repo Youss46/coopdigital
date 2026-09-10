@@ -485,6 +485,79 @@ export async function getLotsDisponibles(cooperativeId: number, expeditionId: nu
   return query;
 }
 
+/**
+ * Enregistre une correction manuelle du statut d'un lot sans réécrire l'étape
+ * courante de ses expéditions. La correction doit toutefois rester visible dans
+ * leur chronologie de traçabilité, et le changement du lot ainsi que cet audit
+ * doivent être atomiques.
+ */
+export async function corrigerStatutLotAvecHistoriqueExpedition(
+  cooperativeId: number,
+  lotId: number,
+  userId: number,
+  statut: typeof lotsTable.$inferInsert["statut"],
+  venteExportateurId?: number | null,
+) {
+  return db.transaction(async (tx) => {
+    const [lot] = await tx
+      .select({
+        id: lotsTable.id,
+        statut: lotsTable.statut,
+      })
+      .from(lotsTable)
+      .where(and(
+        eq(lotsTable.id, lotId),
+        eq(lotsTable.cooperativeId, cooperativeId),
+      ))
+      .for("update")
+      .limit(1);
+
+    if (!lot) return null;
+
+    const linkedExpeditions = await tx
+      .select({
+        id: expeditionsTable.id,
+        statut: expeditionsTable.statut,
+      })
+      .from(expeditionLotsTable)
+      .innerJoin(expeditionsTable, eq(expeditionsTable.id, expeditionLotsTable.expeditionId))
+      .where(and(
+        eq(expeditionLotsTable.lotId, lotId),
+        eq(expeditionsTable.cooperativeId, cooperativeId),
+      ))
+      .orderBy(desc(expeditionsTable.createdAt), desc(expeditionsTable.id))
+      .limit(1);
+
+    const setData: Partial<typeof lotsTable.$inferInsert> = {
+      statut,
+      ...(venteExportateurId !== undefined ? { venteExportateurId } : {}),
+    };
+    const [updatedLot] = await tx
+      .update(lotsTable)
+      .set(setData)
+      .where(eq(lotsTable.id, lotId))
+      .returning();
+
+    if (!updatedLot) throw new Error("Lot introuvable");
+
+    if (lot.statut !== statut && linkedExpeditions.length > 0) {
+      await tx.insert(expeditionHistoriqueTable).values(
+        linkedExpeditions.map((expedition) => ({
+          expeditionId: expedition.id,
+          // La correction concerne le lot, pas l'étape de l'expédition.
+          // Conserver le statut courant rend la chronologie fidèle.
+          statutPrecedent: expedition.statut,
+          statutNouveau: expedition.statut,
+          faitPar: userId,
+          notes: `Correction manuelle du statut du lot : ${lot.statut} → ${statut}`,
+        })),
+      );
+    }
+
+    return updatedLot;
+  });
+}
+
 export async function rattacherLot(expeditionId: number, lotId: number, cooperativeId: number) {
   // Vérifier que le lot appartient à la coopérative
   const [lot] = await db

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { pool } from "@workspace/db";
-import { getLotTracabilite, listLots } from "../controllers/lotsController.js";
+import { getLotTracabilite, listLots, updateLotStatut } from "../controllers/lotsController.js";
 
 const enabled =
   process.env.RUN_POSTGRES_INTEGRATION === "1" &&
@@ -401,6 +401,56 @@ describe.skipIf(!enabled)(
         },
         expeditionHistorique: [],
       });
+    });
+
+    it("conserve la correction manuelle dans l'historique après actualisation", async () => {
+      const updateResponse = makeResponse();
+
+      await updateLotStatut(
+        {
+          user: { id: actorUserId, cooperativeId },
+          params: { id: String(lotWithExpeditionId) },
+          body: { statut: "en_stock" },
+          log: { error: () => undefined },
+        } as never,
+        updateResponse as never,
+      );
+
+      expect(updateResponse.statusCode).toBe(200);
+
+      const refreshResponse = makeResponse();
+      await getLotTracabilite(
+        {
+          user: { cooperativeId },
+          params: { id: String(lotWithExpeditionId) },
+          log: { error: () => undefined },
+        } as never,
+        refreshResponse as never,
+      );
+
+      expect(refreshResponse.statusCode).toBe(200);
+      const historique = (refreshResponse.body as {
+        expeditionHistorique: Array<{
+          expeditionNumero: string;
+          statutPrecedent: string;
+          statutNouveau: string;
+          faitPar: number;
+          dateChangement: string | Date;
+          notes: string;
+        }>;
+      }).expeditionHistorique;
+
+      expect(historique).toHaveLength(4);
+      expect(historique.at(-1)).toMatchObject({
+        expeditionNumero: expect.stringContaining("EXP-LATEST-"),
+        statutPrecedent: "receptionne",
+        statutNouveau: "receptionne",
+        faitPar: actorUserId,
+        notes: "Correction manuelle du statut du lot : transit → en_stock",
+      });
+      expect(new Date(historique.at(-1)!.dateChangement).getTime()).toBeGreaterThan(
+        new Date(historique[2]!.dateChangement).getTime(),
+      );
     });
   },
 );
