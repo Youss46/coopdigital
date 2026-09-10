@@ -160,6 +160,125 @@ export async function listExpeditions(cooperativeId: number, filtres?: {
   return rows;
 }
 
+export type LotExpeditionReceptionStatut =
+  | "aucune"
+  | "en_cours"
+  | "complete"
+  | "partielle"
+  | "litige";
+
+export interface LotExpeditionResume {
+  nombreExpeditions: number;
+  expeditionsMultiples: boolean;
+  poidsAttenduKg: number;
+  poidsAttribueKg: number;
+  poidsRecuKg: number;
+  poidsAccepteKg: number;
+  receptionStatut: LotExpeditionReceptionStatut;
+}
+
+export interface LotExpeditionDetail {
+  id: number;
+  numeroExpedition: string;
+  statut: typeof expeditionsTable.$inferSelect["statut"];
+  poidsAttribueKg: number;
+  poidsRecuKg: number;
+  poidsAccepteKg: number;
+  port: string;
+  dateArriveePort: Date | null;
+  createdAt: Date;
+}
+
+/**
+ * Agrège toutes les expéditions liées à un lot. Une expédition peut contenir
+ * plusieurs lots : son poids reçu est donc ventilé au prorata du poids du lot.
+ * Cela évite de compter deux fois la réception globale du camion.
+ */
+export async function getLotExpeditionSummary(
+  cooperativeId: number,
+  lotId: number,
+  poidsLotKg: string | number,
+): Promise<{ resume: LotExpeditionResume; expeditions: LotExpeditionDetail[] }> {
+  const rows = await db
+    .select({
+      id: expeditionsTable.id,
+      numeroExpedition: expeditionsTable.numeroExpedition,
+      statut: expeditionsTable.statut,
+      port: expeditionsTable.port,
+      dateArriveePort: expeditionsTable.dateArriveePort,
+      createdAt: expeditionsTable.createdAt,
+      poidsLotKg: expeditionLotsTable.poidsKg,
+      poidsRecuPortKg: expeditionsTable.poidsRecuPortKg,
+      poidsAcceptePortKg: expeditionsTable.poidsAcceptePortKg,
+      poidsTotalExpeditionKg: sql<string>`COALESCE((
+        SELECT SUM(el_total.poids_kg)
+        FROM expedition_lots el_total
+        WHERE el_total.expedition_id = ${expeditionsTable.id}
+      ), 0)`,
+    })
+    .from(expeditionLotsTable)
+    .innerJoin(expeditionsTable, eq(expeditionsTable.id, expeditionLotsTable.expeditionId))
+    .where(and(
+      eq(expeditionLotsTable.lotId, lotId),
+      eq(expeditionsTable.cooperativeId, cooperativeId),
+    ))
+    .orderBy(desc(expeditionsTable.createdAt), desc(expeditionsTable.id));
+
+  const poidsAttenduKg = Math.max(0, Number(poidsLotKg) || 0);
+  const poidsAttribueKg = rows.reduce((total, row) => total + Math.max(0, Number(row.poidsLotKg ?? 0)), 0);
+  const details: LotExpeditionDetail[] = rows.map((row) => {
+    const poidsAttribue = Math.max(0, Number(row.poidsLotKg ?? 0));
+    const poidsExpedition = Math.max(0, Number(row.poidsTotalExpeditionKg ?? 0));
+    const ratio = poidsExpedition > 0
+      ? poidsAttribue / poidsExpedition
+      : rows.length === 1
+        ? 1
+        : 0;
+    const ventiler = (poids: string | number | null): number =>
+      Math.min(poidsAttribue, Math.max(0, (Number(poids ?? 0) || 0) * ratio));
+
+    return {
+      id: row.id,
+      numeroExpedition: row.numeroExpedition,
+      statut: row.statut,
+      poidsAttribueKg: poidsAttribue,
+      poidsRecuKg: ventiler(row.poidsRecuPortKg),
+      poidsAccepteKg: ventiler(row.poidsAcceptePortKg),
+      port: row.port,
+      dateArriveePort: row.dateArriveePort,
+      createdAt: row.createdAt,
+    };
+  });
+
+  const poidsRecuKg = details.reduce((total, expedition) => total + expedition.poidsRecuKg, 0);
+  const poidsAccepteKg = details.reduce((total, expedition) => total + expedition.poidsAccepteKg, 0);
+  const hasLitige = rows.some((row) => row.statut === "litige");
+  const allReceptionnees = rows.length > 0 && rows.every((row) => row.statut === "receptionne");
+  const receptionComplete = allReceptionnees && poidsRecuKg + 0.01 >= poidsAttenduKg;
+  const hasReceived = poidsRecuKg > 0.01;
+
+  let receptionStatut: LotExpeditionReceptionStatut = "aucune";
+  if (rows.length > 0) {
+    if (hasLitige) receptionStatut = "litige";
+    else if (receptionComplete) receptionStatut = "complete";
+    else if (hasReceived || rows.some((row) => row.statut === "receptionne")) receptionStatut = "partielle";
+    else receptionStatut = "en_cours";
+  }
+
+  return {
+    resume: {
+      nombreExpeditions: rows.length,
+      expeditionsMultiples: rows.length > 1,
+      poidsAttenduKg,
+      poidsAttribueKg,
+      poidsRecuKg,
+      poidsAccepteKg,
+      receptionStatut,
+    },
+    expeditions: details,
+  };
+}
+
 // ── Frais d'exportation à régler ─────────────────────────────────────────────
 
 export async function listFraisTransportARegler(cooperativeId: number) {

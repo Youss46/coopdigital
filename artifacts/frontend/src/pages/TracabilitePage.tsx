@@ -142,6 +142,22 @@ const EXPEDITION_STATUT_COLORS: Record<string, string> = {
   litige: "bg-red-100 text-red-700",
 };
 
+const RECEPTION_STATUT_LABELS: Record<string, string> = {
+  aucune: "Aucune expédition",
+  en_cours: "Réception en cours",
+  complete: "Réception complète",
+  partielle: "Réception partielle",
+  litige: "Réception en litige",
+};
+
+const RECEPTION_STATUT_COLORS: Record<string, string> = {
+  aucune: "bg-gray-100 text-gray-600",
+  en_cours: "bg-blue-100 text-blue-700",
+  complete: "bg-green-100 text-green-700",
+  partielle: "bg-amber-100 text-amber-700",
+  litige: "bg-red-100 text-red-700",
+};
+
 type LotStatut = "en_stock" | "transit" | "vendu" | "refoule" | "fusionne";
 
 function StatutTimeline({ statut }: { statut: LotStatut }) {
@@ -298,6 +314,8 @@ function DetailModal({
   const [showExpedier, setShowExpedier] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const queryClient = useQueryClient();
+  const expeditions = data?.expeditions ?? [];
+  const expeditionResume = data?.expeditionResume;
 
   const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? "";
 
@@ -479,6 +497,11 @@ function DetailModal({
                         )}
                       </div>
                     )}
+                    {data.lot.nombreExpeditions && data.lot.nombreExpeditions > 1 && (
+                      <p className="mt-2 text-xs font-medium text-amber-700">
+                        Lot réparti sur {data.lot.nombreExpeditions} expéditions
+                      </p>
+                    )}
                   </div>
                   <div className="text-right">
                     <p className="text-2xl font-bold text-gray-900">{formaterPoids(data.lot.poidsTotalKg)}</p>
@@ -629,11 +652,88 @@ function DetailModal({
                 </div>
               )}
 
-              {/* ── SECTION HISTORIQUE EXPÉDITION ── */}
-              {data.lot.expeditionStatut && data.lot.expeditionNumero && (
+              {/* ── SYNTHÈSE DES RÉCEPTIONS ── */}
+              {expeditionResume && expeditionResume.receptionStatut !== "aucune" && (
+                <div className="px-6 py-4">
+                  <div
+                    className={`rounded-xl border px-4 py-3 ${
+                      expeditionResume.receptionStatut === "litige"
+                        ? "border-red-200 bg-red-50"
+                        : expeditionResume.receptionStatut === "partielle"
+                        ? "border-amber-200 bg-amber-50"
+                        : expeditionResume.receptionStatut === "complete"
+                        ? "border-green-200 bg-green-50"
+                        : "border-blue-200 bg-blue-50"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <Truck size={15} className="text-gray-600" />
+                        <span className="text-sm font-semibold text-gray-800">
+                          {RECEPTION_STATUT_LABELS[expeditionResume.receptionStatut] ??
+                            expeditionResume.receptionStatut}
+                        </span>
+                      </div>
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          RECEPTION_STATUT_COLORS[expeditionResume.receptionStatut] ?? "bg-gray-100 text-gray-700"
+                        }`}
+                      >
+                        {expeditionResume.nombreExpeditions} expédition
+                        {expeditionResume.nombreExpeditions > 1 ? "s" : ""}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-1.5">
+                      {formaterPoids(expeditionResume.poidsRecuKg)} reçus sur{" "}
+                      {formaterPoids(expeditionResume.poidsAttenduKg)}
+                      {expeditionResume.receptionStatut === "partielle" &&
+                        " : une partie du lot reste en cours de traitement."}
+                      {expeditionResume.receptionStatut === "litige" &&
+                        " : au moins une expédition doit encore être résolue."}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* ── EXPÉDITIONS LIÉES ── */}
+              {expeditions.length > 0 && (
                 <div className="px-6 py-4">
                   <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
-                    <Truck size={14} /> Étapes de l'expédition {data.lot.expeditionNumero}
+                    <Truck size={14} /> Expéditions liées
+                  </h3>
+                  <div className="grid gap-2">
+                    {expeditions.map((expedition) => (
+                      <div
+                        key={expedition.id}
+                        className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5 flex items-center justify-between gap-3 flex-wrap"
+                      >
+                        <div>
+                          <p className="text-sm font-medium text-gray-800">{expedition.numeroExpedition}</p>
+                          <p className="text-xs text-gray-500">{expedition.port}</p>
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              EXPEDITION_STATUT_COLORS[expedition.statut] ?? "bg-gray-100 text-gray-700"
+                            }`}
+                          >
+                            {EXPEDITION_STATUT_LABELS[expedition.statut] ?? expedition.statut}
+                          </span>
+                          <span className="text-xs text-gray-600">
+                            {formaterPoids(expedition.poidsRecuKg)} / {formaterPoids(expedition.poidsAttribueKg)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ── SECTION HISTORIQUE EXPÉDITION ── */}
+              {expeditions.length > 0 && (
+                <div className="px-6 py-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
+                    <Truck size={14} /> Historique des expéditions liées
                   </h3>
                   {data.expeditionHistorique.length > 0 ? (
                     <div className="relative pl-4">
@@ -656,6 +756,7 @@ function DetailModal({
                                   {precedent ? `${precedent} → ${nouveau}` : nouveau}
                                 </p>
                                 <p className="text-xs text-gray-400">
+                                  {etape.expeditionNumero ? `${etape.expeditionNumero} · ` : ""}
                                   Validé le {formaterDateHeure(etape.dateChangement)}
                                 </p>
                                 <p className="text-xs text-gray-500 mt-0.5">
@@ -671,12 +772,7 @@ function DetailModal({
                       </div>
                     </div>
                   ) : (
-                    <p className="text-sm text-gray-500">
-                      Aucune étape historisée. Statut courant :{" "}
-                      <span className="font-medium text-gray-700">
-                        {EXPEDITION_STATUT_LABELS[data.lot.expeditionStatut] ?? data.lot.expeditionStatut}
-                      </span>
-                    </p>
+                    <p className="text-sm text-gray-500">Aucune étape historisée pour les expéditions liées.</p>
                   )}
                 </div>
               )}

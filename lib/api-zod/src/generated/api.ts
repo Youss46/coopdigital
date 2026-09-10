@@ -611,6 +611,8 @@ export const GetLotsResponseItem = zod.object({
   "nbProducteurs": zod.number().optional(),
   "nbLivraisons": zod.number().optional(),
   "nombreSacs": zod.number().nullish(),
+  "nombreExpeditions": zod.number().optional().describe('Nombre d\'expéditions actives ou historiques liées au lot'),
+  "expeditionsMultiples": zod.boolean().optional().describe('Le lot est réparti entre plusieurs expéditions'),
   "expeditionStatut": zod.enum(['en_preparation', 'charge', 'en_transit', 'arrive_port', 'receptionne', 'litige']).nullish(),
   "expeditionNumero": zod.string().nullish()
 })
@@ -652,6 +654,8 @@ export const GetLotByQrResponse = zod.object({
   "nbProducteurs": zod.number().optional(),
   "nbLivraisons": zod.number().optional(),
   "nombreSacs": zod.number().nullish(),
+  "nombreExpeditions": zod.number().optional().describe('Nombre d\'expéditions actives ou historiques liées au lot'),
+  "expeditionsMultiples": zod.boolean().optional().describe('Le lot est réparti entre plusieurs expéditions'),
   "expeditionStatut": zod.enum(['en_preparation', 'charge', 'en_transit', 'arrive_port', 'receptionne', 'litige']).nullish(),
   "expeditionNumero": zod.string().nullish()
 })
@@ -683,6 +687,8 @@ export const UpdateLotStatutResponse = zod.object({
   "nbProducteurs": zod.number().optional(),
   "nbLivraisons": zod.number().optional(),
   "nombreSacs": zod.number().nullish(),
+  "nombreExpeditions": zod.number().optional().describe('Nombre d\'expéditions actives ou historiques liées au lot'),
+  "expeditionsMultiples": zod.boolean().optional().describe('Le lot est réparti entre plusieurs expéditions'),
   "expeditionStatut": zod.enum(['en_preparation', 'charge', 'en_transit', 'arrive_port', 'receptionne', 'litige']).nullish(),
   "expeditionNumero": zod.string().nullish()
 })
@@ -692,7 +698,6 @@ export const UpdateLotStatutResponse = zod.object({
  * @summary Fusionner plusieurs lots en un seul
  */
 export const fusionnerLotsBodyLotIdsMin = 2;
-
 
 
 export const FusionnerLotsBody = zod.object({
@@ -726,6 +731,8 @@ export const ExpedierLotResponse = zod.object({
   "nbProducteurs": zod.number().optional(),
   "nbLivraisons": zod.number().optional(),
   "nombreSacs": zod.number().nullish(),
+  "nombreExpeditions": zod.number().optional().describe('Nombre d\'expéditions actives ou historiques liées au lot'),
+  "expeditionsMultiples": zod.boolean().optional().describe('Le lot est réparti entre plusieurs expéditions'),
   "expeditionStatut": zod.enum(['en_preparation', 'charge', 'en_transit', 'arrive_port', 'receptionne', 'litige']).nullish(),
   "expeditionNumero": zod.string().nullish()
 })
@@ -753,6 +760,8 @@ export const GetLotTracabiliteResponse = zod.object({
   "nbProducteurs": zod.number().optional(),
   "nbLivraisons": zod.number().optional(),
   "nombreSacs": zod.number().nullish(),
+  "nombreExpeditions": zod.number().optional().describe('Nombre d\'expéditions actives ou historiques liées au lot'),
+  "expeditionsMultiples": zod.boolean().optional().describe('Le lot est réparti entre plusieurs expéditions'),
   "expeditionStatut": zod.enum(['en_preparation', 'charge', 'en_transit', 'arrive_port', 'receptionne', 'litige']).nullish(),
   "expeditionNumero": zod.string().nullish()
 }),
@@ -825,6 +834,8 @@ export const GetLotTracabiliteResponse = zod.object({
   "eudrRisqueDeforestation": zod.string().nullish()
 })).optional(),
   "expeditionHistorique": zod.array(zod.object({
+  "expeditionId": zod.number().optional(),
+  "expeditionNumero": zod.string().optional(),
   "statutPrecedent": zod.string().nullish(),
   "statutNouveau": zod.enum(['en_preparation', 'charge', 'en_transit', 'arrive_port', 'receptionne', 'litige']),
   "dateChangement": zod.coerce.date(),
@@ -832,7 +843,27 @@ export const GetLotTracabiliteResponse = zod.object({
   "faitPar": zod.number().nullable(),
   "faitParNom": zod.string().nullable(),
   "faitParPrenoms": zod.string().nullable()
-}))
+})),
+  "expeditions": zod.array(zod.object({
+  "id": zod.number(),
+  "numeroExpedition": zod.string(),
+  "statut": zod.enum(['en_preparation', 'charge', 'en_transit', 'arrive_port', 'receptionne', 'litige']),
+  "poidsAttribueKg": zod.number(),
+  "poidsRecuKg": zod.number(),
+  "poidsAccepteKg": zod.number(),
+  "port": zod.string(),
+  "dateArriveePort": zod.string().nullish(),
+  "createdAt": zod.string()
+})).optional(),
+  "expeditionResume": zod.object({
+  "nombreExpeditions": zod.number(),
+  "expeditionsMultiples": zod.boolean(),
+  "poidsAttenduKg": zod.number(),
+  "poidsAttribueKg": zod.number(),
+  "poidsRecuKg": zod.number(),
+  "poidsAccepteKg": zod.number(),
+  "receptionStatut": zod.enum(['aucune', 'en_cours', 'complete', 'partielle', 'litige'])
+}).optional()
 })
 
 
@@ -1089,10 +1120,6 @@ export const EncaisserVenteParams = zod.object({
 })
 
 
-
-
-
-
 export const EncaisserVenteBody = zod.object({
   "montantFcfa": zod.number().min(1),
   "modePaiement": zod.enum(['especes', 'cheque']).nullish(),
@@ -1260,8 +1287,6 @@ export const RejeterChequeRecuParams = zod.object({
 })
 
 
-
-
 export const RejeterChequeRecuBody = zod.object({
   "motifRejet": zod.string().min(1),
   "dateRejet": zod.string().optional()
@@ -1299,8 +1324,6 @@ export const RejeterChequeRecuResponse = zod.object({
 export const AnnulerChequeRecuParams = zod.object({
   "id": zod.coerce.number()
 })
-
-
 
 
 export const AnnulerChequeRecuBody = zod.object({
@@ -1453,7 +1476,6 @@ export const exportJournalSageTxtQueryJournalDefault = `CAIS`;
 export const exportJournalSageTxtQueryJournalMax = 8;
 
 
-
 export const ExportJournalSageTxtQueryParams = zod.object({
   "exercice": zod.coerce.number(),
   "journal": zod.coerce.string().max(exportJournalSageTxtQueryJournalMax).default(exportJournalSageTxtQueryJournalDefault).describe('Code du journal Sage; CAIS par défaut')
@@ -1488,7 +1510,6 @@ export const UpdateComptesTiersParams = zod.object({
 })
 
 export const updateComptesTiersBodyComptesItemNumeroCompteMax = 20;
-
 
 
 export const UpdateComptesTiersBody = zod.object({
@@ -1661,7 +1682,6 @@ export const suggestBalanceSageCounterpartiesResponseSuggestionsItemScoreMin = 0
 export const suggestBalanceSageCounterpartiesResponseSuggestionsItemScoreMax = 100;
 
 export const suggestBalanceSageCounterpartiesResponseSuggestionsMax = 3;
-
 
 
 export const SuggestBalanceSageCounterpartiesResponse = zod.object({
@@ -2042,7 +2062,6 @@ export const GetUsersResponse = zod.array(GetUsersResponseItem)
 export const createUserBodyMotDePasseMin = 8;
 
 
-
 export const CreateUserBody = zod.object({
   "nom": zod.string(),
   "prenoms": zod.string(),
@@ -2099,7 +2118,6 @@ export const ResetUserPasswordParams = zod.object({
 })
 
 export const resetUserPasswordBodyNouveauMotDePasseMin = 8;
-
 
 
 export const ResetUserPasswordBody = zod.object({
@@ -3650,7 +3668,6 @@ export const ListPaiementsResponse = zod.array(ListPaiementsResponseItem)
 export const validerLotPaiementsCarburantBodyPaiementIdsMax = 200;
 
 
-
 export const ValiderLotPaiementsCarburantBody = zod.object({
   "paiementIds": zod.array(zod.number()).min(1).max(validerLotPaiementsCarburantBodyPaiementIdsMax),
   "modePaiement": zod.enum(['especes', 'virement', 'orange_money', 'mtn_momo', 'wave']),
@@ -3674,10 +3691,6 @@ export const ValiderLotPaiementsCarburantResponse = zod.object({
 export const ValiderPaiementParams = zod.object({
   "id": zod.coerce.number()
 })
-
-
-
-
 
 
 export const ValiderPaiementBody = zod.object({
@@ -3765,8 +3778,6 @@ export const ValiderPaiementResponse = zod.object({
 export const RejeterPaiementParams = zod.object({
   "id": zod.coerce.number()
 })
-
-
 
 
 export const RejeterPaiementBody = zod.object({
@@ -7927,7 +7938,6 @@ export const GetRapportInventaireEquipementsResponse = zod.object({
 export const postGenererDotationsBodyMoisMax = 12;
 
 
-
 export const PostGenererDotationsBody = zod.object({
   "mois": zod.number().min(1).max(postGenererDotationsBodyMoisMax),
   "annee": zod.number()
@@ -8647,5 +8657,4 @@ export const GetMembreCertificationResponse = zod.object({
 export const GetRapportPdfCertificationParams = zod.object({
   "id": zod.coerce.number()
 })
-
 

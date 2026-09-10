@@ -38,8 +38,12 @@ describe.skipIf(!enabled)(
     let actorUserId: number;
     let lotWithExpeditionId: number;
     let lotWithoutExpeditionId: number;
+    let lotWithLitigeId: number;
+    let lotCompleteId: number;
     let oldExpeditionId: number;
     let latestExpeditionId: number;
+    let litigeExpeditionId: number;
+    let completeExpeditionId: number;
 
     beforeAll(async () => {
       client = await pool.connect();
@@ -80,6 +84,24 @@ describe.skipIf(!enabled)(
       );
       lotWithoutExpeditionId = lotWithoutExpedition.rows[0].id;
 
+      const lotWithLitige = await client.query(
+        `INSERT INTO lots
+          (cooperative_id, statut, poids_total_kg, entrepot)
+         VALUES ($1, 'transit', 500, 'Entrepôt test')
+         RETURNING id`,
+        [cooperativeId],
+      );
+      lotWithLitigeId = lotWithLitige.rows[0].id;
+
+      const lotComplete = await client.query(
+        `INSERT INTO lots
+          (cooperative_id, statut, poids_total_kg, entrepot)
+         VALUES ($1, 'transit', 1200, 'Entrepôt test')
+         RETURNING id`,
+        [cooperativeId],
+      );
+      lotCompleteId = lotComplete.rows[0].id;
+
       const oldExpedition = await client.query(
         `INSERT INTO expeditions
           (cooperative_id, numero_expedition, type_vehicule, port, statut, created_at)
@@ -91,8 +113,8 @@ describe.skipIf(!enabled)(
 
       const latestExpedition = await client.query(
         `INSERT INTO expeditions
-          (cooperative_id, numero_expedition, type_vehicule, port, statut, created_at)
-         VALUES ($1, $2, 'location', 'San Pedro', 'receptionne', '2026-02-10T08:00:00Z')
+          (cooperative_id, numero_expedition, type_vehicule, port, statut, poids_recu_port_kg, poids_accepte_port_kg, created_at)
+         VALUES ($1, $2, 'location', 'San Pedro', 'receptionne', 3000, 3000, '2026-02-10T08:00:00Z')
          RETURNING id`,
         [cooperativeId, `EXP-LATEST-${suffix}`],
       );
@@ -100,8 +122,38 @@ describe.skipIf(!enabled)(
 
       await client.query(
         `INSERT INTO expedition_lots (expedition_id, lot_id, poids_kg)
-         VALUES ($1, $3, 8000), ($2, $3, 8000)`,
+         VALUES ($1, $3, 5000), ($2, $3, 3000)`,
         [oldExpeditionId, latestExpeditionId, lotWithExpeditionId],
+      );
+
+      const litigeExpedition = await client.query(
+        `INSERT INTO expeditions
+          (cooperative_id, numero_expedition, type_vehicule, port, statut, poids_recu_port_kg, poids_accepte_port_kg, created_at)
+         VALUES ($1, $2, 'location', 'San Pedro', 'litige', 450, 400, '2026-03-10T08:00:00Z')
+         RETURNING id`,
+        [cooperativeId, `EXP-LITIGE-${suffix}`],
+      );
+      litigeExpeditionId = litigeExpedition.rows[0].id;
+
+      await client.query(
+        `INSERT INTO expedition_lots (expedition_id, lot_id, poids_kg)
+         VALUES ($1, $2, 500)`,
+        [litigeExpeditionId, lotWithLitigeId],
+      );
+
+      const completeExpedition = await client.query(
+        `INSERT INTO expeditions
+          (cooperative_id, numero_expedition, type_vehicule, port, statut, poids_recu_port_kg, poids_accepte_port_kg, created_at)
+         VALUES ($1, $2, 'location', 'San Pedro', 'receptionne', 1200, 1200, '2026-04-10T08:00:00Z')
+         RETURNING id`,
+        [cooperativeId, `EXP-COMP-${suffix}`],
+      );
+      completeExpeditionId = completeExpedition.rows[0].id;
+
+      await client.query(
+        `INSERT INTO expedition_lots (expedition_id, lot_id, poids_kg)
+         VALUES ($1, $2, 1200)`,
+        [completeExpeditionId, lotCompleteId],
       );
 
       await client.query(
@@ -128,23 +180,23 @@ describe.skipIf(!enabled)(
       try {
         await client.query(
           `DELETE FROM expedition_historique
-            WHERE expedition_id IN ($1, $2)`,
-          [oldExpeditionId, latestExpeditionId],
+            WHERE expedition_id IN ($1, $2, $3, $4)`,
+          [oldExpeditionId, latestExpeditionId, litigeExpeditionId, completeExpeditionId],
         );
         await client.query(
           `DELETE FROM expedition_lots
-            WHERE expedition_id IN ($1, $2)`,
-          [oldExpeditionId, latestExpeditionId],
+            WHERE expedition_id IN ($1, $2, $3, $4)`,
+          [oldExpeditionId, latestExpeditionId, litigeExpeditionId, completeExpeditionId],
         );
         await client.query(
           `DELETE FROM expeditions
-            WHERE id IN ($1, $2)`,
-          [oldExpeditionId, latestExpeditionId],
+            WHERE id IN ($1, $2, $3, $4)`,
+          [oldExpeditionId, latestExpeditionId, litigeExpeditionId, completeExpeditionId],
         );
         await client.query(
           `DELETE FROM lots
-            WHERE id IN ($1, $2)`,
-          [lotWithExpeditionId, lotWithoutExpeditionId],
+            WHERE id IN ($1, $2, $3, $4)`,
+          [lotWithExpeditionId, lotWithoutExpeditionId, lotWithLitigeId, lotCompleteId],
         );
         await client.query(
           `DELETE FROM users
@@ -178,6 +230,8 @@ describe.skipIf(!enabled)(
         id: number;
         expeditionStatut: string | null;
         expeditionNumero: string | null;
+        nombreExpeditions: number;
+        expeditionsMultiples: boolean;
       }>;
       expect(rows).toEqual(
         expect.arrayContaining([
@@ -185,6 +239,8 @@ describe.skipIf(!enabled)(
             id: lotWithExpeditionId,
             expeditionStatut: "receptionne",
             expeditionNumero: expect.stringContaining("EXP-LATEST-"),
+            nombreExpeditions: 2,
+            expeditionsMultiples: true,
           }),
           expect.objectContaining({
             id: lotWithoutExpeditionId,
@@ -213,7 +269,21 @@ describe.skipIf(!enabled)(
           id: lotWithExpeditionId,
           expeditionStatut: "receptionne",
           expeditionNumero: expect.stringContaining("EXP-LATEST-"),
+          nombreExpeditions: 2,
+          expeditionsMultiples: true,
         },
+        expeditionResume: {
+          nombreExpeditions: 2,
+          expeditionsMultiples: true,
+          poidsAttenduKg: 8000,
+          poidsAttribueKg: 8000,
+          poidsRecuKg: 3000,
+          receptionStatut: "partielle",
+        },
+        expeditions: [
+          { numeroExpedition: expect.stringContaining("EXP-LATEST-"), poidsAttribueKg: 3000, poidsRecuKg: 3000 },
+          { numeroExpedition: expect.stringContaining("EXP-OLD-"), poidsAttribueKg: 5000, poidsRecuKg: 0 },
+        ],
         expeditionHistorique: [
           { statutPrecedent: null, statutNouveau: "en_preparation", faitPar: null },
           {
@@ -239,6 +309,72 @@ describe.skipIf(!enabled)(
       expect(new Date(historique[0]!.dateChangement).toISOString()).toBe("2026-02-10T09:00:00.000Z");
     });
 
+    it("signale un litige même lorsqu'une seule expédition est liée", async () => {
+      const response = makeResponse();
+
+      await getLotTracabilite(
+        {
+          user: { cooperativeId },
+          params: { id: String(lotWithLitigeId) },
+          log: { error: () => undefined },
+        } as never,
+        response as never,
+      );
+
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toMatchObject({
+        lot: {
+          id: lotWithLitigeId,
+          expeditionStatut: "litige",
+          nombreExpeditions: 1,
+          expeditionsMultiples: false,
+        },
+        expeditionResume: {
+          receptionStatut: "litige",
+          poidsAttenduKg: 500,
+          poidsRecuKg: 450,
+          poidsAccepteKg: 400,
+        },
+        expeditions: [
+          {
+            numeroExpedition: expect.stringContaining("EXP-LITIGE-"),
+            statut: "litige",
+            poidsRecuKg: 450,
+            poidsAccepteKg: 400,
+          },
+        ],
+      });
+    });
+
+    it("distingue une réception complète d'une réception partielle", async () => {
+      const response = makeResponse();
+
+      await getLotTracabilite(
+        {
+          user: { cooperativeId },
+          params: { id: String(lotCompleteId) },
+          log: { error: () => undefined },
+        } as never,
+        response as never,
+      );
+
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toMatchObject({
+        lot: {
+          id: lotCompleteId,
+          expeditionStatut: "receptionne",
+          nombreExpeditions: 1,
+          expeditionsMultiples: false,
+        },
+        expeditionResume: {
+          receptionStatut: "complete",
+          poidsAttenduKg: 1200,
+          poidsRecuKg: 1200,
+          poidsAccepteKg: 1200,
+        },
+      });
+    });
+
     it("conserve des statuts d'expédition nuls pour un lot sans expédition", async () => {
       const response = makeResponse();
 
@@ -257,6 +393,11 @@ describe.skipIf(!enabled)(
           id: lotWithoutExpeditionId,
           expeditionStatut: null,
           expeditionNumero: null,
+        },
+        expeditionResume: {
+          nombreExpeditions: 0,
+          expeditionsMultiples: false,
+          receptionStatut: "aucune",
         },
         expeditionHistorique: [],
       });

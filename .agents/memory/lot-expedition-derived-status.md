@@ -7,4 +7,4 @@ Le statut stock/vente d’un lot et le statut logistique de sa dernière expédi
 
 **Why:** `vendu` représente la vente exportateur validée, tandis que la réception au port décrit un événement logistique qui peut survenir avant ou indépendamment du règlement commercial.
 
-**How to apply:** Pour un lot rattaché à plusieurs expéditions, prendre le statut et le numéro de l’expédition la plus récente; conserver le statut natif du lot pour les filtres, les actions et le cycle stock/vente.
+**How to apply:** Conserver le statut et le numéro de l’expédition la plus récente pour la compatibilité; ajouter une synthèse de toutes les expéditions liées, avec poids reçu ventilé au prorata si une expédition contient plusieurs lots. Classer la réception en `complete`, `partielle` ou `litige` sans modifier le statut stock/vente du lot.

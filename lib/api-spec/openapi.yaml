@@ -3413,8 +3413,6 @@ paths:
                   $ref: "#/components/schemas/DistributionIntrant"
 
 
-
-
   /budget/campagne/{id}:
     post:
       summary: Créer ou récupérer le budget d'une campagne
@@ -8388,6 +8386,12 @@ components:
           type: integer
         nombreSacs:
           type: ["integer", "null"]
+        nombreExpeditions:
+          type: integer
+          description: Nombre d'expéditions actives ou historiques liées au lot
+        expeditionsMultiples:
+          type: boolean
+          description: Le lot est réparti entre plusieurs expéditions
         expeditionStatut:
           type: string
           enum: [en_preparation, charge, en_transit, arrive_port, receptionne, litige]
@@ -8477,6 +8481,10 @@ components:
       type: object
       required: [statutNouveau, dateChangement, faitPar, faitParNom, faitParPrenoms]
       properties:
+        expeditionId:
+          type: integer
+        expeditionNumero:
+          type: string
         statutPrecedent:
           type: string
           nullable: true
@@ -8523,6 +8531,57 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ExpeditionHistoriqueLot"
+        expeditions:
+          type: array
+          items:
+            $ref: "#/components/schemas/LotExpedition"
+        expeditionResume:
+          $ref: "#/components/schemas/LotExpeditionResume"
+
+    LotExpedition:
+      type: object
+      required: [id, numeroExpedition, statut, poidsAttribueKg, poidsRecuKg, poidsAccepteKg, port, createdAt]
+      properties:
+        id:
+          type: integer
+        numeroExpedition:
+          type: string
+        statut:
+          type: string
+          enum: [en_preparation, charge, en_transit, arrive_port, receptionne, litige]
+        poidsAttribueKg:
+          type: number
+        poidsRecuKg:
+          type: number
+        poidsAccepteKg:
+          type: number
+        port:
+          type: string
+        dateArriveePort:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+
+    LotExpeditionResume:
+      type: object
+      required: [nombreExpeditions, expeditionsMultiples, poidsAttenduKg, poidsAttribueKg, poidsRecuKg, poidsAccepteKg, receptionStatut]
+      properties:
+        nombreExpeditions:
+          type: integer
+        expeditionsMultiples:
+          type: boolean
+        poidsAttenduKg:
+          type: number
+        poidsAttribueKg:
+          type: number
+        poidsRecuKg:
+          type: number
+        poidsAccepteKg:
+          type: number
+        receptionStatut:
+          type: string
+          enum: [aucune, en_cours, complete, partielle, litige]
 
     # ── M03 Stocks ──────────────────────────────────────────────
     EntrepotStock:
@@ -12879,4 +12938,3 @@ components:
         prochesExpiration:
           type: array
           items: { $ref: "#/components/schemas/Certification" }
-

@@ -19,6 +19,7 @@ import {
 import { eq, inArray, sql, desc, and, or, isNull, isNotNull } from "drizzle-orm";
 import { CreateLotBody, UpdateLotStatutBody } from "@workspace/api-zod";
 import { generateLotEudrPdf } from "../services/pdfService";
+import { getLotExpeditionSummary } from "../services/expeditionsService.js";
 
 const livraisonSelect = {
   id: livraisonsTable.id,
@@ -52,6 +53,23 @@ const lotExpeditionSelect = {
     WHERE el.lot_id = ${lotsTable.id}
     ORDER BY e.created_at DESC, e.id DESC
     LIMIT 1
+  )`,
+};
+
+const lotExpeditionSummarySelect = {
+  nombreExpeditions: sql<number>`(
+    SELECT COUNT(*)::int
+    FROM expedition_lots el
+    INNER JOIN expeditions e ON e.id = el.expedition_id
+    WHERE el.lot_id = ${lotsTable.id}
+      AND e.cooperative_id = ${lotsTable.cooperativeId}
+  )`,
+  expeditionsMultiples: sql<boolean>`(
+    SELECT COUNT(*) > 1
+    FROM expedition_lots el
+    INNER JOIN expeditions e ON e.id = el.expedition_id
+    WHERE el.lot_id = ${lotsTable.id}
+      AND e.cooperative_id = ${lotsTable.cooperativeId}
   )`,
 };
 
@@ -89,6 +107,7 @@ export async function listLots(req: Request, res: Response): Promise<void> {
         parentLotIds: lotsTable.parentLotIds,
         nombreSacs: lotsTable.nombreSacs,
         ...lotExpeditionSelect,
+        ...lotExpeditionSummarySelect,
         nbLivraisons: sql<number>`count(${lotLivraisonsTable.livraisonId})::int`,
         nbProducteurs: sql<number>`count(distinct ${livraisonsTable.membreId})::int`,
       })
@@ -458,6 +477,7 @@ export async function createLot(req: Request, res: Response): Promise<void> {
         parentLotIds: lotsTable.parentLotIds,
         nombreSacs: lotsTable.nombreSacs,
         ...lotExpeditionSelect,
+        ...lotExpeditionSummarySelect,
         nbLivraisons: sql<number>`count(${lotLivraisonsTable.livraisonId})::int`,
         nbProducteurs: sql<number>`count(distinct ${livraisonsTable.membreId})::int`,
       })
@@ -497,6 +517,7 @@ export async function getLotByQr(req: Request, res: Response): Promise<void> {
         parentLotIds: lotsTable.parentLotIds,
         nombreSacs: lotsTable.nombreSacs,
         ...lotExpeditionSelect,
+        ...lotExpeditionSummarySelect,
         nbLivraisons: sql<number>`count(${lotLivraisonsTable.livraisonId})::int`,
         nbProducteurs: sql<number>`count(distinct ${livraisonsTable.membreId})::int`,
       })
@@ -651,6 +672,7 @@ export async function fusionnerLots(req: Request, res: Response): Promise<void> 
           parentLotIds: lotsTable.parentLotIds,
           nombreSacs: lotsTable.nombreSacs,
           ...lotExpeditionSelect,
+          ...lotExpeditionSummarySelect,
           nbLivraisons: sql<number>`count(${lotLivraisonsTable.livraisonId})::int`,
           nbProducteurs: sql<number>`count(distinct ${livraisonsTable.membreId})::int`,
         })
@@ -691,6 +713,7 @@ export async function getLotTracabilite(req: Request, res: Response): Promise<vo
         parentLotIds: lotsTable.parentLotIds,
         nombreSacs: lotsTable.nombreSacs,
         ...lotExpeditionSelect,
+        ...lotExpeditionSummarySelect,
         nbLivraisons: sql<number>`count(${lotLivraisonsTable.livraisonId})::int`,
         nbProducteurs: sql<number>`count(distinct ${livraisonsTable.membreId})::int`,
       })
@@ -705,20 +728,18 @@ export async function getLotTracabilite(req: Request, res: Response): Promise<vo
       return;
     }
 
-    const [derniereExpedition] = await db
-      .select({ id: expeditionsTable.id })
-      .from(expeditionLotsTable)
-      .innerJoin(expeditionsTable, eq(expeditionsTable.id, expeditionLotsTable.expeditionId))
-      .where(and(
-        eq(expeditionLotsTable.lotId, id),
-        eq(expeditionsTable.cooperativeId, cooperativeId),
-      ))
-      .orderBy(desc(expeditionsTable.createdAt), desc(expeditionsTable.id))
-      .limit(1);
+    const { resume: expeditionResume, expeditions } = await getLotExpeditionSummary(
+      cooperativeId,
+      id,
+      lot.poidsTotalKg,
+    );
 
-    const expeditionHistorique = derniereExpedition
+    const expeditionIds = expeditions.map((expedition) => expedition.id);
+    const expeditionHistorique = expeditionIds.length
       ? await db
           .select({
+            expeditionId: expeditionHistoriqueTable.expeditionId,
+            expeditionNumero: expeditionsTable.numeroExpedition,
             statutPrecedent: expeditionHistoriqueTable.statutPrecedent,
             statutNouveau: expeditionHistoriqueTable.statutNouveau,
             dateChangement: expeditionHistoriqueTable.dateChangement,
@@ -728,6 +749,7 @@ export async function getLotTracabilite(req: Request, res: Response): Promise<vo
             faitParPrenoms: usersTable.prenoms,
           })
           .from(expeditionHistoriqueTable)
+          .innerJoin(expeditionsTable, eq(expeditionsTable.id, expeditionHistoriqueTable.expeditionId))
           .leftJoin(
             usersTable,
             and(
@@ -735,7 +757,10 @@ export async function getLotTracabilite(req: Request, res: Response): Promise<vo
               eq(usersTable.cooperativeId, cooperativeId),
             ),
           )
-          .where(eq(expeditionHistoriqueTable.expeditionId, derniereExpedition.id))
+          .where(and(
+            inArray(expeditionHistoriqueTable.expeditionId, expeditionIds),
+            eq(expeditionsTable.cooperativeId, cooperativeId),
+          ))
           .orderBy(expeditionHistoriqueTable.dateChangement, expeditionHistoriqueTable.id)
       : [];
 
@@ -804,7 +829,16 @@ export async function getLotTracabilite(req: Request, res: Response): Promise<vo
           .where(and(inArray(parcellesTable.membreId, membreIds), eq(parcellesTable.actif, true)))
       : [];
 
-    res.json({ lot, livraisons, membres, vente: vente ?? null, parcelles, expeditionHistorique });
+    res.json({
+      lot,
+      livraisons,
+      membres,
+      vente: vente ?? null,
+      parcelles,
+      expeditions,
+      expeditionResume,
+      expeditionHistorique,
+    });
   } catch (err) {
     req.log.error({ err }, "Erreur getLotTracabilite");
     res.status(500).json({ erreur: "Erreur interne du serveur" });

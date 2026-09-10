@@ -1406,6 +1406,10 @@ export interface LotDetail {
   nbLivraisons?: number;
   /** @nullable */
   nombreSacs?: number | null;
+  /** Nombre d'expéditions actives ou historiques liées au lot */
+  nombreExpeditions?: number;
+  /** Le lot est réparti entre plusieurs expéditions */
+  expeditionsMultiples?: boolean;
   expeditionStatut?: LotDetailExpeditionStatut;
   expeditionNumero?: string | null;
 }
@@ -1488,6 +1492,8 @@ export const ExpeditionHistoriqueLotStatutNouveau = {
 } as const;
 
 export interface ExpeditionHistoriqueLot {
+  expeditionId?: number;
+  expeditionNumero?: string;
   statutPrecedent?: string | null;
   statutNouveau: ExpeditionHistoriqueLotStatutNouveau;
   dateChangement: string;
@@ -1528,6 +1534,51 @@ export interface VenteDetail {
   createdAt: string;
 }
 
+export type LotExpeditionStatut = typeof LotExpeditionStatut[keyof typeof LotExpeditionStatut];
+
+
+export const LotExpeditionStatut = {
+  en_preparation: 'en_preparation',
+  charge: 'charge',
+  en_transit: 'en_transit',
+  arrive_port: 'arrive_port',
+  receptionne: 'receptionne',
+  litige: 'litige',
+} as const;
+
+export interface LotExpedition {
+  id: number;
+  numeroExpedition: string;
+  statut: LotExpeditionStatut;
+  poidsAttribueKg: number;
+  poidsRecuKg: number;
+  poidsAccepteKg: number;
+  port: string;
+  dateArriveePort?: string | null;
+  createdAt: string;
+}
+
+export type LotExpeditionResumeReceptionStatut = typeof LotExpeditionResumeReceptionStatut[keyof typeof LotExpeditionResumeReceptionStatut];
+
+
+export const LotExpeditionResumeReceptionStatut = {
+  aucune: 'aucune',
+  en_cours: 'en_cours',
+  complete: 'complete',
+  partielle: 'partielle',
+  litige: 'litige',
+} as const;
+
+export interface LotExpeditionResume {
+  nombreExpeditions: number;
+  expeditionsMultiples: boolean;
+  poidsAttenduKg: number;
+  poidsAttribueKg: number;
+  poidsRecuKg: number;
+  poidsAccepteKg: number;
+  receptionStatut: LotExpeditionResumeReceptionStatut;
+}
+
 export interface LotTracabilite {
   lot: LotDetail;
   livraisons: LivraisonDetail[];
@@ -1535,6 +1586,8 @@ export interface LotTracabilite {
   vente?: VenteDetail;
   parcelles?: ParcelleEudr[];
   expeditionHistorique: ExpeditionHistoriqueLot[];
+  expeditions?: LotExpedition[];
+  expeditionResume?: LotExpeditionResume;
 }
 
 export interface EntrepotStock {
@@ -6032,4 +6085,3 @@ jours?: number;
 export type GetCertificationsCriteres200 = { [key: string]: unknown };
 
 export type GetMembreCertification200 = { [key: string]: unknown };
-
