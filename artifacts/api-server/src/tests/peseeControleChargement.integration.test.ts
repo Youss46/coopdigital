@@ -591,6 +591,114 @@ describe.skipIf(!enabled)(
       expect(sortieApresRetry.rows[0].count).toBe(1);
     });
 
+    it("annule la réparation et permet une reprise après une erreur de réception", async () => {
+      await setControleChargementObligatoire(false);
+
+      const id = await createTransitionExpedition(1000);
+      const expedition = await client.query(
+        `SELECT numero_expedition FROM expeditions WHERE id = $1`,
+        [id],
+      );
+      const numeroExpedition = expedition.rows[0].numero_expedition;
+      const nomEntrepot = `Entrepôt rollback ${id}`;
+
+      const entrepot = await client.query(
+        `INSERT INTO entrepots
+          (cooperative_id, nom, ville, capacite_kg)
+         VALUES ($1, $2, 'Test', 5000)
+         RETURNING id`,
+        [cooperativeId, nomEntrepot],
+      );
+      const lot = await client.query(
+        `INSERT INTO lots
+          (cooperative_id, campagne_id, poids_total_kg, entrepot, nombre_sacs)
+         VALUES ($1, $2, 1000, $3, 20)
+         RETURNING id`,
+        [cooperativeId, campaignId, nomEntrepot],
+      );
+      await client.query(
+        `INSERT INTO expedition_lots
+          (expedition_id, lot_id, poids_kg, nombre_sacs)
+         VALUES ($1, $2, 1000, 20)`,
+        [id, lot.rows[0].id],
+      );
+
+      await changerStatut(cooperativeId, id, testUserId, "charge");
+      await changerStatut(cooperativeId, id, testUserId, "en_transit");
+      await changerStatut(cooperativeId, id, testUserId, "arrive_port");
+
+      const motif = `Chargement expédition ${numeroExpedition}`;
+      await client.query(
+        `DELETE FROM mouvements_stock
+          WHERE entrepot_id = $1 AND motif = $2`,
+        [entrepot.rows[0].id, motif],
+      );
+
+      await expect(
+        confirmerReception(cooperativeId, id, testUserId, {
+          poidsRecuPortKg: 1000,
+          numeroRecepissePort: "R".repeat(101),
+          nomReceptionnaire: "Réception rollback",
+        }),
+      ).rejects.toThrow();
+
+      const etatApresErreur = await client.query(
+        `SELECT statut, poids_recu_port_kg
+           FROM expeditions
+          WHERE id = $1`,
+        [id],
+      );
+      expect(etatApresErreur.rows[0]).toEqual({
+        statut: "arrive_port",
+        poids_recu_port_kg: null,
+      });
+
+      const effetsApresErreur = await client.query(
+        `SELECT
+           (SELECT count(*)::int
+              FROM expedition_historique
+             WHERE expedition_id = $1
+               AND statut_nouveau IN ('receptionne', 'litige')) AS historiques,
+           (SELECT count(*)::int
+              FROM mouvements_stock
+             WHERE entrepot_id = $2 AND motif = $3) AS sorties,
+           (SELECT count(*)::int
+              FROM traitements_refus
+             WHERE expedition_id = $1
+               AND source_type = 'reception_port') AS refus`,
+        [id, entrepot.rows[0].id, motif],
+      );
+      expect(effetsApresErreur.rows[0]).toEqual({
+        historiques: 0,
+        sorties: 0,
+        refus: 0,
+      });
+
+      await expect(
+        confirmerReception(cooperativeId, id, testUserId, {
+          poidsRecuPortKg: 1000,
+          numeroRecepissePort: `REC-${id}`,
+          nomReceptionnaire: "Réception reprise",
+        }),
+      ).resolves.toMatchObject({ statut: "receptionne" });
+
+      const effetsApresReprise = await client.query(
+        `SELECT
+           (SELECT count(*)::int
+              FROM expedition_historique
+             WHERE expedition_id = $1
+               AND statut_nouveau = 'receptionne') AS historiques,
+           (SELECT count(*)::int
+              FROM mouvements_stock
+             WHERE entrepot_id = $2 AND motif = $3) AS sorties`,
+        [id, entrepot.rows[0].id, motif],
+      );
+      expect(effetsApresReprise.rows[0]).toEqual({
+        historiques: 1,
+        sorties: 1,
+      });
+    });
+
     it("préserve le comportement historique quand le contrôle obligatoire est désactivé", async () => {
       await setControleChargementObligatoire(false);
       const id = await createTransitionExpedition(1000);

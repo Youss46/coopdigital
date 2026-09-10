@@ -634,8 +634,13 @@ export async function createExpedition(cooperativeId: number, userId: number, in
 
 const PRIX_COUT_DEFAUT_KG = 0;
 
-async function getPrixUnitaireExpedition(expeditionId: number): Promise<number> {
-  const lots = await db
+type ExpeditionDbExecutor = typeof db | ComptabiliteTransaction;
+
+async function getPrixUnitaireExpedition(
+  executor: ExpeditionDbExecutor,
+  expeditionId: number,
+): Promise<number> {
+  const lots = await executor
     .select({ lotId: expeditionLotsTable.lotId })
     .from(expeditionLotsTable)
     .where(eq(expeditionLotsTable.expeditionId, expeditionId));
@@ -644,7 +649,7 @@ async function getPrixUnitaireExpedition(expeditionId: number): Promise<number> 
 
   const lotIds = lots.map((l) => l.lotId).filter((id): id is number => id !== null);
 
-  const ventes = await db
+  const ventes = await executor
     .select({
       prixUnitaireFcfa: ventesExportateursTable.prixUnitaireFcfa,
       poidsKg:          ventesExportateursTable.poidsKg,
@@ -671,17 +676,16 @@ async function getPrixUnitaireExpedition(expeditionId: number): Promise<number> 
 // Pour chaque lot attaché à l'expédition, crée un mouvement de sortie dans
 // l'entrepôt source du lot. Non-bloquant : les erreurs sont loguées seulement.
 
-async function deduireStockChargement(
+async function deduireStockChargementDansTransaction(
+  tx: ComptabiliteTransaction,
   expeditionId: number,
   cooperativeId: number,
   userId: number,
   numeroExpedition: string,
 ): Promise<void> {
-  await db.transaction(async (tx) => {
-    // Le chargement et la réparation à la réception peuvent arriver ensemble.
-    // Le verrou transactionnel rend la vérification et l'insertion atomiques,
-    // même si elles ne partagent pas la transaction de changement de statut.
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(${cooperativeId}, ${expeditionId})`);
+  // Le chargement et la réparation à la réception peuvent arriver ensemble.
+  // Le verrou transactionnel rend la vérification et l'insertion atomiques.
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(${cooperativeId}, ${expeditionId})`);
 
   // Récupérer les lots attachés avec leur entrepôt source et leur poids
   const lotsAttaches = await tx
@@ -708,10 +712,12 @@ async function deduireStockChargement(
   const parEntrepot = new Map<string, { poidsKg: number; nombreSacs: number; lotId: number | null }>();
   for (const lot of lotsAttaches) {
     const nom = (lot.entrepotNom ?? "").trim();
-    if (!nom) continue;
-    const nomNormalise = nom.toLowerCase();
     const poids = parseFloat(String(lot.poidsKg ?? "0"));
     if (poids <= 0) continue;
+    if (!nom) {
+      throw new Error(`Entrepôt source manquant pour le lot ${lot.lotId ?? "inconnu"}`);
+    }
+    const nomNormalise = nom.toLowerCase();
     const existing = parEntrepot.get(nomNormalise);
     if (existing) {
       existing.poidsKg   += poids;
@@ -739,11 +745,9 @@ async function deduireStockChargement(
       .limit(1);
 
     if (!entrepot) {
-      logger.warn(
-        { nomEntrepot, expeditionId },
-        "Entrepôt introuvable pour déduction stock – mouvement ignoré",
+      throw new Error(
+        `Entrepôt source introuvable pour l'expédition ${numeroExpedition}: ${nomEntrepot}`,
       );
-      continue;
     }
 
     const motif = `Chargement expédition ${numeroExpedition}`;
@@ -776,6 +780,22 @@ async function deduireStockChargement(
       "Sortie stock enregistrée – chargement expédition",
     );
   }
+}
+
+async function deduireStockChargement(
+  expeditionId: number,
+  cooperativeId: number,
+  userId: number,
+  numeroExpedition: string,
+): Promise<void> {
+  await db.transaction(async (tx: ComptabiliteTransaction) => {
+    await deduireStockChargementDansTransaction(
+      tx,
+      expeditionId,
+      cooperativeId,
+      userId,
+      numeroExpedition,
+    );
   });
 }
 
@@ -905,7 +925,7 @@ export async function changerStatut(
     // 3. Écriture comptable si prix unitaire connu (vente exportateur déjà saisie)
     if (exp.poidsChargeKg) {
       const dateStr = new Date().toISOString().split("T")[0]!;
-      const prixKg = await getPrixUnitaireExpedition(expeditionId);
+      const prixKg = await getPrixUnitaireExpedition(db, expeditionId);
       if (prixKg > 0) {
         const montant = Math.round(parseFloat(String(exp.poidsChargeKg)) * prixKg);
         try {
@@ -977,10 +997,12 @@ export async function confirmerReception(
     motifRefus?: string;
   }
 ) {
-  const rows = await db
+  return db.transaction(async (tx: ComptabiliteTransaction) => {
+  const rows = await tx
     .select()
     .from(expeditionsTable)
     .where(and(eq(expeditionsTable.id, expeditionId), eq(expeditionsTable.cooperativeId, cooperativeId)))
+    .for("update")
     .limit(1);
 
   if (rows.length === 0) throw new Error("Expédition introuvable");
@@ -1023,16 +1045,17 @@ export async function confirmerReception(
     : "";
 
   // La sortie est normalement créée au chargement. On rejoue toutefois la
-  // vérification ici pour réparer les anciennes expéditions réceptionnées
-  // avant la correction de résolution des entrepôts. L'opération est
-  // idempotente par motif.
-  try {
-    await deduireStockChargement(expeditionId, cooperativeId, userId, exp.numeroExpedition);
-  } catch (err) {
-    logger.error({ err, expeditionId }, "Erreur réparation sortie stock à la réception");
-  }
+  // vérification ici pour réparer les anciennes expéditions réceptionnées.
+  // Cette fois, la réparation partage la transaction de réception.
+  await deduireStockChargementDansTransaction(
+    tx,
+    expeditionId,
+    cooperativeId,
+    userId,
+    exp.numeroExpedition,
+  );
 
-  await db.update(expeditionsTable).set({
+  await tx.update(expeditionsTable).set({
     statut:             nouveauStatut,
     poidsRecuPortKg:    String(poidsRecu),
     poidsAcceptePortKg: String(poidsAccepte),
@@ -1050,7 +1073,7 @@ export async function confirmerReception(
     updatedAt:          new Date(),
   }).where(eq(expeditionsTable.id, expeditionId));
 
-  await db.insert(expeditionHistoriqueTable).values({
+  await tx.insert(expeditionHistoriqueTable).values({
     expeditionId,
     statutPrecedent: exp.statut,
     statutNouveau:   nouveauStatut,
@@ -1061,7 +1084,7 @@ export async function confirmerReception(
   // ── Enregistrement du stock refoulé si présent ──────────────────────────────
   if (poidsRefoule > 0) {
     const dateRefus = (input.dateArriveePort ?? new Date().toISOString()).split("T")[0]!;
-    await db.insert(traitementsRefusTable).values({
+    await tx.insert(traitementsRefusTable).values({
       cooperativeId,
       expeditionId,
       sourceType:          "reception_port",
@@ -1074,52 +1097,44 @@ export async function confirmerReception(
   }
 
   const dateStr = new Date().toISOString().split("T")[0]!;
-  const prixKg = await getPrixUnitaireExpedition(expeditionId);
+  const prixKg = await getPrixUnitaireExpedition(tx, expeditionId);
   const montantStockTransit = Math.round(poidsCharge * prixKg);
 
+  const ecritures: Parameters<typeof proposerEcrituresDansTransaction>[2] = [];
   if (nouveauStatut === "receptionne") {
-    try {
-      // Solde stock transit : soldé au même prix que le départ (381 → 4111)
-      // NB : le chiffre d'affaires est enregistré séparément via "Vente cacao"
-      //      (generateEcrituresVente) lorsque la vente exportateur est créée.
-      await proposerEcriture(cooperativeId, {
-        source:      "stock",
-        sourceId:    expeditionId,
-        libelle:     `Solde stock transit ${exp.numeroExpedition}`,
-        compteDebit:  "4111",
-        compteCredit: "381",
-        montantFcfa:  montantStockTransit,
-        date:         dateStr,
-        numeroPiece:  exp.numeroExpedition,
-      });
-    } catch (err) {
-      logger.error({ err }, "Erreur écriture comptable réception");
-    }
+    // Solde stock transit : soldé au même prix que le départ (381 → 4111).
+    // Le chiffre d'affaires est enregistré séparément via « Vente cacao ».
+    ecritures.push({
+      source:      "stock",
+      sourceId:    expeditionId,
+      libelle:     `Solde stock transit ${exp.numeroExpedition}`,
+      compteDebit:  "4111",
+      compteCredit: "381",
+      montantFcfa:  montantStockTransit,
+      date:         dateStr,
+      numeroPiece:  exp.numeroExpedition,
+    });
 
     if (
       input.fraisTransportFcfa &&
       input.fraisTransportFcfa > 0 &&
       exp.fraisTransportFcfa == null
     ) {
-      try {
-        await proposerEcriture(cooperativeId, {
-          source:      "transport",
-          sourceId:    expeditionId,
-          libelle:     `Frais transport ${exp.numeroExpedition}`,
-          compteDebit:  "612",
-          compteCredit: "401",
-          montantFcfa:  input.fraisTransportFcfa,
-          date:         dateStr,
-          numeroPiece:  exp.numeroExpedition,
-        });
-      } catch (err) {
-        logger.error({ err }, "Erreur écriture frais transport");
-      }
+      ecritures.push({
+        source:      "transport",
+        sourceId:    expeditionId,
+        libelle:     `Frais transport ${exp.numeroExpedition}`,
+        compteDebit:  "612",
+        compteCredit: "401",
+        montantFcfa:  input.fraisTransportFcfa,
+        date:         dateStr,
+        numeroPiece:  exp.numeroExpedition,
+      });
     }
   } else {
     const montantEcart = Math.round(Math.abs(ecartPoids) * prixKg);
-    try {
-      await proposerEcriture(cooperativeId, {
+    ecritures.push(
+      {
         source:      "stock",
         sourceId:    expeditionId,
         libelle:     `Écart litige ${exp.numeroExpedition} — ${ecartPoids.toFixed(1)} kg`,
@@ -1128,8 +1143,8 @@ export async function confirmerReception(
         montantFcfa:  montantEcart,
         date:         dateStr,
         numeroPiece:  exp.numeroExpedition,
-      });
-      await proposerEcriture(cooperativeId, {
+      },
+      {
         source:      "stock",
         sourceId:    expeditionId,
         libelle:     `Provision litige ${exp.numeroExpedition}`,
@@ -1138,10 +1153,15 @@ export async function confirmerReception(
         montantFcfa:  montantEcart,
         date:         dateStr,
         numeroPiece:  exp.numeroExpedition,
-      });
-    } catch (err) {
-      logger.error({ err }, "Erreur écriture litige");
-    }
+      },
+    );
+  }
+
+  // Les écritures sont produites dans la même transaction que la réception.
+  // Toute erreur comptable annule également l'état, l'historique et le stock.
+  await proposerEcrituresDansTransaction(tx, cooperativeId, ecritures);
+
+  if (nouveauStatut === "litige") {
     // Notification litige (fire-and-forget)
     void notifExpeditionLitige(
       cooperativeId,
@@ -1162,6 +1182,7 @@ export async function confirmerReception(
       tauxEcart <= SEUIL_ACCEPTABLE  ? "acceptable" :
       tauxEcart <= SEUIL_LITIGE      ? "a_justifier" : "litige",
   };
+  });
 }
 
 // ── Règlement des frais de transport ─────────────────────────────────────────
