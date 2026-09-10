@@ -666,6 +666,147 @@ describe.skipIf(!enabled)(
       });
     });
 
+  it("annule toutes les sorties si un entrepôt source manque, puis reprend après correction", async () => {
+    await setControleChargementObligatoire(false);
+
+    const id = await createTransitionExpedition(1000);
+    const expedition = await client.query(
+      `SELECT numero_expedition FROM expeditions WHERE id = $1`,
+      [id],
+    );
+    const numeroExpedition = expedition.rows[0].numero_expedition;
+    const motif = `Chargement expédition ${numeroExpedition}`;
+    const nomEntrepotA = `Entrepôt manquant A ${id}`;
+    const nomEntrepotB = `Entrepôt manquant B ${id}`;
+
+    const entrepotA = await client.query(
+      `INSERT INTO entrepots
+        (cooperative_id, nom, ville, capacite_kg)
+       VALUES ($1, $2, 'Test', 5000)
+       RETURNING id`,
+      [cooperativeId, nomEntrepotA],
+    );
+    const lots = await client.query(
+      `INSERT INTO lots
+        (cooperative_id, campagne_id, poids_total_kg, entrepot, nombre_sacs)
+       VALUES
+         ($1, $2, 600, $3, 12),
+         ($1, $2, 400, $4, 8)
+       RETURNING id, statut
+      `,
+      [cooperativeId, campaignId, nomEntrepotA, nomEntrepotB],
+    );
+    await client.query(
+      `INSERT INTO expedition_lots
+        (expedition_id, lot_id, poids_kg, nombre_sacs)
+       VALUES ($1, $2, 600, 12), ($1, $3, 400, 8)`,
+      [id, lots.rows[0].id, lots.rows[1].id],
+    );
+    await client.query(
+      `UPDATE config_comptable
+          SET auto_stocks = true
+        WHERE cooperative_id = $1`,
+      [cooperativeId],
+    );
+
+    await expect(
+      changerStatut(cooperativeId, id, testUserId, "charge"),
+    ).rejects.toThrow("Entrepôt source introuvable");
+
+    const rollback = await client.query(
+      `SELECT
+         (SELECT statut FROM expeditions WHERE id = $1) AS statut,
+         (SELECT nombre_sacs FROM expeditions WHERE id = $1) AS nombre_sacs,
+         (SELECT count(*)::int
+            FROM expedition_historique
+           WHERE expedition_id = $1
+             AND statut_nouveau = 'charge') AS historiques,
+         (SELECT count(*)::int
+            FROM mouvements_stock
+           WHERE motif = $2) AS sorties,
+         (SELECT count(*)::int
+            FROM lots
+           WHERE id IN ($3, $4) AND statut = 'transit') AS lots_transit`,
+      [id, motif, lots.rows[0].id, lots.rows[1].id],
+    );
+    expect(rollback.rows[0]).toEqual({
+      statut: "en_preparation",
+      nombre_sacs: null,
+      historiques: 0,
+      sorties: 0,
+      lots_transit: 0,
+    });
+
+    const lotsApresErreur = await client.query(
+      `SELECT id, statut
+         FROM lots
+        WHERE id IN ($1, $2)
+        ORDER BY id`,
+      [lots.rows[0].id, lots.rows[1].id],
+    );
+    expect(lotsApresErreur.rows).toEqual(lots.rows.map((lot: { id: number; statut: string }) => ({
+      id: lot.id,
+      statut: lot.statut,
+    })));
+
+    const entrepotB = await client.query(
+      `INSERT INTO entrepots
+        (cooperative_id, nom, ville, capacite_kg)
+       VALUES ($1, $2, 'Test', 5000)
+       RETURNING id`,
+      [cooperativeId, nomEntrepotB],
+    );
+
+    await expect(
+      changerStatut(cooperativeId, id, testUserId, "charge"),
+    ).resolves.toMatchObject({ ok: true, statut: "charge" });
+
+    const success = await client.query(
+      `SELECT
+         (SELECT statut FROM expeditions WHERE id = $1) AS statut,
+         (SELECT nombre_sacs FROM expeditions WHERE id = $1) AS nombre_sacs,
+         (SELECT count(*)::int
+            FROM expedition_historique
+           WHERE expedition_id = $1
+             AND statut_nouveau = 'charge') AS historiques,
+         (SELECT count(*)::int
+            FROM lots
+           WHERE id IN ($2, $3) AND statut = 'transit') AS lots_transit`,
+      [id, lots.rows[0].id, lots.rows[1].id],
+    );
+    expect(success.rows[0]).toEqual({
+      statut: "charge",
+      nombre_sacs: 20,
+      historiques: 1,
+      lots_transit: 2,
+    });
+
+    const sorties = await client.query(
+      `SELECT entrepot_id, count(*)::int AS count,
+              coalesce(sum(poids_kg), 0)::numeric AS poids,
+              coalesce(sum(nombre_sacs), 0)::int AS sacs
+         FROM mouvements_stock
+        WHERE motif = $1
+        GROUP BY entrepot_id
+        ORDER BY entrepot_id`,
+      [motif],
+    );
+    expect(sorties.rows).toEqual([
+      {
+        entrepot_id: entrepotA.rows[0].id,
+        count: 1,
+        poids: "600.00",
+        sacs: 12,
+      },
+      {
+        entrepot_id: entrepotB.rows[0].id,
+        count: 1,
+        poids: "400.00",
+        sacs: 8,
+      },
+    ]);
+  });
+
     it("répare une sortie manquante à la réception et normalise le nom de l'entrepôt", async () => {
       await setControleChargementObligatoire(false);
 

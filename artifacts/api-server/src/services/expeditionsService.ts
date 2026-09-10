@@ -733,8 +733,12 @@ async function deduireStockChargementDansTransaction(
 
   if (parEntrepot.size === 0) return;
 
-  // Pour chaque entrepôt impliqué, insérer un mouvement de sortie
-  for (const [nomEntrepot, data] of parEntrepot) {
+  // Résoudre tous les entrepôts avant d'insérer la première sortie. La
+  // transaction protège déjà le rollback, mais cette phase de validation
+  // garantit qu'un entrepôt manquant ne peut jamais laisser une sortie
+  // partiellement créée si ce parcours évolue.
+  const entrepotsResolus = new Map<string, number>();
+  for (const nomEntrepot of parEntrepot.keys()) {
     const [entrepot] = await tx
       .select({ id: entrepotsTable.id })
       .from(entrepotsTable)
@@ -749,13 +753,21 @@ async function deduireStockChargementDansTransaction(
         `Entrepôt source introuvable pour l'expédition ${numeroExpedition}: ${nomEntrepot}`,
       );
     }
+    entrepotsResolus.set(nomEntrepot, entrepot.id);
+  }
 
+  // Pour chaque entrepôt impliqué, insérer un mouvement de sortie
+  for (const [nomEntrepot, data] of parEntrepot) {
+    const entrepotId = entrepotsResolus.get(nomEntrepot);
+    if (entrepotId === undefined) {
+      throw new Error(`Entrepôt source non résolu pour l'expédition ${numeroExpedition}: ${nomEntrepot}`);
+    }
     const motif = `Chargement expédition ${numeroExpedition}`;
     const [mouvementExistant] = await tx
       .select({ id: mouvementsStockTable.id })
       .from(mouvementsStockTable)
       .where(and(
-        eq(mouvementsStockTable.entrepotId, entrepot.id),
+        eq(mouvementsStockTable.entrepotId, entrepotId),
         eq(mouvementsStockTable.type, "sortie"),
         eq(mouvementsStockTable.motif, motif),
       ))
@@ -766,7 +778,7 @@ async function deduireStockChargementDansTransaction(
     if (mouvementExistant) continue;
 
     await tx.insert(mouvementsStockTable).values({
-      entrepotId:  entrepot.id,
+      entrepotId,
       lotId:       data.lotId,
       type:        "sortie",
       poidsKg:     String(data.poidsKg.toFixed(2)),
@@ -776,7 +788,7 @@ async function deduireStockChargementDansTransaction(
     });
 
     logger.info(
-      { entrepotId: entrepot.id, poidsKg: data.poidsKg, expeditionId },
+      { entrepotId, poidsKg: data.poidsKg, expeditionId },
       "Sortie stock enregistrée – chargement expédition",
     );
   }
