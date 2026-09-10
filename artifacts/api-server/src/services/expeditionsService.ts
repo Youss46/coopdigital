@@ -677,8 +677,14 @@ async function deduireStockChargement(
   userId: number,
   numeroExpedition: string,
 ): Promise<void> {
+  await db.transaction(async (tx) => {
+    // Le chargement et la réparation à la réception peuvent arriver ensemble.
+    // Le verrou transactionnel rend la vérification et l'insertion atomiques,
+    // même si elles ne partagent pas la transaction de changement de statut.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(${cooperativeId}, ${expeditionId})`);
+
   // Récupérer les lots attachés avec leur entrepôt source et leur poids
-  const lotsAttaches = await db
+  const lotsAttaches = await tx
     .select({
       lotId:       expeditionLotsTable.lotId,
       poidsKg:     expeditionLotsTable.poidsKg,
@@ -703,7 +709,7 @@ async function deduireStockChargement(
   for (const lot of lotsAttaches) {
     const nom = (lot.entrepotNom ?? "").trim();
     if (!nom) continue;
-    const nomNormalise = nom.toLocaleLowerCase();
+    const nomNormalise = nom.toLowerCase();
     const poids = parseFloat(String(lot.poidsKg ?? "0"));
     if (poids <= 0) continue;
     const existing = parEntrepot.get(nomNormalise);
@@ -723,7 +729,7 @@ async function deduireStockChargement(
 
   // Pour chaque entrepôt impliqué, insérer un mouvement de sortie
   for (const [nomEntrepot, data] of parEntrepot) {
-    const [entrepot] = await db
+    const [entrepot] = await tx
       .select({ id: entrepotsTable.id })
       .from(entrepotsTable)
       .where(and(
@@ -741,7 +747,7 @@ async function deduireStockChargement(
     }
 
     const motif = `Chargement expédition ${numeroExpedition}`;
-    const [mouvementExistant] = await db
+    const [mouvementExistant] = await tx
       .select({ id: mouvementsStockTable.id })
       .from(mouvementsStockTable)
       .where(and(
@@ -755,7 +761,7 @@ async function deduireStockChargement(
     // fournit l'identifiant d'idempotence lors d'une reprise.
     if (mouvementExistant) continue;
 
-    await db.insert(mouvementsStockTable).values({
+    await tx.insert(mouvementsStockTable).values({
       entrepotId:  entrepot.id,
       lotId:       data.lotId,
       type:        "sortie",
@@ -770,6 +776,7 @@ async function deduireStockChargement(
       "Sortie stock enregistrée – chargement expédition",
     );
   }
+  });
 }
 
 // ── Changement de statut ────────────────────────────────────────────────────
