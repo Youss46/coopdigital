@@ -21,6 +21,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 /** Values captured from the paiementsTable.insert() call inside creerLivraisonDepuisSession */
 let capturedPaiementInsert: Record<string, unknown> | null = null;
 let capturedLivraisonInsert: Record<string, unknown> | null = null;
+let capturedAdvanceRepayment: Record<string, unknown> | null = null;
+let mockAdvanceRows: Array<Record<string, unknown>> = [];
 
 // ─── Fixture data ─────────────────────────────────────────────────────────────
 
@@ -81,21 +83,29 @@ vi.mock("@workspace/db", async (importOriginal) => {
           for:     vi.fn(),
           limit:   vi.fn(),
           orderBy: vi.fn(),
-          then:    (resolve: (value: unknown) => unknown) => Promise.resolve(
-            selectCount === 2 ? [{ total: 0 }] : [],
-          ).then(resolve),
+          then:    (resolve: (value: unknown) => unknown) => Promise.resolve([]).then(resolve),
         };
         query.from.mockReturnValue(query);
         query.where.mockReturnValue(query);
         query.for.mockReturnValue(query);
         query.orderBy.mockReturnValue(query);
         query.limit.mockResolvedValue(selectCount === 1 ? [mockSession] : []);
+        query.then = (resolve: (value: unknown) => unknown) =>
+          Promise.resolve(
+            selectCount === 2
+              ? [{ total: 0 }]
+              : selectCount === 3
+              ? mockAdvanceRows
+              : [],
+          ).then(resolve);
         return query;
       }),
       insert: vi.fn(() => ({
         values: vi.fn((vals: unknown) => {
           if (vals && typeof vals === "object" && "numeroRecu" in (vals as object)) {
             capturedPaiementInsert = vals as Record<string, unknown>;
+          } else if (vals && typeof vals === "object" && "avanceId" in (vals as object)) {
+            capturedAdvanceRepayment = vals as Record<string, unknown>;
           } else if (vals && typeof vals === "object" && "poidsKg" in (vals as object)) {
             capturedLivraisonInsert = vals as Record<string, unknown>;
           }
@@ -178,6 +188,8 @@ describe("creerLivraisonDepuisSession — stores REC receipt number on paiement"
   beforeEach(() => {
     capturedPaiementInsert = null;
     capturedLivraisonInsert = null;
+    capturedAdvanceRepayment = null;
+    mockAdvanceRows = [];
     mockGenererNumeroRecu.mockClear();
     mockReserverNumeroPesee.mockClear();
   });
@@ -212,5 +224,25 @@ describe("creerLivraisonDepuisSession — stores REC receipt number on paiement"
     await creerLivraisonDepuisSession(COOPERATIVE_ID, SESSION_ID, {});
     expect(capturedLivraisonInsert?.statutPaiement).toBe("EN_ATTENTE");
     expect(capturedLivraisonInsert?.montantRestant).toBe("144600");
+  });
+
+  it("n'applique pas une avance reportée avant sa date prévue sur le net de session", async () => {
+    mockAdvanceRows = [{
+      id: 4,
+      membreId: MEMBRE_ID,
+      planType: "reporte",
+      montantPartielFcfa: null,
+      soldeRestantFcfa: 200_000,
+      montantRembourse_fcfa: 0,
+      reportDate: "2027-02-28",
+      deductionSource: "livraison",
+      statut: "en_cours",
+    }];
+
+    await creerLivraisonDepuisSession(COOPERATIVE_ID, SESSION_ID, {});
+
+    expect(capturedLivraisonInsert?.avanceDeduiteFcfa).toBe(0);
+    expect(capturedLivraisonInsert?.montantNetFcfa).toBe(144600);
+    expect(capturedAdvanceRepayment).toBeNull();
   });
 });

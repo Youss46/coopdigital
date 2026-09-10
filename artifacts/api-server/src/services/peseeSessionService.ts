@@ -1684,27 +1684,44 @@ export async function creerLivraisonDepuisSession(
     const numeroPesee = reservationPesee.numero;
 
     // ── Avances & intrants deductions — membres seulement (pas de déductions pour fournisseurs) ──
-    let avanceEnCours: typeof avancesTable.$inferSelect | undefined;
+    const avancesATraiter: Array<{
+      av: typeof avancesTable.$inferSelect;
+      montant: number;
+    }> = [];
     let avanceDeduite = 0;
     let intrantsDeduits = 0;
 
     if (!isFournisseur && session.membreId) {
-      // Both reads run inside the transaction with FOR UPDATE so concurrent
-      // deliveries for the same member cannot see the same stale balance.
-      const avanceRows = await tx
+      // Même règle que pour une livraison HTTP et une commission :
+      // une avance « commission » ne réduit jamais une livraison, reportDate
+      // est la première date éligible et le plan limite la retenue.
+      // Le verrou couvre toute la transaction pour les clôtures concurrentes.
+      const avancesEnCours = await tx
         .select()
         .from(avancesTable)
-        .where(and(eq(avancesTable.membreId, session.membreId), eq(avancesTable.statut, "en_cours")))
-        .orderBy(desc(avancesTable.dateOctroi))
-        .for("update")
-        .limit(1);
-      avanceEnCours = avanceRows[0];
+        .where(and(
+          eq(avancesTable.membreId, session.membreId),
+          inArray(avancesTable.statut, ["en_cours", "en_retard"] as const),
+          or(
+            isNull(avancesTable.deductionSource),
+            eq(avancesTable.deductionSource, "livraison"),
+          )!,
+        ))
+        .orderBy(avancesTable.dateOctroi)
+        .for("update");
 
       const encoursIntrants = await getEncoursMembreTx(tx, cooperativeId, session.membreId);
 
-      avanceDeduite = avanceEnCours
-        ? Math.min(avanceEnCours.soldeRestantFcfa, montantBrut)
-        : 0;
+      let budgetRestant = montantBrut;
+      for (const av of avancesEnCours) {
+        if (budgetRestant <= 0) break;
+        const montant = calculerRetenueAvanceLivraison(av, dateStr, budgetRestant);
+        if (montant <= 0) continue;
+        avancesATraiter.push({ av, montant });
+        avanceDeduite += montant;
+        budgetRestant -= montant;
+      }
+
       const apresAvance = montantBrut - avanceDeduite;
       intrantsDeduits = Math.min(encoursIntrants, Math.max(0, apresAvance));
     }
@@ -1754,18 +1771,24 @@ export async function creerLivraisonDepuisSession(
       })
       .returning();
 
-    // ── Mise à jour de l'avance (membres seulement) ───────────────────────
-    if (!isFournisseur && avanceEnCours && avanceDeduite > 0) {
-      const nouveauRembourse = avanceEnCours.montantRembourse_fcfa + avanceDeduite;
-      const nouveauSolde = avanceEnCours.soldeRestantFcfa - avanceDeduite;
+    // ── Mise à jour des avances (membres seulement) ─────────────────────────
+    for (const { av, montant } of avancesATraiter) {
+      const nouveauRembourse = av.montantRembourse_fcfa + montant;
+      const nouveauSolde = av.soldeRestantFcfa - montant;
       await tx
         .update(avancesTable)
         .set({
           montantRembourse_fcfa: nouveauRembourse,
           soldeRestantFcfa: nouveauSolde,
-          statut: nouveauSolde === 0 ? "rembourse" : "en_cours",
+          statut: nouveauSolde === 0 ? "rembourse" : av.statut,
         })
-        .where(eq(avancesTable.id, avanceEnCours.id));
+        .where(eq(avancesTable.id, av.id));
+      await tx.insert(remboursementsAvancesMembresTable).values({
+        avanceId: av.id,
+        livraisonId: livraison!.id,
+        montantFcfa: montant,
+        note: "Déduction automatique sur livraison",
+      });
     }
 
     // ── Remboursement intrants (membres seulement) ────────────────────────
