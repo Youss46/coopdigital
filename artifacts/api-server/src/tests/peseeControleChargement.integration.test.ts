@@ -397,20 +397,21 @@ describe.skipIf(!enabled)(
         [id],
       );
       const numeroExpedition = expedition.rows[0].numero_expedition;
+      const nomEntrepot = `Entrepôt concurrence ${id}`;
 
       const entrepot = await client.query(
         `INSERT INTO entrepots
           (cooperative_id, nom, ville, capacite_kg)
          VALUES ($1, $2, 'Test', 5000)
          RETURNING id`,
-        [cooperativeId, `Entrepôt concurrence ${id}`],
+        [cooperativeId, nomEntrepot],
       );
       const lot = await client.query(
         `INSERT INTO lots
           (cooperative_id, campagne_id, poids_total_kg, entrepot, nombre_sacs)
          VALUES ($1, $2, 1000, $3, 20)
          RETURNING id`,
-        [cooperativeId, campaignId, `Entrepôt concurrence ${id}`],
+        [cooperativeId, campaignId, nomEntrepot],
       );
       await client.query(
         `INSERT INTO expedition_lots
@@ -783,6 +784,8 @@ describe.skipIf(!enabled)(
       await changerStatut(cooperativeId, id, testUserId, "arrive_port");
 
       const motif = `Chargement expédition ${numeroExpedition}`;
+
+      const nomEntrepotA = `Entrepôt multi A ${id}`;
       await client.query(
         `DELETE FROM mouvements_stock
           WHERE entrepot_id = $1 AND motif = $2`,
@@ -852,6 +855,145 @@ describe.skipIf(!enabled)(
         historiques: 1,
         sorties: 1,
       });
+    });
+
+    it("crée une sortie par entrepôt avec les totaux de ses lots et résiste aux réparations concurrentes", async () => {
+      await setControleChargementObligatoire(false);
+
+      const id = await createTransitionExpedition(2200);
+      const expedition = await client.query(
+        `SELECT numero_expedition FROM expeditions WHERE id = $1`,
+        [id],
+      );
+      const numeroExpedition = expedition.rows[0].numero_expedition;
+      const motif = `Chargement expédition ${numeroExpedition}`;
+      const nomEntrepotA = `Entrepôt multi A ${id}`;
+      const nomEntrepotB = `Entrepôt multi B ${id}`;
+
+      const entrepots = await client.query(
+        `INSERT INTO entrepots
+          (cooperative_id, nom, ville, capacite_kg)
+         VALUES
+           ($1, $2, 'Test', 5000),
+           ($1, $3, 'Test', 5000)
+         RETURNING id, nom
+        `,
+        [cooperativeId, nomEntrepotA, nomEntrepotB],
+      );
+      const entrepotA = entrepots.rows.find((row: { nom: string }) => row.nom === nomEntrepotA);
+      const entrepotB = entrepots.rows.find((row: { nom: string }) => row.nom === nomEntrepotB);
+      expect(entrepotA).toBeDefined();
+      expect(entrepotB).toBeDefined();
+
+      const lots = await client.query(
+        `INSERT INTO lots
+          (cooperative_id, campagne_id, poids_total_kg, entrepot, nombre_sacs)
+         VALUES
+           ($1, $2, 700, $3, 14),
+           ($1, $2, 300, $4, 6),
+           ($1, $2, 1200, $5, 24)
+         RETURNING id`,
+        [
+          cooperativeId,
+          campaignId,
+          `  ${nomEntrepotA.toUpperCase()}  `,
+          nomEntrepotA,
+          nomEntrepotB,
+        ],
+      );
+      await client.query(
+        `INSERT INTO expedition_lots
+          (expedition_id, lot_id, poids_kg, nombre_sacs)
+         VALUES
+           ($1, $2, 700, 14),
+           ($1, $3, 300, 6),
+           ($1, $4, 1200, 24)`,
+        [id, lots.rows[0].id, lots.rows[1].id, lots.rows[2].id],
+      );
+
+      await changerStatut(cooperativeId, id, testUserId, "charge");
+
+      const sortiesAuChargement = await client.query(
+        `SELECT entrepot_id, count(*)::int AS count,
+                coalesce(sum(poids_kg), 0)::numeric AS poids,
+                coalesce(sum(nombre_sacs), 0)::int AS sacs
+           FROM mouvements_stock
+          WHERE motif = $1
+          GROUP BY entrepot_id
+          ORDER BY entrepot_id`,
+        [motif],
+      );
+      expect(sortiesAuChargement.rows).toHaveLength(2);
+      expect(sortiesAuChargement.rows).toEqual(
+        expect.arrayContaining([
+          {
+            entrepot_id: entrepotA.id,
+            count: 1,
+            poids: "1000.00",
+            sacs: 20,
+          },
+          {
+            entrepot_id: entrepotB.id,
+            count: 1,
+            poids: "1200.00",
+            sacs: 24,
+          },
+        ]),
+      );
+
+      await changerStatut(cooperativeId, id, testUserId, "en_transit");
+      await changerStatut(cooperativeId, id, testUserId, "arrive_port");
+      await client.query(
+        `DELETE FROM mouvements_stock
+          WHERE motif = $1`,
+        [motif],
+      );
+
+      const receptions = await Promise.all([
+        confirmerReception(cooperativeId, id, testUserId, {
+          poidsRecuPortKg: 2200,
+          numeroRecepissePort: `REC-MULTI-${id}`,
+          nomReceptionnaire: "Réception concurrente",
+        }),
+        confirmerReception(cooperativeId, id, testUserId, {
+          poidsRecuPortKg: 2200,
+          numeroRecepissePort: `REC-MULTI-${id}`,
+          nomReceptionnaire: "Réception concurrente",
+        }),
+      ]);
+      expect(receptions).toHaveLength(2);
+      expect(receptions.map((reception) => reception.statut)).toEqual([
+        "receptionne",
+        "receptionne",
+      ]);
+
+      const sortiesApresReparation = await client.query(
+        `SELECT entrepot_id, count(*)::int AS count,
+                coalesce(sum(poids_kg), 0)::numeric AS poids,
+                coalesce(sum(nombre_sacs), 0)::int AS sacs
+           FROM mouvements_stock
+          WHERE motif = $1
+          GROUP BY entrepot_id
+          ORDER BY entrepot_id`,
+        [motif],
+      );
+      expect(sortiesApresReparation.rows).toHaveLength(2);
+      expect(sortiesApresReparation.rows).toEqual(
+        expect.arrayContaining([
+          {
+            entrepot_id: entrepotA.id,
+            count: 1,
+            poids: "1000.00",
+            sacs: 20,
+          },
+          {
+            entrepot_id: entrepotB.id,
+            count: 1,
+            poids: "1200.00",
+            sacs: 24,
+          },
+        ]),
+      );
     });
 
     it("préserve le comportement historique quand le contrôle obligatoire est désactivé", async () => {
