@@ -22,11 +22,11 @@ vi.mock("@workspace/db", () => ({
   paiementLignesTable: table("paiement_lignes", ["paiementId"]),
   avancesTable: table("avances", []),
   campagnesTable: table("campagnes", ["cooperativeId", "statut", "dateOuverture", "dateFermeture"]),
-  membresTable: table("membres", ["id", "cooperativeId", "delegueId"]),
+  membresTable: table("membres", ["id", "cooperativeId", "delegueId", "nom", "prenoms", "telephone"]),
   livraisonsTable: table("livraisons", ["id", "agentId", "fournisseurId", "statutPaiement", "montantRestant"]),
-  fournisseursTable: table("fournisseurs", ["id", "cooperativeId", "creeParDelegueId"]),
+  fournisseursTable: table("fournisseurs", ["id", "cooperativeId", "creeParDelegueId", "nom", "prenoms", "telephone"]),
   usersTable: table("users", ["id", "role"]),
-  bonsCarburantTable: table("bons_carburant", ["id", "cooperativeId"]),
+  bonsCarburantTable: table("bons_carburant", ["id", "cooperativeId", "numero"]),
   depensesVehiculeTable: table("depenses_vehicule", ["id", "cooperativeId", "libelle", "fournisseur"]),
   ventesExportateursTable: table("ventes_exportateurs", []),
   exportateursTable: table("exportateurs", []),
@@ -56,6 +56,7 @@ vi.mock("drizzle-orm", () => ({
   }),
   gte: (column: unknown, value: unknown) => ({ operator: "gte", column, value }),
   lte: (column: unknown, value: unknown) => ({ operator: "lte", column, value }),
+  ilike: (column: unknown, value: unknown) => ({ operator: "ilike", column, value }),
   inArray: (column: unknown, values: unknown[]) => ({ operator: "inArray", column, values }),
   isNull: (column: unknown) => ({ operator: "isNull", column }),
 }));
@@ -436,6 +437,39 @@ describe("date effective des règlements", () => {
         livraisons: { count: 230, montantTotal: 230_000 },
         tous: { count: 260, montantTotal: 285_000 },
       }),
+    }));
+  });
+
+  it("recherche dans toute la file sans réduire les compteurs par onglet", async () => {
+    const listeChain = selectChain([{ id: 202, livraisonId: 10, montantFcfa: 1_000 }]);
+    mocks.select
+      .mockReturnValueOnce(selectChain([{
+        livraisonsCount: 1,
+        livraisonsMontant: 1_000,
+        carburantCount: 2,
+        carburantMontant: 4_000,
+        autresCount: 0,
+        autresMontant: 0,
+        tousCount: 3,
+        tousMontant: 5_000,
+      }]))
+      .mockReturnValueOnce(listeChain)
+      .mockReturnValueOnce(selectChain([]));
+    const res = response();
+
+    await listPaiements(request({ recherche: "Kouassi", type: "livraison", page: "1", limit: "50" }), res);
+
+    const whereCondition = JSON.stringify(listeChain.where.mock.calls[0]?.[0]);
+    expect(whereCondition).toContain("concat_ws");
+    expect(whereCondition).toContain("Kouassi");
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      pagination: { page: 1, limit: 50, total: 1 },
+      summary: {
+        livraisons: { count: 1, montantTotal: 1_000 },
+        carburant: { count: 2, montantTotal: 4_000 },
+        autres: { count: 0, montantTotal: 0 },
+        tous: { count: 3, montantTotal: 5_000 },
+      },
     }));
   });
 });

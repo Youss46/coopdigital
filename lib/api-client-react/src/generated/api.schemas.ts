@@ -5794,6 +5794,10 @@ date_debut?: string;
  */
 date_fin?: string;
 /**
+ * Recherche sur le nom, le téléphone ou le numéro de bon
+ */
+recherche?: string;
+/**
  * @maximum 200
  */
 limit?: number;

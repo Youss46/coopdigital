@@ -3187,6 +3187,11 @@ paths:
           schema:
             type: string
             format: date
+        - name: recherche
+          in: query
+          description: Recherche sur le nom, le téléphone ou le numéro de bon
+          schema:
+            type: string
         - name: limit
           in: query
           schema:

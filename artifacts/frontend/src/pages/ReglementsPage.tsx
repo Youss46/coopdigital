@@ -1527,6 +1527,7 @@ export default function ReglementsPage() {
       : undefined,
     date_debut: periodePersonnalisee && dateDebut ? dateDebut : undefined,
     date_fin: periodePersonnalisee && dateFin ? dateFin : undefined,
+    recherche: recherche.trim() || undefined,
     type: onglet === "livraisons" ? "livraison" as const : onglet === "carburant" ? "carburant" as const : "tous" as const,
     page,
     limit: 50,
@@ -1557,7 +1558,7 @@ export default function ReglementsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [filtreStatut, filtrePeriode, dateDebut, dateFin, onglet]);
+  }, [filtreStatut, filtrePeriode, dateDebut, dateFin, onglet, recherche]);
 
   const {
     data: fraisTransport = [],
@@ -1759,13 +1760,7 @@ export default function ReglementsPage() {
   const filtres = paiements.filter((p) => {
     if (filtreSansMode && !!p.modePaiement) return false;
     if (filtreProxy && !p.agentSaisiseurId) return false;
-    if (!recherche) return true;
-    const r = recherche.toLowerCase();
-    return (
-      nomProducteur(p).toLowerCase().includes(r) ||
-      (telProducteur(p) ?? "").includes(r) ||
-      (p.bonCarburantNumero ?? "").toLowerCase().includes(r)
-    );
+    return true;
   });
   const paiementsAffiches = filtres;
   const countsOnglets = {
@@ -2099,7 +2094,10 @@ export default function ReglementsPage() {
             type="search"
              placeholder={onglet === "carburant" ? "Rechercher un bon carburant…" : "Rechercher par nom ou téléphone…"}
             value={recherche}
-            onChange={(e) => setRecherche(e.target.value)}
+            onChange={(e) => {
+              setRecherche(e.target.value);
+              setPage(1);
+            }}
             className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-green-400"
           />
         </div>
@@ -2266,13 +2264,20 @@ export default function ReglementsPage() {
 
       {/* ── Liste ── */}
       {isLoading ? (
-        <div className="flex justify-center py-16">
+        <div className="flex flex-col items-center justify-center gap-2 py-16 text-gray-400">
           <Loader2 className="animate-spin text-gray-300" size={32} />
+          <p className="text-sm">
+            {recherche.trim() ? "Recherche des règlements correspondants…" : "Chargement des règlements…"}
+          </p>
         </div>
       ) : paiementsAffiches.length === 0 ? (
         <div className="text-center py-16">
           <CheckCheck size={40} className="mx-auto text-gray-300 mb-3" />
-          <p className="text-gray-400 text-sm">Aucun paiement{filtreStatut === "en_attente" ? " en attente" : ""}</p>
+          <p className="text-gray-400 text-sm">
+            {recherche.trim()
+              ? `Aucun règlement ne correspond à « ${recherche.trim()} ».`
+              : `Aucun paiement${filtreStatut === "en_attente" ? " en attente" : ""}`}
+          </p>
         </div>
       ) : (
         <div className="space-y-2">

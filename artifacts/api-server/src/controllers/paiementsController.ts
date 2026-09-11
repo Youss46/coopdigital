@@ -1,6 +1,6 @@
 import { type Request, type Response } from "express";
 import { db, paiementsTable, paiementLignesTable, membresTable, livraisonsTable, fournisseursTable, usersTable, comptesMobilesMarchandsTable, mouvementsMobileMarchandTable, caissesTable, chequesEmisTable, bonsCarburantTable, campagnesTable, sessionsPeseeTable, commissionsMembresDelaguesTable, depensesVehiculeTable } from "@workspace/db";
-import { eq, desc, and, or, sql, gte, lt, lte, inArray, isNull, type SQL } from "drizzle-orm";
+import { eq, desc, and, or, sql, gte, lt, lte, inArray, isNull, ilike, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { envoyerPushGroupePortail, envoyerPushGroupe } from "../services/pushService";
 import { proposerEcrituresDansTransaction, resolveCompteDetteProducteur, resolveCompteDebit } from "../services/comptabiliteService.js";
@@ -468,6 +468,7 @@ export async function listPaiements(req: Request, res: Response): Promise<void> 
     const periode = req.query["periode"] as string | undefined;
     const dateDebut = typeof req.query["date_debut"] === "string" ? req.query["date_debut"] : undefined;
     const dateFin = typeof req.query["date_fin"] === "string" ? req.query["date_fin"] : undefined;
+    const recherche = typeof req.query["recherche"] === "string" ? req.query["recherche"].trim() : "";
     const type = req.query["type"] as "livraison" | "carburant" | "tous" | undefined;
     const parsedLimit = parseInt(String(req.query["limit"] ?? "50"));
     const parsedPage = parseInt(String(req.query["page"] ?? "1"));
@@ -514,6 +515,19 @@ export async function listPaiements(req: Request, res: Response): Promise<void> 
           sql`${paiementsTable.modePaiement} != 'especes'`,
           isNull(livraisonsTable.agentId),
           sql`${agentUserAlias.role} != 'delegue'`,
+        )!,
+      );
+    }
+
+    if (recherche) {
+      const motifRecherche = `%${recherche}%`;
+      baseConditions.push(
+        or(
+          ilike(sql`concat_ws(' ', ${membresTable.nom}, ${membresTable.prenoms})`, motifRecherche),
+          ilike(membresTable.telephone, motifRecherche),
+          ilike(sql`concat_ws(' ', ${fournisseursTable.nom}, ${fournisseursTable.prenoms})`, motifRecherche),
+          ilike(fournisseursTable.telephone, motifRecherche),
+          ilike(bonsCarburantTable.numero, motifRecherche),
         )!,
       );
     }

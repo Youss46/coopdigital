@@ -3620,6 +3620,7 @@ export const ListPaiementsQueryParams = zod.object({
   "periode": zod.enum(['today', 'week', 'month', 'previous_month', 'campaign']).optional(),
   "date_debut": zod.date().optional().describe('Date effective minimale du paiement'),
   "date_fin": zod.date().optional().describe('Date effective maximale du paiement'),
+  "recherche": zod.coerce.string().optional().describe('Recherche sur le nom, le téléphone ou le numéro de bon'),
   "limit": zod.coerce.number().max(listPaiementsQueryLimitMax).default(listPaiementsQueryLimitDefault),
   "page": zod.coerce.number().min(1).default(listPaiementsQueryPageDefault),
   "type": zod.enum(['livraison', 'carburant', 'tous']).optional().describe('Origine des règlements à retourner. Les compteurs restent calculés pour tous les types.')
