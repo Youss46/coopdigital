@@ -12,6 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { NumericInput } from "@/components/ui/numeric-input";
 import {
+  getGetEntrepotsQueryKey,
+  getGetMouvementsStockQueryKey,
+} from "@workspace/api-client-react";
+import {
   ArrowLeft, Ship, MapPin, CheckCircle2,
   ChevronRight, FileText, Users, Leaf, AlertCircle,
   Plus, Unlink, Link, Download, Scale,
@@ -295,6 +299,10 @@ export default function ExpeditionDetailPage() {
       void qc.invalidateQueries({ queryKey: ["expeditions"] });
       void qc.invalidateQueries({ queryKey: ["expeditions-stats"] });
       void qc.invalidateQueries({ queryKey: ["entrepots-stats"] });
+      // Le journal Gestion des stocks utilise ses propres clés de cache.
+      void qc.invalidateQueries({ queryKey: getGetEntrepotsQueryKey() });
+      void qc.invalidateQueries({ queryKey: getGetMouvementsStockQueryKey() });
+      void qc.invalidateQueries({ queryKey: ["stocks-mouvements"] });
     },
     onError: (err: Error) => toast({
       title: "Réparation impossible",
