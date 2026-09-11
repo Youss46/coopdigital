@@ -4,6 +4,7 @@ import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   createBrouillon,
+  getBrouillon,
   getAllOps,
   incrementGpsTentatives,
   markBrouillonError,
@@ -66,6 +67,28 @@ describe("historique offline multi-files", () => {
         }),
       ]),
     );
+  });
+
+  it("conserve le bon de réception d'un brouillon de membre délégué", async () => {
+    const created = await createBrouillon({
+      membreId: 42,
+      membreNom: "Kouassi",
+      membrePrenoms: "Awa",
+      membreCode: "MEM-042",
+      produit: "cacao",
+      operation: "reception_membre_delegue",
+      certificationCacao: "RA",
+      bonReceptionId: 314,
+    });
+
+    const rehydrated = await getBrouillon(created.localId);
+
+    expect(rehydrated).toEqual(expect.objectContaining({
+      membreId: 42,
+      operation: "reception_membre_delegue",
+      bonReceptionId: 314,
+      certificationCacao: "RA",
+    }));
   });
 
   it("conserve les erreurs de chaque file et trie les entrées par date décroissante", async () => {

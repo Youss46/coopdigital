@@ -56,6 +56,7 @@ const fakeState = vi.hoisted(() => {
       ...brouillon,
       ...data,
     })),
+    getBrouillon: vi.fn(async () => null as BrouillonPesee | null),
     navigate: vi.fn(),
   };
 });
@@ -108,7 +109,15 @@ vi.mock("../components/ScaleWeightDisplay", () => ({
 }));
 
 vi.mock("../components/ui/numeric-input", () => ({
-  NumericInput: () => null,
+  NumericInput: (props: {
+    value?: string;
+    disabled?: boolean;
+    onChange?: (value: string) => void;
+  }) => createElement("input", {
+    value: props.value ?? "",
+    disabled: props.disabled,
+    onChange: (event: { target: { value: string } }) => props.onChange?.(event.target.value),
+  }),
 }));
 
 vi.mock("lucide-react", () => {
@@ -131,7 +140,7 @@ vi.mock("lucide-react", () => {
 
 vi.mock("../lib/idb", () => ({
   createBrouillon: fakeState.createBrouillon,
-  getBrouillon: vi.fn(async () => null),
+  getBrouillon: fakeState.getBrouillon,
   addLigneToBrouillon: vi.fn(),
   deleteLigneFromBrouillon: vi.fn(),
   terminerBrouillon: vi.fn(),
@@ -167,6 +176,7 @@ describe("pesée hors ligne d'un membre délégué", () => {
 
   beforeEach(() => {
     fakeState.createBrouillon.mockClear();
+    fakeState.getBrouillon.mockReset().mockResolvedValue(null);
     fakeState.navigate.mockClear();
     container = document.createElement("div");
     document.body.appendChild(container);
@@ -221,5 +231,27 @@ describe("pesée hors ligne d'un membre délégué", () => {
     }));
     expect(fakeState.navigate).not.toHaveBeenCalledWith("/receptions");
     expect(container.textContent).toContain("Pesée groupée");
+  });
+
+  it("réhydrate le producteur et le bon après une actualisation hors ligne", async () => {
+    fakeState.getBrouillon.mockResolvedValue(fakeState.brouillon);
+
+    await act(async () => {
+      root = createRoot(container);
+      root.render(createElement(SessionPeseeFlow, {
+        params: { sessionId: `b-${fakeState.brouillon.localId}` },
+      }));
+      await Promise.resolve();
+    });
+
+    expect(fakeState.getBrouillon).toHaveBeenCalledWith(fakeState.brouillon.localId);
+    expect(container.textContent).toContain("Kouassi Awa");
+    expect(container.textContent).toContain("Pesée hors ligne");
+    expect(container.textContent).toContain("Nouveau passage");
+
+    const inputs = container.querySelectorAll("input");
+    expect(inputs.length).toBeGreaterThanOrEqual(2);
+    expect(Array.from(inputs).every((input) => !input.disabled)).toBe(true);
+    expect(fakeState.navigate).not.toHaveBeenCalledWith("/receptions");
   });
 });
