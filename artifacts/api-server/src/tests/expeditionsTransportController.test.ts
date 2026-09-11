@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => {
   return {
     listFraisTransportARegler: vi.fn(),
     createExpeditionControlSession: vi.fn(),
+    rattacherLot: vi.fn(),
     SessionExpeditionExistanteError,
   };
 });
@@ -31,7 +32,7 @@ vi.mock("../services/expeditionsService", () => ({
   getFlotteVehicules: vi.fn(),
   getFlotteChauffeurs: vi.fn(),
   getLotsDisponibles: vi.fn(),
-  rattacherLot: vi.fn(),
+  rattacherLot: mocks.rattacherLot,
   detacherLot: vi.fn(),
   genererNumeroExpedition: vi.fn(),
   reglerFraisTransport: vi.fn(),
@@ -57,6 +58,7 @@ vi.mock("../services/peseeSessionService.js", () => ({
 const {
   handleListFraisTransportARegler,
   handleStartExpeditionControl,
+  handleRattacherLot,
 } = await import("../controllers/expeditionsController");
 
 function makeReq(cooperativeId: number | null) {
@@ -165,6 +167,25 @@ describe("liste des frais d'exportation à régler", () => {
       erreur: "Une pesée de contrôle est déjà en cours pour cette expédition (PSE-2026-00044)",
       sessionId: 44,
       numeroSession: "PSE-2026-00044",
+    });
+  });
+
+  it("refuse le rattachement quand le service détecte un accès inter-coopératives", async () => {
+    mocks.rattacherLot.mockRejectedValueOnce(new Error("Expédition introuvable ou accès refusé"));
+    const res = makeRes();
+    const req = {
+      user: { cooperativeId: 7 },
+      params: { id: "12" },
+      body: { lotId: 99 },
+      log: { error: vi.fn() },
+    } as never;
+
+    await handleRattacherLot(req, res as never);
+
+    expect(mocks.rattacherLot).toHaveBeenCalledWith(12, 99, 7);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      erreur: "Expédition introuvable ou accès refusé",
     });
   });
 });

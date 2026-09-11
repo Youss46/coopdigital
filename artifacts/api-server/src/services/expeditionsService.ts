@@ -559,40 +559,62 @@ export async function corrigerStatutLotAvecHistoriqueExpedition(
 }
 
 export async function rattacherLot(expeditionId: number, lotId: number, cooperativeId: number) {
-  // Vérifier que le lot appartient à la coopérative
-  const [lot] = await db
-    .select()
-    .from(lotsTable)
-    .where(and(eq(lotsTable.id, lotId), eq(lotsTable.cooperativeId, cooperativeId)))
-    .limit(1);
+  return db.transaction(async (tx) => {
+    // Les deux ressources doivent appartenir au même tenant. Vérifier
+    // l'expédition avant l'insertion empêche une requête directe de rattacher
+    // un lot valide à l'expédition d'une autre coopérative.
+    const [expedition] = await tx
+      .select({ id: expeditionsTable.id })
+      .from(expeditionsTable)
+      .where(and(
+        eq(expeditionsTable.id, expeditionId),
+        eq(expeditionsTable.cooperativeId, cooperativeId),
+      ))
+      .for("update")
+      .limit(1);
 
-  if (!lot) throw new Error("Lot introuvable ou accès refusé");
+    if (!expedition) throw new Error("Expédition introuvable ou accès refusé");
 
-  // Vérifier que le lot n'est pas déjà rattaché à cette expédition
-  const [existing] = await db
-    .select({ id: expeditionLotsTable.id })
-    .from(expeditionLotsTable)
-    .where(
-      and(
+    const [lot] = await tx
+      .select({
+        id:          lotsTable.id,
+        poidsTotalKg: lotsTable.poidsTotalKg,
+        nombreSacs:   lotsTable.nombreSacs,
+      })
+      .from(lotsTable)
+      .where(and(
+        eq(lotsTable.id, lotId),
+        eq(lotsTable.cooperativeId, cooperativeId),
+      ))
+      .for("update")
+      .limit(1);
+
+    if (!lot) throw new Error("Lot introuvable ou accès refusé");
+
+    // Vérifier que le lot n'est pas déjà rattaché à cette expédition.
+    const [existing] = await tx
+      .select({ id: expeditionLotsTable.id })
+      .from(expeditionLotsTable)
+      .where(and(
         eq(expeditionLotsTable.expeditionId, expeditionId),
-        eq(expeditionLotsTable.lotId, lotId)
-      )
-    )
-    .limit(1);
+        eq(expeditionLotsTable.lotId, lotId),
+      ))
+      .limit(1);
 
-  if (existing) throw new Error("Lot déjà rattaché à cette expédition");
+    if (existing) throw new Error("Lot déjà rattaché à cette expédition");
 
-  const [row] = await db
-    .insert(expeditionLotsTable)
-    .values({
-      expeditionId,
-      lotId,
-      poidsKg:    lot.poidsTotalKg,
-      nombreSacs: lot.nombreSacs ?? null,
-    })
-    .returning();
+    const [row] = await tx
+      .insert(expeditionLotsTable)
+      .values({
+        expeditionId,
+        lotId,
+        poidsKg:    lot.poidsTotalKg,
+        nombreSacs: lot.nombreSacs ?? null,
+      })
+      .returning();
 
-  return row;
+    return row;
+  });
 }
 
 export async function detacherLot(expeditionLotId: number, expeditionId: number) {
