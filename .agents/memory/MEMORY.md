@@ -140,3 +140,4 @@
 - [Filtres persistés validés](persisted-filter-validation.md) — valider les filtres restaurés avant tout appel API et utiliser des dates explicites dans les tests pour éviter la dépendance à l’horloge du runner.
 - [Enum PostgreSQL dans les migrations Drizzle](postgres-enum-migration-transaction.md) — comparer les nouvelles valeurs via `colonne::text` si une contrainte est créée dans le même lot transactionnel.
 - [Cache HTTP et CORS Railway](cache-control-cors-railway.md) — ne jamais ajouter Cache-Control à une requête fetch cross-origin; préférer cache:no-store côté navigateur et Cache-Control côté réponse API.
+- [Expéditions historiques sans lignes de lot](expedition-legacy-without-lot-lines.md) — une ancienne expédition peut n’avoir aucune ligne expedition_lots; débiter poids_charge_kg via lieu_depart seulement si l’entrepôt existe.

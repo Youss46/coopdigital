@@ -1557,5 +1557,62 @@ describe.skipIf(!enabled)(
       );
       expect(sortieApresRejeu.rows[0]).toEqual({ count: 1, poids: "750.00" });
     });
+
+    it("répare une ancienne expédition sans aucune ligne expedition_lots", async () => {
+      await setControleChargementObligatoire(false);
+
+      const id = await createTransitionExpedition(750);
+      await client.query(
+        `INSERT INTO entrepots
+          (cooperative_id, nom, ville, capacite_kg)
+         VALUES ($1, 'Magasin central', 'Test', 5000)`,
+        [cooperativeId],
+      );
+      await client.query(
+        `UPDATE expeditions
+            SET nombre_sacs = 15
+          WHERE id = $1`,
+        [id],
+      );
+
+      await changerStatut(cooperativeId, id, testUserId, "charge");
+      await changerStatut(cooperativeId, id, testUserId, "en_transit");
+      await changerStatut(cooperativeId, id, testUserId, "arrive_port");
+
+      const expedition = await client.query(
+        `SELECT numero_expedition FROM expeditions WHERE id = $1`,
+        [id],
+      );
+      const motif = `Chargement expédition ${expedition.rows[0].numero_expedition}`;
+      const sortieAvantRejeu = await client.query(
+        `SELECT count(*)::int AS count,
+                coalesce(sum(poids_kg), 0)::numeric AS poids,
+                coalesce(sum(nombre_sacs), 0)::int AS sacs
+           FROM mouvements_stock
+          WHERE motif = $1`,
+        [motif],
+      );
+      expect(sortieAvantRejeu.rows[0]).toEqual({ count: 1, poids: "750.00", sacs: 15 });
+
+      await client.query(
+        `DELETE FROM mouvements_stock WHERE motif = $1`,
+        [motif],
+      );
+      await confirmerReception(cooperativeId, id, testUserId, {
+        poidsRecuPortKg: 750,
+        numeroRecepissePort: `REC-SANS-LOT-${id}`,
+        nomReceptionnaire: "Réception sans lot",
+      });
+
+      const sortieApresReparation = await client.query(
+        `SELECT count(*)::int AS count,
+                coalesce(sum(poids_kg), 0)::numeric AS poids,
+                coalesce(sum(nombre_sacs), 0)::int AS sacs
+           FROM mouvements_stock
+          WHERE motif = $1`,
+        [motif],
+      );
+      expect(sortieApresReparation.rows[0]).toEqual({ count: 1, poids: "750.00", sacs: 15 });
+    });
   },
 );

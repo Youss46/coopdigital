@@ -994,39 +994,65 @@ async function deduireStockChargementDansTransaction(
       eq(expeditionLotsTable.expeditionId, expeditionId),
     );
 
-  // Une expédition sans aucune ligne de lot peut représenter un contrôle de
-  // chargement sans effet stock. Le fallback ne s'applique qu'aux anciennes
-  // lignes expedition_lots qui portent bien un poids mais ont perdu lot_id.
-  if (lotsAttaches.length === 0) return resultat;
-
   // Regrouper par nom d'entrepôt (un lot → un entrepôt).
   // Les noms peuvent différer uniquement par la casse ou les espaces
   // entre la fiche du lot et celle de l'entrepôt.
   const parEntrepot = new Map<string, { poidsKg: number; nombreSacs: number; lotId: number | null }>();
-  for (const lot of lotsAttaches) {
-    const poids = parseFloat(String(lot.poidsKg ?? "0"));
-    if (poids <= 0) continue;
-    // Un lot identifié doit fournir son entrepôt propre. Le fallback sur le
-    // lieu de départ est réservé aux anciennes lignes sans lot_id.
-    const nom = (
-      lot.lotId !== null
-        ? lot.entrepotNom
-        : (lot.entrepotNom ?? expedition.lieuDepart)
-    )?.trim() ?? "";
-    if (!nom) {
-      throw new Error(`Entrepôt source manquant pour le lot ${lot.lotId ?? "inconnu"}`);
+  if (lotsAttaches.length === 0) {
+    // Certaines anciennes expéditions ont été créées avec un poids et un
+    // lieu de départ, mais sans aucune ligne expedition_lots. Elles restent
+    // réparables : le poids déclaré représente alors la quantité à débiter
+    // dans l'entrepôt de départ. Le garde-fou poids + lieu évite de fabriquer
+    // une sortie à partir d'une expédition incomplète.
+    const poidsDeclare = parseFloat(String(expedition.poidsChargeKg ?? "0"));
+    const nomDepart = expedition.lieuDepart?.trim() ?? "";
+    if (poidsDeclare > 0 && nomDepart) {
+      const [entrepotSource] = await tx
+        .select({ id: entrepotsTable.id })
+        .from(entrepotsTable)
+        .where(and(
+          eq(entrepotsTable.cooperativeId, cooperativeId),
+          sql`lower(trim(${entrepotsTable.nom})) = ${nomDepart.toLowerCase()}`,
+        ))
+        .limit(1);
+
+      // Les anciennes expéditions de test ou de saisie peuvent avoir un
+      // lieu de départ par défaut sans entrepôt réellement créé. Dans ce cas
+      // conserver le no-op historique ; aucune sortie fiable n'est possible.
+      if (entrepotSource) {
+        parEntrepot.set(nomDepart.toLowerCase(), {
+          poidsKg: poidsDeclare,
+          nombreSacs: expedition.nombreSacs ?? 0,
+          lotId: null,
+        });
+      }
     }
-    const nomNormalise = nom.toLowerCase();
-    const existing = parEntrepot.get(nomNormalise);
-    if (existing) {
-      existing.poidsKg   += poids;
-      existing.nombreSacs += lot.nombreSacs ?? 0;
-    } else {
-      parEntrepot.set(nomNormalise, {
-        poidsKg:    poids,
-        nombreSacs: lot.nombreSacs ?? 0,
-        lotId:      lot.lotId ?? null,
-      });
+  } else {
+    for (const lot of lotsAttaches) {
+      const poids = parseFloat(String(lot.poidsKg ?? "0"));
+      if (poids <= 0) continue;
+      // Un lot identifié doit fournir son entrepôt propre. Le fallback sur le
+      // lieu de départ est réservé aux anciennes lignes sans lot_id.
+      const nom = (
+        lot.lotId !== null
+          ? lot.entrepotNom
+          : (lot.entrepotNom ?? expedition.lieuDepart)
+      )?.trim() ?? "";
+      if (!nom) {
+        throw new Error(`Entrepôt source manquant pour le lot ${lot.lotId ?? "inconnu"}`);
+      }
+      const nomNormalise = nom.toLowerCase();
+      const existing = parEntrepot.get(nomNormalise);
+      if (existing) {
+        existing.poidsKg   += poids;
+        existing.nombreSacs += lot.nombreSacs ?? 0;
+      } else {
+        parEntrepot.set(nomNormalise, {
+          poidsKg:    poids,
+          nombreSacs: lot.nombreSacs ?? 0,
+          lotId:      lot.lotId ?? null,
+        });
+      }
     }
   }
 
