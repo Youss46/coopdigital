@@ -180,6 +180,7 @@ describe("pesée hors ligne d'un membre délégué", () => {
     fakeState.getBrouillon.mockReset().mockResolvedValue(null);
     fakeState.navigate.mockClear();
     fakeState.fournisseur.bonReceptionEnAttenteCount = 1;
+    fakeState.fournisseur.bonsReception = [];
     container = document.createElement("div");
     document.body.appendChild(container);
   });
@@ -277,5 +278,67 @@ describe("pesée hors ligne d'un membre délégué", () => {
     expect(container.textContent).toContain("Plusieurs bons de réception sont ouverts");
     expect(container.textContent).not.toContain("Type de cacao");
     expect(fakeState.createBrouillon).not.toHaveBeenCalled();
+  });
+
+  it("propose les bons synchronisés et conserve celui qui est choisi", async () => {
+    fakeState.fournisseur.bonReceptionEnAttenteCount = 2;
+    fakeState.fournisseur.bonsReception = [
+      {
+        id: 314,
+        poidsDeclaraKg: 245,
+        nombreSacsDeclares: 5,
+        typeTransport: "externe",
+        createdAt: "2026-09-10T08:00:00.000Z",
+      },
+      {
+        id: 315,
+        poidsDeclaraKg: 320,
+        nombreSacsDeclares: 8,
+        typeTransport: "cooperatif",
+        createdAt: "2026-09-11T08:00:00.000Z",
+      },
+    ];
+
+    await act(async () => {
+      root = createRoot(container);
+      root.render(createElement(SessionPeseeFlow));
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      const memberButton = Array.from(container.querySelectorAll("button"))
+        .find((button) => button.textContent === "Membre délégué");
+      memberButton!.click();
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("Bon #314");
+    expect(container.textContent).toContain("Bon #315");
+    expect(container.textContent).not.toContain("Reconnectez-vous");
+
+    await act(async () => {
+      const bonButton = Array.from(container.querySelectorAll("button"))
+        .find((button) => button.textContent?.includes("Bon #315"));
+      bonButton!.click();
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("Type de cacao");
+    await act(async () => {
+      const certificationButton = Array.from(container.querySelectorAll("button"))
+        .find((button) => button.textContent === "RA");
+      certificationButton!.click();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      const startButton = Array.from(container.querySelectorAll("button"))
+        .find((button) => button.textContent === "Commencer — RA");
+      startButton!.click();
+      await Promise.resolve();
+    });
+
+    expect(fakeState.createBrouillon).toHaveBeenCalledWith(expect.objectContaining({
+      bonReceptionId: 315,
+    }));
   });
 });

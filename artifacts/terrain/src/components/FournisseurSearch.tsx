@@ -248,7 +248,7 @@ export default function FournisseurSearch({
                   )}
                   {f.isMembreDelegue && (f.bonReceptionEnAttenteCount ?? 0) > 1 && (
                     <span className="t-badge t-badge--danger">
-                      Plusieurs bons — choix requis dans Réceptions
+                      Plusieurs bons — choix requis {isOnline ? "dans Réceptions" : "hors ligne"}
                     </span>
                   )}
                   {hasSession && (

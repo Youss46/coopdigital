@@ -30,7 +30,13 @@ import {
   patchPlanAvanceDeleague,
   patchPlanAvanceMembre,
 } from "../lib/api";
-import type { Fournisseur, SessionDetail, ConversionLivraisonResult, BrouillonPesee } from "../lib/types";
+import type {
+  BonReceptionTerrain,
+  Fournisseur,
+  SessionDetail,
+  ConversionLivraisonResult,
+  BrouillonPesee,
+} from "../lib/types";
 import {
   createBrouillon,
   getBrouillon,
@@ -46,7 +52,7 @@ import {
   tareFromNombreSacs,
 } from "../lib/sessionPesee";
 
-type Step = "membre" | "certif" | "session" | "succes";
+type Step = "membre" | "bon" | "certif" | "session" | "succes";
 
 function RecuLivraisonButton({ livraisonId }: { livraisonId: number }) {
   const [loading, setLoading] = useState(false);
@@ -355,8 +361,17 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
   async function handleSelectMembre(f: Fournisseur) {
     const bonsAmbigus = f.isMembreDelegue === true && (f.bonReceptionEnAttenteCount ?? 0) > 1;
     if (!isOnline && isPeseurCentral && bonsAmbigus) {
-      setFournisseur(null);
-      setErreur("Plusieurs bons de réception sont ouverts pour ce membre. Reconnectez-vous et choisissez le bon dans Réceptions avant de peser.");
+      // Une ancienne liste cache peut encore ne contenir que le compteur. Dans
+      // ce cas, ne jamais deviner le bon : il faut une nouvelle synchronisation.
+      if ((f.bonsReception?.length ?? 0) < (f.bonReceptionEnAttenteCount ?? 0)) {
+        setFournisseur(null);
+        setErreur("Plusieurs bons de réception sont ouverts, mais leurs détails ne sont pas synchronisés sur cet appareil. Reconnectez-vous avant de choisir le bon.");
+        return;
+      }
+      setFournisseur({ ...f, bonReceptionId: null });
+      setCertificationCacao("");
+      setErreur("");
+      setStep("bon");
       return;
     }
     if (isOnline && isPeseurCentral && f.isMembreDelegue) {
@@ -407,6 +422,19 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
     }
   }
 
+  function handleSelectBonReception(bon: BonReceptionTerrain) {
+    if (!fournisseur) return;
+    const bonDisponible = fournisseur.bonsReception?.some((item) => item.id === bon.id);
+    if (!bonDisponible) {
+      setErreur("Ce bon de réception n'est pas disponible dans les données synchronisées.");
+      return;
+    }
+    setFournisseur({ ...fournisseur, bonReceptionId: bon.id });
+    setCertificationCacao("");
+    setErreur("");
+    setStep("certif");
+  }
+
   // ── Confirmation de la certification + création de session ─────────────────
   async function handleConfirmerCertif() {
     if (!fournisseur) return;
@@ -419,8 +447,8 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
     if (!isOnline) {
       try {
         const isReceptionMembreDelegue = isPeseurCentral && fournisseur.isMembreDelegue === true;
-        if (isReceptionMembreDelegue && (fournisseur.bonReceptionEnAttenteCount ?? 0) > 1) {
-          setErreur("Plusieurs bons de réception sont ouverts pour ce membre. Choisissez le bon dans Réceptions avant de peser.");
+        if (isReceptionMembreDelegue && (fournisseur.bonReceptionEnAttenteCount ?? 0) > 1 && !fournisseur.bonReceptionId) {
+          setErreur("Choisissez explicitement le bon de réception avant de commencer la pesée.");
           return;
         }
         if (isReceptionMembreDelegue && !fournisseur.bonReceptionId) {
@@ -446,8 +474,8 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
     try {
       const isExterne = fournisseur.typeMembre === "externe";
       const isReceptionMembreDelegue = isPeseurCentral && fournisseur.isMembreDelegue === true;
-      if (isReceptionMembreDelegue && (fournisseur.bonReceptionEnAttenteCount ?? 0) > 1) {
-        setErreur("Plusieurs bons de réception sont ouverts pour ce membre. Choisissez le bon dans Réceptions avant de peser.");
+      if (isReceptionMembreDelegue && (fournisseur.bonReceptionEnAttenteCount ?? 0) > 1 && !fournisseur.bonReceptionId) {
+        setErreur("Choisissez explicitement le bon de réception avant de commencer la pesée.");
         return;
       }
       const sessionPayload = isExterne
@@ -928,6 +956,73 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
               onSelectActiveSession={handleSelectActiveSession}
             />
           </>
+        )}
+
+        {/* ─── STEP : Certification cacao ──────────────────────────────── */}
+        {step === "bon" && fournisseur && (
+          <div style={{ padding: "16px" }}>
+            <div style={{
+              background: "var(--t-peseur-bg)", border: "1.5px solid var(--t-peseur)",
+              borderRadius: 12, padding: "12px 14px", marginBottom: 20,
+            }}>
+              <div style={{ fontSize: ".7rem", color: "var(--t-peseur)", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 2 }}>
+                Producteur
+              </div>
+              <div style={{ fontWeight: 700, fontSize: "1rem", color: "var(--t-text)" }}>
+                {fournisseur.prenoms} {fournisseur.nom}
+              </div>
+              <div style={{ fontSize: ".78rem", color: "var(--t-muted)", marginTop: 6 }}>
+                Plusieurs bons sont ouverts. Choisissez celui qui correspond au cacao à peser.
+              </div>
+            </div>
+
+            <div style={{ fontSize: ".72rem", color: "var(--t-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 10 }}>
+              Bon de réception
+            </div>
+            <div style={{ display: "grid", gap: 10 }}>
+              {(fournisseur.bonsReception ?? []).map((bon) => (
+                <button
+                  key={bon.id}
+                  onClick={() => handleSelectBonReception(bon)}
+                  className="t-btn t-btn--ghost"
+                  style={{
+                    width: "100%", textAlign: "left", padding: "13px 14px",
+                    border: "1.5px solid var(--t-border)", background: "var(--t-card)",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+                    <strong>Bon #{bon.id}</strong>
+                    <span style={{ color: "var(--t-muted)", fontSize: ".75rem" }}>
+                      {new Date(bon.createdAt).toLocaleDateString("fr-FR")}
+                    </span>
+                  </div>
+                  <div style={{ color: "var(--t-muted)", fontSize: ".78rem", marginTop: 5 }}>
+                    {bon.poidsDeclaraKg != null ? `Poids déclaré : ${fmtPoids(bon.poidsDeclaraKg)}` : "Poids non renseigné"}
+                    {bon.nombreSacsDeclares != null ? ` · ${bon.nombreSacsDeclares} sac${bon.nombreSacsDeclares > 1 ? "s" : ""}` : ""}
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {erreur && (
+              <div style={{
+                marginTop: 12, padding: "10px 14px", borderRadius: 10,
+                borderLeft: "4px solid var(--t-danger)", background: "var(--t-danger-bg)",
+                display: "flex", gap: 8, alignItems: "center",
+              }}>
+                <AlertTriangle size={15} color="var(--t-danger)" style={{ flexShrink: 0 }} />
+                <span style={{ color: "var(--t-danger)", fontSize: ".85rem" }}>{erreur}</span>
+              </div>
+            )}
+
+            <button
+              onClick={() => { setStep("membre"); setFournisseur(null); setErreur(""); }}
+              className="t-btn t-btn--ghost"
+              style={{ width: "100%", marginTop: 14 }}
+            >
+              ← Retour
+            </button>
+          </div>
         )}
 
         {/* ─── STEP : Certification cacao ──────────────────────────────── */}

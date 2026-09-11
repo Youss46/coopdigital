@@ -47,6 +47,34 @@ export function getBonReceptionTerrainState(
   };
 }
 
+export interface BonReceptionTerrainDetails {
+  id: number;
+  membreDelegueId: number;
+  poidsDeclaraKg: number | null;
+  nombreSacsDeclares: number | null;
+  typeTransport: string;
+  createdAt: string;
+}
+
+export function getBonReceptionTerrainDetails(
+  bons: ReadonlyArray<BonReceptionTerrainDetails>,
+  membreId: number,
+): {
+  bonReceptionId: number | null;
+  bonReceptionEnAttenteCount: number;
+  bonsReception: Array<Omit<BonReceptionTerrainDetails, "membreDelegueId">>;
+} {
+  const membresBons = bons
+    .filter((bon) => bon.membreDelegueId === membreId)
+    .map(({ membreDelegueId: _membreDelegueId, ...bon }) => bon);
+
+  return {
+    bonReceptionId: membresBons.length === 1 ? membresBons[0]!.id : null,
+    bonReceptionEnAttenteCount: membresBons.length,
+    bonsReception: membresBons,
+  };
+}
+
 // ─── Auth terrain ──────────────────────────────────────────────────────────
 
 export async function loginTerrain(telephone: string, motDePasse: string) {
@@ -257,14 +285,16 @@ export async function getFournisseurs(
     );
   }
 
-  // Garder un bon en attente avec le membre permet au terrain de démarrer une
-  // pesée hors ligne sans perdre le lien métier obligatoire à la synchronisation.
-  // Plusieurs bons ouverts sont volontairement ambigus : aucun n'est choisi
-  // automatiquement, afin d'éviter de rattacher la pesée au mauvais bon.
+  // Garder les bons en attente avec le membre permet au terrain de choisir
+  // hors ligne sans perdre le lien métier obligatoire à la synchronisation.
   const bonsEnAttente = await db
     .select({
       id: bonsReceptionMembresDeleguesTable.id,
       membreDelegueId: bonsReceptionMembresDeleguesTable.membreDelegueId,
+      poidsDeclaraKg: bonsReceptionMembresDeleguesTable.poidsDeclaraKg,
+      nombreSacsDeclares: bonsReceptionMembresDeleguesTable.nombreSacsDeclares,
+      typeTransport: bonsReceptionMembresDeleguesTable.typeTransport,
+      createdAt: bonsReceptionMembresDeleguesTable.createdAt,
     })
     .from(bonsReceptionMembresDeleguesTable)
     .where(and(
@@ -295,7 +325,16 @@ export async function getFournisseurs(
         .from(distributionsIntrantsTable)
         .where(eq(distributionsIntrantsTable.membreId, m.id));
 
-      const bonReceptionTerrain = getBonReceptionTerrainState(bonsEnAttente, m.id);
+      const bonReceptionTerrain = getBonReceptionTerrainDetails(
+        bonsEnAttente.map((bon) => ({
+          ...bon,
+          poidsDeclaraKg: bon.poidsDeclaraKg == null ? null : toNum(bon.poidsDeclaraKg),
+          createdAt: bon.createdAt instanceof Date
+            ? bon.createdAt.toISOString()
+            : String(bon.createdAt),
+        })),
+        m.id,
+      );
       return {
         id: m.id,
         code: computeCodeMembre(m.numeroMembre, m.dateAdhesion),
@@ -308,6 +347,7 @@ export async function getFournisseurs(
         isMembreDelegue: m.categorieMembre === "délégué de localités",
         bonReceptionId: bonReceptionTerrain.bonReceptionId,
         bonReceptionEnAttenteCount: bonReceptionTerrain.bonReceptionEnAttenteCount,
+        bonsReception: bonReceptionTerrain.bonsReception,
         avanceEnCours: avance ? toNum(avance.solde) : 0,
         avanceId: null as number | null,
         intrantsDus: toNum(intrantsDus?.total),

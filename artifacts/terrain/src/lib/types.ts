@@ -33,9 +33,19 @@ export interface Fournisseur {
   bonReceptionId?: number | null;
   /** Nombre de bons encore ouverts pour ce membre ; > 1 interdit tout auto-rattachement. */
   bonReceptionEnAttenteCount?: number;
+  /** Bons en attente synchronisés pour permettre un choix hors ligne explicite. */
+  bonsReception?: BonReceptionTerrain[];
   avanceEnCours: number;
   intrantsDus: number;
   derniereLivraison: string | null;
+}
+
+export interface BonReceptionTerrain {
+  id: number;
+  poidsDeclaraKg: number | null;
+  nombreSacsDeclares: number | null;
+  typeTransport: string;
+  createdAt: string;
 }
 
 export interface FournisseurRecap {
