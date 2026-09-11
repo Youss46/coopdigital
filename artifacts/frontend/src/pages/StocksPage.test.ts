@@ -1,5 +1,39 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { act, createElement } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchMouvementsStock, formaterPoids } from "./StocksPage";
+
+const {
+  useGetEntrepotsMock,
+  useGetStockAlertesMock,
+  useEntreeStockMock,
+  useSortieStockMock,
+} = vi.hoisted(() => ({
+  useGetEntrepotsMock: vi.fn(),
+  useGetStockAlertesMock: vi.fn(),
+  useEntreeStockMock: vi.fn(),
+  useSortieStockMock: vi.fn(),
+}));
+
+vi.mock("@workspace/api-client-react", () => ({
+  useGetEntrepots: useGetEntrepotsMock,
+  useGetStockAlertes: useGetStockAlertesMock,
+  useEntreeStock: useEntreeStockMock,
+  useSortieStock: useSortieStockMock,
+  getGetEntrepotsQueryKey: () => ["entrepots"],
+  getGetMouvementsStockQueryKey: () => ["mouvements"],
+  getGetStockAlertesQueryKey: () => ["alertes"],
+}));
+
+vi.mock("@/hooks/usePermission", () => ({
+  usePermission: () => false,
+}));
+
+vi.mock("wouter", () => ({
+  useLocation: () => ["", vi.fn()],
+  useSearch: () => "",
+}));
 
 describe("formatage des poids dans les stocks", () => {
   it("affiche 6077 kg en kilogrammes exacts avec le séparateur français", () => {
@@ -72,5 +106,71 @@ describe("chargement du journal des mouvements", () => {
     await expect(
       fetchMouvementsStock("", "token-test", new URLSearchParams()),
     ).rejects.toThrow("Erreur chargement mouvements");
+  });
+});
+
+describe("cartes KPI après chargement des entrepôts", () => {
+  let root: Root;
+  let container: HTMLDivElement;
+
+  beforeEach(() => {
+    useGetEntrepotsMock.mockReturnValue({
+      data: [{
+        id: 1,
+        nom: "Entrepôt central",
+        ville: "Abidjan",
+        capaciteKg: "10000",
+        stockActuelKg: 6077,
+        nombreSacsTotal: 0,
+        seuilAlerteKg: "500",
+        pourFournisseursExt: false,
+      }],
+      isLoading: false,
+    });
+    useGetStockAlertesMock.mockReturnValue({ data: [] });
+    useEntreeStockMock.mockReturnValue({ mutate: vi.fn(), isPending: false });
+    useSortieStockMock.mockReturnValue({ mutate: vi.fn(), isPending: false });
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+    container.remove();
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+  });
+
+  it("affiche le stock exact en kg dans la carte après la réponse API", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      const payload = url.includes("lotissement-stats")
+        ? { poidsTotal: 0, poidsLoti: 0, poidsNonLoti: 0 }
+        : [];
+      return {
+        ok: true,
+        json: async () => payload,
+      };
+    }));
+
+    const { default: StocksPage } = await import("./StocksPage");
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    await act(async () => {
+      root = createRoot(container);
+      root.render(createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(StocksPage),
+      ));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(container.textContent).toContain("6\u202f077 kg");
+    expect(container.textContent).toContain("6,077 t");
+    expect(container.textContent).not.toContain("6,08 t");
   });
 });
