@@ -54,9 +54,11 @@ describe.skipIf(!enabled)("totaux paginés des règlements sur PostgreSQL", () =
 
   const deliveryCount = 210;
   const fuelCount = 25;
+  const otherCount = 1;
   const deliveryRemainder = 1_234;
   const deliveryTotal = deliveryCount * deliveryRemainder;
   const fuelTotal = fuelCount * 2_000;
+  const otherTotal = 3_000;
 
   beforeAll(async () => {
     client = await pool.connect();
@@ -130,6 +132,24 @@ describe.skipIf(!enabled)("totaux paginés des règlements sur PostgreSQL", () =
        FROM fuel_vouchers`,
       [cooperativeId, vehicleId, fuelCount],
     );
+
+    const expense = await client.query(
+      `INSERT INTO depenses_vehicule
+         (cooperative_id, vehicule_id, type, date_depense, montant_fcfa,
+          libelle, demandeur, fournisseur)
+       VALUES ($1, $2, 'autre', CURRENT_DATE, $3,
+               'Dépense KPI', 'Test KPI', 'Fournisseur KPI')
+       RETURNING id`,
+      [cooperativeId, vehicleId, otherTotal],
+    );
+    await client.query(
+      `INSERT INTO paiements
+         (cooperative_id, depense_vehicule_id, numero_recu,
+          montant_fcfa, statut, created_at)
+       VALUES ($1, $2, 'REC-KPI-AUTRE-1', $3, 'en_attente',
+               CURRENT_TIMESTAMP - INTERVAL '2 days')`,
+      [cooperativeId, expense.rows[0].id, otherTotal],
+    );
   });
 
   afterAll(async () => {
@@ -157,6 +177,10 @@ describe.skipIf(!enabled)("totaux paginés des règlements sur PostgreSQL", () =
       );
       await client.query(
         `DELETE FROM bons_carburant WHERE cooperative_id = $1`,
+        [cooperativeId],
+      );
+      await client.query(
+        `DELETE FROM depenses_vehicule WHERE cooperative_id = $1`,
         [cooperativeId],
       );
       await client.query(`DELETE FROM vehicules WHERE id = $1`, [vehicleId]);
@@ -197,14 +221,18 @@ describe.skipIf(!enabled)("totaux paginés des règlements sur PostgreSQL", () =
         expect.objectContaining({ livraisonMontantRestant: deliveryRemainder }),
       ]),
     );
-    expect(body.pagination).toEqual({ page: 2, limit: 50, total: deliveryCount + fuelCount });
+    expect(body.pagination).toEqual({
+      page: 2,
+      limit: 50,
+      total: deliveryCount + fuelCount + otherCount,
+    });
     expect(body.summary).toEqual({
       livraisons: { count: deliveryCount, montantTotal: deliveryTotal },
       carburant: { count: fuelCount, montantTotal: fuelTotal },
-      autres: { count: 0, montantTotal: 0 },
+      autres: { count: otherCount, montantTotal: otherTotal },
       tous: {
-        count: deliveryCount + fuelCount,
-        montantTotal: deliveryTotal + fuelTotal,
+        count: deliveryCount + fuelCount + otherCount,
+        montantTotal: deliveryTotal + fuelTotal + otherTotal,
       },
     });
   });
@@ -235,10 +263,10 @@ describe.skipIf(!enabled)("totaux paginés des règlements sur PostgreSQL", () =
     expect(body.summary).toEqual({
       livraisons: { count: deliveryCount, montantTotal: deliveryTotal },
       carburant: { count: fuelCount, montantTotal: fuelTotal },
-      autres: { count: 0, montantTotal: 0 },
+      autres: { count: otherCount, montantTotal: otherTotal },
       tous: {
-        count: deliveryCount + fuelCount,
-        montantTotal: deliveryTotal + fuelTotal,
+        count: deliveryCount + fuelCount + otherCount,
+        montantTotal: deliveryTotal + fuelTotal + otherTotal,
       },
     });
   });
