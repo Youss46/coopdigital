@@ -46,7 +46,7 @@ function formaterDate(d: string) {
     minute: "2-digit",
   });
 }
-function formaterPoids(kg: string | number) {
+export function formaterPoids(kg: string | number) {
   const v = parseFloat(String(kg));
   return `${new Intl.NumberFormat("fr-FR", {
     maximumFractionDigits: 3,

@@ -1,5 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchMouvementsStock } from "./StocksPage";
+import { fetchMouvementsStock, formaterPoids } from "./StocksPage";
+
+describe("formatage des poids dans les stocks", () => {
+  it("affiche 6077 kg en kilogrammes exacts avec le séparateur français", () => {
+    expect(formaterPoids(6077)).toBe("6\u202f077 kg");
+    expect(formaterPoids(6077)).not.toContain("t");
+  });
+
+  it("conserve les décimales valides en kilogrammes", () => {
+    expect(formaterPoids("6077.25")).toBe("6\u202f077,25 kg");
+  });
+});
 
 describe("chargement du journal des mouvements", () => {
   afterEach(() => {
