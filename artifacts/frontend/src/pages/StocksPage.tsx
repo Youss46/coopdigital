@@ -52,6 +52,13 @@ function formaterPoids(kg: string | number) {
     maximumFractionDigits: 3,
   }).format(v)} kg`;
 }
+function formaterTonnage(kg: string | number) {
+  const v = parseFloat(String(kg));
+  return `${new Intl.NumberFormat("fr-FR", {
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
+  }).format(v / 1000)} t`;
+}
 
 interface LotissementStats {
   poidsTotal: number;
@@ -389,9 +396,27 @@ export default function StocksPage() {
       {/* Cartes KPI */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
-          { label: "Stock total", val: formaterPoids(stockTotal), icon: Warehouse, color: "#1a4731", sub: sacsTotalStock > 0 ? `${sacsTotalStock} sac${sacsTotalStock > 1 ? "s" : ""}` : null },
-          { label: "Entrées (historique)", val: formaterPoids(entreesTotal), icon: TrendingUp, color: "#22c55e", sub: sacsEntreesTotal > 0 ? `${sacsEntreesTotal} sac${sacsEntreesTotal > 1 ? "s" : ""}` : null },
-          { label: "Sorties (historique)", val: formaterPoids(sortiesTotal), icon: TrendingDown, color: "#ef4444", sub: sacsSortiesTotal > 0 ? `${sacsSortiesTotal} sac${sacsSortiesTotal > 1 ? "s" : ""}` : null },
+          {
+            label: "Stock total",
+            val: formaterPoids(stockTotal),
+            icon: Warehouse,
+            color: "#1a4731",
+            sub: `${formaterTonnage(stockTotal)}${sacsTotalStock > 0 ? ` · ${sacsTotalStock} sac${sacsTotalStock > 1 ? "s" : ""}` : ""}`,
+          },
+          {
+            label: "Entrées (historique)",
+            val: formaterPoids(entreesTotal),
+            icon: TrendingUp,
+            color: "#22c55e",
+            sub: `${formaterTonnage(entreesTotal)}${sacsEntreesTotal > 0 ? ` · ${sacsEntreesTotal} sac${sacsEntreesTotal > 1 ? "s" : ""}` : ""}`,
+          },
+          {
+            label: "Sorties (historique)",
+            val: formaterPoids(sortiesTotal),
+            icon: TrendingDown,
+            color: "#ef4444",
+            sub: `${formaterTonnage(sortiesTotal)}${sacsSortiesTotal > 0 ? ` · ${sacsSortiesTotal} sac${sacsSortiesTotal > 1 ? "s" : ""}` : ""}`,
+          },
         ].map(({ label, val, icon: Icon, color, sub }) => (
           <div key={label} className="bg-white rounded-xl border border-gray-200 p-5 flex items-start gap-4">
             <div className="rounded-lg p-2.5" style={{ backgroundColor: color + "15" }}>

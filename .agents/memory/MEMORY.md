@@ -141,3 +141,4 @@
 - [Enum PostgreSQL dans les migrations Drizzle](postgres-enum-migration-transaction.md) — comparer les nouvelles valeurs via `colonne::text` si une contrainte est créée dans le même lot transactionnel.
 - [Cache HTTP et CORS Railway](cache-control-cors-railway.md) — ne jamais ajouter Cache-Control à une requête fetch cross-origin; préférer cache:no-store côté navigateur et Cache-Control côté réponse API.
 - [Expéditions historiques sans lignes de lot](expedition-legacy-without-lot-lines.md) — une ancienne expédition peut n’avoir aucune ligne expedition_lots; débiter poids_charge_kg via lieu_depart seulement si l’entrepôt existe.
+- [Affichage double des tonnages](stock-dual-unit-display.md) — afficher le kilogramme exact en principal et le tonnage à trois décimales en secondaire sur les cartes de synthèse.
