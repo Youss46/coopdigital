@@ -197,10 +197,11 @@ export default function StocksPage() {
       const qs = params.toString() ? `?${params.toString()}` : "";
        const r = await fetch(`${BASE}/api/stocks/mouvements${qs}`, {
          cache: "no-store",
-         headers: {
-           Authorization: `Bearer ${tok()}`,
-           "Cache-Control": "no-cache",
-         },
+         // Ne pas ajouter Cache-Control à la requête : avec VITE_API_URL
+         // pointant directement vers Railway, cela déclenche un preflight
+         // CORS supplémentaire. Le mode no-store suffit côté navigateur ;
+         // l'API envoie elle-même Cache-Control: no-store en réponse.
+         headers: { Authorization: `Bearer ${tok()}` },
        });
       if (!r.ok) throw new Error("Erreur chargement mouvements");
       return r.json() as Promise<Array<{ id: number; entrepotNom: string | null; type: string; poidsKg: string; motif: string | null; createdAt: string; nombreSacs?: number | null; certificationCacao?: string | null }>>;
