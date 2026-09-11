@@ -272,6 +272,37 @@ export default function ExpeditionDetailPage() {
     onError: (err: Error) => toast({ title: "Erreur", description: err.message, variant: "destructive" }),
   });
 
+  const reparerSortieStockMutation = useMutation({
+    mutationFn: () => {
+      if (!exp) throw new Error("Expédition introuvable");
+      return apiPut(`/api/expeditions/${id}/reception`, token, {
+        // Pour une expédition déjà réceptionnée, le serveur traite cet appel
+        // comme une réparation idempotente et ne recrée pas la réception.
+        poidsRecuPortKg: Number(exp.poidsRecuPortKg ?? 0),
+        nombreSacsRecuPort: exp.nombreSacsRecuPort == null
+          ? undefined
+          : Number(exp.nombreSacsRecuPort),
+        numeroRecepissePort: String(exp.numeroRecepissePort ?? `REPRISE-${id}`),
+        nomReceptionnaire: String(exp.nomReceptionnaire ?? "Réparation stock"),
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Sortie stock vérifiée",
+        description: "La sortie historique a été créée si elle manquait. Une seconde sortie ne sera pas ajoutée.",
+      });
+      void qc.invalidateQueries({ queryKey: ["expedition", id] });
+      void qc.invalidateQueries({ queryKey: ["expeditions"] });
+      void qc.invalidateQueries({ queryKey: ["expeditions-stats"] });
+      void qc.invalidateQueries({ queryKey: ["entrepots-stats"] });
+    },
+    onError: (err: Error) => toast({
+      title: "Réparation impossible",
+      description: err.message,
+      variant: "destructive",
+    }),
+  });
+
   if (isLoading) return <div className="p-8 text-center text-gray-500">Chargement…</div>;
   if (!exp) return <div className="p-8 text-center text-gray-500">Expédition introuvable</div>;
 
@@ -1212,6 +1243,31 @@ export default function ExpeditionDetailPage() {
                 Confirmation bloquée : le contrôle obligatoire doit être clôturé avec un écart acceptable ou justifié.
               </p>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {statut === "receptionne" && (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="p-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+              <div>
+                <p className="font-semibold text-amber-900">Sortie stock historique</p>
+                <p className="text-sm text-amber-800">
+                  Si cette expédition a été réceptionnée avant la correction, relancez la vérification pour créer la sortie manquante.
+                </p>
+              </div>
+            </div>
+            <Button
+              data-testid="button-reparer-sortie-stock"
+              variant="outline"
+              className="border-amber-400 bg-white text-amber-900 hover:bg-amber-100"
+              disabled={reparerSortieStockMutation.isPending}
+              onClick={() => reparerSortieStockMutation.mutate()}
+            >
+              {reparerSortieStockMutation.isPending ? "Vérification…" : "Réparer la sortie stock"}
+            </Button>
           </CardContent>
         </Card>
       )}
