@@ -166,11 +166,53 @@ describe("cartes KPI après chargement des entrepôts", () => {
         { client: queryClient },
         createElement(StocksPage),
       ));
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 25));
     });
 
     expect(container.textContent).toContain("6\u202f077 kg");
     expect(container.textContent).toContain("6,077 t");
     expect(container.textContent).not.toContain("6,08 t");
+  });
+
+  it("conserve les décimales en kg dans la répartition par certification", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      const payload = url.includes("tonnage-certification")
+        ? [{
+            certification: "FAIRTRADE",
+            totalKg: "6077.25",
+            totalSacs: "120",
+            totalLivraisons: "3",
+          }]
+        : url.includes("lotissement-stats")
+          ? { poidsTotal: 0, poidsLoti: 0, poidsNonLoti: 0 }
+          : [];
+      return {
+        ok: true,
+        json: async () => payload,
+      };
+    }));
+
+    const { default: StocksPage } = await import("./StocksPage");
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    await act(async () => {
+      root = createRoot(container);
+      root.render(createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(StocksPage),
+      ));
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    });
+
+    const certificationCard = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent?.includes("Fairtrade"));
+
+    expect(certificationCard).toBeDefined();
+    expect(certificationCard?.textContent).toContain("6\u202f077,25 kg");
+    expect(certificationCard?.textContent).not.toContain("6,08 t");
   });
 });
