@@ -618,7 +618,7 @@ export default function PcaDashboardPage() {
               {[
                 {
                   label: "Tonnage (T)",
-                  key: (r: ComparaisonRow) => `${r.tonnage_t.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} T`,
+                  key: (r: ComparaisonRow) => `${r.tonnage_t.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} T`,
                 },
                 {
                   label: "CA ventes (FCFA)",
