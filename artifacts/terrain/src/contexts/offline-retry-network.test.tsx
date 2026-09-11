@@ -211,7 +211,10 @@ describe("relance GPS après coupure réseau", () => {
   it("affiche l'erreur du brouillon et le rend réessayable après un échec", async () => {
     fakeState.op.status = "synced";
     fakeState.batchSyncBrouillon
-      .mockRejectedValueOnce(new Error("Bon de réception déjà utilisé"))
+      .mockRejectedValueOnce(Object.assign(
+        new Error("Le bon de réception #314 n'est plus disponible pour une pesée"),
+        { code: "BON_RECEPTION_INDISPONIBLE" },
+      ))
       .mockResolvedValueOnce({
         sessionId: 902,
         numeroSession: "PES-S-2026-00902",
@@ -232,12 +235,12 @@ describe("relance GPS après coupure réseau", () => {
 
     expect(fakeState.brouillon).toMatchObject({
       syncStatus: "error",
-      errorMsg: "Bon de réception déjà utilisé",
+      errorMsg: expect.stringContaining("Bon de réception indisponible (bon #314)"),
     });
-    expect(container.textContent).toContain("error:Bon de réception déjà utilisé");
+    expect(container.textContent).toContain("error:Bon de réception indisponible (bon #314)");
     expect(fakeState.markBrouillonError).toHaveBeenCalledWith(
       fakeState.brouillon.localId,
-      "Bon de réception déjà utilisé",
+      expect.stringContaining("Bon de réception indisponible (bon #314)"),
     );
 
     await act(async () => {

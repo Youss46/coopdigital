@@ -32,6 +32,25 @@ interface OfflineContextValue {
   retryGpsOperation: (localId: string) => Promise<void>;
 }
 
+function formatBrouillonSyncError(error: unknown, localId: string, bonReceptionId?: number | null): string {
+  const message = error instanceof Error ? error.message : "Erreur de synchronisation";
+  if (message === "Failed to fetch" || message === "NetworkError" || message === "Load failed") {
+    return "Réseau indisponible : le brouillon reste conservé sur cet appareil.";
+  }
+
+  const bon = bonReceptionId != null ? ` (bon #${bonReceptionId})` : "";
+  const code = error instanceof Error && typeof (error as Error & { code?: unknown }).code === "string"
+    ? (error as Error & { code: string }).code
+    : undefined;
+  if (code === "SESSION_BON_EXISTANTE") {
+    return `Bon de réception déjà utilisé${bon} : ${message} — brouillon ${localId} conservé pour résolution manuelle.`;
+  }
+  if (code === "BON_RECEPTION_INDISPONIBLE") {
+    return `Bon de réception indisponible${bon} : ${message} — brouillon ${localId} conservé pour résolution manuelle.`;
+  }
+  return message;
+}
+
 const OfflineContext = createContext<OfflineContextValue>({
   isOnline: true,
   pendingCount: 0,
@@ -129,7 +148,7 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
             await markBrouillonSynced(brouillon.localId, result.sessionId, result.numeroSession);
             nbSucces++;
           } catch (err) {
-            const erreur = err instanceof Error ? err.message : "Erreur de synchronisation";
+            const erreur = formatBrouillonSyncError(err, brouillon.localId, brouillon.bonReceptionId);
             await markBrouillonError(brouillon.localId, erreur);
             nbEchecs++;
             erreurs.push(erreur);

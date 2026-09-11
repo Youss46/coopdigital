@@ -144,3 +144,4 @@
 - [Expéditions historiques sans lignes de lot](expedition-legacy-without-lot-lines.md) — une ancienne expédition peut n’avoir aucune ligne expedition_lots; débiter poids_charge_kg via lieu_depart seulement si l’entrepôt existe.
 - [Affichage double des tonnages](stock-dual-unit-display.md) — afficher le kilogramme exact en principal et le tonnage à trois décimales en secondaire sur les cartes de synthèse.
 - [Réparations techniques hors parcours métier](maintenance-repair-hidden-ui.md) — conserver les réparations idempotentes côté serveur, mais ne pas exposer un bouton de maintenance dans le parcours utilisateur courant.
+- [Codes d’erreur métier offline](offline-business-error-codes.md) — classifier les rejets API via le code sérialisé, pas via `instanceof`, puis conserver le brouillon avec son identifiant.

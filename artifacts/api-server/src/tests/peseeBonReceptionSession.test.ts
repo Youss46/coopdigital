@@ -21,6 +21,17 @@ vi.mock("../services/peseeSessionService", () => ({
       super(`Une session est déjà associée au bon #${sessionId}`);
     }
   },
+  BonReceptionIndisponibleError: class BonReceptionIndisponibleError extends Error {
+    readonly code = "BON_RECEPTION_INDISPONIBLE";
+    constructor(
+      public readonly bonReceptionId: number,
+      public readonly motif: "introuvable" | "statut_indisponible",
+      message: string,
+      public readonly statut?: string,
+    ) {
+      super(message);
+    }
+  },
   SessionTransfertExistanteError: class SessionTransfertExistanteError extends Error {},
 }));
 
@@ -172,6 +183,40 @@ describe("création de session depuis un bon de réception", () => {
       certificationCacao: "RA",
     }));
     expect(response.status).toHaveBeenCalledWith(201);
+  });
+
+  it("renvoie un motif métier quand le bon est devenu indisponible pendant la synchronisation", async () => {
+    const { BonReceptionIndisponibleError } = await import("../services/peseeSessionService.js");
+    creerSessionBatch.mockRejectedValueOnce(new BonReceptionIndisponibleError(
+      42,
+      "statut_indisponible",
+      "Le bon de réception #42 n'est plus disponible pour une pesée",
+      "annule",
+    ));
+    const request = {
+      agent: { id: 7, cooperativeId: 3, role: "peseur", delegueId: null },
+      body: {
+        localId: "offline-bon-indisponible",
+        membreId: 12,
+        produit: "cacao",
+        operation: "reception_membre_delegue",
+        certificationCacao: "RA",
+        bonReceptionId: 42,
+        lignes: [{ localId: "ligne-1", nbSacs: 2, poidsBrutKg: 101, tareKg: 1 }],
+        statut: "terminee",
+      },
+      log: { error: vi.fn() },
+    } as unknown as Request;
+
+    await handleBatchCreateSession(request, response);
+
+    expect(response.status).toHaveBeenCalledWith(409);
+    expect(response.json).toHaveBeenCalledWith(expect.objectContaining({
+      code: "BON_RECEPTION_INDISPONIBLE",
+      bonReceptionId: 42,
+      motif: "statut_indisponible",
+      statut: "annule",
+    }));
   });
 
   it("refuse la synchronisation hors ligne d'un membre délégué sans bon", async () => {

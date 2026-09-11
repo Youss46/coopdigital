@@ -170,9 +170,27 @@ export class SessionEnCoursError extends Error {
 /** Thrown when a weighing session already exists for the given bon de réception. */
 export class SessionBonExistanteError extends Error {
   readonly code = "SESSION_BON_EXISTANTE";
-  constructor(public readonly sessionId: number) {
+  readonly motif = "deja_utilise" as const;
+  constructor(
+    public readonly sessionId: number,
+    public readonly bonReceptionId?: number,
+  ) {
     super(`Une session de pesée est déjà associée à ce bon de réception (session #${sessionId})`);
     this.name = "SessionBonExistanteError";
+  }
+}
+
+/** Le bon existe, mais ne peut plus être utilisé pour une nouvelle pesée. */
+export class BonReceptionIndisponibleError extends Error {
+  readonly code = "BON_RECEPTION_INDISPONIBLE";
+  constructor(
+    public readonly bonReceptionId: number,
+    public readonly motif: "introuvable" | "statut_indisponible",
+    message: string,
+    public readonly statut?: string,
+  ) {
+    super(message);
+    this.name = "BonReceptionIndisponibleError";
   }
 }
 
@@ -330,13 +348,24 @@ export async function createSession(
         ))
         .limit(1);
 
-      if (!bon) throw new Error("Bon de réception introuvable");
+      if (!bon) {
+        throw new BonReceptionIndisponibleError(
+          bonId,
+          "introuvable",
+          `Le bon de réception #${bonId} est introuvable ou n'est plus disponible`,
+        );
+      }
       if (data.membreId !== undefined && data.membreId !== bon.membreDelegueId) {
         throw new Error("Le bon de réception ne correspond pas au membre sélectionné");
       }
       if (bon.statut !== "en_attente_pesee") {
-        if (bon.sessionPeseeId) throw new SessionBonExistanteError(bon.sessionPeseeId);
-        throw new Error(`Le bon doit être en statut 'en_attente_pesee' pour démarrer une pesée (statut actuel : ${bon.statut})`);
+        if (bon.sessionPeseeId) throw new SessionBonExistanteError(bon.sessionPeseeId, bonId);
+        throw new BonReceptionIndisponibleError(
+          bonId,
+          "statut_indisponible",
+          `Le bon de réception #${bonId} n'est plus disponible pour une pesée (statut actuel : ${bon.statut})`,
+          bon.statut,
+        );
       }
 
       // Les sessions annulées historiques peuvent encore retenir le lien unique
@@ -417,7 +446,7 @@ export async function createSession(
           .from(bonsReceptionMembresDeleguesTable)
           .where(eq(bonsReceptionMembresDeleguesTable.id, bonId))
           .limit(1);
-        throw new SessionBonExistanteError(rival?.sessionPeseeId ?? 0);
+        throw new SessionBonExistanteError(rival?.sessionPeseeId ?? 0, bonId);
       }
       return created!;
     });

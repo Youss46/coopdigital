@@ -63,9 +63,10 @@ export default function SyncHistorique() {
 
   useEffect(() => { void reload(); }, []);
 
-  // Recharger après une sync
+  // Recharger après une sync, y compris après un rejet métier : le brouillon
+  // reste alors dans IndexedDB et son motif doit être immédiatement visible.
   useEffect(() => {
-    if (syncStatus === "done") void reload();
+    if (syncStatus === "done" || syncStatus === "error") void reload();
   }, [syncStatus]);
 
   // Une erreur GPS reste pending dans IndexedDB pour pouvoir être relancée,

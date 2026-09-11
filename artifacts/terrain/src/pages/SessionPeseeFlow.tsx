@@ -1498,11 +1498,19 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
                 <div style={{ fontWeight: 700, fontSize: ".88rem", color: "#f59e0b", marginBottom: 4 }}>
                   📴 Pesée enregistrée hors ligne
                 </div>
-                <div style={{ fontSize: ".78rem", color: "#64748b", marginBottom: brouillon.syncStatus === "error" ? 8 : 0 }}>
-                  La pesée sera envoyée au serveur dès le retour du réseau. La conversion en livraison sera possible une fois synchronisée.
+                <div style={{ fontSize: ".78rem", color: "#64748b", marginBottom: 6 }}>
+                  {brouillon.syncStatus === "error"
+                    ? "Le brouillon est conservé sur cet appareil. Corrigez la situation du bon puis relancez la synchronisation."
+                    : brouillon.syncStatus === "synced"
+                      ? "La pesée est synchronisée. La conversion en livraison sera disponible depuis la session serveur."
+                      : "La pesée sera envoyée au serveur dès le retour du réseau. La conversion en livraison sera possible une fois synchronisée."}
+                </div>
+                <div style={{ fontSize: ".72rem", color: "#64748b", wordBreak: "break-all" }}>
+                  Identifiant du brouillon : <strong>{brouillon.localId}</strong>
+                  {brouillon.bonReceptionId != null && ` · bon #${brouillon.bonReceptionId}`}
                 </div>
                 {brouillon.syncStatus === "error" && brouillon.errorMsg && (
-                  <div style={{ fontSize: ".76rem", color: "var(--t-danger)", background: "var(--t-danger-bg)", borderRadius: 6, padding: "6px 10px" }}>
+                  <div role="alert" style={{ fontSize: ".76rem", color: "var(--t-danger)", background: "var(--t-danger-bg)", borderRadius: 6, padding: "6px 10px", marginTop: 8 }}>
                     ⚠️ Erreur lors de la synchronisation : {brouillon.errorMsg}
                   </div>
                 )}

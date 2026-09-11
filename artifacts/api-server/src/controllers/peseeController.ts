@@ -14,6 +14,7 @@ import {
   creerSessionBatch,
   SessionEnCoursError,
   SessionBonExistanteError,
+  BonReceptionIndisponibleError,
   SessionTransfertExistanteError,
 } from "../services/peseeSessionService";
 import { isCertificationCacao } from "../lib/certificationCacao.js";
@@ -346,6 +347,26 @@ export async function handleBatchCreateSession(req: Request, res: Response): Pro
     res.status(201).json(result);
   } catch (err) {
     req.log.error({ err }, "handleBatchCreateSession");
+    if (err instanceof SessionBonExistanteError) {
+      res.status(409).json({
+        erreur: err.message,
+        code: err.code,
+        sessionId: err.sessionId,
+        bonReceptionId: err.bonReceptionId,
+        motif: err.motif,
+      });
+      return;
+    }
+    if (err instanceof BonReceptionIndisponibleError) {
+      res.status(409).json({
+        erreur: err.message,
+        code: err.code,
+        bonReceptionId: err.bonReceptionId,
+        motif: err.motif,
+        statut: err.statut,
+      });
+      return;
+    }
     res.status(400).json({ erreur: (err as Error).message });
   }
 }
@@ -411,6 +432,18 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
         erreur: err.message,
         code: "SESSION_BON_EXISTANTE",
         sessionId: err.sessionId,
+        bonReceptionId: err.bonReceptionId,
+        motif: err.motif,
+      });
+      return;
+    }
+    if (err instanceof BonReceptionIndisponibleError) {
+      res.status(409).json({
+        erreur: err.message,
+        code: err.code,
+        bonReceptionId: err.bonReceptionId,
+        motif: err.motif,
+        statut: err.statut,
       });
       return;
     }
