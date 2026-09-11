@@ -12,10 +12,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { NumericInput } from "@/components/ui/numeric-input";
 import {
-  getGetEntrepotsQueryKey,
-  getGetMouvementsStockQueryKey,
-} from "@workspace/api-client-react";
-import {
   ArrowLeft, Ship, MapPin, CheckCircle2,
   ChevronRight, FileText, Users, Leaf, AlertCircle,
   Plus, Unlink, Link, Download, Scale,
@@ -274,55 +270,6 @@ export default function ExpeditionDetailPage() {
       void qc.invalidateQueries({ queryKey: ["expeditions"] });
     },
     onError: (err: Error) => toast({ title: "Erreur", description: err.message, variant: "destructive" }),
-  });
-
-  const reparerSortieStockMutation = useMutation({
-    mutationFn: () => {
-      if (!exp) throw new Error("Expédition introuvable");
-      return apiPut(`/api/expeditions/${id}/reception`, token, {
-        // Pour une expédition déjà réceptionnée, le serveur traite cet appel
-        // comme une réparation idempotente et ne recrée pas la réception.
-        poidsRecuPortKg: Number(exp.poidsRecuPortKg ?? 0),
-        nombreSacsRecuPort: exp.nombreSacsRecuPort == null
-          ? undefined
-          : Number(exp.nombreSacsRecuPort),
-        numeroRecepissePort: String(exp.numeroRecepissePort ?? `REPRISE-${id}`),
-        nomReceptionnaire: String(exp.nomReceptionnaire ?? "Réparation stock"),
-      });
-    },
-    onSuccess: (data: unknown) => {
-      const repair = (data as {
-        stockRepair?: {
-          mouvementsCrees?: number;
-          mouvementsExistants?: number;
-          poidsCreeKg?: number;
-        };
-      }).stockRepair;
-      const mouvementsCrees = Number(repair?.mouvementsCrees ?? 0);
-      const mouvementsExistants = Number(repair?.mouvementsExistants ?? 0);
-      const poidsCreeKg = Number(repair?.poidsCreeKg ?? 0);
-      toast({
-        title: mouvementsCrees > 0 ? "Sortie stock créée" : "Sortie stock vérifiée",
-        description: mouvementsCrees > 0
-          ? `${mouvementsCrees} sortie(s) enregistrée(s), soit ${poidsCreeKg.toFixed(2)} kg.`
-          : mouvementsExistants > 0
-            ? "La sortie historique existait déjà. Aucune seconde sortie n'a été ajoutée."
-            : "Aucune sortie n'a été créée : aucune ligne de lot avec un poids et un entrepôt source exploitable n'a été trouvée.",
-      });
-      void qc.invalidateQueries({ queryKey: ["expedition", id] });
-      void qc.invalidateQueries({ queryKey: ["expeditions"] });
-      void qc.invalidateQueries({ queryKey: ["expeditions-stats"] });
-      void qc.invalidateQueries({ queryKey: ["entrepots-stats"] });
-      // Le journal Gestion des stocks utilise ses propres clés de cache.
-      void qc.invalidateQueries({ queryKey: getGetEntrepotsQueryKey() });
-      void qc.invalidateQueries({ queryKey: getGetMouvementsStockQueryKey() });
-      void qc.invalidateQueries({ queryKey: ["stocks-mouvements"] });
-    },
-    onError: (err: Error) => toast({
-      title: "Réparation impossible",
-      description: err.message,
-      variant: "destructive",
-    }),
   });
 
   if (isLoading) return <div className="p-8 text-center text-gray-500">Chargement…</div>;
@@ -1265,31 +1212,6 @@ export default function ExpeditionDetailPage() {
                 Confirmation bloquée : le contrôle obligatoire doit être clôturé avec un écart acceptable ou justifié.
               </p>
             )}
-          </CardContent>
-        </Card>
-      )}
-
-      {statut === "receptionne" && (
-        <Card className="border-amber-200 bg-amber-50">
-          <CardContent className="p-4 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-              <div>
-                <p className="font-semibold text-amber-900">Sortie stock historique</p>
-                <p className="text-sm text-amber-800">
-                  Si cette expédition a été réceptionnée avant la correction, relancez la vérification pour créer la sortie manquante.
-                </p>
-              </div>
-            </div>
-            <Button
-              data-testid="button-reparer-sortie-stock"
-              variant="outline"
-              className="border-amber-400 bg-white text-amber-900 hover:bg-amber-100"
-              disabled={reparerSortieStockMutation.isPending}
-              onClick={() => reparerSortieStockMutation.mutate()}
-            >
-              {reparerSortieStockMutation.isPending ? "Vérification…" : "Réparer la sortie stock"}
-            </Button>
           </CardContent>
         </Card>
       )}
