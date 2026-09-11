@@ -237,6 +237,40 @@ describe.skipIf(!enabled)("totaux paginés des règlements sur PostgreSQL", () =
     });
   });
 
+  it("conserve les totaux quand la page demandée est après la dernière", async () => {
+    const filledPage = response();
+    const emptyPage = response();
+
+    await listPaiements(
+      request(cooperativeId, { page: "2", limit: "50" }) as any,
+      filledPage as any,
+    );
+    await listPaiements(
+      request(cooperativeId, { page: "6", limit: "50" }) as any,
+      emptyPage as any,
+    );
+
+    expect(filledPage.statusCode).toBe(200);
+    expect(emptyPage.statusCode).toBe(200);
+
+    const filledBody = filledPage.body as {
+      summary: unknown;
+    };
+    const emptyBody = emptyPage.body as {
+      items: unknown[];
+      pagination: { page: number; limit: number; total: number };
+      summary: unknown;
+    };
+
+    expect(emptyBody.items).toEqual([]);
+    expect(emptyBody.pagination).toEqual({
+      page: 6,
+      limit: 50,
+      total: deliveryCount + fuelCount,
+    });
+    expect(emptyBody.summary).toEqual(filledBody.summary);
+  });
+
   it("conserve les compteurs globaux quand la page est filtrée par carburant", async () => {
     const res = response();
 
