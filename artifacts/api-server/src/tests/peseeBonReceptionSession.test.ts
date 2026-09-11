@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const createSession = vi.fn();
+const creerSessionBatch = vi.fn();
 
 vi.mock("../services/peseeSessionService", () => ({
   createSession,
@@ -13,7 +14,7 @@ vi.mock("../services/peseeSessionService", () => ({
   annulerSession: vi.fn(),
   creerLivraisonDepuisSession: vi.fn(),
   expirerSessionsStales: vi.fn(),
-  creerSessionBatch: vi.fn(),
+  creerSessionBatch,
   SessionEnCoursError: class SessionEnCoursError extends Error {},
   SessionBonExistanteError: class SessionBonExistanteError extends Error {
     constructor(public readonly sessionId: number) {
@@ -43,7 +44,7 @@ vi.mock("../services/peseeService", () => ({
   upsertConfig: vi.fn(),
 }));
 
-const { handleCreateSession } = await import("../controllers/peseeController.js");
+const { handleCreateSession, handleBatchCreateSession } = await import("../controllers/peseeController.js");
 
 describe("création de session depuis un bon de réception", () => {
   const response = {
@@ -54,6 +55,12 @@ describe("création de session depuis un bon de réception", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     createSession.mockResolvedValue({ id: 19, numeroSession: "PSE-2026-00019" });
+    creerSessionBatch.mockResolvedValue({
+      sessionId: 19,
+      numeroSession: "PSE-2026-00019",
+      poidsTotalKg: "100",
+      nbSacsTotal: 2,
+    });
   });
 
   it("transmet le bon et crée une session liée au membre délégué", async () => {
@@ -136,6 +143,58 @@ describe("création de session depuis un bon de réception", () => {
     expect(response.json).toHaveBeenCalledWith(expect.objectContaining({
       code: "SESSION_BON_EXISTANTE",
       sessionId: 19,
+    }));
+  });
+
+  it("transmet le bon au batch de synchronisation hors ligne", async () => {
+    const request = {
+      agent: { id: 7, cooperativeId: 3, role: "peseur", delegueId: null },
+      body: {
+        localId: "offline-delegue-1",
+        membreId: 12,
+        produit: "cacao",
+        operation: "reception_membre_delegue",
+        certificationCacao: "RA",
+        bonReceptionId: 42,
+        lignes: [{ localId: "ligne-1", nbSacs: 2, poidsBrutKg: 101, tareKg: 1 }],
+        statut: "terminee",
+      },
+      log: { error: vi.fn() },
+    } as unknown as Request;
+
+    await handleBatchCreateSession(request, response);
+
+    expect(creerSessionBatch).toHaveBeenCalledWith(3, 7, expect.objectContaining({
+      localId: "offline-delegue-1",
+      membreId: 12,
+      operation: "reception_membre_delegue",
+      bonReceptionId: 42,
+      certificationCacao: "RA",
+    }));
+    expect(response.status).toHaveBeenCalledWith(201);
+  });
+
+  it("refuse la synchronisation hors ligne d'un membre délégué sans bon", async () => {
+    const request = {
+      agent: { id: 7, cooperativeId: 3, role: "peseur", delegueId: null },
+      body: {
+        localId: "offline-delegue-sans-bon",
+        membreId: 12,
+        produit: "cacao",
+        operation: "reception_membre_delegue",
+        certificationCacao: "RA",
+        lignes: [{ localId: "ligne-1", nbSacs: 2, poidsBrutKg: 101, tareKg: 1 }],
+        statut: "terminee",
+      },
+      log: { error: vi.fn() },
+    } as unknown as Request;
+
+    await handleBatchCreateSession(request, response);
+
+    expect(creerSessionBatch).not.toHaveBeenCalled();
+    expect(response.status).toHaveBeenCalledWith(400);
+    expect(response.json).toHaveBeenCalledWith(expect.objectContaining({
+      erreur: expect.stringContaining("bon de réception"),
     }));
   });
 });

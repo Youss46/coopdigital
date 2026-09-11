@@ -4,6 +4,7 @@ import {
   distributionsIntrantsTable, historiquePrixTable, campagnesTable,
   caissesTable, mouvementsCaisseTable, sessionsPeseeTable,
   cooperativesTable, transfertsStockTable, entrepotsTable, entrepotsDeleguesTable, mouvementsStockTable,
+  bonsReceptionMembresDeleguesTable,
 } from "@workspace/db";
 import { and, eq, sql, desc, or, isNull, gte, lte } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -237,6 +238,28 @@ export async function getFournisseurs(
     );
   }
 
+  // Garder le bon en attente avec le membre permet au terrain de démarrer une
+  // pesée hors ligne sans perdre le lien métier obligatoire à la synchronisation.
+  // Un membre peut avoir plusieurs bons historiques : seul le plus récent bon
+  // encore en attente est proposé.
+  const bonsEnAttente = await db
+    .select({
+      id: bonsReceptionMembresDeleguesTable.id,
+      membreDelegueId: bonsReceptionMembresDeleguesTable.membreDelegueId,
+    })
+    .from(bonsReceptionMembresDeleguesTable)
+    .where(and(
+      eq(bonsReceptionMembresDeleguesTable.cooperativeId, cooperativeId),
+      eq(bonsReceptionMembresDeleguesTable.statut, "en_attente_pesee"),
+    ))
+    .orderBy(desc(bonsReceptionMembresDeleguesTable.createdAt));
+  const bonEnAttenteParMembre = new Map<number, number>();
+  for (const bon of bonsEnAttente) {
+    if (!bonEnAttenteParMembre.has(bon.membreDelegueId)) {
+      bonEnAttenteParMembre.set(bon.membreDelegueId, bon.id);
+    }
+  }
+
   const membresResult = await Promise.all(
     filtered.slice(0, 50).map(async (m) => {
       const [avance] = await db
@@ -270,6 +293,7 @@ export async function getFournisseurs(
         village: m.village ?? null,
         typeMembre: (m.typeFournisseur ?? "membre") as string,
         isMembreDelegue: m.categorieMembre === "délégué de localités",
+        bonReceptionId: bonEnAttenteParMembre.get(m.id) ?? null,
         avanceEnCours: avance ? toNum(avance.solde) : 0,
         avanceId: null as number | null,
         intrantsDus: toNum(intrantsDus?.total),

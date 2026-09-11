@@ -723,6 +723,7 @@ export async function batchSyncBrouillon(brouillon: import("./types").BrouillonP
       produit: brouillon.produit,
       operation: brouillon.operation,
       certificationCacao: brouillon.certificationCacao,
+      bonReceptionId: brouillon.bonReceptionId,
       lignes: brouillon.lignes.map((l) => ({
         localId: l.localId,
         nbSacs: l.nbSacs,

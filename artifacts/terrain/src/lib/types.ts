@@ -29,6 +29,8 @@ export interface Fournisseur {
   typeMembre: "membre" | "externe";
   /** Les membres délégués doivent passer par un bon de réception avant pesée. */
   isMembreDelegue?: boolean;
+  /** Bon de réception en attente déjà disponible pour une pesée hors ligne. */
+  bonReceptionId?: number | null;
   avanceEnCours: number;
   intrantsDus: number;
   derniereLivraison: string | null;
@@ -354,6 +356,8 @@ export interface BrouillonPesee {
   operation: string;
   /** Certification déclarée par le peseur avant le démarrage hors ligne */
   certificationCacao: string;
+  /** Requis pour synchroniser une réception de membre délégué. */
+  bonReceptionId?: number | null;
   statut: "en_cours" | "terminee" | "annulee";
   syncStatus: "pending" | "syncing" | "synced" | "error";
   lignes: BrouillonLigne[];

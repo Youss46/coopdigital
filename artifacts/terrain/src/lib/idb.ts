@@ -555,6 +555,7 @@ export async function createBrouillon(data: {
   produit: string;
   operation: string;
   certificationCacao: string;
+  bonReceptionId?: number | null;
 }): Promise<BrouillonPesee> {
   const db = await openDb();
   const now = Date.now();

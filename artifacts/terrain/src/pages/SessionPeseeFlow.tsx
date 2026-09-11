@@ -229,6 +229,8 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
             setFournisseur({
               id: b.membreId, code: b.membreCode, nom: b.membreNom, prenoms: b.membrePrenoms,
               telephone: "", section: null, village: null, typeMembre: "membre",
+              isMembreDelegue: b.operation === "reception_membre_delegue",
+              bonReceptionId: b.bonReceptionId ?? null,
               avanceEnCours: 0, intrantsDus: 0, derniereLivraison: null,
             });
             setBrouillon(b);
@@ -294,7 +296,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
 
   // ── Reprise directe depuis le badge "Session en cours" ────────────────────
   async function handleSelectActiveSession(f: Fournisseur, sessionId: number) {
-    if (isPeseurCentral && f.isMembreDelegue) {
+    if (isOnline && isPeseurCentral && f.isMembreDelegue) {
       setLocation(`/receptions?membreDelegueId=${f.id}`);
       return;
     }
@@ -323,6 +325,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
       membrePrenoms: b.membrePrenoms,
       produit: b.produit,
       operation: b.operation,
+      bonReceptionId: b.bonReceptionId ?? null,
       certificationCacao: b.certificationCacao,
       statut: b.statut === "annulee" ? "annulee" : b.statut === "terminee" ? "terminee" : "en_cours",
       poidsTotalKg: String(b.poidsTotalKg.toFixed(3)),
@@ -350,7 +353,7 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
   // Si une session active existe déjà → reprendre directement.
   // Sinon → passer par l'étape "certif" pour déclarer le type de cacao avant création.
   async function handleSelectMembre(f: Fournisseur) {
-    if (isPeseurCentral && f.isMembreDelegue) {
+    if (isOnline && isPeseurCentral && f.isMembreDelegue) {
       setLocation(`/receptions?membreDelegueId=${f.id}`);
       return;
     }
@@ -409,9 +412,17 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
 
     if (!isOnline) {
       try {
+        const isReceptionMembreDelegue = isPeseurCentral && fournisseur.isMembreDelegue === true;
+        if (isReceptionMembreDelegue && !fournisseur.bonReceptionId) {
+          setErreur("Ce membre délégué n'a pas de bon de réception synchronisé sur cet appareil. Reconnectez-vous avant de commencer cette réception.");
+          return;
+        }
         const newBrouillon = await createBrouillon({
           membreId: fournisseur.id, membreNom: fournisseur.nom, membrePrenoms: fournisseur.prenoms,
-          membreCode: fournisseur.code, produit: "cacao", operation: "reception", certificationCacao,
+          membreCode: fournisseur.code, produit: "cacao",
+          operation: isReceptionMembreDelegue ? "reception_membre_delegue" : "reception",
+          certificationCacao,
+          bonReceptionId: isReceptionMembreDelegue ? fournisseur.bonReceptionId : null,
         });
         setBrouillon(newBrouillon);
         setSession(brouillonToSyntheticSession(newBrouillon));
@@ -424,9 +435,18 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
 
     try {
       const isExterne = fournisseur.typeMembre === "externe";
+      const isReceptionMembreDelegue = isPeseurCentral && fournisseur.isMembreDelegue === true;
       const sessionPayload = isExterne
         ? { fournisseurId: fournisseur.id, produit: "cacao", operation: "reception", certificationCacao }
-        : { membreId: fournisseur.id, produit: "cacao", operation: "reception", certificationCacao };
+        : isReceptionMembreDelegue
+          ? {
+              membreId: fournisseur.id,
+              produit: "cacao",
+              operation: "reception_membre_delegue",
+              bonReceptionId: fournisseur.bonReceptionId ?? undefined,
+              certificationCacao,
+            }
+          : { membreId: fournisseur.id, produit: "cacao", operation: "reception", certificationCacao };
       const s = await createSessionPesee(sessionPayload);
       const detail = await getSessionDetail(s.id);
       setSession(detail);

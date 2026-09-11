@@ -47,6 +47,7 @@ export async function creerSessionBatch(
     produit: string;
     operation: string;
     certificationCacao: CertificationCacao;
+    bonReceptionId?: number;
     lignes: Array<{ localId: string; nbSacs: number; poidsBrutKg: number; tareKg: number; notes?: string }>;
     statut: "terminee" | "en_cours";
   },
@@ -82,6 +83,7 @@ export async function creerSessionBatch(
         membreId: data.membreId,
         produit: data.produit,
         operation: data.operation,
+        bonReceptionId: data.bonReceptionId,
         peseurId,
         notes: offlineTag,
         certificationCacao: data.certificationCacao,

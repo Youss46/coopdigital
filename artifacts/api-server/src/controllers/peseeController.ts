@@ -304,12 +304,13 @@ export async function handleBatchCreateSession(req: Request, res: Response): Pro
   if (!cooperativeId) { res.status(401).json({ erreur: "Non autorisé" }); return; }
   const peseurId = req.agent!.id;
 
-  const { localId, membreId, produit, operation, certificationCacao, lignes, statut } = req.body as {
+  const { localId, membreId, produit, operation, certificationCacao, bonReceptionId, lignes, statut } = req.body as {
     localId?: string;
     membreId?: number;
     produit?: string;
     operation?: string;
     certificationCacao?: string;
+    bonReceptionId?: number;
     lignes?: Array<{ localId: string; nbSacs: number; poidsBrutKg: number; tareKg: number; notes?: string }>;
     statut?: "terminee" | "en_cours";
   };
@@ -326,6 +327,10 @@ export async function handleBatchCreateSession(req: Request, res: Response): Pro
     res.status(400).json({ erreur: "Sélectionnez le type de certification du cacao avant de démarrer la pesée" });
     return;
   }
+  if (operation === "reception_membre_delegue" && !bonReceptionId) {
+    res.status(400).json({ erreur: "Un bon de réception est obligatoire pour synchroniser la pesée d'un membre délégué" });
+    return;
+  }
 
   try {
     const result = await creerSessionBatch(cooperativeId, peseurId, {
@@ -334,6 +339,7 @@ export async function handleBatchCreateSession(req: Request, res: Response): Pro
       produit: produit ?? "cacao",
       operation: operation ?? "reception",
       certificationCacao,
+      bonReceptionId: bonReceptionId ? Number(bonReceptionId) : undefined,
       lignes,
       statut: statut ?? "terminee",
     });
