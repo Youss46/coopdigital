@@ -139,3 +139,4 @@
 - [Atomicité retenue-livraison session](session-advance-retention-atomicity.md) — la retenue d'avance, son historique et la livraison officielle doivent partager la même transaction.
 - [Filtres persistés validés](persisted-filter-validation.md) — valider les filtres restaurés avant tout appel API et utiliser des dates explicites dans les tests pour éviter la dépendance à l’horloge du runner.
 - [Enum PostgreSQL dans les migrations Drizzle](postgres-enum-migration-transaction.md) — comparer les nouvelles valeurs via `colonne::text` si une contrainte est créée dans le même lot transactionnel.
+- [Cache HTTP et CORS Railway](cache-control-cors-railway.md) — ne jamais ajouter Cache-Control à une requête fetch cross-origin; préférer cache:no-store côté navigateur et Cache-Control côté réponse API.

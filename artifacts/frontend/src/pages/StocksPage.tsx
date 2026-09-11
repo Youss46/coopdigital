@@ -187,7 +187,11 @@ export default function StocksPage() {
 
   // Fetch mouvements avec filtre de période + certification
   const periodeDates = getPeriodeDates(periode, dateDebut, dateFin);
-  const { data: mouvements = [], isLoading: isLoadingMouvements } = useQuery({
+  const {
+    data: mouvements = [],
+    isLoading: isLoadingMouvements,
+    isError: mouvementsError,
+  } = useQuery({
     queryKey: ["stocks-mouvements", periode, dateDebut, dateFin, filtreCertification],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -750,6 +754,13 @@ export default function StocksPage() {
                     <tr>
                       <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">Chargement…</td>
                     </tr>
+                  ) : mouvementsError ? (
+                    <EmptyState
+                      colSpan={6}
+                      icone={AlertTriangle}
+                      titre="Journal indisponible"
+                      description="Impossible de charger les mouvements de stock. Vérifiez la connexion à l'API puis réessayez."
+                    />
                   ) : mouvements.length === 0 ? (
                     <EmptyState
                       colSpan={6}
