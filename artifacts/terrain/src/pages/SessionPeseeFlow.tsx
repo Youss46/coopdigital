@@ -353,6 +353,12 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
   // Si une session active existe déjà → reprendre directement.
   // Sinon → passer par l'étape "certif" pour déclarer le type de cacao avant création.
   async function handleSelectMembre(f: Fournisseur) {
+    const bonsAmbigus = f.isMembreDelegue === true && (f.bonReceptionEnAttenteCount ?? 0) > 1;
+    if (!isOnline && isPeseurCentral && bonsAmbigus) {
+      setFournisseur(null);
+      setErreur("Plusieurs bons de réception sont ouverts pour ce membre. Reconnectez-vous et choisissez le bon dans Réceptions avant de peser.");
+      return;
+    }
     if (isOnline && isPeseurCentral && f.isMembreDelegue) {
       setLocation(`/receptions?membreDelegueId=${f.id}`);
       return;
@@ -413,6 +419,10 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
     if (!isOnline) {
       try {
         const isReceptionMembreDelegue = isPeseurCentral && fournisseur.isMembreDelegue === true;
+        if (isReceptionMembreDelegue && (fournisseur.bonReceptionEnAttenteCount ?? 0) > 1) {
+          setErreur("Plusieurs bons de réception sont ouverts pour ce membre. Choisissez le bon dans Réceptions avant de peser.");
+          return;
+        }
         if (isReceptionMembreDelegue && !fournisseur.bonReceptionId) {
           setErreur("Ce membre délégué n'a pas de bon de réception synchronisé sur cet appareil. Reconnectez-vous avant de commencer cette réception.");
           return;
@@ -436,6 +446,10 @@ export default function SessionPeseeFlow({ params }: { params?: { sessionId?: st
     try {
       const isExterne = fournisseur.typeMembre === "externe";
       const isReceptionMembreDelegue = isPeseurCentral && fournisseur.isMembreDelegue === true;
+      if (isReceptionMembreDelegue && (fournisseur.bonReceptionEnAttenteCount ?? 0) > 1) {
+        setErreur("Plusieurs bons de réception sont ouverts pour ce membre. Choisissez le bon dans Réceptions avant de peser.");
+        return;
+      }
       const sessionPayload = isExterne
         ? { fournisseurId: fournisseur.id, produit: "cacao", operation: "reception", certificationCacao }
         : isReceptionMembreDelegue

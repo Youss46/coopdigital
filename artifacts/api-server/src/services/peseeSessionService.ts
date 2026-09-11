@@ -331,6 +331,9 @@ export async function createSession(
         .limit(1);
 
       if (!bon) throw new Error("Bon de réception introuvable");
+      if (data.membreId !== undefined && data.membreId !== bon.membreDelegueId) {
+        throw new Error("Le bon de réception ne correspond pas au membre sélectionné");
+      }
       if (bon.statut !== "en_attente_pesee") {
         if (bon.sessionPeseeId) throw new SessionBonExistanteError(bon.sessionPeseeId);
         throw new Error(`Le bon doit être en statut 'en_attente_pesee' pour démarrer une pesée (statut actuel : ${bon.statut})`);

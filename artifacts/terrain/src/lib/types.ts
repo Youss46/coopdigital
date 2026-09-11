@@ -31,6 +31,8 @@ export interface Fournisseur {
   isMembreDelegue?: boolean;
   /** Bon de réception en attente déjà disponible pour une pesée hors ligne. */
   bonReceptionId?: number | null;
+  /** Nombre de bons encore ouverts pour ce membre ; > 1 interdit tout auto-rattachement. */
+  bonReceptionEnAttenteCount?: number;
   avanceEnCours: number;
   intrantsDus: number;
   derniereLivraison: string | null;

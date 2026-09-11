@@ -28,6 +28,25 @@ function formatFcfa(n: number): string {
   return n.toLocaleString("fr-FR") + " FCFA";
 }
 
+/**
+ * Un bon ne peut être pré-rattaché depuis la liste Terrain que si le membre
+ * n'en a qu'un seul en attente. Au-delà, le peseur doit choisir le bon dans
+ * le parcours Réceptions.
+ */
+export function getBonReceptionTerrainState(
+  bons: ReadonlyArray<{ id: number; membreDelegueId: number }>,
+  membreId: number,
+): { bonReceptionId: number | null; bonReceptionEnAttenteCount: number } {
+  const ids = bons
+    .filter((bon) => bon.membreDelegueId === membreId)
+    .map((bon) => bon.id);
+
+  return {
+    bonReceptionId: ids.length === 1 ? ids[0]! : null,
+    bonReceptionEnAttenteCount: ids.length,
+  };
+}
+
 // ─── Auth terrain ──────────────────────────────────────────────────────────
 
 export async function loginTerrain(telephone: string, motDePasse: string) {
@@ -238,10 +257,10 @@ export async function getFournisseurs(
     );
   }
 
-  // Garder le bon en attente avec le membre permet au terrain de démarrer une
+  // Garder un bon en attente avec le membre permet au terrain de démarrer une
   // pesée hors ligne sans perdre le lien métier obligatoire à la synchronisation.
-  // Un membre peut avoir plusieurs bons historiques : seul le plus récent bon
-  // encore en attente est proposé.
+  // Plusieurs bons ouverts sont volontairement ambigus : aucun n'est choisi
+  // automatiquement, afin d'éviter de rattacher la pesée au mauvais bon.
   const bonsEnAttente = await db
     .select({
       id: bonsReceptionMembresDeleguesTable.id,
@@ -253,13 +272,6 @@ export async function getFournisseurs(
       eq(bonsReceptionMembresDeleguesTable.statut, "en_attente_pesee"),
     ))
     .orderBy(desc(bonsReceptionMembresDeleguesTable.createdAt));
-  const bonEnAttenteParMembre = new Map<number, number>();
-  for (const bon of bonsEnAttente) {
-    if (!bonEnAttenteParMembre.has(bon.membreDelegueId)) {
-      bonEnAttenteParMembre.set(bon.membreDelegueId, bon.id);
-    }
-  }
-
   const membresResult = await Promise.all(
     filtered.slice(0, 50).map(async (m) => {
       const [avance] = await db
@@ -283,6 +295,7 @@ export async function getFournisseurs(
         .from(distributionsIntrantsTable)
         .where(eq(distributionsIntrantsTable.membreId, m.id));
 
+      const bonReceptionTerrain = getBonReceptionTerrainState(bonsEnAttente, m.id);
       return {
         id: m.id,
         code: computeCodeMembre(m.numeroMembre, m.dateAdhesion),
@@ -293,7 +306,8 @@ export async function getFournisseurs(
         village: m.village ?? null,
         typeMembre: (m.typeFournisseur ?? "membre") as string,
         isMembreDelegue: m.categorieMembre === "délégué de localités",
-        bonReceptionId: bonEnAttenteParMembre.get(m.id) ?? null,
+        bonReceptionId: bonReceptionTerrain.bonReceptionId,
+        bonReceptionEnAttenteCount: bonReceptionTerrain.bonReceptionEnAttenteCount,
         avanceEnCours: avance ? toNum(avance.solde) : 0,
         avanceId: null as number | null,
         intrantsDus: toNum(intrantsDus?.total),

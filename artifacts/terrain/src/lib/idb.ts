@@ -206,11 +206,13 @@ export async function deleteGpsDraft(missionId: number, membreId: number): Promi
 }
 
 export async function cacheFournisseurs(fournisseurs: Fournisseur[]): Promise<void> {
-  await setCache("fournisseurs", fournisseurs);
+  // v2 invalide les listes héritées qui pouvaient contenir le dernier bon
+  // choisi automatiquement alors que plusieurs bons étaient ouverts.
+  await setCache("fournisseurs_v2", fournisseurs);
 }
 
 export async function getCachedFournisseurs(): Promise<Fournisseur[]> {
-  return (await getCache<Fournisseur[]>("fournisseurs")) ?? [];
+  return (await getCache<Fournisseur[]>("fournisseurs_v2")) ?? [];
 }
 
 export async function cachePrix(prix: PrixActuel): Promise<void> {

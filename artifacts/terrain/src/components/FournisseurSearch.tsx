@@ -246,6 +246,11 @@ export default function FournisseurSearch({
                       Membre délégué — bon de réception
                     </span>
                   )}
+                  {f.isMembreDelegue && (f.bonReceptionEnAttenteCount ?? 0) > 1 && (
+                    <span className="t-badge t-badge--danger">
+                      Plusieurs bons — choix requis dans Réceptions
+                    </span>
+                  )}
                   {hasSession && (
                     <span className="t-badge t-badge--peseur">
                       <Play size={10} fill="currentColor" style={{ marginRight: 4 }} />

@@ -17,6 +17,7 @@ const fakeState = vi.hoisted(() => {
     typeMembre: "membre",
     isMembreDelegue: true,
     bonReceptionId: 314,
+    bonReceptionEnAttenteCount: 1,
     avanceEnCours: 0,
     intrantsDus: 0,
     derniereLivraison: null,
@@ -178,6 +179,7 @@ describe("pesée hors ligne d'un membre délégué", () => {
     fakeState.createBrouillon.mockClear();
     fakeState.getBrouillon.mockReset().mockResolvedValue(null);
     fakeState.navigate.mockClear();
+    fakeState.fournisseur.bonReceptionEnAttenteCount = 1;
     container = document.createElement("div");
     document.body.appendChild(container);
   });
@@ -253,5 +255,27 @@ describe("pesée hors ligne d'un membre délégué", () => {
     expect(inputs.length).toBeGreaterThanOrEqual(2);
     expect(Array.from(inputs).every((input) => !input.disabled)).toBe(true);
     expect(fakeState.navigate).not.toHaveBeenCalledWith("/receptions");
+  });
+
+  it("refuse de démarrer hors ligne quand plusieurs bons sont ouverts", async () => {
+    fakeState.fournisseur.bonReceptionEnAttenteCount = 2;
+
+    await act(async () => {
+      root = createRoot(container);
+      root.render(createElement(SessionPeseeFlow));
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      const memberButton = Array.from(container.querySelectorAll("button"))
+        .find((button) => button.textContent === "Membre délégué");
+      expect(memberButton).not.toBeUndefined();
+      memberButton!.click();
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("Plusieurs bons de réception sont ouverts");
+    expect(container.textContent).not.toContain("Type de cacao");
+    expect(fakeState.createBrouillon).not.toHaveBeenCalled();
   });
 });
