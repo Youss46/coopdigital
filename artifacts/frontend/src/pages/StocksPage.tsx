@@ -195,7 +195,13 @@ export default function StocksPage() {
       if (periodeDates.date_fin) params.set("date_fin", periodeDates.date_fin);
       if (filtreCertification) params.set("certification", filtreCertification);
       const qs = params.toString() ? `?${params.toString()}` : "";
-      const r = await fetch(`${BASE}/api/stocks/mouvements${qs}`, { headers: { Authorization: `Bearer ${tok()}` } });
+       const r = await fetch(`${BASE}/api/stocks/mouvements${qs}`, {
+         cache: "no-store",
+         headers: {
+           Authorization: `Bearer ${tok()}`,
+           "Cache-Control": "no-cache",
+         },
+       });
       if (!r.ok) throw new Error("Erreur chargement mouvements");
       return r.json() as Promise<Array<{ id: number; entrepotNom: string | null; type: string; poidsKg: string; motif: string | null; createdAt: string; nombreSacs?: number | null; certificationCacao?: string | null }>>;
     },

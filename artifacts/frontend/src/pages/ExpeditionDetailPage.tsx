@@ -290,10 +290,24 @@ export default function ExpeditionDetailPage() {
         nomReceptionnaire: String(exp.nomReceptionnaire ?? "Réparation stock"),
       });
     },
-    onSuccess: () => {
+    onSuccess: (data: unknown) => {
+      const repair = (data as {
+        stockRepair?: {
+          mouvementsCrees?: number;
+          mouvementsExistants?: number;
+          poidsCreeKg?: number;
+        };
+      }).stockRepair;
+      const mouvementsCrees = Number(repair?.mouvementsCrees ?? 0);
+      const mouvementsExistants = Number(repair?.mouvementsExistants ?? 0);
+      const poidsCreeKg = Number(repair?.poidsCreeKg ?? 0);
       toast({
-        title: "Sortie stock vérifiée",
-        description: "La sortie historique a été créée si elle manquait. Une seconde sortie ne sera pas ajoutée.",
+        title: mouvementsCrees > 0 ? "Sortie stock créée" : "Sortie stock vérifiée",
+        description: mouvementsCrees > 0
+          ? `${mouvementsCrees} sortie(s) enregistrée(s), soit ${poidsCreeKg.toFixed(2)} kg.`
+          : mouvementsExistants > 0
+            ? "La sortie historique existait déjà. Aucune seconde sortie n'a été ajoutée."
+            : "Aucune sortie n'a été créée : aucune ligne de lot avec un poids et un entrepôt source exploitable n'a été trouvée.",
       });
       void qc.invalidateQueries({ queryKey: ["expedition", id] });
       void qc.invalidateQueries({ queryKey: ["expeditions"] });

@@ -933,13 +933,27 @@ async function getPrixUnitaireExpedition(
 // Pour chaque lot attaché à l'expédition, crée un mouvement de sortie dans
 // l'entrepôt source du lot. Toute erreur bloque la transition et annule ses effets.
 
+interface ReparationSortieStockResult {
+  mouvementsCrees: number;
+  mouvementsExistants: number;
+  poidsCreeKg: number;
+  entrepotsTraites: number;
+}
+
 async function deduireStockChargementDansTransaction(
   tx: ComptabiliteTransaction,
   expeditionId: number,
   cooperativeId: number,
   userId: number,
   numeroExpedition: string,
-): Promise<void> {
+): Promise<ReparationSortieStockResult> {
+  const resultat: ReparationSortieStockResult = {
+    mouvementsCrees: 0,
+    mouvementsExistants: 0,
+    poidsCreeKg: 0,
+    entrepotsTraites: 0,
+  };
+
   // Le chargement et la réparation à la réception peuvent arriver ensemble.
   // Le verrou transactionnel rend la vérification et l'insertion atomiques.
   await tx.execute(sql`SELECT pg_advisory_xact_lock(${cooperativeId}, ${expeditionId})`);
@@ -983,7 +997,7 @@ async function deduireStockChargementDansTransaction(
   // Une expédition sans aucune ligne de lot peut représenter un contrôle de
   // chargement sans effet stock. Le fallback ne s'applique qu'aux anciennes
   // lignes expedition_lots qui portent bien un poids mais ont perdu lot_id.
-  if (lotsAttaches.length === 0) return;
+  if (lotsAttaches.length === 0) return resultat;
 
   // Regrouper par nom d'entrepôt (un lot → un entrepôt).
   // Les noms peuvent différer uniquement par la casse ou les espaces
@@ -1019,9 +1033,7 @@ async function deduireStockChargementDansTransaction(
   // Une ligne historique peut ne contenir aucun poids exploitable. Dans ce
   // cas, il n'existe pas de quantité fiable à débiter : conserver le
   // comportement sans effet plutôt que fabriquer une sortie.
-  if (parEntrepot.size === 0) {
-    return;
-  }
+  if (parEntrepot.size === 0) return resultat;
 
   // Résoudre tous les entrepôts avant d'insérer la première sortie. La
   // transaction protège déjà le rollback, mais cette phase de validation
@@ -1045,6 +1057,7 @@ async function deduireStockChargementDansTransaction(
     }
     entrepotsResolus.set(nomEntrepot, entrepot.id);
   }
+  resultat.entrepotsTraites = entrepotsResolus.size;
 
   // Pour chaque entrepôt impliqué, insérer un mouvement de sortie
   for (const [nomEntrepot, data] of parEntrepot) {
@@ -1065,7 +1078,10 @@ async function deduireStockChargementDansTransaction(
 
     // Aucun expedition_id n'existe dans mouvements_stock : le motif métier
     // fournit l'identifiant d'idempotence lors d'une reprise.
-    if (mouvementExistant) continue;
+    if (mouvementExistant) {
+      resultat.mouvementsExistants += 1;
+      continue;
+    }
 
     await tx.insert(mouvementsStockTable).values({
       entrepotId,
@@ -1076,12 +1092,16 @@ async function deduireStockChargementDansTransaction(
       motif,
       agentId:     userId,
     });
+    resultat.mouvementsCrees += 1;
+    resultat.poidsCreeKg += data.poidsKg;
 
     logger.info(
       { entrepotId, poidsKg: data.poidsKg, expeditionId },
       "Sortie stock enregistrée – chargement expédition",
     );
   }
+
+  return resultat;
 }
 
 // ── Changement de statut ────────────────────────────────────────────────────
@@ -1288,7 +1308,7 @@ export async function confirmerReception(
   // réparer uniquement une sortie de stock historique éventuellement absente,
   // sans recréer l'événement métier ni ses effets comptables.
   if (exp.statut === "receptionne" || exp.statut === "litige") {
-    await deduireStockChargementDansTransaction(
+    const stockRepair = await deduireStockChargementDansTransaction(
       tx,
       expeditionId,
       cooperativeId,
@@ -1306,6 +1326,7 @@ export async function confirmerReception(
       ecartKg:        ecartPoidsExistant,
       tauxEcartPct:   tauxEcartExistant * 100,
       provisionLitige: exp.provisionLitige,
+      stockRepair,
       niveauAlerte:    exp.statut === "litige"
         ? "litige"
         : tauxEcartExistant <= SEUIL_ACCEPTABLE
@@ -1350,7 +1371,7 @@ export async function confirmerReception(
   // La sortie est normalement créée au chargement. On rejoue toutefois la
   // vérification ici pour réparer les anciennes expéditions réceptionnées.
   // Cette fois, la réparation partage la transaction de réception.
-  await deduireStockChargementDansTransaction(
+  const stockRepair = await deduireStockChargementDansTransaction(
     tx,
     expeditionId,
     cooperativeId,
@@ -1481,6 +1502,7 @@ export async function confirmerReception(
     ecartKg:        ecartPoids,
     tauxEcartPct:   tauxEcart * 100,
     provisionLitige,
+    stockRepair,
     niveauAlerte:
       tauxEcart <= SEUIL_ACCEPTABLE  ? "acceptable" :
       tauxEcart <= SEUIL_LITIGE      ? "a_justifier" : "litige",

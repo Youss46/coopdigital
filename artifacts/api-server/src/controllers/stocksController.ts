@@ -171,6 +171,10 @@ export async function getMouvements(req: Request, res: Response): Promise<void> 
       LIMIT 200
     `);
 
+    // Ce journal dépend de l'utilisateur, de la coopérative et du token.
+    // Il ne doit pas être conservé par Vercel ou un navigateur après une
+    // réparation de sortie stock.
+    res.setHeader("Cache-Control", "no-store, max-age=0");
     res.json(rows.rows);
   } catch (err) {
     req.log.error({ err }, "Erreur getMouvements");
