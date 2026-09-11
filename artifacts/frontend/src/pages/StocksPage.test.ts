@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchMouvementsStock, formaterPoids } from "./StocksPage";
 
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
 const {
   useGetEntrepotsMock,
   useGetStockAlertesMock,
@@ -175,7 +177,7 @@ describe("cartes KPI après chargement des entrepôts", () => {
   });
 
   it("conserve les décimales en kg dans la répartition par certification", async () => {
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       const payload = url.includes("tonnage-certification")
         ? [{
@@ -191,7 +193,8 @@ describe("cartes KPI après chargement des entrepôts", () => {
         ok: true,
         json: async () => payload,
       };
-    }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
 
     const { default: StocksPage } = await import("./StocksPage");
     const queryClient = new QueryClient({
@@ -206,6 +209,9 @@ describe("cartes KPI après chargement des entrepôts", () => {
         createElement(StocksPage),
       ));
       await new Promise((resolve) => setTimeout(resolve, 25));
+    });
+    await act(async () => {
+      await queryClient.refetchQueries({ queryKey: ["stocks-tonnage-certification"] });
     });
 
     const certificationCard = Array.from(container.querySelectorAll("button"))
