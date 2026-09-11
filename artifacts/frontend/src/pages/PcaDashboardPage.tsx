@@ -346,7 +346,7 @@ export default function PcaDashboardPage() {
         <KpiCard
           icon={<Package className="w-5 h-5 text-green-700" />}
           label="Tonnage campagne"
-          value={`${(s.production.tonnage_campagne / 1000).toFixed(1)}`}
+          value={`${(s.production.tonnage_campagne / 1000).toFixed(2)}`}
           unit="T"
           sub={
             s.production.objectif_campagne > 0
