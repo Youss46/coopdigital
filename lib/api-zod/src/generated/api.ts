@@ -700,6 +700,7 @@ export const UpdateLotStatutResponse = zod.object({
 export const fusionnerLotsBodyLotIdsMin = 2;
 
 
+
 export const FusionnerLotsBody = zod.object({
   "lotIds": zod.array(zod.number()).min(fusionnerLotsBodyLotIdsMin),
   "entrepot": zod.string()
@@ -1120,6 +1121,10 @@ export const EncaisserVenteParams = zod.object({
 })
 
 
+
+
+
+
 export const EncaisserVenteBody = zod.object({
   "montantFcfa": zod.number().min(1),
   "modePaiement": zod.enum(['especes', 'cheque']).nullish(),
@@ -1287,6 +1292,8 @@ export const RejeterChequeRecuParams = zod.object({
 })
 
 
+
+
 export const RejeterChequeRecuBody = zod.object({
   "motifRejet": zod.string().min(1),
   "dateRejet": zod.string().optional()
@@ -1324,6 +1331,8 @@ export const RejeterChequeRecuResponse = zod.object({
 export const AnnulerChequeRecuParams = zod.object({
   "id": zod.coerce.number()
 })
+
+
 
 
 export const AnnulerChequeRecuBody = zod.object({
@@ -1476,6 +1485,7 @@ export const exportJournalSageTxtQueryJournalDefault = `CAIS`;
 export const exportJournalSageTxtQueryJournalMax = 8;
 
 
+
 export const ExportJournalSageTxtQueryParams = zod.object({
   "exercice": zod.coerce.number(),
   "journal": zod.coerce.string().max(exportJournalSageTxtQueryJournalMax).default(exportJournalSageTxtQueryJournalDefault).describe('Code du journal Sage; CAIS par défaut')
@@ -1510,6 +1520,7 @@ export const UpdateComptesTiersParams = zod.object({
 })
 
 export const updateComptesTiersBodyComptesItemNumeroCompteMax = 20;
+
 
 
 export const UpdateComptesTiersBody = zod.object({
@@ -1682,6 +1693,7 @@ export const suggestBalanceSageCounterpartiesResponseSuggestionsItemScoreMin = 0
 export const suggestBalanceSageCounterpartiesResponseSuggestionsItemScoreMax = 100;
 
 export const suggestBalanceSageCounterpartiesResponseSuggestionsMax = 3;
+
 
 
 export const SuggestBalanceSageCounterpartiesResponse = zod.object({
@@ -2062,6 +2074,7 @@ export const GetUsersResponse = zod.array(GetUsersResponseItem)
 export const createUserBodyMotDePasseMin = 8;
 
 
+
 export const CreateUserBody = zod.object({
   "nom": zod.string(),
   "prenoms": zod.string(),
@@ -2118,6 +2131,7 @@ export const ResetUserPasswordParams = zod.object({
 })
 
 export const resetUserPasswordBodyNouveauMotDePasseMin = 8;
+
 
 
 export const ResetUserPasswordBody = zod.object({
@@ -3593,7 +3607,12 @@ export const GetPaiementsStatsResponse = zod.object({
 /**
  * @summary Liste des paiements producteurs
  */
-export const listPaiementsQueryLimitDefault = 100;
+export const listPaiementsQueryLimitDefault = 50;
+export const listPaiementsQueryLimitMax = 200;
+
+export const listPaiementsQueryPageDefault = 1;
+
+
 
 export const ListPaiementsQueryParams = zod.object({
   "statut": zod.enum(['en_attente', 'confirme', 'echec', 'rejete', 'en_cours', 'effectue']).optional(),
@@ -3601,10 +3620,13 @@ export const ListPaiementsQueryParams = zod.object({
   "periode": zod.enum(['today', 'week', 'month', 'previous_month', 'campaign']).optional(),
   "date_debut": zod.date().optional().describe('Date effective minimale du paiement'),
   "date_fin": zod.date().optional().describe('Date effective maximale du paiement'),
-  "limit": zod.coerce.number().default(listPaiementsQueryLimitDefault)
+  "limit": zod.coerce.number().max(listPaiementsQueryLimitMax).default(listPaiementsQueryLimitDefault),
+  "page": zod.coerce.number().min(1).default(listPaiementsQueryPageDefault),
+  "type": zod.enum(['livraison', 'carburant', 'tous']).optional().describe('Origine des règlements à retourner. Les compteurs restent calculés pour tous les types.')
 })
 
-export const ListPaiementsResponseItem = zod.object({
+export const ListPaiementsResponse = zod.object({
+  "items": zod.array(zod.object({
   "id": zod.number(),
   "livraisonId": zod.number().nullish(),
   "bonCarburantId": zod.number().nullish(),
@@ -3658,14 +3680,38 @@ export const ListPaiementsResponseItem = zod.object({
   "banque": zod.string().nullish(),
   "dateEcheance": zod.string().nullish()
 })).optional()
+})),
+  "pagination": zod.object({
+  "page": zod.number(),
+  "limit": zod.number(),
+  "total": zod.number()
+}),
+  "summary": zod.object({
+  "livraisons": zod.object({
+  "count": zod.number(),
+  "montantTotal": zod.number()
+}),
+  "carburant": zod.object({
+  "count": zod.number(),
+  "montantTotal": zod.number()
+}),
+  "autres": zod.object({
+  "count": zod.number(),
+  "montantTotal": zod.number()
+}),
+  "tous": zod.object({
+  "count": zod.number(),
+  "montantTotal": zod.number()
 })
-export const ListPaiementsResponse = zod.array(ListPaiementsResponseItem)
+})
+})
 
 
 /**
  * @summary Valider plusieurs paiements de bons carburant en une seule opération
  */
 export const validerLotPaiementsCarburantBodyPaiementIdsMax = 200;
+
 
 
 export const ValiderLotPaiementsCarburantBody = zod.object({
@@ -3691,6 +3737,10 @@ export const ValiderLotPaiementsCarburantResponse = zod.object({
 export const ValiderPaiementParams = zod.object({
   "id": zod.coerce.number()
 })
+
+
+
+
 
 
 export const ValiderPaiementBody = zod.object({
@@ -3778,6 +3828,8 @@ export const ValiderPaiementResponse = zod.object({
 export const RejeterPaiementParams = zod.object({
   "id": zod.coerce.number()
 })
+
+
 
 
 export const RejeterPaiementBody = zod.object({
@@ -7938,6 +7990,7 @@ export const GetRapportInventaireEquipementsResponse = zod.object({
 export const postGenererDotationsBodyMoisMax = 12;
 
 
+
 export const PostGenererDotationsBody = zod.object({
   "mois": zod.number().min(1).max(postGenererDotationsBodyMoisMax),
   "annee": zod.number()
@@ -8657,4 +8710,3 @@ export const GetMembreCertificationResponse = zod.object({
 export const GetRapportPdfCertificationParams = zod.object({
   "id": zod.coerce.number()
 })
-

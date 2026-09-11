@@ -3191,16 +3191,27 @@ paths:
           in: query
           schema:
             type: integer
-            default: 100
+            default: 50
+            maximum: 200
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: type
+          in: query
+          description: Origine des règlements à retourner. Les compteurs restent calculés pour tous les types.
+          schema:
+            type: string
+            enum: [livraison, carburant, tous]
       responses:
         "200":
           description: Liste paiements
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/PaiementListItem"
+                $ref: "#/components/schemas/PaiementsListResponse"
 
   /paiements/carburant/valider-lot:
     post:
@@ -8156,6 +8167,46 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PaiementLigne"
+
+    PaiementsListSummaryItem:
+      type: object
+      required: [count, montantTotal]
+      properties:
+        count:
+          type: integer
+        montantTotal:
+          type: integer
+
+    PaiementsListResponse:
+      type: object
+      required: [items, pagination, summary]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaiementListItem"
+        pagination:
+          type: object
+          required: [page, limit, total]
+          properties:
+            page:
+              type: integer
+            limit:
+              type: integer
+            total:
+              type: integer
+        summary:
+          type: object
+          required: [livraisons, carburant, autres, tous]
+          properties:
+            livraisons:
+              $ref: "#/components/schemas/PaiementsListSummaryItem"
+            carburant:
+              $ref: "#/components/schemas/PaiementsListSummaryItem"
+            autres:
+              $ref: "#/components/schemas/PaiementsListSummaryItem"
+            tous:
+              $ref: "#/components/schemas/PaiementsListSummaryItem"
 
     PaiementLigne:
       type: object

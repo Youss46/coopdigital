@@ -23,7 +23,7 @@ vi.mock("@workspace/db", () => ({
   avancesTable: table("avances", []),
   campagnesTable: table("campagnes", ["cooperativeId", "statut", "dateOuverture", "dateFermeture"]),
   membresTable: table("membres", ["id", "cooperativeId", "delegueId"]),
-  livraisonsTable: table("livraisons", ["id", "agentId", "fournisseurId"]),
+  livraisonsTable: table("livraisons", ["id", "agentId", "fournisseurId", "statutPaiement", "montantRestant"]),
   fournisseursTable: table("fournisseurs", ["id", "cooperativeId", "creeParDelegueId"]),
   usersTable: table("users", ["id", "role"]),
   bonsCarburantTable: table("bons_carburant", ["id", "cooperativeId"]),
@@ -97,6 +97,7 @@ type SelectChain = {
   where: ReturnType<typeof vi.fn>;
   orderBy: ReturnType<typeof vi.fn>;
   limit: ReturnType<typeof vi.fn>;
+  offset: ReturnType<typeof vi.fn>;
   then: (resolve: (rows: unknown[]) => unknown, reject?: (error: unknown) => unknown) => Promise<unknown>;
 };
 
@@ -107,6 +108,7 @@ function selectChain(rows: unknown[]): SelectChain {
     where: vi.fn(),
     orderBy: vi.fn(),
     limit: vi.fn(),
+    offset: vi.fn(),
     then: (resolve: (rows: unknown[]) => unknown, reject?: (error: unknown) => unknown) =>
       Promise.resolve(rows).then(resolve, reject),
   } as SelectChain;
@@ -115,6 +117,7 @@ function selectChain(rows: unknown[]): SelectChain {
   chain.where.mockReturnValue(chain);
   chain.orderBy.mockReturnValue(chain);
   chain.limit.mockReturnValue(chain);
+  chain.offset.mockReturnValue(chain);
   return chain;
 }
 
@@ -322,7 +325,18 @@ describe("date effective des règlements", () => {
       dateValidation: null,
     };
     const listeChain = selectChain([paiement]);
+    const summaryChain = selectChain([{
+      livraisonsCount: 1,
+      livraisonsMontant: 25_000,
+      carburantCount: 0,
+      carburantMontant: 0,
+      autresCount: 0,
+      autresMontant: 0,
+      tousCount: 1,
+      tousMontant: 25_000,
+    }]);
     mocks.select
+      .mockReturnValueOnce(summaryChain)
       .mockReturnValueOnce(listeChain)
       .mockReturnValueOnce(selectChain([]));
     const res = response();
@@ -331,12 +345,22 @@ describe("date effective des règlements", () => {
 
     const whereCondition = listeChain.where.mock.calls[0]?.[0];
     expect(JSON.stringify(whereCondition)).toContain("coalesce");
-    expect(res.json).toHaveBeenCalledWith([{ ...paiement, lignes: [] }]);
+    expect(res.json).toHaveBeenCalledWith({
+      items: [{ ...paiement, lignes: [] }],
+      pagination: { page: 1, limit: 50, total: 1 },
+      summary: {
+        livraisons: { count: 1, montantTotal: 25_000 },
+        carburant: { count: 0, montantTotal: 0 },
+        autres: { count: 0, montantTotal: 0 },
+        tous: { count: 1, montantTotal: 25_000 },
+      },
+    });
   });
 
   it("filtre la liste sur une période personnalisée inclusive", async () => {
     const listeChain = selectChain([]);
     mocks.select
+      .mockReturnValueOnce(selectChain([{}]))
       .mockReturnValueOnce(listeChain)
       .mockReturnValueOnce(selectChain([]));
     const res = response();
@@ -374,6 +398,7 @@ describe("date effective des règlements", () => {
     const listeChain = selectChain([]);
     mocks.select
       .mockReturnValueOnce(campagneChain)
+      .mockReturnValueOnce(selectChain([{}]))
       .mockReturnValueOnce(listeChain)
       .mockReturnValueOnce(selectChain([]));
     const res = response();
@@ -383,5 +408,34 @@ describe("date effective des règlements", () => {
     const condition = JSON.stringify(listeChain.where.mock.calls[0]?.[0]);
     expect(condition).toContain("2026-04-01T00:00:00.000Z");
     expect(condition).toContain("2026-09-04T23:59:59.999Z");
+  });
+
+  it("conserve les compteurs complets quand une page est limitée à 50 règlements", async () => {
+    const listeChain = selectChain([{ id: 201, livraisonId: 10, montantFcfa: 1_000 }]);
+    mocks.select
+      .mockReturnValueOnce(selectChain([{
+        livraisonsCount: 230,
+        livraisonsMontant: 230_000,
+        carburantCount: 25,
+        carburantMontant: 50_000,
+        autresCount: 5,
+        autresMontant: 5_000,
+        tousCount: 260,
+        tousMontant: 285_000,
+      }]))
+      .mockReturnValueOnce(listeChain)
+      .mockReturnValueOnce(selectChain([]));
+    const res = response();
+
+    await listPaiements(request({ type: "livraison", page: "2", limit: "50" }), res);
+
+    expect(listeChain.offset).toHaveBeenCalledWith(50);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      pagination: { page: 2, limit: 50, total: 230 },
+      summary: expect.objectContaining({
+        livraisons: { count: 230, montantTotal: 230_000 },
+        tous: { count: 260, montantTotal: 285_000 },
+      }),
+    }));
   });
 });

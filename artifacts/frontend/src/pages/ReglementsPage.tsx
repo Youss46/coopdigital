@@ -4,6 +4,7 @@ import {
   CheckCheck, AlertCircle, Banknote, Smartphone, ChevronDown,
   Receipt, Package, User, Calendar, TrendingUp, X, Wallet,
   AlertTriangle, Lock, FileDown, Printer, Fuel, Ship, Undo2,
+  ChevronLeft, ChevronRight,
 } from "lucide-react";
 import {
   useListPaiements,
@@ -1464,6 +1465,7 @@ export default function ReglementsPage() {
   const [filtreProxy, setFiltreProxy] = useState(false);
   const [recherche, setRecherche] = useState("");
   const [onglet, setOnglet] = useState<ReglementOnglet>("livraisons");
+  const [page, setPage] = useState(1);
   const [modal, setModal] = useState<ModalState>(null);
   const [transportModal, setTransportModal] = useState<FraisTransportARegler | null>(null);
   const [lotCarburantOuvert, setLotCarburantOuvert] = useState(false);
@@ -1525,7 +1527,9 @@ export default function ReglementsPage() {
       : undefined,
     date_debut: periodePersonnalisee && dateDebut ? dateDebut : undefined,
     date_fin: periodePersonnalisee && dateFin ? dateFin : undefined,
-    limit: 200,
+    type: onglet === "livraisons" ? "livraison" as const : onglet === "carburant" ? "carburant" as const : "tous" as const,
+    page,
+    limit: 50,
   };
   const statsParams = {
     periode: filtrePeriode && !periodePersonnalisee
@@ -1541,12 +1545,19 @@ export default function ReglementsPage() {
       enabled: periodePersonnaliseeValide,
     },
   });
-  const { data: paiements, isLoading } = useListPaiements(params, {
+  const { data: paiementsResponse, isLoading } = useListPaiements(params, {
     query: {
       queryKey: getListPaiementsQueryKey(params),
       enabled: periodePersonnaliseeValide,
     },
   });
+  const paiements = paiementsResponse?.items ?? [];
+  const pagination = paiementsResponse?.pagination;
+  const summary = paiementsResponse?.summary;
+
+  useEffect(() => {
+    setPage(1);
+  }, [filtreStatut, filtrePeriode, dateDebut, dateFin, onglet]);
 
   const {
     data: fraisTransport = [],
@@ -1745,7 +1756,7 @@ export default function ReglementsPage() {
     }
   }
 
-  const filtres = (paiements ?? []).filter((p) => {
+  const filtres = paiements.filter((p) => {
     if (filtreSansMode && !!p.modePaiement) return false;
     if (filtreProxy && !p.agentSaisiseurId) return false;
     if (!recherche) return true;
@@ -1756,11 +1767,11 @@ export default function ReglementsPage() {
       (p.bonCarburantNumero ?? "").toLowerCase().includes(r)
     );
   });
-  const paiementsAffiches = filterReglementsByTab(filtres, onglet);
+  const paiementsAffiches = filtres;
   const countsOnglets = {
-    livraisons: filtres.filter((p) => classifyReglement(p) === "livraison").length,
-    carburant: filtres.filter((p) => classifyReglement(p) === "carburant").length,
-    tous: filtres.length,
+    livraisons: summary?.livraisons.count ?? 0,
+    carburant: summary?.carburant.count ?? 0,
+    tous: summary?.tous.count ?? 0,
   };
   const bonsCarburantEnAttente = filtreStatut === "en_attente" && onglet === "carburant"
     ? paiementsAffiches.filter((p) => p.statut === "en_attente" && classifyReglement(p) === "carburant")
@@ -2201,24 +2212,17 @@ export default function ReglementsPage() {
       </div>
 
       {(() => {
-        const enAttente = filtres.filter((p) => p.statut === "en_attente");
-        const pendingDelivery = enAttente
-          .filter((p) => classifyReglement(p) === "livraison")
-          .reduce((sum, p) => sum + montantRestantLivraison(p), 0);
-        const pendingFuel = enAttente
-          .filter((p) => classifyReglement(p) === "carburant")
-          .reduce((sum, p) => sum + p.montantFcfa, 0);
-        const pendingOverall = enAttente.reduce((sum, p) => sum + (
-          classifyReglement(p) === "livraison" ? montantRestantLivraison(p) : p.montantFcfa
-        ), 0);
+        const pendingDelivery = filtreStatut === "en_attente" ? summary?.livraisons.montantTotal ?? 0 : 0;
+        const pendingFuel = filtreStatut === "en_attente" ? summary?.carburant.montantTotal ?? 0 : 0;
+        const pendingOverall = filtreStatut === "en_attente" ? summary?.tous.montantTotal ?? 0 : 0;
         return (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <StatCard icon={<Package size={16} className="text-green-700" />} bg="bg-green-50"
-              label="Livraisons en attente (chargées)" value={fmt(pendingDelivery)} sub="" subCls="" />
+              label="Livraisons en attente" value={fmt(pendingDelivery)} sub="" subCls="" />
             <StatCard icon={<Fuel size={16} className="text-amber-700" />} bg="bg-amber-50"
-              label="Carburant en attente (chargé)" value={fmt(pendingFuel)} sub="" subCls="" />
+              label="Carburant en attente" value={fmt(pendingFuel)} sub="" subCls="" />
             <StatCard icon={<TrendingUp size={16} className="text-gray-600" />} bg="bg-gray-50"
-              label="Total en attente (chargé)" value={fmt(pendingOverall)} sub="" subCls="" />
+              label="Total en attente" value={fmt(pendingOverall)} sub="" subCls="" />
           </div>
         );
       })()}
@@ -2290,6 +2294,31 @@ export default function ReglementsPage() {
               onRecu={() => setModal({ type: "recu", paiement: p })}
             />
           ))}
+          {pagination && pagination.total > pagination.limit && (
+            <div className="flex items-center justify-between pt-4">
+              <p className="text-xs text-gray-500">
+                Page {pagination.page} sur {Math.ceil(pagination.total / pagination.limit)}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPage((value) => Math.max(1, value - 1))}
+                  disabled={pagination.page <= 1}
+                  className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 disabled:opacity-40"
+                >
+                  <ChevronLeft size={14} /> Précédent
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPage((value) => value + 1)}
+                  disabled={pagination.page * pagination.limit >= pagination.total}
+                  className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 disabled:opacity-40"
+                >
+                  Suivant <ChevronRight size={14} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

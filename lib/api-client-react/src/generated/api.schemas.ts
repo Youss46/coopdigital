@@ -1284,6 +1284,30 @@ export interface PaiementListItem {
   lignes?: PaiementLigne[];
 }
 
+export interface PaiementsListSummaryItem {
+  count: number;
+  montantTotal: number;
+}
+
+export type PaiementsListResponsePagination = {
+  page: number;
+  limit: number;
+  total: number;
+};
+
+export type PaiementsListResponseSummary = {
+  livraisons: PaiementsListSummaryItem;
+  carburant: PaiementsListSummaryItem;
+  autres: PaiementsListSummaryItem;
+  tous: PaiementsListSummaryItem;
+};
+
+export interface PaiementsListResponse {
+  items: PaiementListItem[];
+  pagination: PaiementsListResponsePagination;
+  summary: PaiementsListResponseSummary;
+}
+
 export type PaiementsStatsEnAttente = {
   count: number;
   montant_total: number;
@@ -5769,7 +5793,18 @@ date_debut?: string;
  * Date effective maximale du paiement
  */
 date_fin?: string;
+/**
+ * @maximum 200
+ */
 limit?: number;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * Origine des règlements à retourner. Les compteurs restent calculés pour tous les types.
+ */
+type?: ListPaiementsType;
 };
 
 export type ListPaiementsStatut = typeof ListPaiementsStatut[keyof typeof ListPaiementsStatut];
@@ -5793,6 +5828,15 @@ export const ListPaiementsPeriode = {
   month: 'month',
   previous_month: 'previous_month',
   campaign: 'campaign',
+} as const;
+
+export type ListPaiementsType = typeof ListPaiementsType[keyof typeof ListPaiementsType];
+
+
+export const ListPaiementsType = {
+  livraison: 'livraison',
+  carburant: 'carburant',
+  tous: 'tous',
 } as const;
 
 export type GetEncoursIntrantsMembre200 = {

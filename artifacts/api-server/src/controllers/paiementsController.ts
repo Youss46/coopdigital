@@ -468,7 +468,15 @@ export async function listPaiements(req: Request, res: Response): Promise<void> 
     const periode = req.query["periode"] as string | undefined;
     const dateDebut = typeof req.query["date_debut"] === "string" ? req.query["date_debut"] : undefined;
     const dateFin = typeof req.query["date_fin"] === "string" ? req.query["date_fin"] : undefined;
-    const limit = Math.min(200, parseInt(String(req.query["limit"] ?? "100")));
+    const type = req.query["type"] as "livraison" | "carburant" | "tous" | undefined;
+    const parsedLimit = parseInt(String(req.query["limit"] ?? "50"));
+    const parsedPage = parseInt(String(req.query["page"] ?? "1"));
+    const limit = Number.isFinite(parsedLimit) ? Math.max(1, Math.min(200, parsedLimit)) : 50;
+    const page = Number.isFinite(parsedPage) ? Math.max(1, parsedPage) : 1;
+    if (type && !["livraison", "carburant", "tous"].includes(type)) {
+      res.status(400).json({ erreur: "Le type doit être livraison, carburant ou tous" });
+      return;
+    }
     const datePattern = /^\d{4}-\d{2}-\d{2}$/;
     if ((dateDebut && !datePattern.test(dateDebut)) || (dateFin && !datePattern.test(dateFin))) {
       res.status(400).json({ erreur: "Les dates doivent être au format AAAA-MM-JJ" });
@@ -485,12 +493,12 @@ export async function listPaiements(req: Request, res: Response): Promise<void> 
       eq(bonsCarburantTable.cooperativeId, cooperativeId),
       eq(depensesVehiculeTable.cooperativeId, cooperativeId),
     )!;
-    const conditions: SQL<unknown>[] = [coopFilter];
-    if (statut) conditions.push(eq(paiementsTable.statut, statut as "en_attente" | "confirme" | "echec" | "rejete" | "en_cours" | "effectue"));
-    if (membreId) conditions.push(eq(paiementsTable.membreId, membreId));
+    const baseConditions: SQL<unknown>[] = [coopFilter];
+    if (statut) baseConditions.push(eq(paiementsTable.statut, statut as "en_attente" | "confirme" | "echec" | "rejete" | "en_cours" | "effectue"));
+    if (membreId) baseConditions.push(eq(paiementsTable.membreId, membreId));
     // Un délégué ne voit que les règlements des membres/fournisseurs qui lui sont rattachés
     if (req.user?.role === "delegue" && req.user?.id) {
-      conditions.push(
+      baseConditions.push(
         or(
           eq(membresTable.delegueId, req.user.id),
           eq(fournisseursTable.creeParDelegueId, req.user.id),
@@ -500,7 +508,7 @@ export async function listPaiements(req: Request, res: Response): Promise<void> 
       // Base centrale : masquer les règlements en espèces enregistrés par un délégué
       // (ces règlements sont gérés dans la page Caisse du délégué concerné)
       // Les paiements sans mode pré-sélectionné (pesée groupée) sont toujours visibles.
-      conditions.push(
+      baseConditions.push(
         or(
           isNull(paiementsTable.modePaiement),
           sql`${paiementsTable.modePaiement} != 'especes'`,
@@ -514,22 +522,22 @@ export async function listPaiements(req: Request, res: Response): Promise<void> 
     const dateEffective = dateEffectivePaiementSql();
     if (dateDebut || dateFin) {
       if (dateDebut) {
-        conditions.push(gte(dateEffective, new Date(`${dateDebut}T00:00:00.000Z`)));
+        baseConditions.push(gte(dateEffective, new Date(`${dateDebut}T00:00:00.000Z`)));
       }
       if (dateFin) {
-        conditions.push(lte(dateEffective, new Date(`${dateFin}T23:59:59.999Z`)));
+        baseConditions.push(lte(dateEffective, new Date(`${dateFin}T23:59:59.999Z`)));
       }
     } else if (periode === "today") {
-      conditions.push(gte(dateEffective, startOfDay(now)));
+      baseConditions.push(gte(dateEffective, startOfDay(now)));
     } else if (periode === "week") {
       const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      conditions.push(gte(dateEffective, weekAgo));
+      baseConditions.push(gte(dateEffective, weekAgo));
     } else if (periode === "month") {
-      conditions.push(gte(dateEffective, startOfMonth(now)));
+      baseConditions.push(gte(dateEffective, startOfMonth(now)));
     } else if (periode === "previous_month") {
       const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      conditions.push(gte(dateEffective, startOfMonth(previousMonth)));
-      conditions.push(lte(dateEffective, endOfMonth(previousMonth)));
+      baseConditions.push(gte(dateEffective, startOfMonth(previousMonth)));
+      baseConditions.push(lte(dateEffective, endOfMonth(previousMonth)));
     } else if (periode === "campaign") {
       const [campagneActive] = await db
         .select({
@@ -544,13 +552,53 @@ export async function listPaiements(req: Request, res: Response): Promise<void> 
         .orderBy(desc(campagnesTable.dateOuverture))
         .limit(1);
       if (campagneActive) {
-        conditions.push(gte(dateEffective, new Date(`${campagneActive.dateOuverture}T00:00:00.000Z`)));
+        baseConditions.push(gte(dateEffective, new Date(`${campagneActive.dateOuverture}T00:00:00.000Z`)));
         const campagneFin = campagneActive.dateFermeture ?? now.toISOString().split("T")[0]!;
-        conditions.push(lte(dateEffective, new Date(`${campagneFin}T23:59:59.999Z`)));
+        baseConditions.push(lte(dateEffective, new Date(`${campagneFin}T23:59:59.999Z`)));
       }
     }
 
-    const paiements = await db
+    const typeCondition = type === "livraison"
+      ? sql`${paiementsTable.livraisonId} IS NOT NULL`
+      : type === "carburant"
+        ? sql`${paiementsTable.bonCarburantId} IS NOT NULL`
+        : undefined;
+    const listConditions = typeCondition ? [...baseConditions, typeCondition] : baseConditions;
+    const [summaryRow, paiements] = await Promise.all([
+      db.select({
+        livraisonsCount: sql<number>`count(*) filter (where ${paiementsTable.livraisonId} is not null)::integer`,
+        livraisonsMontant: sql<number>`coalesce(sum(
+          case when ${paiementsTable.livraisonId} is not null
+            then case
+              when upper(coalesce(${livraisonsTable.statutPaiement}::text, '')) in ('EN_ATTENTE', 'PARTIEL', 'DIFFERE', 'IMPAYE', 'EN_RETARD')
+                then greatest(0, coalesce(${livraisonsTable.montantRestant}, ${paiementsTable.montantFcfa}, 0))
+              else coalesce(${paiementsTable.montantFcfa}, 0)
+            end
+          else 0 end
+        ), 0)::integer`,
+        carburantCount: sql<number>`count(*) filter (where ${paiementsTable.bonCarburantId} is not null)::integer`,
+        carburantMontant: sql<number>`coalesce(sum(case when ${paiementsTable.bonCarburantId} is not null then ${paiementsTable.montantFcfa} else 0 end), 0)::integer`,
+        autresCount: sql<number>`count(*) filter (where ${paiementsTable.livraisonId} is null and ${paiementsTable.bonCarburantId} is null)::integer`,
+        autresMontant: sql<number>`coalesce(sum(case when ${paiementsTable.livraisonId} is null and ${paiementsTable.bonCarburantId} is null then ${paiementsTable.montantFcfa} else 0 end), 0)::integer`,
+        tousCount: sql<number>`count(*)::integer`,
+        tousMontant: sql<number>`coalesce(sum(
+          case when ${paiementsTable.livraisonId} is not null
+            and upper(coalesce(${livraisonsTable.statutPaiement}::text, '')) in ('EN_ATTENTE', 'PARTIEL', 'DIFFERE', 'IMPAYE', 'EN_RETARD')
+              then greatest(0, coalesce(${livraisonsTable.montantRestant}, ${paiementsTable.montantFcfa}, 0))
+            else coalesce(${paiementsTable.montantFcfa}, 0)
+          end
+        ), 0)::integer`,
+      })
+        .from(paiementsTable)
+        .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
+        .leftJoin(livraisonsTable, eq(paiementsTable.livraisonId, livraisonsTable.id))
+        .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
+        .leftJoin(agentUserAlias, eq(livraisonsTable.agentId, agentUserAlias.id))
+        .leftJoin(bonsCarburantTable, eq(paiementsTable.bonCarburantId, bonsCarburantTable.id))
+        .leftJoin(depensesVehiculeTable, eq(paiementsTable.depenseVehiculeId, depensesVehiculeTable.id))
+        .where(and(...baseConditions))
+        .then((rows) => rows[0]),
+      db
       .select(SELECT_FIELDS)
       .from(paiementsTable)
       .leftJoin(membresTable, eq(paiementsTable.membreId, membresTable.id))
@@ -562,11 +610,32 @@ export async function listPaiements(req: Request, res: Response): Promise<void> 
       .leftJoin(bonsCarburantTable, eq(paiementsTable.bonCarburantId, bonsCarburantTable.id))
       .leftJoin(depensesVehiculeTable, eq(paiementsTable.depenseVehiculeId, depensesVehiculeTable.id))
       .leftJoin(saisiseurUserAlias, eq(paiementsTable.agentSaisiseurId, saisiseurUserAlias.id))
-      .where(and(...conditions))
+      .where(and(...listConditions))
       .orderBy(desc(paiementsTable.createdAt))
-      .limit(limit);
+      .limit(limit)
+      .offset((page - 1) * limit),
+    ]);
 
-    res.json(await attachPaiementLignes(paiements));
+    const summary = {
+      livraisons: { count: summaryRow?.livraisonsCount ?? 0, montantTotal: summaryRow?.livraisonsMontant ?? 0 },
+      carburant: { count: summaryRow?.carburantCount ?? 0, montantTotal: summaryRow?.carburantMontant ?? 0 },
+      autres: { count: summaryRow?.autresCount ?? 0, montantTotal: summaryRow?.autresMontant ?? 0 },
+      tous: { count: summaryRow?.tousCount ?? 0, montantTotal: summaryRow?.tousMontant ?? 0 },
+    };
+    const items = await attachPaiementLignes(paiements);
+    res.json({
+      items,
+      pagination: {
+        page,
+        limit,
+        total: type === "livraison"
+          ? summary.livraisons.count
+          : type === "carburant"
+            ? summary.carburant.count
+            : summary.tous.count,
+      },
+      summary,
+    });
   } catch (err) {
     req.log.error({ err }, "Erreur listPaiements");
     res.status(500).json({ erreur: "Erreur interne du serveur" });

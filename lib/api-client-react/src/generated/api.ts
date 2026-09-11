@@ -274,6 +274,7 @@ import type {
   NotificationsCount,
   NotificationsResponse,
   PaiementListItem,
+  PaiementsListResponse,
   PaiementsStats,
   PartsMembre,
   PayerBulletinInput,
@@ -10911,9 +10912,9 @@ export const getListPaiementsUrl = (params?: ListPaiementsParams,) => {
 /**
  * @summary Liste des paiements producteurs
  */
-export const listPaiements = async (params?: ListPaiementsParams, options?: RequestInit): Promise<PaiementListItem[]> => {
+export const listPaiements = async (params?: ListPaiementsParams, options?: RequestInit): Promise<PaiementsListResponse> => {
 
-  return customFetch<PaiementListItem[]>(getListPaiementsUrl(params),
+  return customFetch<PaiementsListResponse>(getListPaiementsUrl(params),
   {
     ...options,
     method: 'GET'
