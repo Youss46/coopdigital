@@ -57,6 +57,36 @@ interface LotissementStats {
   poidsNonLoti: number;
 }
 
+export interface StockMovementRow {
+  id: number;
+  entrepotNom: string | null;
+  type: string;
+  poidsKg: string;
+  motif: string | null;
+  createdAt: string;
+  nombreSacs?: number | null;
+  certificationCacao?: string | null;
+}
+
+export async function fetchMouvementsStock(
+  baseUrl: string,
+  token: string,
+  params: URLSearchParams,
+): Promise<StockMovementRow[]> {
+  const normalizedBaseUrl = baseUrl.replace(/\/$/, "");
+  const query = params.toString() ? `?${params.toString()}` : "";
+  const response = await fetch(`${normalizedBaseUrl}/api/stocks/mouvements${query}`, {
+    cache: "no-store",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!response.ok) {
+    throw new Error("Erreur chargement mouvements");
+  }
+
+  return response.json() as Promise<StockMovementRow[]>;
+}
+
 type PeriodeFilter = "all" | "today" | "week" | "month" | "custom";
 
 function getPeriodeDates(periode: PeriodeFilter, customDebut = "", customFin = ""): { date_debut?: string; date_fin?: string } {
@@ -198,17 +228,7 @@ export default function StocksPage() {
       if (periodeDates.date_debut) params.set("date_debut", periodeDates.date_debut);
       if (periodeDates.date_fin) params.set("date_fin", periodeDates.date_fin);
       if (filtreCertification) params.set("certification", filtreCertification);
-      const qs = params.toString() ? `?${params.toString()}` : "";
-       const r = await fetch(`${BASE}/api/stocks/mouvements${qs}`, {
-         cache: "no-store",
-         // Ne pas ajouter Cache-Control à la requête : avec VITE_API_URL
-         // pointant directement vers Railway, cela déclenche un preflight
-         // CORS supplémentaire. Le mode no-store suffit côté navigateur ;
-         // l'API envoie elle-même Cache-Control: no-store en réponse.
-         headers: { Authorization: `Bearer ${tok()}` },
-       });
-      if (!r.ok) throw new Error("Erreur chargement mouvements");
-      return r.json() as Promise<Array<{ id: number; entrepotNom: string | null; type: string; poidsKg: string; motif: string | null; createdAt: string; nombreSacs?: number | null; certificationCacao?: string | null }>>;
+      return fetchMouvementsStock(BASE, tok(), params);
     },
   });
 
