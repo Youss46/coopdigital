@@ -922,7 +922,29 @@ async function deduireStockChargementDansTransaction(
   // Le verrou transactionnel rend la vérification et l'insertion atomiques.
   await tx.execute(sql`SELECT pg_advisory_xact_lock(${cooperativeId}, ${expeditionId})`);
 
-  // Récupérer les lots attachés avec leur entrepôt source et leur poids
+  // Une ancienne expédition peut avoir été créée sans lot technique, alors que
+  // son poids et son lieu de départ sont bien renseignés. Il faut conserver ce
+  // fallback pour pouvoir réparer son stock lors de la réception.
+  const [expedition] = await tx
+    .select({
+      lieuDepart:    expeditionsTable.lieuDepart,
+      poidsChargeKg: expeditionsTable.poidsChargeKg,
+      nombreSacs:    expeditionsTable.nombreSacs,
+    })
+    .from(expeditionsTable)
+    .where(and(
+      eq(expeditionsTable.id, expeditionId),
+      eq(expeditionsTable.cooperativeId, cooperativeId),
+    ))
+    .limit(1);
+
+  if (!expedition) {
+    throw new Error(`Expédition introuvable pour la sortie de stock: ${numeroExpedition}`);
+  }
+
+  // Récupérer les lots attachés avec leur entrepôt source et leur poids.
+  // Ne pas filtrer lot_id ici : les anciennes lignes peuvent n'avoir que le
+  // poids et être réparées depuis lieu_depart.
   const lotsAttaches = await tx
     .select({
       lotId:       expeditionLotsTable.lotId,
@@ -933,12 +955,12 @@ async function deduireStockChargementDansTransaction(
     .from(expeditionLotsTable)
     .leftJoin(lotsTable, eq(lotsTable.id, expeditionLotsTable.lotId))
     .where(
-      and(
-        eq(expeditionLotsTable.expeditionId, expeditionId),
-        sql`${expeditionLotsTable.lotId} IS NOT NULL`,
-      )
+      eq(expeditionLotsTable.expeditionId, expeditionId),
     );
 
+  // Une expédition sans aucune ligne de lot peut représenter un contrôle de
+  // chargement sans effet stock. Le fallback ne s'applique qu'aux anciennes
+  // lignes expedition_lots qui portent bien un poids mais ont perdu lot_id.
   if (lotsAttaches.length === 0) return;
 
   // Regrouper par nom d'entrepôt (un lot → un entrepôt).
@@ -946,9 +968,15 @@ async function deduireStockChargementDansTransaction(
   // entre la fiche du lot et celle de l'entrepôt.
   const parEntrepot = new Map<string, { poidsKg: number; nombreSacs: number; lotId: number | null }>();
   for (const lot of lotsAttaches) {
-    const nom = (lot.entrepotNom ?? "").trim();
     const poids = parseFloat(String(lot.poidsKg ?? "0"));
     if (poids <= 0) continue;
+    // Un lot identifié doit fournir son entrepôt propre. Le fallback sur le
+    // lieu de départ est réservé aux anciennes lignes sans lot_id.
+    const nom = (
+      lot.lotId !== null
+        ? lot.entrepotNom
+        : (lot.entrepotNom ?? expedition.lieuDepart)
+    )?.trim() ?? "";
     if (!nom) {
       throw new Error(`Entrepôt source manquant pour le lot ${lot.lotId ?? "inconnu"}`);
     }
@@ -966,7 +994,12 @@ async function deduireStockChargementDansTransaction(
     }
   }
 
-  if (parEntrepot.size === 0) return;
+  // Une ligne historique peut ne contenir aucun poids exploitable. Dans ce
+  // cas, il n'existe pas de quantité fiable à débiter : conserver le
+  // comportement sans effet plutôt que fabriquer une sortie.
+  if (parEntrepot.size === 0) {
+    return;
+  }
 
   // Résoudre tous les entrepôts avant d'insérer la première sortie. La
   // transaction protège déjà le rollback, mais cette phase de validation

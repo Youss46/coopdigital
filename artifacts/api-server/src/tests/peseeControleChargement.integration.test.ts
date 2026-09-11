@@ -1484,5 +1484,78 @@ describe.skipIf(!enabled)(
       expect(sortie.rows[0].count).toBe(1);
       expect(Number(sortie.rows[0].poids)).toBe(750);
     });
+
+    it("débite le lieu de départ pour une ancienne ligne d'expédition sans lot_id", async () => {
+      await setControleChargementObligatoire(false);
+
+      const id = await createTransitionExpedition(750);
+      const nomEntrepot = `Entrepôt legacy sans lot ${id}`;
+      await client.query(
+        `INSERT INTO entrepots
+          (cooperative_id, nom, ville, capacite_kg)
+         VALUES ($1, $2, 'Test', 5000)`,
+        [cooperativeId, nomEntrepot],
+      );
+      await client.query(
+        `UPDATE expeditions
+            SET lieu_depart = $2
+          WHERE id = $1`,
+        [id, nomEntrepot],
+      );
+      await client.query(
+        `INSERT INTO expedition_lots
+          (expedition_id, poids_kg, nombre_sacs)
+         VALUES ($1, 750, 15)`,
+        [id],
+      );
+
+      await changerStatut(cooperativeId, id, testUserId, "charge");
+      await changerStatut(cooperativeId, id, testUserId, "en_transit");
+      await changerStatut(cooperativeId, id, testUserId, "arrive_port");
+
+      const expedition = await client.query(
+        `SELECT numero_expedition FROM expeditions WHERE id = $1`,
+        [id],
+      );
+      const motif = `Chargement expédition ${expedition.rows[0].numero_expedition}`;
+      const entrepot = await client.query(
+        `SELECT id FROM entrepots WHERE cooperative_id = $1 AND nom = $2`,
+        [cooperativeId, nomEntrepot],
+      );
+
+      const sortie = await client.query(
+        `SELECT count(*)::int AS count, coalesce(sum(poids_kg), 0)::numeric AS poids
+           FROM mouvements_stock
+          WHERE entrepot_id = $1 AND motif = $2`,
+        [entrepot.rows[0].id, motif],
+      );
+      expect(sortie.rows[0]).toEqual({ count: 1, poids: "750.00" });
+
+      // Simule une ancienne expédition réceptionnée sans sortie persistée :
+      // la réparation à la réception doit recréer une seule sortie.
+      await client.query(
+        `DELETE FROM mouvements_stock
+          WHERE entrepot_id = $1 AND motif = $2`,
+        [entrepot.rows[0].id, motif],
+      );
+      await confirmerReception(cooperativeId, id, testUserId, {
+        poidsRecuPortKg: 750,
+        numeroRecepissePort: `REC-LEGACY-${id}`,
+        nomReceptionnaire: "Réception legacy",
+      });
+      await confirmerReception(cooperativeId, id, testUserId, {
+        poidsRecuPortKg: 750,
+        numeroRecepissePort: `REC-LEGACY-${id}`,
+        nomReceptionnaire: "Réception legacy",
+      });
+
+      const sortieApresRejeu = await client.query(
+        `SELECT count(*)::int AS count, coalesce(sum(poids_kg), 0)::numeric AS poids
+           FROM mouvements_stock
+          WHERE entrepot_id = $1 AND motif = $2`,
+        [entrepot.rows[0].id, motif],
+      );
+      expect(sortieApresRejeu.rows[0]).toEqual({ count: 1, poids: "750.00" });
+    });
   },
 );
