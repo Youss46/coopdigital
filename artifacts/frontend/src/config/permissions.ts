@@ -136,6 +136,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     // Corrections d'écritures
     corriger:                 ["pca", "directeur", "comptable"],
     voir_historique_corrections: ["pca", "directeur", "comptable", "auditeur"],
+    voir_anomalies_ia:           ["comptable"],
     importer_balance:           ["pca", "directeur", "comptable"],
     valider_reprise_balance:    ["pca", "directeur", "comptable"],
   },
@@ -148,6 +149,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     voir_etats_financiers:      ["pca", "directeur", "comptable", "auditeur"],
     generer_fiche_membre:       ["pca", "directeur", "delegue"],
     exporter_donnees_bailleurs: ["pca", "directeur", "auditeur"],
+    generer_rapport_ia:         ["pca", "directeur", "comptable", "auditeur"],
   },
 
   communication: {
@@ -196,6 +198,57 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     rapport_change: ["pca", "directeur", "comptable", "auditeur"],
   },
 
+  parts_sociales: {
+    lire:                 ["pca", "directeur", "comptable", "delegue", "auditeur"],
+    enregistrer_versement:["pca", "directeur", "comptable", "delegue"],
+    configurer:           ["pca", "directeur"],
+  },
+
+  emprunts: {
+    voir:       ["pca", "directeur", "comptable", "auditeur"],
+    creer:      ["pca", "directeur"],
+    rembourser: ["pca", "directeur", "comptable"],
+    supprimer:  ["pca"],
+  },
+
+  intrants: {
+    voir:           ["pca", "directeur", "comptable", "delegue", "auditeur", "magasinier"],
+    distribuer:     ["pca", "directeur", "delegue"],
+    approvisionner: ["pca", "directeur", "magasinier"],
+    rembourser:     ["pca", "directeur", "delegue", "comptable"],
+    rapport:        ["pca", "directeur", "comptable", "auditeur"],
+    creer:          ["pca", "directeur", "magasinier"],
+    modifier:       ["pca", "directeur", "magasinier"],
+  },
+
+  parcelles: {
+    voir_carte:        ["pca", "directeur", "responsable_tracabilite", "delegue", "auditeur"],
+    creer_parcelle:    ["pca", "directeur", "delegue", "responsable_tracabilite"],
+    modifier_parcelle: ["pca", "directeur", "delegue", "responsable_tracabilite"],
+    verifier_eudr:     ["pca", "directeur", "responsable_tracabilite", "auditeur"],
+    exporter_geojson:  ["pca", "directeur", "responsable_tracabilite", "auditeur"],
+    importer_zones:    ["pca", "directeur"],
+  },
+
+  dons: {
+    voir:             ["pca", "directeur", "comptable", "auditeur"],
+    creer:            ["pca", "directeur", "comptable"],
+    modifier:         ["pca", "directeur"],
+    valider:          ["pca", "directeur"],
+    annuler:          ["pca", "directeur"],
+    generer_pv:       ["pca", "directeur", "comptable"],
+    voir_stats:       ["pca", "directeur", "comptable", "auditeur"],
+    rapport_ag:       ["pca", "directeur", "comptable"],
+    gerer_programmes: ["pca", "directeur"],
+  },
+
+  rse: {
+    voir:                  ["pca", "directeur", "comptable", "auditeur"],
+    calculer:              ["pca", "directeur"],
+    enregistrer_formation: ["pca", "directeur", "responsable_tracabilite"],
+    generer_rapport:      ["pca", "directeur", "comptable"],
+  },
+
   salaires: {
     lire:                ["pca", "directeur", "comptable", "responsable_rh"],
     creer_personnel:     ["comptable", "responsable_rh"],
@@ -239,31 +292,14 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     traiter: ["pca", "directeur", "magasinier", "responsable_tracabilite"],
   },
 
-  transport: {
-    lire:        ["pca", "directeur", "magasinier", "responsable_logistique", "auditeur"],
-    creer_bon:   ["pca", "directeur", "magasinier"],
-    soumettre:   ["pca", "directeur", "magasinier"],
-    traiter:     ["pca", "directeur", "magasinier"],
-    approuver:   ["pca", "directeur", "magasinier"],
-    utiliser:    ["pca", "directeur", "magasinier"],
-    annuler:     ["pca", "directeur", "magasinier"],
-  },
-
   missions: {
     lire:                ["pca", "directeur", "responsable_tracabilite", "agent_terrain"],
     creer:               ["pca", "directeur", "responsable_tracabilite"],
     modifier:            ["pca", "directeur", "responsable_tracabilite"],
     supprimer:           ["pca", "directeur", "responsable_tracabilite"],
     valider:             ["pca", "directeur", "responsable_tracabilite"],
-    rejeter:             ["pca", "directeur", "responsable_tracabilite"],
     executer:            ["agent_terrain"],
     creer_agent_terrain: ["pca", "directeur", "responsable_tracabilite"],
-  },
-
-  anomalies: {
-    lire:       ["pca", "directeur", "comptable", "auditeur"],
-    traiter:    ["pca", "directeur", "comptable"],
-    configurer: ["pca", "directeur"],
   },
 
   fournisseurs: {
@@ -302,14 +338,6 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     creer: ["pca", "directeur"],
   },
 
-  missions_enquete: {
-    lire:     ["pca", "directeur", "responsable_tracabilite"],
-    creer:    ["pca", "directeur", "responsable_tracabilite"],
-    modifier: ["pca", "directeur", "responsable_tracabilite"],
-    valider:  ["pca", "directeur", "responsable_tracabilite"],
-    supprimer:["pca", "directeur"],
-  },
-
   certifications: {
     lire:              ["pca", "directeur", "responsable_tracabilite"],
     creer:             ["pca", "directeur", "responsable_tracabilite"],
@@ -341,5 +369,64 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     lire:       ["pca", "directeur", "comptable", "auditeur"],
     gerer_taux: ["pca", "directeur", "comptable"],
     payer:      ["pca", "directeur", "comptable"],
+  },
+
+  banque: {
+    voir:            ["pca", "directeur", "comptable", "caissier", "auditeur"],
+    creer:           ["pca", "directeur"],
+    enregistrer_mvt: ["pca", "directeur", "comptable"],
+    rapprocher:      ["pca", "directeur", "comptable"],
+  },
+
+  mobile_marchand: {
+    voir:            ["pca", "directeur", "comptable", "caissier", "auditeur"],
+    creer:           ["pca", "directeur"],
+    enregistrer_mvt: ["pca", "directeur", "comptable", "caissier"],
+  },
+
+  caisse: {
+    voir:            ["pca", "directeur", "comptable", "caissier", "auditeur", "delegue"],
+    ouvrir_session:  ["pca", "directeur", "comptable", "caissier", "delegue"],
+    enregistrer_mvt: ["pca", "directeur", "comptable", "caissier", "delegue"],
+    fermer_session:  ["pca", "directeur", "comptable", "caissier", "delegue"],
+    creer_caisse:    ["pca", "directeur"],
+    voir_alertes:    ["pca", "directeur", "comptable", "caissier", "delegue"],
+  },
+
+  reconciliation: {
+    voir:        ["pca", "directeur", "comptable", "auditeur"],
+    importer:    ["pca", "directeur", "comptable"],
+    reconcilier: ["pca", "directeur", "comptable"],
+  },
+
+  investissements: {
+    voir:     ["pca", "directeur", "comptable", "auditeur"],
+    creer:    ["pca", "directeur"],
+    depenser: ["pca", "directeur", "comptable"],
+  },
+
+  support: {
+    creer_ticket: ["pca", "directeur", "comptable", "delegue", "responsable_tracabilite"],
+    voir_tickets: ["pca", "directeur", "comptable", "delegue", "responsable_tracabilite"],
+  },
+
+  fiscalite: {
+    voir:       ["pca", "directeur", "comptable", "auditeur"],
+    generer:    ["pca", "directeur", "comptable"],
+    payer:      ["pca", "directeur", "comptable"],
+    configurer: ["pca", "directeur"],
+  },
+
+  planning_collecte: {
+    voir:         ["pca", "directeur", "comptable", "responsable_tracabilite", "auditeur"],
+    planifier:    ["pca", "directeur", "responsable_tracabilite"],
+    notifier_sms: ["pca", "directeur"],
+    terminer:     ["pca", "directeur", "responsable_tracabilite", "delegue"],
+    gerer_zones:  ["pca", "directeur"],
+  },
+
+  entrepots_delegues: {
+    lire:  ["pca", "directeur", "responsable_logistique", "auditeur"],
+    gerer: ["pca", "directeur"],
   },
 };

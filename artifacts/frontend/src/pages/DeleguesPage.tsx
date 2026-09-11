@@ -119,6 +119,9 @@ export default function DeleguesPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const peutGererTaux = usePermission("commissions_delegues", "gerer_taux");
+  const peutOctroyerAvance = usePermission("avances", "octroyer");
+  const peutRembourserAvance = usePermission("avances", "rembourser");
+  const peutModifierPlanAvance = usePermission("avances", "modifier_plan");
   const peutAnnulerAvance = usePermission("avances", "annuler");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showAppro, setShowAppro] = useState<number | null>(null);
@@ -871,7 +874,7 @@ export default function DeleguesPage() {
                 <option value="">— Sélectionner un délégué —</option>
                 {delegues.map((d) => <option key={d.id} value={d.id}>{d.nom} {d.prenoms}{d.section ? ` — ${d.section}` : ""}</option>)}
               </select>
-              {avDelegueId && (
+              {avDelegueId && peutOctroyerAvance && (
                 <button
                   onClick={() => setShowOctroiForm(true)}
                   style={{ padding: "8px 18px", borderRadius: 8, border: "none", background: "#2563eb", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: ".88rem" }}
@@ -953,13 +956,13 @@ export default function DeleguesPage() {
                             <td style={{ padding: "10px 14px" }}>
                               {a.statut !== "rembourse" && a.statut !== "annulee" && a.statut !== "cloturee" && (
                                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                                  <button
+                                  {peutRembourserAvance && <button
                                     onClick={() => { setShowRembModal({ avanceId: a.id, solde: a.soldeRestantFcfa }); setRembMontant(String(a.soldeRestantFcfa)); }}
                                     style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #d1d5db", background: "#fff", fontWeight: 600, cursor: "pointer", fontSize: ".8rem" }}
                                   >
                                     Rembourser
-                                  </button>
-                                  <button
+                                  </button>}
+                                  {peutModifierPlanAvance && <button
                                     onClick={() => {
                                       setShowPlanModal({ avanceId: a.id });
                                       setEditPlan({ planType: a.planType, montantPartiel: a.montantPartielFcfa ? String(a.montantPartielFcfa) : "", reportDate: a.reportDate ?? "" });
@@ -967,7 +970,7 @@ export default function DeleguesPage() {
                                     style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #d1d5db", background: "#f9fafb", fontWeight: 600, cursor: "pointer", fontSize: ".8rem" }}
                                   >
                                     Plan
-                                  </button>
+                                  </button>}
                                   {peutAnnulerAvance && a.montantRembourse === 0 && (
                                     <button onClick={() => { setShowTerminalModal({ avanceId: a.id, action: "annuler" }); setTerminalMotif(""); }} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #dc2626", color: "#dc2626", background: "#fff", fontWeight: 600, cursor: "pointer", fontSize: ".8rem" }}>Annuler</button>
                                   )}

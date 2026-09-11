@@ -12,7 +12,7 @@ import {
   Avance,
 } from "@workspace/api-client-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { PlusCircle, TrendingDown, Banknote, Clock, FileDown, CloudOff, HandCoins, Loader2, Check, Settings2, History, User, X, AlertTriangle } from "lucide-react";
+import { PlusCircle, TrendingDown, Banknote, Clock, FileDown, CloudOff, HandCoins, Loader2, Check, Settings2, History, User, X, AlertTriangle, Ban } from "lucide-react";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { usePermission } from "@/hooks/usePermission";
@@ -77,12 +77,16 @@ export default function Avances() {
   const queryClient = useQueryClient();
   const peutOctroyer = usePermission("avances", "octroyer");
   const peutRembourser = usePermission("avances", "rembourser");
+  const peutModifierPlan = usePermission("avances", "modifier_plan");
+  const peutAnnuler = usePermission("avances", "annuler");
   const [modalOuvert, setModalOuvert] = useState(false);
   const [filtreStatut, setFiltreStatut] = useState<"" | "en_cours" | "rembourse" | "en_retard">("");
   const [filtreProxy, setFiltreProxy] = useState(false);
   const [modalRemboursement, setModalRemboursement] = useState<{ id: number; solde: number; nom: string } | null>(null);
   const [montantRemboursement, setMontantRemboursement] = useState("");
   const [planTarget, setPlanTarget] = useState<Avance | null>(null);
+  const [terminalTarget, setTerminalTarget] = useState<{ id: number; nom: string; action: "annuler" | "cloturer" } | null>(null);
+  const [motifTerminal, setMotifTerminal] = useState("");
   const [notifHorsLigne, setNotifHorsLigne] = useState<string | null>(null);
   const [filtreReportees, setFiltreReportees] = useState(false);
 
@@ -178,6 +182,25 @@ export default function Avances() {
         queryClient.invalidateQueries({ queryKey: getGetAvancesQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetAvancesEncoursQueryKey() });
       },
+    },
+  });
+
+  const mutationTerminal = useMutation({
+    mutationFn: async ({ id, action, motif }: { id: number; action: "annuler" | "cloturer"; motif: string }) => {
+      const token = localStorage.getItem("coop_token") ?? "";
+      const response = await fetch(`${BASE}/api/avances/${id}/${action === "annuler" ? "annuler" : "cloturer-solde"}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ motif }),
+      });
+      const payload = await response.json().catch(() => null) as { erreur?: string } | null;
+      if (!response.ok) throw new Error(payload?.erreur ?? "Impossible de terminer cette avance");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: getGetAvancesQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetAvancesEncoursQueryKey() });
+      setTerminalTarget(null);
+      setMotifTerminal("");
     },
   });
 
@@ -446,18 +469,18 @@ export default function Avances() {
                     </td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-2">
-                        {peutRembourser && statut !== "annulee" && statut !== "cloturee" && (
+                        {(peutModifierPlan || peutRembourser) && statut !== "annulee" && statut !== "cloturee" && (
                           <>
-                            <button
+                            {peutModifierPlan && <button
                               onClick={() => setPlanTarget(a)}
                               className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
                               title="Configurer le plan de déduction"
                             >
                               <Settings2 size={13} /> Plan
-                            </button>
-                            {statut !== "rembourse" && a.soldeRestantFcfa > 0 && (
+                            </button>}
+                            {peutRembourser && statut !== "rembourse" && a.soldeRestantFcfa > 0 && (
                               <>
-                                <span className="text-gray-200">|</span>
+                                {peutModifierPlan && <span className="text-gray-200">|</span>}
                                 <button
                                   onClick={() => ouvrirRemboursement(a.id, a.soldeRestantFcfa, `${a.membreNom ?? ""} ${a.membrePrenoms ?? ""}`)}
                                   className="text-xs text-green-700 hover:text-green-900 font-medium"
@@ -467,6 +490,24 @@ export default function Avances() {
                               </>
                             )}
                           </>
+                        )}
+                        {peutAnnuler && statut !== "annulee" && statut !== "cloturee" && a.montantRembourseFcfa === 0 && (
+                          <button
+                            onClick={() => { setTerminalTarget({ id: a.id, nom: `${a.membreNom ?? ""} ${a.membrePrenoms ?? ""}`.trim(), action: "annuler" }); setMotifTerminal(""); }}
+                            className="flex items-center gap-1 text-xs text-red-600 hover:text-red-800"
+                            title="Annuler l'avance"
+                          >
+                            <Ban size={13} /> Annuler
+                          </button>
+                        )}
+                        {peutAnnuler && statut !== "annulee" && statut !== "cloturee" && a.montantRembourseFcfa > 0 && a.soldeRestantFcfa > 0 && (
+                          <button
+                            onClick={() => { setTerminalTarget({ id: a.id, nom: `${a.membreNom ?? ""} ${a.membrePrenoms ?? ""}`.trim(), action: "cloturer" }); setMotifTerminal(""); }}
+                            className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800"
+                            title="Clôturer le solde restant"
+                          >
+                            <Ban size={13} /> Clôturer
+                          </button>
                         )}
                         <button
                           title="Télécharger le reçu"
@@ -786,6 +827,64 @@ export default function Avances() {
                   {mutationRembourser.isPending && <Loader2 size={16} className="animate-spin motion-reduce:animate-none" />}
                   {mutationRembourser.isSuccess && !mutationRembourser.isPending && <Check size={16} />}
                   {mutationRembourser.isPending ? "Enregistrement…" : mutationRembourser.isError ? "Réessayer" : "Confirmer"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal annulation/clôture d'une avance */}
+      {terminalTarget && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm animate-in zoom-in-95 fade-in slide-in-from-bottom-2 duration-200 motion-reduce:animate-none">
+            <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-bold text-gray-900">
+                {terminalTarget.action === "annuler" ? "Annuler une avance" : "Clôturer le solde"}
+              </h3>
+              <button onClick={() => setTerminalTarget(null)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <p className="text-sm text-gray-600">
+                Membre : <span className="font-semibold text-gray-900">{terminalTarget.nom || "—"}</span>
+              </p>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Motif *</label>
+                <textarea
+                  value={motifTerminal}
+                  onChange={(event) => setMotifTerminal(event.target.value)}
+                  rows={3}
+                  maxLength={500}
+                  placeholder={terminalTarget.action === "annuler" ? "Motif de l'annulation" : "Motif de la clôture du solde"}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 resize-none"
+                />
+              </div>
+              {mutationTerminal.isError && (
+                <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+                  {(mutationTerminal.error as Error).message}
+                </p>
+              )}
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setTerminalTarget(null)}
+                  className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Retour
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const motif = motifTerminal.trim();
+                    if (!motif) return;
+                    mutationTerminal.mutate({ ...terminalTarget, motif });
+                  }}
+                  disabled={mutationTerminal.isPending || !motifTerminal.trim()}
+                  className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-60 flex items-center justify-center gap-2"
+                  style={{ backgroundColor: terminalTarget.action === "annuler" ? "#b91c1c" : "#4338ca" }}
+                >
+                  {mutationTerminal.isPending && <Loader2 size={16} className="animate-spin" />}
+                  {mutationTerminal.isPending ? "Enregistrement…" : "Confirmer"}
                 </button>
               </div>
             </div>

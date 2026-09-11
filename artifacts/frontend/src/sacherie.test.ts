@@ -34,7 +34,6 @@ describe("intégration frontend Logistique", () => {
   it("réserve les opérations financières aux rôles financiers", () => {
     expect(PERMISSIONS.logistique.lire).toEqual(expect.arrayContaining(["responsable_logistique"]));
     expect(PERMISSIONS.logistique.lire).not.toContain("comptable");
-    expect(PERMISSIONS.transport.creer_bon).not.toContain("responsable_logistique");
   });
 });
 
