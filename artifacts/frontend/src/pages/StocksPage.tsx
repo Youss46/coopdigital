@@ -48,7 +48,9 @@ function formaterDate(d: string) {
 }
 function formaterPoids(kg: string | number) {
   const v = parseFloat(String(kg));
-  return v >= 1000 ? `${(v / 1000).toFixed(2)} T` : `${v.toFixed(1)} kg`;
+  return `${new Intl.NumberFormat("fr-FR", {
+    maximumFractionDigits: 3,
+  }).format(v)} kg`;
 }
 
 interface LotissementStats {
