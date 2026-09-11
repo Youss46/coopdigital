@@ -666,7 +666,13 @@ export async function annulerBrouillon(localId: string): Promise<void> {
 export async function markBrouillonSynced(localId: string, serverId: number, numeroSession: string): Promise<void> {
   const brouillon = await getBrouillon(localId);
   if (!brouillon) return;
-  await saveBrouillon({ ...brouillon, syncStatus: "synced", serverId, numeroSession });
+  await saveBrouillon({
+    ...brouillon,
+    syncStatus: "synced",
+    serverId,
+    numeroSession,
+    errorMsg: undefined,
+  });
 }
 
 export async function markBrouillonError(localId: string, errorMsg: string): Promise<void> {
@@ -678,7 +684,11 @@ export async function markBrouillonError(localId: string, errorMsg: string): Pro
 /** Retourne les brouillons terminés et non encore synchronisés. */
 export async function getPendingBrouillons(): Promise<BrouillonPesee[]> {
   const all = await getBrouillons();
-  return all.filter((b) => b.statut === "terminee" && b.syncStatus === "pending");
+  // Une erreur de synchronisation reste affichée à l'utilisateur, mais le
+  // brouillon doit rester sélectionnable au prochain retour du réseau.
+  return all.filter((b) =>
+    b.statut === "terminee" && (b.syncStatus === "pending" || b.syncStatus === "error"),
+  );
 }
 
 // ─── Cache missions d'enquête ──────────────────────────────────────────────────

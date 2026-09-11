@@ -129,8 +129,10 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
             await markBrouillonSynced(brouillon.localId, result.sessionId, result.numeroSession);
             nbSucces++;
           } catch (err) {
-            await markBrouillonError(brouillon.localId, (err as Error).message);
+            const erreur = err instanceof Error ? err.message : "Erreur de synchronisation";
+            await markBrouillonError(brouillon.localId, erreur);
             nbEchecs++;
+            erreurs.push(erreur);
           }
         }
       }
