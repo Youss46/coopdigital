@@ -231,6 +231,16 @@
           "name": "avances_delegues_terminal_metadata_check"
         }
       ]
+    },
+    {
+      "migration": "0172_annuler_lots",
+      "objects": [
+        {
+          "kind": "table",
+          "schema": "public",
+          "table": "lots"
+        }
+      ]
     }
   ]
 }
