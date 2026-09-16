@@ -2,7 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { LotTracabilite } from "@workspace/api-client-react";
-import { construireExportEudr, DetailModal, obtenirFuseauHoraireLocal } from "./TracabilitePage";
+import {
+  construireExportEudr,
+  DetailModal,
+  doitMasquerStatutTransit,
+  obtenirFuseauHoraireLocal,
+} from "./TracabilitePage";
 
 const { useGetLotTracabiliteMock } = vi.hoisted(() => ({
   useGetLotTracabiliteMock: vi.fn(),
@@ -135,6 +140,19 @@ describe("export EUDR de la traçabilité", () => {
       "2026-09-10T09:00:00.000Z",
       "2026-09-10T14:30:00.000Z",
     ]);
+  });
+});
+
+describe("affichage du statut d'expédition", () => {
+  it("masque le statut En transit du lot lorsqu'il est chargé ou réceptionné au port", () => {
+    expect(doitMasquerStatutTransit("transit", "charge")).toBe(true);
+    expect(doitMasquerStatutTransit("transit", "receptionne")).toBe(true);
+  });
+
+  it("conserve En transit pour les autres statuts", () => {
+    expect(doitMasquerStatutTransit("transit", "en_transit")).toBe(false);
+    expect(doitMasquerStatutTransit("transit", "en_preparation")).toBe(false);
+    expect(doitMasquerStatutTransit("en_stock", "charge")).toBe(false);
   });
 });
 

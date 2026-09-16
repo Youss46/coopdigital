@@ -72,6 +72,13 @@ function formaterMontant(v: number) {
   return new Intl.NumberFormat("fr-FR").format(v) + " FCFA";
 }
 
+export function doitMasquerStatutTransit(
+  statutLot: string | null | undefined,
+  statutExpedition: string | null | undefined,
+) {
+  return statutLot === "transit" && (statutExpedition === "charge" || statutExpedition === "receptionne");
+}
+
 export function construireExportEudr(data: LotTracabilite) {
   const coop = data.membres[0] as unknown as Record<string, unknown> | undefined;
   return {
@@ -495,7 +502,9 @@ export function DetailModal({
                         <Download size={14} />
                       </button>
                     </div>
-                    <StatutTimeline statut={statut ?? "en_stock"} />
+                    {!doitMasquerStatutTransit(statut, data.lot.expeditionStatut) && (
+                      <StatutTimeline statut={statut ?? "en_stock"} />
+                    )}
                     {data.lot.expeditionStatut && (
                       <div className="mt-2 flex items-center gap-2 flex-wrap">
                         <span
@@ -1481,13 +1490,15 @@ export default function TracabilitePage() {
                           {formaterDate(lot.dateCreation)}
                         </td>
                         <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                              STATUT_COLORS[lot.statut] ?? ""
-                            }`}
-                          >
-                            {STATUT_LABELS[lot.statut]}
-                          </span>
+                           {!doitMasquerStatutTransit(lot.statut, lot.expeditionStatut) && (
+                             <span
+                               className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                 STATUT_COLORS[lot.statut] ?? ""
+                               }`}
+                             >
+                               {STATUT_LABELS[lot.statut]}
+                             </span>
+                           )}
                       {lot.expeditionStatut && (
                         <div className="mt-1 flex flex-wrap items-center gap-1">
                           <span
