@@ -1,0 +1,1 @@
+ALTER TYPE lot_statut ADD VALUE IF NOT EXISTS 'annule';

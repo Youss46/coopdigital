@@ -594,14 +594,14 @@ export const GetDashboardAvancesRetardResponse = zod.array(GetDashboardAvancesRe
  * @summary Liste des lots
  */
 export const GetLotsQueryParams = zod.object({
-  "statut": zod.enum(['en_stock', 'vendu', 'transit', 'refoule', 'fusionne']).optional()
+  "statut": zod.enum(['en_stock', 'vendu', 'transit', 'refoule', 'fusionne', 'annule']).optional()
 })
 
 export const GetLotsResponseItem = zod.object({
   "id": zod.number(),
   "cooperativeId": zod.number(),
   "qrCodeLot": zod.string(),
-  "statut": zod.enum(['en_stock', 'vendu', 'transit', 'refoule', 'fusionne']),
+  "statut": zod.enum(['en_stock', 'vendu', 'transit', 'refoule', 'fusionne', 'annule']),
   "venteExportateurId": zod.number().nullish(),
   "parentLotIds": zod.array(zod.number()).nullish(),
   "poidsTotalKg": zod.string(),
@@ -644,7 +644,7 @@ export const GetLotByQrResponse = zod.object({
   "id": zod.number(),
   "cooperativeId": zod.number(),
   "qrCodeLot": zod.string(),
-  "statut": zod.enum(['en_stock', 'vendu', 'transit', 'refoule', 'fusionne']),
+  "statut": zod.enum(['en_stock', 'vendu', 'transit', 'refoule', 'fusionne', 'annule']),
   "venteExportateurId": zod.number().nullish(),
   "parentLotIds": zod.array(zod.number()).nullish(),
   "poidsTotalKg": zod.string(),
@@ -669,7 +669,7 @@ export const UpdateLotStatutParams = zod.object({
 })
 
 export const UpdateLotStatutBody = zod.object({
-  "statut": zod.enum(['en_stock', 'vendu', 'transit', 'refoule', 'fusionne']),
+  "statut": zod.enum(['en_stock', 'vendu', 'transit', 'refoule', 'fusionne', 'annule']),
   "venteExportateurId": zod.number().nullish()
 })
 
@@ -677,7 +677,7 @@ export const UpdateLotStatutResponse = zod.object({
   "id": zod.number(),
   "cooperativeId": zod.number(),
   "qrCodeLot": zod.string(),
-  "statut": zod.enum(['en_stock', 'vendu', 'transit', 'refoule', 'fusionne']),
+  "statut": zod.enum(['en_stock', 'vendu', 'transit', 'refoule', 'fusionne', 'annule']),
   "venteExportateurId": zod.number().nullish(),
   "parentLotIds": zod.array(zod.number()).nullish(),
   "poidsTotalKg": zod.string(),
@@ -722,7 +722,7 @@ export const ExpedierLotResponse = zod.object({
   "id": zod.number(),
   "cooperativeId": zod.number(),
   "qrCodeLot": zod.string(),
-  "statut": zod.enum(['en_stock', 'vendu', 'transit', 'refoule', 'fusionne']),
+  "statut": zod.enum(['en_stock', 'vendu', 'transit', 'refoule', 'fusionne', 'annule']),
   "venteExportateurId": zod.number().nullish(),
   "parentLotIds": zod.array(zod.number()).nullish(),
   "poidsTotalKg": zod.string(),
@@ -751,7 +751,7 @@ export const GetLotTracabiliteResponse = zod.object({
   "id": zod.number(),
   "cooperativeId": zod.number(),
   "qrCodeLot": zod.string(),
-  "statut": zod.enum(['en_stock', 'vendu', 'transit', 'refoule', 'fusionne']),
+  "statut": zod.enum(['en_stock', 'vendu', 'transit', 'refoule', 'fusionne', 'annule']),
   "venteExportateurId": zod.number().nullish(),
   "parentLotIds": zod.array(zod.number()).nullish(),
   "poidsTotalKg": zod.string(),

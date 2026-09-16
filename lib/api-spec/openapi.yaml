@@ -481,7 +481,7 @@ paths:
       parameters:
         - name: statut
           in: query
-          schema: { type: string, enum: [en_stock, vendu, transit, refoule, fusionne] }
+          schema: { type: string, enum: [en_stock, vendu, transit, refoule, fusionne, annule] }
       responses:
         "200":
           description: Liste des lots
@@ -8420,7 +8420,7 @@ components:
           type: string
         statut:
           type: string
-          enum: [en_stock, vendu, transit, refoule, fusionne]
+          enum: [en_stock, vendu, transit, refoule, fusionne, annule]
         venteExportateurId:
           type: ["integer", "null"]
         parentLotIds:
@@ -8486,7 +8486,7 @@ components:
       properties:
         statut:
           type: string
-          enum: [en_stock, vendu, transit, refoule, fusionne]
+          enum: [en_stock, vendu, transit, refoule, fusionne, annule]
         venteExportateurId:
           type: ["integer", "null"]
 

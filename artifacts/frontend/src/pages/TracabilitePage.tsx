@@ -117,6 +117,7 @@ const STATUT_COLORS: Record<string, string> = {
   transit: "bg-amber-100 text-amber-700",
   refoule: "bg-red-100 text-red-700",
   fusionne: "bg-gray-100 text-gray-500",
+  annule: "bg-gray-100 text-gray-500",
 };
 const STATUT_LABELS: Record<string, string> = {
   en_stock: "En stock",
@@ -124,6 +125,7 @@ const STATUT_LABELS: Record<string, string> = {
   transit: "En transit",
   refoule: "Refoulé",
   fusionne: "Fusionné",
+  annule: "Annulé",
 };
 const STATUT_ORDER = ["en_stock", "transit", "vendu"];
 
@@ -161,7 +163,7 @@ const RECEPTION_STATUT_COLORS: Record<string, string> = {
   litige: "bg-red-100 text-red-700",
 };
 
-type LotStatut = "en_stock" | "transit" | "vendu" | "refoule" | "fusionne";
+type LotStatut = "en_stock" | "transit" | "vendu" | "refoule" | "fusionne" | "annule";
 
 function StatutTimeline({ statut }: { statut: LotStatut }) {
   if (statut === "refoule") {
@@ -177,6 +179,14 @@ function StatutTimeline({ statut }: { statut: LotStatut }) {
       <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-100 border border-gray-200 rounded-full w-fit">
         <Merge size={11} className="text-gray-500" />
         <span className="text-xs font-medium text-gray-500">Fusionné (archivé)</span>
+      </div>
+    );
+  }
+  if (statut === "annule") {
+    return (
+      <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-100 border border-gray-200 rounded-full w-fit">
+        <X size={11} className="text-gray-500" />
+        <span className="text-xs font-medium text-gray-500">Annulé — livraisons libérées</span>
       </div>
     );
   }
@@ -569,6 +579,16 @@ export function DetailModal({
                       </button>
                     )}
 
+                    {/* Annuler et libérer les livraisons — uniquement si EN STOCK */}
+                    {statut === "en_stock" && !confirmStatut && (
+                      <button
+                        onClick={() => setConfirmStatut("annule")}
+                        className="flex items-center gap-1.5 px-3 py-1.5 border border-red-300 text-red-700 text-xs font-medium rounded-lg hover:bg-red-50"
+                      >
+                        <X size={13} /> Annuler le lot
+                      </button>
+                    )}
+
                     {/* Passer EN TRANSIT (si pas de vente exportateur disponible) via statut classique */}
                     {statut === "en_stock" && prochainStatut("en_stock") && !confirmStatut && (
                       <button
@@ -585,6 +605,8 @@ export function DetailModal({
                         <p className="text-sm text-amber-800 flex-1">
                           {confirmStatut === "refoule"
                             ? "Confirmer le signalement de refus ?"
+                            : confirmStatut === "annule"
+                            ? "Annuler ce lot et libérer ses livraisons ?"
                             : `Passer ce lot en ${STATUT_LABELS[confirmStatut]} ?`}
                         </p>
                         <button
@@ -1156,7 +1178,23 @@ export default function TracabilitePage() {
 
   const mutStatut = useUpdateLotStatut({
     mutation: {
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetLotsQueryKey() }),
+      onSuccess: (_data, variables) => {
+        queryClient.invalidateQueries({ queryKey: getGetLotsQueryKey() });
+        if (variables.data.statut === "annule") {
+          queryClient.invalidateQueries({ queryKey: getGetLivraisonsNonLoteesQueryKey() });
+          toast({
+            title: "Lot annulé",
+            description: "Le lot est conservé dans l’historique et ses livraisons sont de nouveau disponibles.",
+          });
+        }
+      },
+      onError: (err) => {
+        const msg =
+          (err as { data?: { erreur?: string } } | null)?.data?.erreur ??
+          (err as Error | null)?.message ??
+          "Impossible de modifier le statut du lot";
+        toast({ title: "Erreur", description: msg, variant: "destructive" });
+      },
     },
   });
 
@@ -1286,6 +1324,7 @@ export default function TracabilitePage() {
     transit: lots.filter((l) => l.statut === "transit").length,
     vendu: lots.filter((l) => l.statut === "vendu").length,
     refoule: lots.filter((l) => l.statut === "refoule").length,
+    annule: lots.filter((l) => l.statut === "annule").length,
     poidsTotal: lots.reduce((s, l) => s + parseFloat(l.poidsTotalKg ?? "0"), 0),
   };
 
@@ -1308,12 +1347,13 @@ export default function TracabilitePage() {
 
       {/* Stats */}
       {lots.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
           {[
             { label: "En stock", value: statsLots.en_stock, color: "text-emerald-700", bg: "bg-emerald-50" },
             { label: "En transit", value: statsLots.transit, color: "text-amber-700", bg: "bg-amber-50" },
             { label: "Vendus", value: statsLots.vendu, color: "text-blue-700", bg: "bg-blue-50" },
             { label: "Refoulés", value: statsLots.refoule, color: "text-red-700", bg: "bg-red-50" },
+            { label: "Annulés", value: statsLots.annule, color: "text-gray-600", bg: "bg-gray-50" },
             { label: "Poids total", value: formaterPoids(statsLots.poidsTotal), color: "text-gray-700", bg: "bg-gray-50" },
           ].map((s) => (
             <div key={s.label} className={`${s.bg} rounded-xl px-4 py-3`}>
@@ -1348,7 +1388,7 @@ export default function TracabilitePage() {
         <div className="space-y-4">
           {/* Filtres statut */}
           <div className="flex gap-2 flex-wrap">
-            {(["", "en_stock", "transit", "vendu", "refoule", "fusionne"] as const).map((s) => (
+            {(["", "en_stock", "transit", "vendu", "refoule", "fusionne", "annule"] as const).map((s) => (
               <button
                 key={s}
                 onClick={() => setFiltreStatut(s)}

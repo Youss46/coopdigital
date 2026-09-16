@@ -27,3 +27,11 @@ migrations.forEach(m => console.log(m.hash));
 
 La logique de saut: une migration est SKIPPÉE si `lastMigration.created_at >= migration.folderMillis`.
 Donc un seul enregistrement avec `created_at` = timestamp de la dernière migration appliquée suffit pour skipper toutes les précédentes.
+
+## Validation locale après ajout d'une migration
+
+Après l'ajout d'une migration, la base de développement doit l'avoir reçue avant d'exécuter directement les tests d'intégration ou une instance API déjà démarrée.
+
+**Why:** Les tests peuvent atteindre la base avant le démarrage suivant de l'API, alors que l'API applique les migrations au lancement; les nouveaux enums ou colonnes provoquent alors des erreurs SQL trompeuses.
+
+**How to apply:** Appliquer la migration de développement avec le script Drizzle du projet, puis relancer le test ciblé et redémarrer le workflow API si nécessaire.

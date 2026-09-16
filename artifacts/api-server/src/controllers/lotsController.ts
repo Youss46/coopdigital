@@ -24,6 +24,8 @@ import {
   getLotExpeditionSummary,
 } from "../services/expeditionsService.js";
 
+class LotAnnulationError extends Error {}
+
 const livraisonSelect = {
   id: livraisonsTable.id,
   membreId: livraisonsTable.membreId,
@@ -88,7 +90,7 @@ export async function listLots(req: Request, res: Response): Promise<void> {
 
     const conditions: ReturnType<typeof eq>[] = [eq(lotsTable.cooperativeId, cooperativeId)];
     if (statut) {
-      const statuts = statut.split(",").map(s => s.trim()).filter(Boolean) as ("en_stock" | "vendu" | "transit" | "refoule" | "fusionne")[];
+      const statuts = statut.split(",").map(s => s.trim()).filter(Boolean) as ("en_stock" | "vendu" | "transit" | "refoule" | "fusionne" | "annule")[];
       if (statuts.length === 1) {
         conditions.push(eq(lotsTable.statut, statuts[0]!));
       } else if (statuts.length > 1) {
@@ -557,6 +559,61 @@ export async function updateLotStatut(req: Request, res: Response): Promise<void
   }
 
   try {
+    if (parse.data.statut === "annule") {
+      const lot = await db.transaction(async (tx) => {
+        const [currentLot] = await tx
+          .select({
+            id: lotsTable.id,
+            statut: lotsTable.statut,
+          })
+          .from(lotsTable)
+          .where(and(
+            eq(lotsTable.id, id),
+            eq(lotsTable.cooperativeId, cooperativeId),
+          ))
+          .for("update")
+          .limit(1);
+
+        if (!currentLot) return null;
+        if (currentLot.statut !== "en_stock") {
+          throw new LotAnnulationError("Seuls les lots en stock peuvent être annulés");
+        }
+
+        const [expeditionLink] = await tx
+          .select({ expeditionId: expeditionLotsTable.expeditionId })
+          .from(expeditionLotsTable)
+          .innerJoin(expeditionsTable, eq(expeditionsTable.id, expeditionLotsTable.expeditionId))
+          .where(and(
+            eq(expeditionLotsTable.lotId, id),
+            eq(expeditionsTable.cooperativeId, cooperativeId),
+          ))
+          .limit(1);
+
+        if (expeditionLink) {
+          throw new LotAnnulationError("Impossible d'annuler un lot déjà lié à une expédition");
+        }
+
+        await tx
+          .delete(lotLivraisonsTable)
+          .where(eq(lotLivraisonsTable.lotId, id));
+
+        const [updatedLot] = await tx
+          .update(lotsTable)
+          .set({ statut: "annule", venteExportateurId: null })
+          .where(eq(lotsTable.id, id))
+          .returning();
+
+        return updatedLot ?? null;
+      });
+
+      if (!lot) {
+        res.status(404).json({ erreur: "Lot non trouvé" });
+        return;
+      }
+      res.json({ ...lot, nbLivraisons: 0, nbProducteurs: 0 });
+      return;
+    }
+
     const lot = await corrigerStatutLotAvecHistoriqueExpedition(
       cooperativeId,
       id,
@@ -571,6 +628,10 @@ export async function updateLotStatut(req: Request, res: Response): Promise<void
     }
     res.json({ ...lot, nbLivraisons: 0, nbProducteurs: 0 });
   } catch (err) {
+    if (err instanceof LotAnnulationError) {
+      res.status(409).json({ erreur: err.message });
+      return;
+    }
     req.log.error({ err }, "Erreur updateLotStatut");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }

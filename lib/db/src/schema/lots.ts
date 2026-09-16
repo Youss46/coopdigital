@@ -5,7 +5,7 @@ import { cooperativesTable } from "./cooperatives";
 import { livraisonsTable } from "./livraisons";
 import { campagnesTable } from "./campagnes";
 
-export const lotStatutEnum = pgEnum("lot_statut", ["en_stock", "vendu", "transit", "refoule", "fusionne"]);
+export const lotStatutEnum = pgEnum("lot_statut", ["en_stock", "vendu", "transit", "refoule", "fusionne", "annule"]);
 
 export const lotsTable = pgTable("lots", {
   id: serial("id").primaryKey(),

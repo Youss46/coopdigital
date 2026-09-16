@@ -1399,6 +1399,7 @@ export const LotDetailStatut = {
   transit: 'transit',
   refoule: 'refoule',
   fusionne: 'fusionne',
+  annule: 'annule',
 } as const;
 
 export type LotDetailExpeditionStatut = typeof LotDetailExpeditionStatut[keyof typeof LotDetailExpeditionStatut] | null;
@@ -1460,6 +1461,7 @@ export const LotStatutInputStatut = {
   transit: 'transit',
   refoule: 'refoule',
   fusionne: 'fusionne',
+  annule: 'annule',
 } as const;
 
 export interface LotStatutInput {
@@ -5469,6 +5471,7 @@ export const GetLotsStatut = {
   transit: 'transit',
   refoule: 'refoule',
   fusionne: 'fusionne',
+  annule: 'annule',
 } as const;
 
 export type GetMouvementsStockParams = {
