@@ -78,10 +78,19 @@ function decimal(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function normalizedLabel(value: unknown): string {
+  return clean(value)
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
 function findSheet(workbook: XLSX.WorkBook, text: string): XLSX.WorkSheet {
-  const normalized = text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+  const normalized = normalizedLabel(text);
   const name = workbook.SheetNames.find((candidate) => {
-    const current = candidate.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+    const current = normalizedLabel(candidate);
     return current.includes(normalized);
   });
   if (!name) throw new Error(`Onglet introuvable : ${text}`);
@@ -92,81 +101,179 @@ function tableRows(sheet: XLSX.WorkSheet): unknown[][] {
   return XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: null }) as unknown[][];
 }
 
-export function parseMembresImportWorkbook(buffer: Buffer): ImportRow[] {
-  const workbook = XLSX.read(buffer, { type: "buffer", raw: false, cellDates: false });
-  const members = tableRows(findSheet(workbook, "exploitation agricole"));
-  const units = tableRows(findSheet(workbook, "unité agricole"));
+function columnIndex(header: unknown[], ...labels: string[]): number {
+  const normalizedLabels = labels.map(normalizedLabel);
+  return header.findIndex((value) => normalizedLabels.includes(normalizedLabel(value)));
+}
 
+function parseSexe(value: unknown): "M" | "F" | null {
+  const sexeValue = normalizedLabel(value);
+  if (["hommes", "homme", "masculin", "m"].includes(sexeValue)) return "M";
+  if (["femmes", "femme", "feminin", "f"].includes(sexeValue)) return "F";
+  return null;
+}
+
+function buildImportRow(
+  rowNumber: number,
+  sourceId: string,
+  nom: string,
+  prenoms: string,
+  telephone: string | null,
+  numeroCni: string | null,
+  village: string | null,
+  superficieHa: number,
+  birthYear: number,
+  sexe: "M" | "F" | null,
+  memberUnits: UnitRow[],
+): ImportRow {
+  const superficieTotale = memberUnits.reduce((sum, unit) => sum + unit.superficie, 0);
+  const blockingReasons: string[] = [];
+  const warnings: string[] = [];
+  const currentYear = new Date().getFullYear();
+
+  if (!sourceId) blockingReasons.push("Identifiant COOBEPA manquant");
+  if (!nom || !prenoms) blockingReasons.push("Nom ou prénom manquant");
+  if (!telephone) warnings.push("Téléphone manquant — à compléter ultérieurement");
+  if (!(superficieHa > 0)) blockingReasons.push("Superficie totale invalide ou manquante");
+  if (memberUnits.length === 0) warnings.push("Aucune parcelle GPS liée à cet identifiant");
+  if (memberUnits.some((unit) => !(unit.superficie > 0) || !Number.isFinite(unit.lat) || !Number.isFinite(unit.lng))) {
+    warnings.push("Une parcelle possède une superficie ou une coordonnée invalide");
+  }
+  if (!Number.isFinite(birthYear) || birthYear < 1900 || birthYear > currentYear) {
+    warnings.push("Année de naissance absente ou invalide");
+  }
+  if (!sexe) warnings.push("Sexe non reconnu");
+
+  return {
+    rowNumber,
+    sourceId,
+    nom,
+    prenoms,
+    telephone,
+    telephoneKey: phoneKey(telephone),
+    numeroCni,
+    cniKey: cniKey(numeroCni),
+    village,
+    superficieHa,
+    anneeNaissance: Number.isFinite(birthYear) && birthYear >= 1900 && birthYear <= currentYear ? birthYear : null,
+    sexe,
+    nombreParcelles: memberUnits.length,
+    superficieTotale: Number(superficieTotale.toFixed(4)),
+    units: memberUnits,
+    blockingReasons,
+    warnings,
+  };
+}
+
+function parseReorganizedWorkbook(
+  members: unknown[][],
+  units: unknown[][],
+): ImportRow[] {
+  const memberHeader = members[0] ?? [];
+  const unitHeader = units[0] ?? [];
+  const memberSourceIndex = columnIndex(memberHeader, "Identifiant COOBEPA");
+  const memberNameIndex = columnIndex(memberHeader, "Nom");
+  const memberPrenomsIndex = columnIndex(memberHeader, "Prénoms", "Prenoms");
+  const memberPhoneIndex = columnIndex(memberHeader, "Téléphone", "Telephone");
+  const memberCniIndex = columnIndex(memberHeader, "Numéro CNI", "Numero CNI");
+  const memberVillageIndex = columnIndex(memberHeader, "Village");
+  const memberSurfaceIndex = columnIndex(memberHeader, "Superficie totale déclarée (ha)", "Superficie totale déclarée");
+  const memberBirthYearIndex = columnIndex(memberHeader, "Année de naissance", "Annee de naissance");
+  const memberSexIndex = columnIndex(memberHeader, "Sexe");
+  const unitSourceIndex = columnIndex(unitHeader, "Identifiant COOBEPA");
+  const unitCodeIndex = columnIndex(unitHeader, "Code parcelle");
+  const unitSurfaceIndex = columnIndex(unitHeader, "Superficie (ha)", "Superficie");
+  const unitLatIndex = columnIndex(unitHeader, "Latitude");
+  const unitLngIndex = columnIndex(unitHeader, "Longitude");
+
+  if (memberSourceIndex < 0 || memberNameIndex < 0 || memberPrenomsIndex < 0 || unitSourceIndex < 0 || unitCodeIndex < 0) {
+    throw new Error("En-têtes COOBEPA non reconnus dans les onglets réorganisés");
+  }
+
+  const unitsBySource = new Map<string, UnitRow[]>();
+  for (const row of units.slice(1)) {
+    const sourceId = clean(row[unitSourceIndex]);
+    const code = clean(row[unitCodeIndex]);
+    if (!sourceId || !code) continue;
+    const list = unitsBySource.get(sourceId) ?? [];
+    list.push({
+      code,
+      superficie: decimal(row[unitSurfaceIndex]),
+      lat: decimal(row[unitLatIndex]),
+      lng: decimal(row[unitLngIndex]),
+    });
+    unitsBySource.set(sourceId, list);
+  }
+
+  return members.slice(1)
+    .map((row, index) => {
+      if (!row.some((value) => !unavailable(value))) return null;
+      const sourceId = clean(row[memberSourceIndex]);
+      const telephone = unavailable(row[memberPhoneIndex]) ? null : clean(row[memberPhoneIndex]);
+      const numeroCni = unavailable(row[memberCniIndex]) ? null : clean(row[memberCniIndex]);
+      const birthYear = Number.parseInt(clean(row[memberBirthYearIndex]), 10);
+      return buildImportRow(
+        index + 2,
+        sourceId,
+        clean(row[memberNameIndex]),
+        clean(row[memberPrenomsIndex]),
+        telephone,
+        numeroCni,
+        unavailable(row[memberVillageIndex]) ? null : clean(row[memberVillageIndex]),
+        decimal(row[memberSurfaceIndex]),
+        birthYear,
+        parseSexe(row[memberSexIndex]),
+        unitsBySource.get(sourceId) ?? [],
+      );
+    })
+    .filter((row): row is ImportRow => row !== null);
+}
+
+function parseLegacyWorkbook(members: unknown[][], units: unknown[][]): ImportRow[] {
   const unitsBySource = new Map<string, UnitRow[]>();
   for (const row of units.slice(2)) {
     const sourceId = clean(row[0]);
     const code = clean(row[1]);
     if (!sourceId || !code) continue;
-    const superficie = decimal(row[2]);
-    const lat = decimal(row[3]);
-    const lng = decimal(row[4]);
     const list = unitsBySource.get(sourceId) ?? [];
-    list.push({ code, superficie, lat, lng });
+    list.push({
+      code,
+      superficie: decimal(row[2]),
+      lat: decimal(row[3]),
+      lng: decimal(row[4]),
+    });
     unitsBySource.set(sourceId, list);
   }
 
-  const parsed: ImportRow[] = [];
-  for (let index = 2; index < members.length; index += 1) {
-    const row = members[index]!;
-    if (!row.some((value) => !unavailable(value))) continue;
+  return members.slice(2)
+    .map((row, index) => {
+      if (!row.some((value) => !unavailable(value))) return null;
+      const birthYear = Number.parseInt(clean(row[14]), 10);
+      return buildImportRow(
+        index + 3,
+        clean(row[0]),
+        clean(row[10]),
+        clean(row[9]),
+        unavailable(row[11]) ? null : clean(row[11]),
+        unavailable(row[12]) ? null : clean(row[12]),
+        unavailable(row[2]) ? null : clean(row[2]),
+        decimal(row[5]),
+        birthYear,
+        parseSexe(row[13]),
+        unitsBySource.get(clean(row[0])) ?? [],
+      );
+    })
+    .filter((row): row is ImportRow => row !== null);
+}
 
-    const sourceId = clean(row[0]);
-    const nom = clean(row[10]);
-    const prenoms = clean(row[9]);
-    const telephone = unavailable(row[11]) ? null : clean(row[11]);
-    const numeroCni = unavailable(row[12]) ? null : clean(row[12]);
-    const village = unavailable(row[2]) ? null : clean(row[2]);
-    const superficieHa = decimal(row[5]);
-    const birthYear = Number.parseInt(clean(row[14]), 10);
-    const sexeValue = clean(row[13]).toLowerCase();
-    const sexe = sexeValue === "hommes" || sexeValue === "homme" || sexeValue === "m" ? "M"
-      : sexeValue === "femmes" || sexeValue === "femme" || sexeValue === "f" ? "F"
-      : null;
-    const memberUnits = unitsBySource.get(sourceId) ?? [];
-    const superficieTotale = memberUnits.reduce((sum, unit) => sum + unit.superficie, 0);
-    const blockingReasons: string[] = [];
-    const warnings: string[] = [];
-
-    if (!sourceId) blockingReasons.push("Identifiant COOBEPA manquant");
-    if (!nom || !prenoms) blockingReasons.push("Nom ou prénom manquant");
-    if (!telephone) warnings.push("Téléphone manquant — à compléter ultérieurement");
-    if (!(superficieHa > 0)) blockingReasons.push("Superficie totale invalide ou manquante");
-    if (memberUnits.length === 0) warnings.push("Aucune parcelle GPS liée à cet identifiant");
-    if (memberUnits.some((unit) => !(unit.superficie > 0) || !Number.isFinite(unit.lat) || !Number.isFinite(unit.lng))) {
-      warnings.push("Une parcelle possède une superficie ou une coordonnée invalide");
-    }
-    if (!Number.isFinite(birthYear) || birthYear < 1900 || birthYear > new Date().getFullYear()) {
-      warnings.push("Année de naissance absente ou invalide");
-    }
-    if (!sexe) warnings.push("Sexe non reconnu");
-
-    parsed.push({
-      rowNumber: index + 1,
-      sourceId,
-      nom,
-      prenoms,
-      telephone,
-      telephoneKey: phoneKey(telephone),
-      numeroCni,
-      cniKey: cniKey(numeroCni),
-      village,
-      superficieHa,
-      anneeNaissance: Number.isFinite(birthYear) && birthYear >= 1900 && birthYear <= new Date().getFullYear() ? birthYear : null,
-      sexe,
-      nombreParcelles: memberUnits.length,
-      superficieTotale: Number(superficieTotale.toFixed(4)),
-      units: memberUnits,
-      blockingReasons,
-      warnings,
-    });
-  }
-
-  return parsed;
+export function parseMembresImportWorkbook(buffer: Buffer): ImportRow[] {
+  const workbook = XLSX.read(buffer, { type: "buffer", raw: false, cellDates: false });
+  const hasReorganizedMembers = workbook.SheetNames.some((name) => normalizedLabel(name) === "membres import");
+  const members = tableRows(findSheet(workbook, hasReorganizedMembers ? "membres import" : "exploitation agricole"));
+  const units = tableRows(findSheet(workbook, hasReorganizedMembers ? "parcelles import" : "unité agricole"));
+  return hasReorganizedMembers
+    ? parseReorganizedWorkbook(members, units)
+    : parseLegacyWorkbook(members, units);
 }
 
 async function existingMembers(cooperativeId: number): Promise<ExistingMember[]> {
