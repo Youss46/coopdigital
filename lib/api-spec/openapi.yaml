@@ -155,6 +155,69 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /membres/import/preview:
+    post:
+      operationId: previewMembresImport
+      tags: [membres]
+      summary: Prévisualiser un import Excel de membres
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [fichier]
+              properties:
+                fichier:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Résultat de l'analyse du fichier
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MembresImportPreview"
+        "400":
+          description: Fichier invalide
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /membres/import:
+    post:
+      operationId: importMembres
+      tags: [membres]
+      summary: Importer les lignes valides d'un registre Excel
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [fichier, dateAdhesion]
+              properties:
+                fichier:
+                  type: string
+                  format: binary
+                dateAdhesion:
+                  type: string
+                  format: date
+      responses:
+        "201":
+          description: Import terminé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MembresImportResult"
+        "400":
+          description: Import invalide
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /membres/qr/{token}:
     get:
       operationId: getMembreByQr
@@ -7656,6 +7719,10 @@ components:
           type: string
         dateAdhesion:
           type: string
+        anneeNaissance:
+          type: ["integer", "null"]
+        identifiantSource:
+          type: ["string", "null"]
         photoUrl:
           type: ["string", "null"]
         sexe:
@@ -7774,6 +7841,54 @@ components:
           type: integer
         limit:
           type: integer
+
+    MembresImportPreview:
+      type: object
+      required: [fileName, summary, rows]
+      properties:
+        fileName:
+          type: string
+        summary:
+          type: object
+          required: [total, importable, existing, blocked, parcels]
+          properties:
+            total: { type: integer }
+            importable: { type: integer }
+            existing: { type: integer }
+            blocked: { type: integer }
+            parcels: { type: integer }
+        rows:
+          type: array
+          items:
+            type: object
+            required: [rowNumber, sourceId, nom, prenoms, status, blockingReasons, warnings]
+            properties:
+              rowNumber: { type: integer }
+              sourceId: { type: string }
+              nom: { type: string }
+              prenoms: { type: string }
+              telephone: { type: ["string", "null"] }
+              village: { type: ["string", "null"] }
+              superficieHa: { type: number }
+              nombreParcelles: { type: integer }
+              status: { type: string, enum: [importable, existing, blocked] }
+              blockingReasons:
+                type: array
+                items: { type: string }
+              warnings:
+                type: array
+                items: { type: string }
+              existingId: { type: ["integer", "null"] }
+
+    MembresImportResult:
+      type: object
+      required: [imported, skippedExisting, rejected, parcels, message]
+      properties:
+        imported: { type: integer }
+        skippedExisting: { type: integer }
+        rejected: { type: integer }
+        parcels: { type: integer }
+        message: { type: string }
 
     MembreHistorique:
       type: object

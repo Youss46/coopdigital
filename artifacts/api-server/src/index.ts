@@ -16,6 +16,7 @@ import { runNotificationsCron, runAvancesReporteesCron } from "./jobs/notificati
 import { runMigrations } from "@workspace/db";
 import { bootstrapReferenceData } from "./services/bootstrapService";
 import path from "path";
+import { existsSync } from "node:fs";
 
 const rawPort = process.env["PORT"];
 const port = rawPort ? Number(rawPort) : 8080;
@@ -25,9 +26,14 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 // ── Migrations DB (idempotentes) ─────────────────────────────────────────────
-// Le chemin est résolu depuis le répertoire de travail du serveur
-// (artifacts/api-server/) vers lib/db/drizzle/
-const migrationsFolder = path.resolve(process.cwd(), "../../lib/db/drizzle");
+// Le workflow peut démarrer depuis la racine du monorepo ou depuis
+// artifacts/api-server. Utiliser le premier dossier de migrations existant.
+const migrationsCandidates = [
+  path.resolve(process.cwd(), "lib/db/drizzle"),
+  path.resolve(process.cwd(), "../../lib/db/drizzle"),
+];
+const migrationsFolder = migrationsCandidates.find((candidate) => existsSync(candidate))
+  ?? migrationsCandidates[0]!;
 
 runMigrations(migrationsFolder)
   .then(() => {

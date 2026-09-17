@@ -31,6 +31,8 @@ export const membresTable = pgTable("membres", {
   // Données démographiques
   sexe:           text("sexe"),
   dateNaissance:  date("date_naissance", { mode: "string" }),
+  anneeNaissance: integer("annee_naissance"),
+  identifiantSource: text("identifiant_source"),
 
   // Catégorie de membre (label organisationnel, sans impact sur les droits)
   categorieMembre: text("categorie_membre"),

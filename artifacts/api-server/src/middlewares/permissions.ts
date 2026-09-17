@@ -19,6 +19,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
   membres: {
     lire:     ["pca", "directeur", "comptable", "caissier", "responsable_tracabilite", "delegue", "auditeur", "agent_terrain"],
     creer:    ["pca", "directeur", "delegue", "responsable_tracabilite"],
+    importer: ["pca", "directeur", "responsable_tracabilite"],
     modifier: ["pca", "directeur", "delegue", "responsable_tracabilite"],
     supprimer:["pca", "directeur"],
     exporter: ["pca", "directeur", "comptable", "auditeur"],

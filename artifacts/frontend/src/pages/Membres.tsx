@@ -8,6 +8,7 @@ import {
   Building2, User, AlertTriangle, CheckCircle,
   XCircle, Clock, MapPin, ClipboardList, Users,
   PieChart, List, Leaf, Star, ShieldCheck, Award,
+  Upload, FileSpreadsheet, X,
 } from "lucide-react";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -48,6 +49,33 @@ interface FournisseurExterneRow {
   id: number; nom: string; prenoms: string;
   telephone: string | null; code: string | null;
   createdAt: string | null; creeParDelegueId: number | null;
+}
+
+interface ImportPreviewRow {
+  rowNumber: number;
+  sourceId: string;
+  nom: string;
+  prenoms: string;
+  telephone: string | null;
+  village: string | null;
+  superficieHa: number;
+  nombreParcelles: number;
+  status: "importable" | "existing" | "blocked";
+  blockingReasons: string[];
+  warnings: string[];
+  existingId: number | null;
+}
+
+interface ImportPreview {
+  fileName: string;
+  summary: {
+    total: number;
+    importable: number;
+    existing: number;
+    blocked: number;
+    parcels: number;
+  };
+  rows: ImportPreviewRow[];
 }
 
 type MembreForm = Partial<MembreInput> & {
@@ -163,6 +191,7 @@ export default function Membres() {
   const { toast } = useToast();
 
   const peutCreer   = usePermission("membres", "creer");
+  const peutImporter = usePermission("membres", "importer");
   const peutExporter = usePermission("membres", "exporter");
   const peutValider = usePermission("membres", "valider");
 
@@ -179,6 +208,12 @@ export default function Membres() {
   const [filtreRattachement, setFiltreRattachement] = useState<"" | "delegue" | "base_centrale">("");
   const [exportPending, setExportPending] = useState(false);
   const [modalOuvert, setModalOuvert] = useState(false);
+  const [importModalOuvert, setImportModalOuvert] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importDateAdhesion, setImportDateAdhesion] = useState(new Date().toISOString().split("T")[0]);
+  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
+  const [importPending, setImportPending] = useState(false);
+  const [importError, setImportError] = useState("");
   const [modalRejet, setModalRejet] = useState<{ id: number; nom: string } | null>(null);
   const [motifRejetText, setMotifRejetText] = useState("");
   /** Toggle visible uniquement pour les délégués : "membre" ou "fournisseur_externe" */
@@ -265,6 +300,66 @@ export default function Membres() {
   const delegueCourant = estDelegue ? delegues.find((d) => d.id === utilisateur?.id) : null;
 
   // ── Mutations ────────────────────────────────────────────────────────────────
+
+  function resetImport() {
+    setImportFile(null);
+    setImportPreview(null);
+    setImportPending(false);
+    setImportError("");
+    setImportDateAdhesion(new Date().toISOString().split("T")[0]);
+  }
+
+  async function handleImportPreview() {
+    if (!importFile) return;
+    setImportPending(true);
+    setImportError("");
+    try {
+      const body = new FormData();
+      body.append("fichier", importFile);
+      const response = await fetch(`${BASE}/api/membres/import/preview`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${tok()}` },
+        body,
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error((payload as { erreur?: string }).erreur ?? "Impossible de lire le fichier");
+      setImportPreview(payload as ImportPreview);
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : "Impossible de lire le fichier");
+    } finally {
+      setImportPending(false);
+    }
+  }
+
+  async function handleImportConfirm() {
+    if (!importFile || !importPreview || importPreview.summary.importable === 0) return;
+    setImportPending(true);
+    setImportError("");
+    try {
+      const body = new FormData();
+      body.append("fichier", importFile);
+      body.append("dateAdhesion", importDateAdhesion);
+      const response = await fetch(`${BASE}/api/membres/import`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${tok()}` },
+        body,
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error((payload as { erreur?: string }).erreur ?? "Import impossible");
+      const result = payload as { imported: number; rejected: number; skippedExisting: number; parcels: number; message: string };
+      toast({
+        title: "Import terminé",
+        description: `${result.imported} membre(s), ${result.parcels} parcelle(s). ${result.rejected} ligne(s) sont restées bloquées.`,
+      });
+      setImportModalOuvert(false);
+      resetImport();
+      void queryClient.invalidateQueries({ queryKey: ["membres-list"] });
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : "Import impossible");
+    } finally {
+      setImportPending(false);
+    }
+  }
 
   const mutation = useCreateMembre({
     mutation: {
@@ -469,6 +564,13 @@ export default function Membres() {
               style={{ backgroundColor: "#1a4731" }}>
               <UserPlus size={16} />
               <span className="hidden sm:inline">{estDelegue ? "Soumettre une demande" : "Nouveau membre"}</span>
+            </button>
+          )}
+          {peutImporter && !estDelegue && (
+            <button onClick={() => { resetImport(); setImportModalOuvert(true); }}
+              className="flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-lg border border-[#1a4731]/25 bg-white text-[#1a4731] text-sm font-medium hover:bg-green-50">
+              <Upload size={16} />
+              <span className="hidden sm:inline">Importer Excel</span>
             </button>
           )}
         </div>
@@ -738,6 +840,163 @@ export default function Membres() {
       </Tabs>
 
       {/* ── Modal rejet ──────────────────────────────────────────────────────── */}
+      {importModalOuvert && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl max-h-[92vh] overflow-y-auto">
+            <div className="px-6 py-5 border-b border-gray-100 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                  <FileSpreadsheet size={19} className="text-[#1a4731]" />
+                  Importer un registre Excel
+                </h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Les membres importés seront rattachés à la base centrale et resteront en attente de validation.
+                </p>
+              </div>
+              <button onClick={() => { setImportModalOuvert(false); resetImport(); }}
+                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700" aria-label="Fermer">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-5">
+              {!importPreview ? (
+                <>
+                  <label className="block border-2 border-dashed border-gray-200 rounded-xl p-8 text-center hover:border-[#1a4731]/50 cursor-pointer transition-colors">
+                    <input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                      className="sr-only" onChange={(event) => {
+                        const file = event.target.files?.[0] ?? null;
+                        setImportFile(file);
+                        setImportError("");
+                      }} />
+                    <Upload size={30} className="mx-auto text-[#1a4731] mb-3" />
+                    <span className="block text-sm font-medium text-gray-800">
+                      {importFile ? importFile.name : "Sélectionner le registre Excel .xlsx"}
+                    </span>
+                    <span className="block text-xs text-gray-500 mt-1">
+                      Le fichier est lu en mémoire et n’est pas conservé après l’import.
+                    </span>
+                  </label>
+                  <div className="rounded-lg bg-blue-50 border border-blue-100 px-4 py-3 text-sm text-blue-800">
+                    L’aperçu détecte les téléphones manquants, les doublons et les identifiants déjà importés avant toute écriture.
+                  </div>
+                  {importError && <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{importError}</p>}
+                  <div className="flex justify-end gap-3">
+                    <button type="button" onClick={() => { setImportModalOuvert(false); resetImport(); }}
+                      className="px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
+                      Annuler
+                    </button>
+                    <button type="button" disabled={!importFile || importPending} onClick={() => void handleImportPreview()}
+                      className="px-4 py-2.5 rounded-lg bg-[#1a4731] text-white text-sm font-medium disabled:opacity-50 flex items-center gap-2">
+                      {importPending && <Loader2 size={15} className="animate-spin" />}
+                      {importPending ? "Analyse…" : "Analyser le fichier"}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-gray-900">{importPreview.fileName}</p>
+                      <p className="text-xs text-gray-500">{importPreview.summary.total} ligne(s) membre détectée(s)</p>
+                    </div>
+                    <button type="button" onClick={() => { setImportPreview(null); setImportFile(null); setImportError(""); }}
+                      className="text-sm text-[#1a4731] hover:underline">Choisir un autre fichier</button>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="rounded-xl bg-green-50 border border-green-100 p-3">
+                      <p className="text-xs text-green-700">Importables</p>
+                      <p className="text-xl font-bold text-green-800">{importPreview.summary.importable}</p>
+                    </div>
+                    <div className="rounded-xl bg-gray-50 border border-gray-200 p-3">
+                      <p className="text-xs text-gray-600">Déjà présents</p>
+                      <p className="text-xl font-bold text-gray-800">{importPreview.summary.existing}</p>
+                    </div>
+                    <div className="rounded-xl bg-red-50 border border-red-100 p-3">
+                      <p className="text-xs text-red-700">À corriger</p>
+                      <p className="text-xl font-bold text-red-800">{importPreview.summary.blocked}</p>
+                    </div>
+                    <div className="rounded-xl bg-blue-50 border border-blue-100 p-3">
+                      <p className="text-xs text-blue-700">Parcelles GPS</p>
+                      <p className="text-xl font-bold text-blue-800">{importPreview.summary.parcels}</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-gray-200 overflow-hidden">
+                    <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+                      <p className="text-sm font-semibold text-gray-800">Aperçu des lignes</p>
+                      <p className="text-xs text-gray-500">Les premières lignes sont affichées ; les motifs détaillés restent disponibles dans l’analyse.</p>
+                    </div>
+                    <div className="overflow-x-auto max-h-64">
+                      <table className="w-full text-xs">
+                        <thead className="bg-white sticky top-0 border-b border-gray-100">
+                          <tr>
+                            <th className="text-left px-3 py-2">Ligne</th>
+                            <th className="text-left px-3 py-2">Identifiant</th>
+                            <th className="text-left px-3 py-2">Membre</th>
+                            <th className="text-left px-3 py-2">Téléphone</th>
+                            <th className="text-left px-3 py-2">Statut</th>
+                            <th className="text-left px-3 py-2">Motif</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {importPreview.rows.slice(0, 50).map((row) => (
+                            <tr key={`${row.rowNumber}-${row.sourceId}`}>
+                              <td className="px-3 py-2 text-gray-500">{row.rowNumber}</td>
+                              <td className="px-3 py-2 font-mono">{row.sourceId || "—"}</td>
+                              <td className="px-3 py-2">{row.prenoms} {row.nom}</td>
+                              <td className="px-3 py-2">{row.telephone ?? "Manquant"}</td>
+                              <td className="px-3 py-2">
+                                <span className={`inline-flex rounded-full px-2 py-0.5 font-medium ${
+                                  row.status === "importable" ? "bg-green-100 text-green-700" :
+                                  row.status === "existing" ? "bg-gray-100 text-gray-700" :
+                                  "bg-red-100 text-red-700"
+                                }`}>
+                                  {row.status === "importable" ? "Importable" : row.status === "existing" ? "Déjà présent" : "Bloqué"}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-red-600">{row.blockingReasons[0] ?? row.warnings[0] ?? "—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-[1fr_auto] gap-4 items-end">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Date d’adhésion appliquée aux nouveaux membres *</label>
+                      <input type="date" required value={importDateAdhesion}
+                        onChange={(event) => setImportDateAdhesion(event.target.value)}
+                        className="w-full md:w-64 border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+                    </div>
+                    <div className="text-xs text-gray-500 md:text-right">
+                      {importPreview.summary.blocked > 0 && <p>{importPreview.summary.blocked} ligne(s) bloquée(s) ne seront pas écrite(s).</p>}
+                      <p>{importPreview.summary.existing} ligne(s) déjà présentes seront ignorées.</p>
+                    </div>
+                  </div>
+
+                  {importError && <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{importError}</p>}
+                  <div className="flex justify-end gap-3">
+                    <button type="button" onClick={() => { setImportModalOuvert(false); resetImport(); }}
+                      className="px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
+                      Annuler
+                    </button>
+                    <button type="button" disabled={importPending || importPreview.summary.importable === 0 || !importDateAdhesion}
+                      onClick={() => void handleImportConfirm()}
+                      className="px-4 py-2.5 rounded-lg bg-[#1a4731] text-white text-sm font-medium disabled:opacity-50 flex items-center gap-2">
+                      {importPending && <Loader2 size={15} className="animate-spin" />}
+                      {importPending ? "Import en cours…" : `Confirmer ${importPreview.summary.importable} import(s)`}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {modalRejet && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm animate-in zoom-in-95 fade-in slide-in-from-bottom-2 duration-200 motion-reduce:animate-none">

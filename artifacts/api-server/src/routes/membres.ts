@@ -21,6 +21,7 @@ import {
   getRepartitionMembres,
   getMembreCertifications,
 } from "../controllers/membresController";
+import { membresImportUpload, previewMembresImport, importMembres } from "../controllers/membresImportController.js";
 
 const router: IRouter = Router();
 
@@ -30,6 +31,8 @@ router.get("/membres/export-pdf",    checkPermission("membres", "exporter"), exp
 router.get("/membres/delegues-list", checkPermission("membres", "lire"),     listDeleguesPourMembres);
 router.get("/membres/cartes",        checkPermission("membres", "lire"),     getCartesMembres);
 router.get("/membres/repartition",   checkPermission("membres", "lire"),     getRepartitionMembres);
+router.post("/membres/import/preview", checkPermission("membres", "importer"), membresImportUpload.single("fichier"), previewMembresImport);
+router.post("/membres/import", checkPermission("membres", "importer"), membresImportUpload.single("fichier"), importMembres);
 router.get("/membres",               checkPermission("membres", "lire"),     listMembres);
 router.post("/membres",              checkPermission("membres", "creer"),    auditMiddleware("membres", "CREATE", { entiteType: "membre" }), createMembre);
 router.get("/membres/qr/:token",     checkPermission("membres", "lire"),     getMembreByQr);

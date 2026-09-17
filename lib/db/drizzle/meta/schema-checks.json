@@ -241,6 +241,29 @@
           "table": "lots"
         }
       ]
+    },
+    {
+      "migration": "0173_import_membres_coobepa",
+      "objects": [
+        {
+          "kind": "column",
+          "schema": "public",
+          "table": "membres",
+          "name": "annee_naissance"
+        },
+        {
+          "kind": "column",
+          "schema": "public",
+          "table": "membres",
+          "name": "identifiant_source"
+        },
+        {
+          "kind": "index",
+          "schema": "public",
+          "table": "membres",
+          "name": "membres_cooperative_identifiant_source_unique"
+        }
+      ]
     }
   ]
 }

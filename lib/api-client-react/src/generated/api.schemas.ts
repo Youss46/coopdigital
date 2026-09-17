@@ -682,6 +682,10 @@ export interface Membre {
   qrCodeToken: string;
   dateAdhesion: string;
   /** @nullable */
+  anneeNaissance?: number | null;
+  /** @nullable */
+  identifiantSource?: string | null;
+  /** @nullable */
   photoUrl?: string | null;
   /** @nullable */
   sexe?: MembreSexe;
@@ -791,6 +795,55 @@ export interface MembrePagination {
   total: number;
   page: number;
   limit: number;
+}
+
+export type MembresImportPreviewSummary = {
+  total: number;
+  importable: number;
+  existing: number;
+  blocked: number;
+  parcels: number;
+};
+
+export type MembresImportPreviewRowsItemStatus = typeof MembresImportPreviewRowsItemStatus[keyof typeof MembresImportPreviewRowsItemStatus];
+
+
+export const MembresImportPreviewRowsItemStatus = {
+  importable: 'importable',
+  existing: 'existing',
+  blocked: 'blocked',
+} as const;
+
+export type MembresImportPreviewRowsItem = {
+  rowNumber: number;
+  sourceId: string;
+  nom: string;
+  prenoms: string;
+  /** @nullable */
+  telephone?: string | null;
+  /** @nullable */
+  village?: string | null;
+  superficieHa?: number;
+  nombreParcelles?: number;
+  status: MembresImportPreviewRowsItemStatus;
+  blockingReasons: string[];
+  warnings: string[];
+  /** @nullable */
+  existingId?: number | null;
+};
+
+export interface MembresImportPreview {
+  fileName: string;
+  summary: MembresImportPreviewSummary;
+  rows: MembresImportPreviewRowsItem[];
+}
+
+export interface MembresImportResult {
+  imported: number;
+  skippedExisting: number;
+  rejected: number;
+  parcels: number;
+  message: string;
 }
 
 export interface LivraisonDetail {
@@ -5427,6 +5480,15 @@ export const GetMembresStatut = {
   actif: 'actif',
   inactif: 'inactif',
 } as const;
+
+export type PreviewMembresImportBody = {
+  fichier: Blob;
+};
+
+export type ImportMembresBody = {
+  fichier: Blob;
+  dateAdhesion: string;
+};
 
 export type GetAvancesParams = {
 statut?: GetAvancesStatut;

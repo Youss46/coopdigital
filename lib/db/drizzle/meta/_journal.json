@@ -1212,6 +1212,13 @@
       "when": 1789581800000,
       "tag": "0172_annuler_lots",
       "breakpoints": true
+    },
+    {
+      "idx": 173,
+      "version": "7",
+      "when": 1789660000000,
+      "tag": "0173_import_membres_coobepa",
+      "breakpoints": true
     }
   ]
 }

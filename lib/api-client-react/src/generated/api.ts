@@ -233,6 +233,7 @@ import type {
   HypothesesBody,
   HypothesesInput,
   ImportBalanceSageBody,
+  ImportMembresBody,
   Intrant,
   IntrantInput,
   IntrantResume,
@@ -266,6 +267,8 @@ import type {
   MembreNiveau,
   MembrePagination,
   MembreUpdate,
+  MembresImportPreview,
+  MembresImportResult,
   MissionTransport,
   ModifierLigneInput,
   ModifierStatutMembreBody,
@@ -289,6 +292,7 @@ import type {
   Preteur,
   PreteurInput,
   PreviewBalanceSageBody,
+  PreviewMembresImportBody,
   ProjectionCampagne,
   ProjectionTresorerie,
   RapportAgentPesee,
@@ -776,6 +780,153 @@ export const useCreateMembre = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getCreateMembreMutationOptions(options));
+    }
+
+export const getPreviewMembresImportUrl = () => {
+
+
+
+
+  return `/api/membres/import/preview`
+}
+
+/**
+ * @summary Prévisualiser un import Excel de membres
+ */
+export const previewMembresImport = async (previewMembresImportBody: PreviewMembresImportBody, options?: RequestInit): Promise<MembresImportPreview> => {
+    const formData = new FormData();
+formData.append(`fichier`, previewMembresImportBody.fichier);
+
+  return customFetch<MembresImportPreview>(getPreviewMembresImportUrl(),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body:
+      formData,
+  }
+);}
+
+
+
+
+export const getPreviewMembresImportMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewMembresImport>>, TError,{data: BodyType<PreviewMembresImportBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewMembresImport>>, TError,{data: BodyType<PreviewMembresImportBody>}, TContext> => {
+
+const mutationKey = ['previewMembresImport'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewMembresImport>>, {data: BodyType<PreviewMembresImportBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  previewMembresImport(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewMembresImportMutationResult = NonNullable<Awaited<ReturnType<typeof previewMembresImport>>>
+    export type PreviewMembresImportMutationBody = BodyType<PreviewMembresImportBody>
+    export type PreviewMembresImportMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Prévisualiser un import Excel de membres
+ */
+export const usePreviewMembresImport = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewMembresImport>>, TError,{data: BodyType<PreviewMembresImportBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewMembresImport>>,
+        TError,
+        {data: BodyType<PreviewMembresImportBody>},
+        TContext
+      > => {
+      return useMutation(getPreviewMembresImportMutationOptions(options));
+    }
+
+export const getImportMembresUrl = () => {
+
+
+
+
+  return `/api/membres/import`
+}
+
+/**
+ * @summary Importer les lignes valides d'un registre Excel
+ */
+export const importMembres = async (importMembresBody: ImportMembresBody, options?: RequestInit): Promise<MembresImportResult> => {
+    const formData = new FormData();
+formData.append(`fichier`, importMembresBody.fichier);
+formData.append(`dateAdhesion`, importMembresBody.dateAdhesion);
+
+  return customFetch<MembresImportResult>(getImportMembresUrl(),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body:
+      formData,
+  }
+);}
+
+
+
+
+export const getImportMembresMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importMembres>>, TError,{data: BodyType<ImportMembresBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof importMembres>>, TError,{data: BodyType<ImportMembresBody>}, TContext> => {
+
+const mutationKey = ['importMembres'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof importMembres>>, {data: BodyType<ImportMembresBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  importMembres(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ImportMembresMutationResult = NonNullable<Awaited<ReturnType<typeof importMembres>>>
+    export type ImportMembresMutationBody = BodyType<ImportMembresBody>
+    export type ImportMembresMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Importer les lignes valides d'un registre Excel
+ */
+export const useImportMembres = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importMembres>>, TError,{data: BodyType<ImportMembresBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof importMembres>>,
+        TError,
+        {data: BodyType<ImportMembresBody>},
+        TContext
+      > => {
+      return useMutation(getImportMembresMutationOptions(options));
     }
 
 export const getGetMembreByQrUrl = (token: string,) => {

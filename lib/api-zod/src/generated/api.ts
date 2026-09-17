@@ -79,6 +79,8 @@ export const GetMembresResponse = zod.object({
   "statut": zod.enum(['actif', 'inactif']),
   "qrCodeToken": zod.string(),
   "dateAdhesion": zod.string(),
+  "anneeNaissance": zod.number().nullish(),
+  "identifiantSource": zod.string().nullish(),
   "photoUrl": zod.string().nullish(),
   "sexe": zod.union([zod.literal('M'),zod.literal('F'),zod.literal(null)]).nullish(),
   "parcelleLat": zod.string().nullish(),
@@ -114,6 +116,48 @@ export const CreateMembreBody = zod.object({
 
 
 /**
+ * @summary Prévisualiser un import Excel de membres
+ */
+export const PreviewMembresImportBody = zod.object({
+  "fichier": zod.instanceof(File)
+})
+
+export const PreviewMembresImportResponse = zod.object({
+  "fileName": zod.string(),
+  "summary": zod.object({
+  "total": zod.number(),
+  "importable": zod.number(),
+  "existing": zod.number(),
+  "blocked": zod.number(),
+  "parcels": zod.number()
+}),
+  "rows": zod.array(zod.object({
+  "rowNumber": zod.number(),
+  "sourceId": zod.string(),
+  "nom": zod.string(),
+  "prenoms": zod.string(),
+  "telephone": zod.string().nullish(),
+  "village": zod.string().nullish(),
+  "superficieHa": zod.number().optional(),
+  "nombreParcelles": zod.number().optional(),
+  "status": zod.enum(['importable', 'existing', 'blocked']),
+  "blockingReasons": zod.array(zod.string()),
+  "warnings": zod.array(zod.string()),
+  "existingId": zod.number().nullish()
+}))
+})
+
+
+/**
+ * @summary Importer les lignes valides d'un registre Excel
+ */
+export const ImportMembresBody = zod.object({
+  "fichier": zod.instanceof(File),
+  "dateAdhesion": zod.coerce.date()
+})
+
+
+/**
  * @summary Lookup membre par QR code
  */
 export const GetMembreByQrParams = zod.object({
@@ -135,6 +179,8 @@ export const GetMembreByQrResponse = zod.object({
   "statut": zod.enum(['actif', 'inactif']),
   "qrCodeToken": zod.string(),
   "dateAdhesion": zod.string(),
+  "anneeNaissance": zod.number().nullish(),
+  "identifiantSource": zod.string().nullish(),
   "photoUrl": zod.string().nullish(),
   "sexe": zod.union([zod.literal('M'),zod.literal('F'),zod.literal(null)]).nullish(),
   "parcelleLat": zod.string().nullish(),
@@ -166,6 +212,8 @@ export const GetMembreByIdResponse = zod.object({
   "statut": zod.enum(['actif', 'inactif']),
   "qrCodeToken": zod.string(),
   "dateAdhesion": zod.string(),
+  "anneeNaissance": zod.number().nullish(),
+  "identifiantSource": zod.string().nullish(),
   "photoUrl": zod.string().nullish(),
   "sexe": zod.union([zod.literal('M'),zod.literal('F'),zod.literal(null)]).nullish(),
   "parcelleLat": zod.string().nullish(),
@@ -218,6 +266,8 @@ export const UpdateMembreResponse = zod.object({
   "statut": zod.enum(['actif', 'inactif']),
   "qrCodeToken": zod.string(),
   "dateAdhesion": zod.string(),
+  "anneeNaissance": zod.number().nullish(),
+  "identifiantSource": zod.string().nullish(),
   "photoUrl": zod.string().nullish(),
   "sexe": zod.union([zod.literal('M'),zod.literal('F'),zod.literal(null)]).nullish(),
   "parcelleLat": zod.string().nullish(),
@@ -253,6 +303,8 @@ export const ModifierStatutMembreResponse = zod.object({
   "statut": zod.enum(['actif', 'inactif']),
   "qrCodeToken": zod.string(),
   "dateAdhesion": zod.string(),
+  "anneeNaissance": zod.number().nullish(),
+  "identifiantSource": zod.string().nullish(),
   "photoUrl": zod.string().nullish(),
   "sexe": zod.union([zod.literal('M'),zod.literal('F'),zod.literal(null)]).nullish(),
   "parcelleLat": zod.string().nullish(),
@@ -797,6 +849,8 @@ export const GetLotTracabiliteResponse = zod.object({
   "statut": zod.enum(['actif', 'inactif']),
   "qrCodeToken": zod.string(),
   "dateAdhesion": zod.string(),
+  "anneeNaissance": zod.number().nullish(),
+  "identifiantSource": zod.string().nullish(),
   "photoUrl": zod.string().nullish(),
   "sexe": zod.union([zod.literal('M'),zod.literal('F'),zod.literal(null)]).nullish(),
   "parcelleLat": zod.string().nullish(),
