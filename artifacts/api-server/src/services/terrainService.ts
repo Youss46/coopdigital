@@ -281,7 +281,7 @@ export async function getFournisseurs(
     filtered = filtered.filter((m) =>
       m.nom.toLowerCase().includes(s) ||
       m.prenoms.toLowerCase().includes(s) ||
-      m.telephone.includes(s)
+      m.telephone?.includes(s)
     );
   }
 

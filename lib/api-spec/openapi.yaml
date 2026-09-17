@@ -7685,7 +7685,7 @@ components:
 
     Membre:
       type: object
-      required: [id, cooperativeId, codeMembre, nom, prenoms, telephone, superficieHa, statut, qrCodeToken, dateAdhesion, createdAt, updatedAt]
+      required: [id, cooperativeId, codeMembre, nom, prenoms, superficieHa, statut, qrCodeToken, dateAdhesion, createdAt, updatedAt]
       properties:
         id:
           type: integer
@@ -7702,7 +7702,7 @@ components:
         numeroCni:
           type: ["string", "null"]
         telephone:
-          type: string
+          type: ["string", "null"]
         village:
           type: ["string", "null"]
         groupement:
@@ -7739,7 +7739,7 @@ components:
 
     MembreInput:
       type: object
-      required: [cooperativeId, nom, prenoms, telephone, superficieHa, dateAdhesion]
+      required: [cooperativeId, nom, prenoms, superficieHa, dateAdhesion]
       properties:
         cooperativeId:
           type: integer
@@ -7750,7 +7750,7 @@ components:
         numeroCni:
           type: string
         telephone:
-          type: string
+          type: ["string", "null"]
         village:
           type: string
         groupement:

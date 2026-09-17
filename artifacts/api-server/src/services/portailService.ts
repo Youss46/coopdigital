@@ -93,7 +93,7 @@ export async function authentifierMembre(
   if (candidats.length === 0) throw new Error("Code membre ou téléphone incorrect");
 
   // Défense en profondeur côté JS (double vérification)
-  const membre = candidats.find(m => telCanon(m.telephone) === telNorm);
+  const membre = candidats.find(m => m.telephone !== null && telCanon(m.telephone) === telNorm);
   if (!membre) throw new Error("Code membre ou téléphone incorrect");
 
   return membre;

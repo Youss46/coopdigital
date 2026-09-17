@@ -368,11 +368,11 @@ export default function NouvelleLivraison() {
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
                   {membresData.membres.map((m) => (
                     <button key={m.id} type="button"
-                      onClick={() => { setMembreSelectionne({ id: m.id, nom: m.nom, prenoms: m.prenoms, telephone: m.telephone }); setMembreRecherche(""); }}
+                      onClick={() => { setMembreSelectionne({ id: m.id, nom: m.nom, prenoms: m.prenoms, telephone: m.telephone ?? "" }); setMembreRecherche(""); }}
                       className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-sm"
                     >
                       <span className="font-medium">{m.nom} {m.prenoms}</span>
-                      <span className="text-gray-400 ml-2">{m.telephone}</span>
+                      <span className="text-gray-400 ml-2">{m.telephone ?? "Téléphone non renseigné"}</span>
                     </button>
                   ))}
                 </div>

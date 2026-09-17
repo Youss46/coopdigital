@@ -29,7 +29,7 @@ interface DelegueInfo {
 
 interface MembreRow {
   id: number; nom: string; prenoms: string;
-  telephone: string; village?: string | null;
+  telephone: string | null; village?: string | null;
   statut: string; statutMembre?: string | null;
   completudeFiche?: number | null;
   completudeIdentite?: number | null;
@@ -482,14 +482,14 @@ export default function Membres() {
 
     // ── Membre coopérant (flux existant) ─────────────────────────────────────
     if (!form.sexe) { alert("Veuillez sélectionner une civilité (Monsieur / Madame)."); return; }
-    if (!form.nom || !form.prenoms || !form.telephone || !form.superficieHa) return;
+    if (!form.nom || !form.prenoms || !form.superficieHa) return;
     const delegueIdFinal = estDelegue ? utilisateur?.id : form.delegueId;
     const rattachementTypeFinal = estDelegue ? "delegue" : form.rattachementType;
     mutation.mutate({
       data: {
         cooperativeId: COOP_ID_PAR_DEFAUT,
         nom: form.nom!, prenoms: form.prenoms!,
-        telephone: form.telephone!, superficieHa: String(form.superficieHa),
+        telephone: form.telephone?.trim() || undefined, superficieHa: String(form.superficieHa),
         dateAdhesion: form.dateAdhesion!, statut: form.statut as "actif" | "inactif",
         village: form.village, groupement: form.groupement,
         numeroCni: form.numeroCni, sexe: form.sexe as "M" | "F" | undefined,
@@ -691,7 +691,7 @@ export default function Membres() {
                     {m.codeMembre && <div className="text-xs text-green-700 font-mono font-semibold mt-0.5">{m.codeMembre}</div>}
                     {badgesCertifications(m.certificationsBadges)}
                   </td>
-                  <td className="px-4 py-3 text-gray-600">{m.telephone}</td>
+                  <td className="px-4 py-3 text-gray-600">{m.telephone ?? "Non renseigné"}</td>
                   <td className="px-4 py-3 text-gray-600 hidden sm:table-cell">{m.village ?? "—"}</td>
                   {!estDelegue && (
                     <td className="px-4 py-3 hidden md:table-cell">
@@ -1151,8 +1151,8 @@ export default function Membres() {
                         className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1" placeholder="Lass" />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Téléphone *</label>
-                      <input required type="tel" inputMode="tel" minLength={10} maxLength={10} pattern="[0-9]{10}" value={form.telephone ?? ""} onChange={(e) => setForm({ ...form, telephone: e.target.value })}
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Téléphone <span className="text-gray-400">(optionnel)</span></label>
+                      <input type="tel" inputMode="tel" minLength={10} maxLength={10} pattern="[0-9]{10}" value={form.telephone ?? ""} onChange={(e) => setForm({ ...form, telephone: e.target.value })}
                         className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1" placeholder="07 XX XX XX XX" />
                     </div>
                     <div>
@@ -1221,8 +1221,8 @@ export default function Membres() {
               {/* Téléphone + CNI */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Téléphone *</label>
-                  <input required type="tel" inputMode="tel" minLength={10} maxLength={10} pattern="[0-9]{10}" value={form.telephone ?? ""} onChange={(e) => setForm({ ...form, telephone: e.target.value })}
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Téléphone <span className="text-gray-400">(optionnel)</span></label>
+                  <input type="tel" inputMode="tel" minLength={10} maxLength={10} pattern="[0-9]{10}" value={form.telephone ?? ""} onChange={(e) => setForm({ ...form, telephone: e.target.value })}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1" placeholder="07 XX XX XX XX" />
                 </div>
                 <div>

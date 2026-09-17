@@ -779,7 +779,7 @@ export default function MembreFiche() {
             </span>
           </div>
           <div className="flex flex-wrap gap-3 mt-2 text-sm text-gray-500">
-            <span className="flex items-center gap-1"><Phone size={13} />{membre.telephone}</span>
+            <span className={`flex items-center gap-1 ${membre.telephone ? "" : "text-amber-600"}`}><Phone size={13} />{membre.telephone ?? "Téléphone non renseigné"}</span>
             {membre.village && <span className="flex items-center gap-1"><MapPin size={13} />{membre.village}</span>}
             {membre.groupement && <span className="flex items-center gap-1"><Users size={13} />{membre.groupement}</span>}
             {(mx?.categorieMembre as string | null) && (
@@ -1802,9 +1802,8 @@ export default function MembreFiche() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Téléphone *</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Téléphone <span className="text-gray-400">(optionnel)</span></label>
                   <input
-                    required
                     value={editForm.telephone}
                     onChange={e => setEditForm(f => ({ ...f, telephone: e.target.value }))}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-300"

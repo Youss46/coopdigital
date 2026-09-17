@@ -13,7 +13,7 @@ function genCodeFournisseur(seq: number, annee: number) {
 
 async function autoCreateFournisseurMembre(
   cooperativeId: number,
-  membre: { id: number; nom: string; prenoms: string | null; telephone: string; section?: string | null; nationalite?: string | null; dateAdhesion: string; lieuNaissance?: string | null },
+  membre: { id: number; nom: string; prenoms: string | null; telephone: string | null; section?: string | null; nationalite?: string | null; dateAdhesion: string; lieuNaissance?: string | null },
 ) {
   try {
     const existing = await db.query.fournisseursTable.findFirst({
@@ -325,6 +325,7 @@ export async function createMembre(req: Request, res: Response): Promise<void> {
   }
 
   const data = { ...parse.data, cooperativeId };
+  const telephone = data.telephone?.trim() || null;
 
   if (!data.superficieHa || parseFloat(String(data.superficieHa)) <= 0) {
     res.status(400).json({ erreur: "La superficie doit être supérieure à 0" });
@@ -387,15 +388,17 @@ export async function createMembre(req: Request, res: Response): Promise<void> {
   }
 
   try {
-    const [existing] = await db
-      .select()
-      .from(membresTable)
-      .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.telephone, data.telephone)))
-      .limit(1);
+    if (telephone) {
+      const [existing] = await db
+        .select()
+        .from(membresTable)
+        .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(membresTable.telephone, telephone)))
+        .limit(1);
 
-    if (existing) {
-      res.status(400).json({ erreur: "Ce numéro de téléphone est déjà utilisé dans cette coopérative" });
-      return;
+      if (existing) {
+        res.status(400).json({ erreur: "Ce numéro de téléphone est déjà utilisé dans cette coopérative" });
+        return;
+      }
     }
 
     // ── RÈGLE 2/3 — Workflow selon rôle ────────────────────────────────────────
@@ -431,7 +434,7 @@ export async function createMembre(req: Request, res: Response): Promise<void> {
         numeroMembre: nextNumero,
         nom: data.nom,
         prenoms: data.prenoms,
-        telephone: data.telephone,
+        telephone,
         superficieHa: String(data.superficieHa),
         dateAdhesion: data.dateAdhesion ?? new Date().toISOString().split("T")[0]!,
         statut: data.statut ?? "actif",

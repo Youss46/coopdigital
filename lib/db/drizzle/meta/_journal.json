@@ -1219,6 +1219,13 @@
       "when": 1789660000000,
       "tag": "0173_import_membres_coobepa",
       "breakpoints": true
+    },
+    {
+      "idx": 174,
+      "version": "7",
+      "when": 1789661000000,
+      "tag": "0174_membres_telephone_optionnel",
+      "breakpoints": true
     }
   ]
 }

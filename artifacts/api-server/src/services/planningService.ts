@@ -319,7 +319,7 @@ export async function notifierMembresZone(cooperativeId: number, planningId: num
     (planning.zone_villages ?? planning.villages_prevus ?? []) as string[];
 
   // Membres actifs dont le village est dans la zone
-  let membres: { id: number; nom: string; telephone: string; village: string | null }[] = [];
+  let membres: { id: number; nom: string; telephone: string | null; village: string | null }[] = [];
   if (villagesZone.length > 0) {
     membres = await db
       .select({

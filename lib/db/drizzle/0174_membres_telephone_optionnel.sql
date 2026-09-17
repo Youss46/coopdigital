@@ -1,0 +1,2 @@
+ALTER TABLE "membres"
+  ALTER COLUMN "telephone" DROP NOT NULL;

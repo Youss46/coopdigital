@@ -34,7 +34,7 @@ type ImportRow = {
 type ExistingMember = {
   id: number;
   identifiantSource: string | null;
-  telephone: string;
+  telephone: string | null;
   numeroCni: string | null;
 };
 
@@ -134,7 +134,7 @@ export function parseMembresImportWorkbook(buffer: Buffer): ImportRow[] {
 
     if (!sourceId) blockingReasons.push("Identifiant COOBEPA manquant");
     if (!nom || !prenoms) blockingReasons.push("Nom ou prénom manquant");
-    if (!telephone) blockingReasons.push("Téléphone manquant");
+    if (!telephone) warnings.push("Téléphone manquant — à compléter ultérieurement");
     if (!(superficieHa > 0)) blockingReasons.push("Superficie totale invalide ou manquante");
     if (memberUnits.length === 0) warnings.push("Aucune parcelle GPS liée à cet identifiant");
     if (memberUnits.some((unit) => !(unit.superficie > 0) || !Number.isFinite(unit.lat) || !Number.isFinite(unit.lng))) {
@@ -309,7 +309,7 @@ export async function importMembres(req: Request, res: Response): Promise<void> 
           nom: row.nom,
           prenoms: row.prenoms,
           numeroCni: row.numeroCni,
-          telephone: row.telephone!,
+           telephone: row.telephone,
           village: row.village,
           superficieHa: String(row.superficieHa),
           statut: "actif",

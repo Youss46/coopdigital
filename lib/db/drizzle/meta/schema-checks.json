@@ -264,6 +264,17 @@
           "name": "membres_cooperative_identifiant_source_unique"
         }
       ]
+    },
+    {
+      "migration": "0174_membres_telephone_optionnel",
+      "objects": [
+        {
+          "kind": "column",
+          "schema": "public",
+          "table": "membres",
+          "name": "telephone"
+        }
+      ]
     }
   ]
 }

@@ -667,7 +667,8 @@ export interface Membre {
   prenoms: string;
   /** @nullable */
   numeroCni?: string | null;
-  telephone: string;
+  /** @nullable */
+  telephone?: string | null;
   /** @nullable */
   village?: string | null;
   /** @nullable */
@@ -718,7 +719,8 @@ export interface MembreInput {
   nom: string;
   prenoms: string;
   numeroCni?: string;
-  telephone: string;
+  /** @nullable */
+  telephone?: string | null;
   village?: string;
   groupement?: string;
   superficieHa: string;

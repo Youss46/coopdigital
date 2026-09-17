@@ -17,7 +17,7 @@ export const membresTable = pgTable("membres", {
   nom: text("nom").notNull(),
   prenoms: text("prenoms").notNull(),
   numeroCni: text("numero_cni"),
-  telephone: text("telephone").notNull(),
+  telephone: text("telephone"),
   village: text("village"),
   groupement: text("groupement"),
   superficieHa: numeric("superficie_ha", { precision: 8, scale: 2 }).notNull(),
