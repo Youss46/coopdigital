@@ -433,14 +433,71 @@ export default function ChargesDiversesPage() {
     ? `${form.compte_tresorerie_type}:${form.compte_tresorerie_id}`
     : form.compte_credit;
   const catLabel = (v: string) => CATEGORIES.find(c => c.value === v)?.label ?? v;
+  const statutLabel = (statut: string) =>
+    statut === "reglee" ? "✓ Réglée" : statut === "valide" ? "✓ Validé" : "Brouillon";
   const isSubmitting = createMut.isPending || updateMut.isPending;
+  const renderChargeActions = (charge: Charge) => (
+    <>
+      {charge.statut === "valide" && charge.mode_paiement === "credit" && !isFeatureReadOnly && (
+        <Button
+          variant="ghost"
+          size="icon"
+          title="Régler la dette fournisseur"
+          aria-label="Régler la dette fournisseur"
+          onClick={() => openReglement(charge)}
+          disabled={reglerMut.isPending || charge.montant_regle_fcfa > 0}
+        >
+          <WalletCards className="h-4 w-4 text-blue-600" />
+        </Button>
+      )}
+      {charge.statut === "brouillon" && (
+        <>
+          {!isFeatureReadOnly && (
+            <Button
+              variant="ghost"
+              size="icon"
+              title="Valider et générer l'écriture comptable"
+              aria-label="Valider et générer l'écriture comptable"
+              onClick={() => validerMut.mutate(charge.id)}
+              disabled={validerMut.isPending}
+            >
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+            </Button>
+          )}
+          {!isFeatureReadOnly && (
+            <Button
+              variant="ghost"
+              size="icon"
+              title="Modifier la charge"
+              aria-label="Modifier la charge"
+              onClick={() => openEdit(charge)}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+          )}
+          {!isFeatureReadOnly && (
+            <Button
+              variant="ghost"
+              size="icon"
+              title="Supprimer la charge"
+              aria-label="Supprimer la charge"
+              onClick={() => { if (confirm("Supprimer cette charge ?")) deleteMut.mutate(charge.id); }}
+              disabled={deleteMut.isPending}
+            >
+              <Trash2 className="h-4 w-4 text-red-500" />
+            </Button>
+          )}
+        </>
+      )}
+    </>
+  );
 
   // ── Rendu ─────────────────────────────────────────────────────────────────────
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto">
       {/* En-tête */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <TrendingDown className="h-6 w-6 text-red-500" />
             Charges diverses
@@ -449,12 +506,12 @@ export default function ChargesDiversesPage() {
             Enregistrement et suivi des dépenses de fonctionnement de la coopérative
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setShowStats(s => !s)}>
+        <div className="grid grid-cols-2 gap-2 w-full sm:flex sm:w-auto sm:shrink-0">
+          <Button className="w-full" variant="outline" onClick={() => setShowStats(s => !s)}>
             <BarChart3 className="h-4 w-4 mr-2" />
             {showStats ? "Masquer stats" : "Statistiques"}
           </Button>
-          {!isFeatureReadOnly && <Button onClick={openCreate} className="bg-red-600 hover:bg-red-700">
+          {!isFeatureReadOnly && <Button onClick={openCreate} className="w-full bg-red-600 hover:bg-red-700">
             <Plus className="h-4 w-4 mr-2" /> Nouvelle charge
           </Button>}
         </div>
@@ -493,13 +550,13 @@ export default function ChargesDiversesPage() {
           </CardHeader>
           <CardContent className="space-y-2">
             {dettes.map(dette => (
-              <div key={dette.id} className="flex items-center justify-between gap-3 rounded-md border bg-white px-3 py-2">
+              <div key={dette.id} className="flex flex-col gap-2 rounded-md border bg-white px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                   <p className="text-sm font-medium truncate">{dette.tiers || "Fournisseur non nommé"} — {dette.libelle}</p>
                   <p className="text-xs text-gray-500">{fmt(dette.date_charge)} · {fmtFcfa(dette.montant_fcfa)}</p>
                 </div>
                 {!isFeatureReadOnly && (
-                  <Button size="sm" onClick={() => openReglement(dette)}>
+                  <Button size="sm" className="w-full sm:w-auto" onClick={() => openReglement(dette)}>
                     <WalletCards className="h-4 w-4 mr-1" /> Régler
                   </Button>
                 )}
@@ -512,7 +569,7 @@ export default function ChargesDiversesPage() {
       {/* Filtres */}
       <Card>
         <CardContent className="pt-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-4 gap-3">
             <div>
               <Label className="text-xs text-gray-500">Statut</Label>
               <Select value={filtreStatut || "all"} onValueChange={v => setFiltreStatut(v === "all" ? "" : v)}>
@@ -571,7 +628,9 @@ export default function ChargesDiversesPage() {
               </Button>}
             </div>
           ) : (
-            <Table>
+            <>
+            <div className="hidden md:block overflow-x-auto">
+            <Table className="min-w-[1080px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
@@ -614,44 +673,60 @@ export default function ChargesDiversesPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center justify-end gap-1">
-                        {c.statut === "valide" && c.mode_paiement === "credit" && !isFeatureReadOnly && (
-                          <Button
-                            variant="ghost" size="icon"
-                            title="Régler la dette fournisseur"
-                            onClick={() => openReglement(c)}
-                            disabled={reglerMut.isPending || c.montant_regle_fcfa > 0}
-                          >
-                            <WalletCards className="h-4 w-4 text-blue-600" />
-                          </Button>
-                        )}
-                        {c.statut === "brouillon" && (
-                          <>
-                            {!isFeatureReadOnly && <Button
-                              variant="ghost" size="icon"
-                              title="Valider et générer l'écriture comptable"
-                              onClick={() => validerMut.mutate(c.id)}
-                              disabled={validerMut.isPending}
-                            >
-                              <CheckCircle2 className="h-4 w-4 text-green-600" />
-                            </Button>}
-                            {!isFeatureReadOnly && <Button variant="ghost" size="icon" onClick={() => openEdit(c)}>
-                              <Pencil className="h-4 w-4" />
-                            </Button>}
-                            {!isFeatureReadOnly && <Button
-                              variant="ghost" size="icon"
-                              onClick={() => { if (confirm("Supprimer cette charge ?")) deleteMut.mutate(c.id); }}
-                              disabled={deleteMut.isPending}
-                            >
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>}
-                          </>
-                        )}
+                        {renderChargeActions(c)}
                       </div>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
+            </div>
+            <div className="md:hidden divide-y divide-gray-100">
+              {charges.map(c => (
+                <div key={c.id} className="space-y-3 px-4 py-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm text-gray-900 break-words">{c.libelle}</p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {fmt(c.date_charge)} · {catLabel(c.categorie)}
+                      </p>
+                    </div>
+                    <Badge className={`shrink-0 ${STATUT_BADGE[c.statut] ?? "bg-gray-100 text-gray-600"}`}>
+                      {statutLabel(c.statut)}
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    <div>
+                      <p className="text-xs text-gray-500">Montant brut</p>
+                      <p className="font-semibold">{fmtFcfa(c.montant_fcfa)}</p>
+                    </div>
+                    {c.categorie === "ppsi" && (
+                      <div>
+                        <p className="text-xs text-gray-500">Net prestataire</p>
+                        <p className="font-semibold">
+                          {fmtFcfa(c.montant_net_fcfa ?? c.montant_fcfa - c.retenue_ppsi_fcfa)}
+                        </p>
+                      </div>
+                    )}
+                    {c.tiers && (
+                      <div className="min-w-0">
+                        <p className="text-xs text-gray-500">Tiers / Fournisseur</p>
+                        <p className="truncate">{c.tiers}</p>
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-xs text-gray-500">Compte</p>
+                      <p className="truncate font-mono text-xs text-gray-600">{c.compte_debit} / {c.compte_credit}</p>
+                    </div>
+                  </div>
+                  {c.description && <p className="text-xs text-gray-500 break-words">{c.description}</p>}
+                  <div className="flex justify-end gap-1 border-t border-gray-100 pt-2">
+                    {renderChargeActions(c)}
+                  </div>
+                </div>
+              ))}
+            </div>
+            </>
           )}
         </CardContent>
       </Card>
