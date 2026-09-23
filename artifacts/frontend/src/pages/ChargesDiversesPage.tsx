@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Card, CardContent, CardHeader, CardTitle,
@@ -11,6 +11,10 @@ import { Badge } from "@/components/ui/badge";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command, CommandEmpty, CommandInput, CommandItem, CommandList,
+} from "@/components/ui/command";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -22,7 +26,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useFeatureAccess } from "@/hooks/useFeatureAccess";
 import {
   Plus, Pencil, Trash2, CheckCircle2, Filter, BarChart3, WalletCards,
-  TrendingDown, FileText, Loader2,
+  TrendingDown, FileText, Loader2, Check, ChevronsUpDown,
 } from "lucide-react";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
@@ -93,19 +97,27 @@ interface MobileTresorerie {
   operateur: string;
 }
 
+interface CompteCharge {
+  id: number;
+  numeroCompte: string;
+  libelle: string;
+  classe: number | null;
+  ordreAffichage: number | null;
+}
+
 // ── Référentiels ──────────────────────────────────────────────────────────────
-const CATEGORIES: Array<{ value: string; label: string; compte: string }> = [
-  { value: "loyer",           label: "Loyer et charges locatives",  compte: "622000"  },
-  { value: "eau_electricite", label: "Eau et électricité",           compte: "605000"  },
-  { value: "fournitures",     label: "Fournitures de bureau",        compte: "604000"  },
-  { value: "communication",   label: "Téléphone et communication",   compte: "628000"  },
-  { value: "deplacement",     label: "Déplacements et transport",    compte: "618000"  },
-  { value: "reception",       label: "Réceptions et hébergement",    compte: "627000"  },
-  { value: "entretien",       label: "Entretien et réparations",     compte: "624000"  },
-  { value: "honoraires",      label: "Honoraires et consultants",    compte: "632000"  },
-  { value: "ppsi",            label: "Prestation informelle — PPSSI", compte: "632000"  },
-  { value: "publicite",       label: "Publicité et marketing",       compte: "627000"  },
-  { value: "autre",           label: "Autres charges",               compte: "658000"  },
+const CATEGORIES: Array<{ value: string; label: string }> = [
+  { value: "loyer",           label: "Loyer et charges locatives" },
+  { value: "eau_electricite", label: "Eau et électricité" },
+  { value: "fournitures",     label: "Fournitures de bureau" },
+  { value: "communication",   label: "Téléphone et communication" },
+  { value: "deplacement",     label: "Déplacements et transport" },
+  { value: "reception",       label: "Réceptions et hébergement" },
+  { value: "entretien",       label: "Entretien et réparations" },
+  { value: "honoraires",      label: "Honoraires et consultants" },
+  { value: "ppsi",            label: "Prestation informelle — PPSSI" },
+  { value: "publicite",       label: "Publicité et marketing" },
+  { value: "autre",           label: "Autres charges" },
 ];
 
 const MODES_PAIEMENT = [
@@ -170,11 +182,7 @@ export default function ChargesDiversesPage() {
     reference: "",
   });
 
-  // Sync compte débit quand catégorie change
-  useEffect(() => {
-    const cat = CATEGORIES.find(c => c.value === form.categorie);
-    if (cat && !editTarget) setForm(f => ({ ...f, compte_debit: cat.compte }));
-  }, [form.categorie, editTarget]);
+  const [compteChargeOpen, setCompteChargeOpen] = useState(false);
 
   // ── Queries ──────────────────────────────────────────────────────────────────
   const qs = new URLSearchParams();
@@ -213,6 +221,19 @@ export default function ChargesDiversesPage() {
     queryKey: ["charges-diverses-dettes-fournisseurs"],
     queryFn: () => apiFetch<Charge[]>("/charges-diverses/dettes-fournisseurs"),
   });
+
+  const { data: comptesCharge = [], isLoading: comptesChargeLoading, isError: comptesChargeError } = useQuery<CompteCharge[]>({
+    queryKey: ["charges-diverses-comptes-charge"],
+    queryFn: () => apiFetch<CompteCharge[]>("/charges-diverses/comptes-charge"),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const compteChargeSelection = comptesCharge.find(c => c.numeroCompte === form.compte_debit);
+  const compteChargeLabel = compteChargeSelection
+    ? `${compteChargeSelection.numeroCompte} — ${compteChargeSelection.libelle}`
+    : form.compte_debit
+      ? `${form.compte_debit} — compte actuel`
+      : "Sélectionner un compte de charge";
 
   // ── Mutations ─────────────────────────────────────────────────────────────────
   const invalidate = () => { void qc.invalidateQueries({ queryKey: ["charges-diverses"] }); };
@@ -284,9 +305,12 @@ export default function ChargesDiversesPage() {
   // ── Handlers ──────────────────────────────────────────────────────────────────
   const openCreate = useCallback(() => {
     setEditTarget(null);
-    setForm({ ...EMPTY_FORM });
+    setForm({
+      ...EMPTY_FORM,
+      compte_debit: comptesCharge[0]?.numeroCompte ?? EMPTY_FORM.compte_debit,
+    });
     setShowForm(true);
-  }, []);
+  }, [comptesCharge]);
 
   const openReglement = useCallback((charge: Charge) => {
     setReglementTarget(charge);
@@ -345,6 +369,10 @@ export default function ChargesDiversesPage() {
     if (isFeatureReadOnly) return;
     if (!form.libelle || !form.montant_fcfa || !form.date_charge) {
       toast({ title: "Champs requis", description: "Libellé, montant et date sont obligatoires.", variant: "destructive" });
+      return;
+    }
+    if (!form.compte_debit) {
+      toast({ title: "Compte de charge requis", description: "Sélectionnez un compte de charge SYSCOHADA actif.", variant: "destructive" });
       return;
     }
     if (!form.compte_credit) {
@@ -844,9 +872,52 @@ export default function ChargesDiversesPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <Label>Compte débit (OHADA)</Label>
-                <Input placeholder="Ex: 6132" value={form.compte_debit} onChange={e => setForm(f => ({ ...f, compte_debit: e.target.value }))} />
-                <p className="text-xs text-gray-400">Auto-rempli selon catégorie</p>
+                <Label>Compte de charge SYSCOHADA *</Label>
+                <Popover open={compteChargeOpen} onOpenChange={setCompteChargeOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      role="combobox"
+                      disabled={comptesChargeLoading || comptesChargeError || comptesCharge.length === 0}
+                      className="w-full justify-between font-normal"
+                    >
+                      <span className="truncate text-left">
+                        {comptesChargeLoading ? "Chargement du plan…" : comptesChargeError ? "Plan comptable indisponible" : compteChargeLabel}
+                      </span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Rechercher un compte ou un libellé…" />
+                      <CommandList>
+                        <CommandEmpty>Aucun compte de charge trouvé.</CommandEmpty>
+                        {comptesCharge.map(compte => (
+                          <CommandItem
+                            key={compte.id}
+                            value={`${compte.numeroCompte} ${compte.libelle}`}
+                            onSelect={() => {
+                              setForm(f => ({ ...f, compte_debit: compte.numeroCompte }));
+                              setCompteChargeOpen(false);
+                            }}
+                          >
+                            <Check className={`mr-2 h-4 w-4 ${form.compte_debit === compte.numeroCompte ? "opacity-100" : "opacity-0"}`} />
+                            <span className="font-mono">{compte.numeroCompte}</span>
+                            <span className="ml-2 truncate">{compte.libelle}</span>
+                          </CommandItem>
+                        ))}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                <p className="text-xs text-gray-400">
+                  {comptesChargeError
+                    ? "Impossible de charger le plan comptable."
+                    : comptesCharge.length === 0 && !comptesChargeLoading
+                      ? "Aucun compte de charge actif dans le plan comptable."
+                      : "Les comptes actifs de type charge sont proposés."}
+                </p>
               </div>
               <div className="space-y-1">
                 <Label>Compte crédit / trésorerie *</Label>

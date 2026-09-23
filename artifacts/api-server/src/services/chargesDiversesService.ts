@@ -9,8 +9,9 @@ import {
   comptesMobilesMarchandsTable,
   mouvementsMobileMarchandTable,
   fournisseursTable,
+  planComptableTable,
 } from "@workspace/db";
-import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
+import { eq, and, asc, desc, gte, lte, sql } from "drizzle-orm";
 import { getTauxPpsi } from "./fiscaliteService.js";
 import { normaliserNumeroCompte } from "../lib/numeroCompte.js";
 import { proposerEcrituresDansTransaction } from "./comptabiliteService.js";
@@ -90,6 +91,41 @@ export async function listChargesDiverses(
     .offset(filters.offset ?? 0);
 
   return rows;
+}
+
+export async function listComptesChargeActifs(cooperativeId: number) {
+  return db
+    .select({
+      id: planComptableTable.id,
+      numeroCompte: planComptableTable.numeroCompte,
+      libelle: planComptableTable.libelle,
+      classe: planComptableTable.classe,
+      ordreAffichage: planComptableTable.ordreAffichage,
+    })
+    .from(planComptableTable)
+    .where(and(
+      eq(planComptableTable.cooperativeId, cooperativeId),
+      eq(planComptableTable.type, "charge"),
+      eq(planComptableTable.actif, true),
+    ))
+    .orderBy(
+      sql`COALESCE(${planComptableTable.ordreAffichage}, 999999)`,
+      asc(planComptableTable.numeroCompte),
+    );
+}
+
+export async function compteChargeActifExiste(cooperativeId: number, numeroCompte: string): Promise<boolean> {
+  const [compte] = await db
+    .select({ id: planComptableTable.id })
+    .from(planComptableTable)
+    .where(and(
+      eq(planComptableTable.cooperativeId, cooperativeId),
+      eq(planComptableTable.numeroCompte, normaliserNumeroCompte(numeroCompte)),
+      eq(planComptableTable.type, "charge"),
+      eq(planComptableTable.actif, true),
+    ))
+    .limit(1);
+  return Boolean(compte);
 }
 
 export async function getChargeDiverses(cooperativeId: number, id: number) {

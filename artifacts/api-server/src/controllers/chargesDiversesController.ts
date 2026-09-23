@@ -12,6 +12,8 @@ import {
   getStatsChargesDiverses,
   securiserReglementPpsi,
   listHistoriqueCreditFournisseur,
+  listComptesChargeActifs,
+  compteChargeActifExiste,
 } from "../services/chargesDiversesService";
 import { normaliserNumeroCompte } from "../lib/numeroCompte.js";
 
@@ -34,6 +36,18 @@ export function erreurStructureCharge(
     return "Le compte 401 — Fournisseurs nécessite le mode de paiement « À crédit »";
   }
   return null;
+}
+
+// ── GET /charges-diverses/comptes-charge ─────────────────────────────────────
+export async function handleListComptesCharge(req: Request, res: Response): Promise<void> {
+  try {
+    const cooperativeId = req.user?.cooperativeId;
+    if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
+    res.json(await listComptesChargeActifs(cooperativeId));
+  } catch (err) {
+    req.log.error({ err }, "Erreur listComptesCharge");
+    res.status(500).json({ erreur: "Erreur interne" });
+  }
 }
 
 // ── GET /charges-diverses ─────────────────────────────────────────────────────
@@ -89,13 +103,20 @@ export async function handleCreateChargeDiverses(req: Request, res: Response): P
       res.status(400).json({ erreur: "Le nom du prestataire est requis pour une prestation soumise à la PPSSI" });
       return;
     }
+    const compteDebit = normaliserNumeroCompte(
+      body.compte_debit ?? COMPTE_DEBIT_DEFAUT[body.categorie] ?? "658",
+    );
+    if (!(await compteChargeActifExiste(cooperativeId, compteDebit))) {
+      res.status(400).json({ erreur: `Le compte de charge ${compteDebit} n'existe pas dans le plan comptable actif` });
+      return;
+    }
     const row = await createChargeDiverses(cooperativeId, userId, {
       dateCharge:     body.date_charge,
       libelle:        body.libelle,
       description:    body.description ?? null,
       montantFcfa:    String(body.montant_fcfa),
       categorie:      body.categorie,
-      compteDebit:    body.compte_debit  ?? COMPTE_DEBIT_DEFAUT[body.categorie] ?? "658",
+      compteDebit,
       compteCredit,
       modePaiement,
       tiers:          body.tiers ?? null,
@@ -211,13 +232,17 @@ export async function handleUpdateChargeDiverses(req: Request, res: Response): P
       );
       if (structureError) { res.status(400).json({ erreur: structureError }); return; }
     }
+    if (body.compte_debit && !(await compteChargeActifExiste(cooperativeId, body.compte_debit))) {
+      res.status(400).json({ erreur: `Le compte de charge ${normaliserNumeroCompte(body.compte_debit)} n'existe pas dans le plan comptable actif` });
+      return;
+    }
     const row = await updateChargeDiverses(cooperativeId, id, {
       ...(body.date_charge     ? { dateCharge:     body.date_charge }      : {}),
       ...(body.libelle         ? { libelle:        body.libelle }           : {}),
       ...(body.description     !== undefined ? { description: body.description } : {}),
       ...(body.montant_fcfa    ? { montantFcfa:    String(body.montant_fcfa) } : {}),
       ...(body.categorie       ? { categorie:      body.categorie }         : {}),
-      ...(body.compte_debit    ? { compteDebit:    body.compte_debit }      : {}),
+      ...(body.compte_debit    ? { compteDebit:    normaliserNumeroCompte(body.compte_debit) } : {}),
       ...(body.compte_credit   ? { compteCredit:   body.compte_credit }     : {}),
       ...(body.mode_paiement   ? { modePaiement:   body.mode_paiement }     : {}),
       ...(body.tiers           !== undefined ? { tiers: body.tiers }        : {}),

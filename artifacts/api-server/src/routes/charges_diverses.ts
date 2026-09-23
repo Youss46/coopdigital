@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import {
   handleListChargesDiverses,
+  handleListComptesCharge,
   handleCreateChargeDiverses,
   handleGetChargeDiverses,
   handleListDettesFournisseurs,
@@ -17,6 +18,7 @@ const router: IRouter = Router();
 router.get("/charges-diverses/stats",  handleStatsChargesDiverses);
 router.get("/charges-diverses/dettes-fournisseurs", handleListDettesFournisseurs);
 router.get("/charges-diverses/fournisseurs/:id/historique", handleHistoriqueCreditFournisseur);
+router.get("/charges-diverses/comptes-charge", handleListComptesCharge);
 router.get("/charges-diverses",        handleListChargesDiverses);
 router.post("/charges-diverses",       handleCreateChargeDiverses);
 router.get("/charges-diverses/:id",    handleGetChargeDiverses);
