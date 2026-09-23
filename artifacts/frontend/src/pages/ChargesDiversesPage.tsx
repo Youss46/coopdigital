@@ -182,6 +182,7 @@ export default function ChargesDiversesPage() {
     reference: "",
   });
 
+  const [categorieOpen, setCategorieOpen] = useState(false);
   const [compteChargeOpen, setCompteChargeOpen] = useState(false);
 
   // ── Queries ──────────────────────────────────────────────────────────────────
@@ -228,12 +229,34 @@ export default function ChargesDiversesPage() {
     staleTime: 5 * 60 * 1000,
   });
 
+  const catLabel = (v: string, comptes = comptesCharge) =>
+    comptes.find(c => c.numeroCompte === v)?.libelle
+      ? `${v} — ${comptes.find(c => c.numeroCompte === v)?.libelle}`
+      : CATEGORIES.find(c => c.value === v)?.label ?? v;
   const compteChargeSelection = comptesCharge.find(c => c.numeroCompte === form.compte_debit);
   const compteChargeLabel = compteChargeSelection
     ? `${compteChargeSelection.numeroCompte} — ${compteChargeSelection.libelle}`
     : form.compte_debit
       ? `${form.compte_debit} — compte actuel`
       : "Sélectionner un compte de charge";
+  const compteChargeOptions = comptesCharge.map(compte => ({
+    value: compte.numeroCompte,
+    label: `${compte.numeroCompte} — ${compte.libelle}`,
+  }));
+  const categorieActuelleStatique = CATEGORIES.find(c => c.value === form.categorie);
+  const categorieOptions = [
+    { value: "ppsi", label: "Prestation informelle — PPSSI" },
+    ...compteChargeOptions,
+    ...(categorieActuelleStatique && form.categorie !== "ppsi" && !compteChargeOptions.some(c => c.value === form.categorie)
+      ? [categorieActuelleStatique]
+      : []),
+  ];
+  const categorieLabel = categorieOptions.find(c => c.value === form.categorie)?.label
+    ?? catLabel(form.categorie);
+  const filtreCategorieOptions = [
+    ...CATEGORIES,
+    ...compteChargeOptions.filter(compte => !CATEGORIES.some(categorie => categorie.value === compte.value)),
+  ];
 
   // ── Mutations ─────────────────────────────────────────────────────────────────
   const invalidate = () => { void qc.invalidateQueries({ queryKey: ["charges-diverses"] }); };
@@ -305,9 +328,11 @@ export default function ChargesDiversesPage() {
   // ── Handlers ──────────────────────────────────────────────────────────────────
   const openCreate = useCallback(() => {
     setEditTarget(null);
+    const compteParDefaut = comptesCharge[0]?.numeroCompte ?? EMPTY_FORM.compte_debit;
     setForm({
       ...EMPTY_FORM,
-      compte_debit: comptesCharge[0]?.numeroCompte ?? EMPTY_FORM.compte_debit,
+      categorie: comptesCharge[0]?.numeroCompte ?? EMPTY_FORM.categorie,
+      compte_debit: compteParDefaut,
     });
     setShowForm(true);
   }, [comptesCharge]);
@@ -426,6 +451,31 @@ export default function ChargesDiversesPage() {
     }));
   }, []);
 
+  const handleCategorieChange = useCallback((value: string) => {
+    if (value === "ppsi") {
+      const comptePpsi = comptesCharge.find(compte => compte.numeroCompte === "632000")?.numeroCompte
+        ?? comptesCharge[0]?.numeroCompte;
+      setForm(f => ({
+        ...f,
+        categorie: value,
+        compte_debit: comptePpsi ?? f.compte_debit,
+      }));
+      setCategorieOpen(false);
+      return;
+    }
+    setForm(f => ({ ...f, categorie: value, compte_debit: value }));
+    setCategorieOpen(false);
+  }, [comptesCharge]);
+
+  const handleCompteChargeChange = useCallback((numeroCompte: string) => {
+    setForm(f => ({
+      ...f,
+      compte_debit: numeroCompte,
+      categorie: f.categorie === "ppsi" ? "ppsi" : numeroCompte,
+    }));
+    setCompteChargeOpen(false);
+  }, []);
+
   const handleModePaiementChange = useCallback((modePaiement: string) => {
     if (modePaiement === "credit") {
       setForm(f => ({
@@ -460,7 +510,6 @@ export default function ChargesDiversesPage() {
   const compteCreditValue = form.compte_tresorerie_type && form.compte_tresorerie_id
     ? `${form.compte_tresorerie_type}:${form.compte_tresorerie_id}`
     : form.compte_credit;
-  const catLabel = (v: string) => CATEGORIES.find(c => c.value === v)?.label ?? v;
   const statutLabel = (statut: string) =>
     statut === "reglee" ? "✓ Réglée" : statut === "valide" ? "✓ Validé" : "Brouillon";
   const isSubmitting = createMut.isPending || updateMut.isPending;
