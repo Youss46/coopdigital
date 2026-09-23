@@ -664,7 +664,9 @@ export default function ChargesDiversesPage() {
                 <SelectTrigger><SelectValue placeholder="Toutes" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Toutes</SelectItem>
-                  {CATEGORIES.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                  {filtreCategorieOptions.map(c => (
+                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -901,12 +903,41 @@ export default function ChargesDiversesPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label>Catégorie *</Label>
-                <Select value={form.categorie} onValueChange={v => setForm(f => ({ ...f, categorie: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {CATEGORIES.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Popover open={categorieOpen} onOpenChange={setCategorieOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      role="combobox"
+                      disabled={comptesChargeLoading || comptesChargeError || comptesCharge.length === 0}
+                      className="w-full justify-between font-normal"
+                    >
+                      <span className="truncate text-left">{categorieLabel}</span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Rechercher une catégorie ou un compte…" />
+                      <CommandList>
+                        <CommandEmpty>Aucune catégorie trouvée.</CommandEmpty>
+                        {categorieOptions.map(categorie => (
+                          <CommandItem
+                            key={categorie.value}
+                            value={`${categorie.value} ${categorie.label}`}
+                            onSelect={() => handleCategorieChange(categorie.value)}
+                          >
+                            <Check className={`mr-2 h-4 w-4 ${form.categorie === categorie.value ? "opacity-100" : "opacity-0"}`} />
+                            <span className={/^\d+$/.test(categorie.value) ? "font-mono" : ""}>{categorie.label}</span>
+                          </CommandItem>
+                        ))}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                <p className="text-xs text-gray-400">
+                  Les comptes actifs de type charge sont proposés comme catégories.
+                </p>
               </div>
               <div className="space-y-1">
                 <Label>Mode de paiement</Label>
@@ -947,8 +978,7 @@ export default function ChargesDiversesPage() {
                             key={compte.id}
                             value={`${compte.numeroCompte} ${compte.libelle}`}
                             onSelect={() => {
-                              setForm(f => ({ ...f, compte_debit: compte.numeroCompte }));
-                              setCompteChargeOpen(false);
+                              handleCompteChargeChange(compte.numeroCompte);
                             }}
                           >
                             <Check className={`mr-2 h-4 w-4 ${form.compte_debit === compte.numeroCompte ? "opacity-100" : "opacity-0"}`} />
