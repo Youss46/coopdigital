@@ -8,7 +8,7 @@ import L from "leaflet";
 import {
   Map, List, ShieldCheck, Download, Plus, RefreshCw, X, CheckCircle2,
   AlertTriangle, XCircle, Clock, HelpCircle, ChevronRight, Leaf, Navigation,
-  Globe, Users, Layers, Filter, FileDown, Printer, Search, MapPin,
+  Globe, Users, Layers, Filter, FileDown, Printer, Search, MapPin, Pencil,
 } from "lucide-react";
 
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)["_getIconUrl"];
@@ -971,11 +971,15 @@ function OngletListe({
   onVerifierTout,
   isVerifying,
   onShowOnMap,
+  onTraceContour,
+  canDrawContour,
 }: {
   onExportGeoJSON: () => void;
   onVerifierTout: () => Promise<void>;
   isVerifying: boolean;
   onShowOnMap?: (polygone: [number,number][] | null, point: { lat: number; lng: number } | null) => void;
+  onTraceContour?: (id: number) => void;
+  canDrawContour: boolean;
 }) {
   const [search, setSearch] = useState("");
   const [filterEudr, setFilterEudr] = useState("");
