@@ -1014,8 +1014,16 @@ function JournalCaisse({
             <p>Aucun mouvement pour cette période.</p>
           </div>
         ) : (
-          <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-            <table className="w-full text-sm">
+          <div
+            className="bg-white rounded-xl border border-gray-100 overflow-x-auto"
+            role="region"
+            aria-label="Tableau des opérations avec défilement horizontal"
+            tabIndex={0}
+          >
+            <p className="px-3 pt-2 text-xs text-gray-500 sm:hidden">
+              Faites glisser le tableau horizontalement pour voir toutes les colonnes.
+            </p>
+            <table className="w-full min-w-[1000px] text-sm">
               <thead>
                 <tr className="bg-gray-50 text-gray-500 text-xs">
                   <th className="text-left px-4 py-3 font-medium">Date opération</th>
@@ -1030,7 +1038,7 @@ function JournalCaisse({
               <tbody>
                 {journal.mouvements.map((m, i) => (
                   <tr key={m.id} className={`border-t border-gray-50 ${i % 2 === 1 ? "bg-gray-50/50" : ""}`}>
-                    <td className="px-4 py-3 text-gray-400 font-mono text-xs">{m.date_operation ?? "—"}</td>
+                    <td className="px-4 py-3 text-gray-400 font-mono text-xs whitespace-nowrap">{m.date_operation ?? "—"}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${m.type === "entree" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
                         {m.type === "entree" ? "↑ Entrée" : "↓ Sortie"}
@@ -1041,10 +1049,10 @@ function JournalCaisse({
                     <td className="px-4 py-3 text-gray-600 text-xs whitespace-nowrap">
                       {m.enregistre_par_nom?.trim() || "Système"}
                     </td>
-                    <td className={`px-4 py-3 text-right font-semibold ${m.type === "entree" ? "text-green-600" : "text-red-600"}`}>
+                    <td className={`px-4 py-3 text-right font-semibold whitespace-nowrap ${m.type === "entree" ? "text-green-600" : "text-red-600"}`}>
                       {m.type === "entree" ? "+" : "-"}{FCFA(m.montant_fcfa)}
                     </td>
-                    <td className="px-4 py-3 text-right text-gray-600 text-xs">
+                    <td className="px-4 py-3 text-right text-gray-600 text-xs whitespace-nowrap">
                       {m.solde_apres_fcfa ? FCFA(m.solde_apres_fcfa) : "—"}
                     </td>
                   </tr>
