@@ -241,8 +241,36 @@ export async function updateParcelle(req: Request, res: Response): Promise<void>
       .where(and(eq(parcellesTable.id, id), eq(parcellesTable.cooperativeId, coopId))).limit(1);
     if (!existing) { res.status(404).json({ erreur: "Parcelle introuvable" }); return; }
 
-    const polygone = body["polygone"] as [number, number][] | undefined;
-    const polygoneChanged = polygone !== undefined;
+    const polygoneChanged = Object.prototype.hasOwnProperty.call(body, "polygone");
+    const polygoneInput = body["polygone"];
+    let polygone: [number, number][] | null | undefined;
+    if (polygoneChanged && polygoneInput !== null) {
+      if (
+        !Array.isArray(polygoneInput)
+        || polygoneInput.length < 3
+        || polygoneInput.some((point: unknown) => (
+          !Array.isArray(point)
+          || point.length !== 2
+          || typeof point[0] !== "number"
+          || typeof point[1] !== "number"
+          || !Number.isFinite(point[0])
+          || !Number.isFinite(point[1])
+          || Math.abs(point[0]) > 90
+          || Math.abs(point[1]) > 180
+        ))
+      ) {
+        res.status(400).json({ erreur: "Le contour doit contenir au moins 3 coordonnées GPS valides." });
+        return;
+      }
+      polygone = polygoneInput as [number, number][];
+      const pointsDistincts = new Set(polygone.map(([lat, lng]) => `${lat},${lng}`));
+      if (pointsDistincts.size < 3 || calculerSuperficie(polygone) <= 0) {
+        res.status(400).json({ erreur: "Le contour est invalide ou sa superficie est nulle." });
+        return;
+      }
+    } else if (polygoneChanged) {
+      polygone = null;
+    }
     const superficieCalculee = polygone && polygone.length >= 3 ? calculerSuperficie(polygone) : undefined;
 
     const updates: Partial<typeof parcellesTable.$inferInsert> = {
@@ -272,13 +300,22 @@ export async function updateParcelle(req: Request, res: Response): Promise<void>
     const [updated] = await db.update(parcellesTable).set(updates)
       .where(and(eq(parcellesTable.id, id), eq(parcellesTable.cooperativeId, coopId))).returning();
 
+    let verificationEudrOk: boolean | undefined;
+    let resultat = updated;
     if (polygoneChanged && polygone && polygone.length >= 3) {
-      verifierEUDR(id).catch(e =>
-        req.log.warn({ err: e, parcelleId: id }, "Re-vérification EUDR différée échouée")
-      );
+      try {
+        await verifierEUDR(id);
+        verificationEudrOk = true;
+      } catch (e) {
+        verificationEudrOk = false;
+        req.log.warn({ err: e, parcelleId: id }, "Re-vérification EUDR échouée après mise à jour du contour");
+      }
+      const [refreshed] = await db.select().from(parcellesTable)
+        .where(and(eq(parcellesTable.id, id), eq(parcellesTable.cooperativeId, coopId))).limit(1);
+      if (refreshed) resultat = refreshed;
     }
 
-    res.json(updated);
+    res.json(verificationEudrOk === undefined ? resultat : { ...resultat, verificationEudrOk });
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur updateParcelle");

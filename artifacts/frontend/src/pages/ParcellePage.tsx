@@ -2,6 +2,7 @@ import "leaflet/dist/leaflet.css";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { usePermission } from "@/hooks/usePermission";
 import { MapContainer, TileLayer, Polygon, CircleMarker, Popup, Polyline, useMapEvents, useMap } from "react-leaflet";
 import L from "leaflet";
 import {
@@ -212,9 +213,14 @@ function DrawingLayer({
 
   return (
     <>
-      {vertices.length >= 2 && (
+      {vertices.length >= 3 ? (
+        <Polygon
+          positions={vertices}
+          pathOptions={{ color: "#2563eb", fillColor: "#3b82f6", fillOpacity: 0.15, dashArray: "6 4", weight: 2 }}
+        />
+      ) : vertices.length >= 2 ? (
         <Polyline positions={vertices} pathOptions={{ color: "#2563eb", dashArray: "6 4", weight: 2 }} />
-      )}
+      ) : null}
       {vertices.map((v, i) => (
         <CircleMarker
           key={i}
@@ -302,7 +308,7 @@ function LeafletMap({
                 fillOpacity: 0.5,
                 weight: isSelected ? 3 : 1.5,
               }}
-              eventHandlers={{ click: () => onSelect(p.id) }}
+              eventHandlers={{ click: () => { if (!drawingMode) onSelect(p.id); } }}
             >
               <Popup>
                 <div className="text-sm min-w-32">
@@ -323,7 +329,7 @@ function LeafletMap({
               center={[p.coordonneesPoint.lat, p.coordonneesPoint.lng]}
               radius={6}
               pathOptions={{ color: cfg.color, fillColor: cfg.color, fillOpacity: 0.8, weight: 2 }}
-              eventHandlers={{ click: () => onSelect(p.id) }}
+              eventHandlers={{ click: () => { if (!drawingMode) onSelect(p.id); } }}
             >
               <Popup>
                 <div className="text-sm">
@@ -411,10 +417,14 @@ function SidePanel({
   parcelle,
   onClose,
   onVerifier,
+  onDrawContour,
+  canDrawContour,
 }: {
   parcelle: ParcelleCarte;
   onClose: () => void;
   onVerifier: (id: number) => void;
+  onDrawContour: (parcelle: ParcelleCarte) => void;
+  canDrawContour: boolean;
 }) {
   const ha = parseFloat(String(parcelle.superficieCalculeeHa ?? parcelle.superficieDeclareeHa ?? 0));
   return (
@@ -444,8 +454,24 @@ function SidePanel({
           <p className="text-xs text-gray-500 mb-1">Statut EUDR</p>
           <BadgeEudr statut={parcelle.eudrStatut} />
         </div>
+        {parcelle.polygone && parcelle.polygone.length >= 3 ? (
+          <p className="text-xs text-green-700">Contour GPS enregistré.</p>
+        ) : (
+          <p className="text-xs text-amber-700">
+            Point GPS uniquement. Un contour est nécessaire pour évaluer la parcelle.
+          </p>
+        )}
       </div>
-      <div className="p-4 border-t border-gray-200">
+      <div className="p-4 border-t border-gray-200 space-y-2">
+        {canDrawContour && (!parcelle.polygone || parcelle.polygone.length < 3) && (
+          <button
+            onClick={() => onDrawContour(parcelle)}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 border border-blue-600 text-blue-700 text-sm rounded-lg hover:bg-blue-50 transition-colors"
+          >
+            <MapPin size={14} />
+            Tracer le contour
+          </button>
+        )}
         <button
           onClick={() => onVerifier(parcelle.id)}
           className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
@@ -713,6 +739,8 @@ function OngletCarte({
   isLoading,
   onRefresh,
   onVerifier,
+  canDrawContour,
+  onSaveContour,
 }: {
   parcelles: ParcelleCarte[];
   zones: ZoneRisque[];
@@ -720,15 +748,20 @@ function OngletCarte({
   isLoading: boolean;
   onRefresh: () => void;
   onVerifier: (id: number) => Promise<void>;
+  canDrawContour: boolean;
+  onSaveContour: (id: number, polygone: [number, number][]) => Promise<boolean>;
 }) {
   const [selected, setSelected] = useState<number | null>(null);
   const [drawingMode, setDrawingMode] = useState(false);
   const [drawVertices, setDrawVertices] = useState<[number, number][]>([]);
+  const [drawingTarget, setDrawingTarget] = useState<ParcelleCarte | null>(null);
+  const [savingContour, setSavingContour] = useState(false);
   const [showZones, setShowZones] = useState(true);
   const [showGpsTerrain, setShowGpsTerrain] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [drawnPolygon, setDrawnPolygon] = useState<[number, number][] | null>(null);
   const [filterEudr, setFilterEudr] = useState("all");
+  const [flyTarget, setFlyTarget] = useState<FlyTarget | null>(null);
 
   const selectedParcelle = parcelles.find(p => p.id === selected) ?? null;
 
@@ -748,9 +781,40 @@ function OngletCarte({
     setShowForm(true);
   }
 
+  function startContourDrawing(parcelle: ParcelleCarte) {
+    if (!canDrawContour || (parcelle.polygone && parcelle.polygone.length >= 3)) return;
+    setDrawingTarget(parcelle);
+    setDrawVertices([]);
+    setSelected(null);
+    setDrawingMode(true);
+    if (parcelle.coordonneesPoint) {
+      setFlyTarget({
+        bounds: pointToBounds(parcelle.coordonneesPoint.lat, parcelle.coordonneesPoint.lng),
+      });
+    }
+  }
+
+  async function saveContour() {
+    if (!drawingTarget || drawVertices.length < 3 || savingContour) return;
+    setSavingContour(true);
+    try {
+      const saved = await onSaveContour(drawingTarget.id, drawVertices);
+      if (saved) {
+        setDrawingMode(false);
+        setDrawVertices([]);
+        setDrawingTarget(null);
+        setSelected(drawingTarget.id);
+      }
+    } finally {
+      setSavingContour(false);
+    }
+  }
+
   function cancelDrawing() {
     setDrawingMode(false);
     setDrawVertices([]);
+    if (drawingTarget) setSelected(drawingTarget.id);
+    setDrawingTarget(null);
   }
 
   return (
@@ -785,26 +849,46 @@ function OngletCarte({
         <div className="ml-auto flex items-center gap-2">
           {drawingMode ? (
             <>
-              <span className="text-xs text-blue-600 font-medium">{drawVertices.length} sommet{drawVertices.length > 1 ? "s" : ""} — cliquez sur la carte</span>
+              <span className="text-xs text-blue-700 font-medium basis-full sm:basis-auto">
+                {drawingTarget
+                  ? `Contour de ${drawingTarget.codeParcelle ?? "la parcelle"} · ${drawVertices.length} sommet${drawVertices.length > 1 ? "s" : ""}`
+                  : `${drawVertices.length} sommet${drawVertices.length > 1 ? "s" : ""}`}
+                {" — touchez la carte"}
+              </span>
               <button
                 onClick={() => setDrawVertices(v => v.slice(0, -1))}
-                disabled={drawVertices.length === 0}
+                disabled={drawVertices.length === 0 || savingContour}
                 title="Supprimer le dernier point"
                 className="px-3 py-1.5 border border-orange-300 text-orange-700 text-sm rounded-lg hover:bg-orange-50 disabled:opacity-40 transition-colors"
               >
                 ↩ Annuler point
               </button>
-              <button onClick={finishDrawing} disabled={drawVertices.length < 3}
+              <button
+                onClick={drawingTarget ? () => { void saveContour(); } : finishDrawing}
+                disabled={drawVertices.length < 3 || savingContour}
                 className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:bg-gray-300 transition-colors">
-                Fermer le polygone
+                {savingContour
+                  ? "Enregistrement…"
+                  : drawingTarget
+                    ? "Enregistrer le contour"
+                    : "Fermer le polygone"}
               </button>
-              <button onClick={cancelDrawing} className="px-3 py-1.5 border border-gray-300 text-sm rounded-lg hover:bg-gray-50 transition-colors">
+              <button
+                onClick={cancelDrawing}
+                disabled={savingContour}
+                className="px-3 py-1.5 border border-gray-300 text-sm rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
                 Tout annuler
               </button>
             </>
           ) : (
             <button
-              onClick={() => { setDrawingMode(true); setDrawVertices([]); setSelected(null); }}
+              onClick={() => {
+                setDrawingTarget(null);
+                setDrawingMode(true);
+                setDrawVertices([]);
+                setSelected(null);
+              }}
               className="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
             >
               <Plus size={14} />
@@ -854,12 +938,15 @@ function OngletCarte({
           showGpsTerrain={showGpsTerrain}
           membresSansGps={[]}
           showMembresSansGps={false}
+          flyTarget={flyTarget}
         />
         {selectedParcelle && (
           <SidePanel
             parcelle={selectedParcelle}
             onClose={() => setSelected(null)}
             onVerifier={async (id) => { await onVerifier(id); setSelected(null); }}
+            onDrawContour={startContourDrawing}
+            canDrawContour={canDrawContour}
           />
         )}
       </div>
@@ -1202,10 +1289,17 @@ interface CoopConfig {
   logo_url: string | null;
 }
 
-function OngletCarteGlobale({ externalFlyTarget, onFlyTargetConsumed }: {
+function OngletCarteGlobale({
+  externalFlyTarget,
+  onFlyTargetConsumed,
+  canDrawContour,
+  onSaveContour,
+}: {
   externalFlyTarget?: FlyTarget | null;
   onFlyTargetConsumed?: () => void;
-} = {}) {
+  canDrawContour: boolean;
+  onSaveContour: (id: number, polygone: [number, number][]) => Promise<boolean>;
+}) {
   const qc = useQueryClient();
   const [filterEudr, setFilterEudr] = useState("all");
   const [filterVillage, setFilterVillage] = useState("");
@@ -1216,6 +1310,10 @@ function OngletCarteGlobale({ externalFlyTarget, onFlyTargetConsumed }: {
   const [showMembresSansGps, setShowMembresSansGps] = useState(true);
   const [selected, setSelected] = useState<number | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [drawingMode, setDrawingMode] = useState(false);
+  const [drawVertices, setDrawVertices] = useState<[number, number][]>([]);
+  const [drawingTarget, setDrawingTarget] = useState<ParcelleCarte | null>(null);
+  const [savingContour, setSavingContour] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isExportingXlsx, setIsExportingXlsx] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
@@ -1412,6 +1510,42 @@ function OngletCarteGlobale({ externalFlyTarget, onFlyTargetConsumed }: {
       setIsVerifying(false);
       setSelected(null);
     }
+  }
+
+  function startContourDrawing(parcelle: ParcelleCarte) {
+    if (!canDrawContour || (parcelle.polygone && parcelle.polygone.length >= 3)) return;
+    setDrawingTarget(parcelle);
+    setDrawVertices([]);
+    setSelected(null);
+    setDrawingMode(true);
+    if (parcelle.coordonneesPoint) {
+      setFlyTarget({
+        bounds: pointToBounds(parcelle.coordonneesPoint.lat, parcelle.coordonneesPoint.lng),
+      });
+    }
+  }
+
+  async function saveContour() {
+    if (!drawingTarget || drawVertices.length < 3 || savingContour) return;
+    setSavingContour(true);
+    try {
+      const saved = await onSaveContour(drawingTarget.id, drawVertices);
+      if (saved) {
+        setDrawingMode(false);
+        setDrawVertices([]);
+        setDrawingTarget(null);
+        setSelected(drawingTarget.id);
+      }
+    } finally {
+      setSavingContour(false);
+    }
+  }
+
+  function cancelContourDrawing() {
+    setDrawingMode(false);
+    setDrawVertices([]);
+    if (drawingTarget) setSelected(drawingTarget.id);
+    setDrawingTarget(null);
   }
 
   async function handleExportPDF() {
@@ -1849,6 +1983,35 @@ function OngletCarteGlobale({ externalFlyTarget, onFlyTargetConsumed }: {
         )}
       </div>
 
+      {drawingMode && (
+        <div className="no-print flex flex-wrap items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 p-3">
+          <p className="mr-auto text-sm font-medium text-blue-800">
+            {drawingTarget?.codeParcelle ?? "Parcelle"} · {drawVertices.length} sommet{drawVertices.length === 1 ? "" : "s"} — touchez la carte pour tracer le contour.
+          </p>
+          <button
+            onClick={() => setDrawVertices(vertices => vertices.slice(0, -1))}
+            disabled={drawVertices.length === 0 || savingContour}
+            className="rounded-lg border border-orange-300 px-3 py-2 text-sm text-orange-700 disabled:opacity-40"
+          >
+            Annuler le dernier point
+          </button>
+          <button
+            onClick={() => { void saveContour(); }}
+            disabled={drawVertices.length < 3 || savingContour}
+            className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-300"
+          >
+            {savingContour ? "Enregistrement…" : "Enregistrer le contour"}
+          </button>
+          <button
+            onClick={cancelContourDrawing}
+            disabled={savingContour}
+            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 disabled:opacity-50"
+          >
+            Annuler
+          </button>
+        </div>
+      )}
+
       {/* Carte */}
       <div className="no-print relative rounded-xl overflow-hidden border border-gray-200" style={{ height: 560 }}>
         <LeafletMap
@@ -1856,9 +2019,9 @@ function OngletCarteGlobale({ externalFlyTarget, onFlyTargetConsumed }: {
           zones={filteredZones}
           selectedId={selected}
           onSelect={setSelected}
-          drawingMode={false}
-          drawVertices={[]}
-          onAddVertex={() => {}}
+          drawingMode={drawingMode}
+          drawVertices={drawVertices}
+          onAddVertex={point => setDrawVertices(vertices => [...vertices, point])}
           showZones={showZones}
           gpsTerrainPolygons={gpsPolygones}
           showGpsTerrain={showGpsTerrain}
@@ -1871,6 +2034,8 @@ function OngletCarteGlobale({ externalFlyTarget, onFlyTargetConsumed }: {
             parcelle={selectedParcelle}
             onClose={() => setSelected(null)}
             onVerifier={handleVerifier}
+            onDrawContour={startContourDrawing}
+            canDrawContour={canDrawContour}
           />
         )}
       </div>
@@ -2022,6 +2187,9 @@ export default function ParcellePage() {
   const [mapTarget, setMapTarget] = useState<FlyTarget | null>(null);
   const qc = useQueryClient();
   const { toast } = useToast();
+  const peutModifierParcelle = usePermission("parcelles", "modifier_parcelle");
+  const peutVerifierEudr = usePermission("parcelles", "verifier_eudr");
+  const peutTracerContour = peutModifierParcelle && peutVerifierEudr;
 
   function handleShowOnMap(polygone: [number,number][] | null, point: { lat: number; lng: number } | null) {
     let target: FlyTarget | null = null;
@@ -2070,6 +2238,61 @@ export default function ParcellePage() {
     } finally {
       setIsVerifying(false);
     }
+  }
+
+  async function handleSaveContour(id: number, polygone: [number, number][]): Promise<boolean> {
+    let resultat: { eudrStatut: string | null; verificationEudrOk?: boolean };
+    try {
+      resultat = await apiFetch<{ eudrStatut: string | null; verificationEudrOk?: boolean }>(`/api/parcelles/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ polygone }),
+      });
+    } catch (err) {
+      toast({
+        title: "Contour non enregistré",
+        description: err instanceof Error ? err.message : "Vérifiez les coordonnées et réessayez.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    const rafraichirParcelles = async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["parcelles-carte"] }),
+        qc.invalidateQueries({ queryKey: ["parcelles-carte-globale"] }),
+        qc.invalidateQueries({ queryKey: ["parcelles-conformite"] }),
+        qc.invalidateQueries({ queryKey: ["parcelles-conformite-globale"] }),
+        qc.invalidateQueries({ queryKey: ["parcelles-liste"] }),
+      ]);
+    };
+
+    try {
+      if (resultat.verificationEudrOk === false) {
+        toast({
+          title: "Contour enregistré, vérification impossible",
+          description: "Le contrôle EUDR n'a pas abouti. Vous pourrez le relancer depuis la fiche de la parcelle.",
+          variant: "warning",
+          duration: 7000,
+        });
+      } else {
+        toast({
+          title: "Contour enregistré et vérifié",
+          description: `Résultat EUDR : ${getEudrConfig(resultat.eudrStatut).label}.`,
+          variant: resultat.eudrStatut === "non_conforme" ? "warning" : "success",
+          duration: 7000,
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Contour enregistré, vérification impossible",
+        description: err instanceof Error ? err.message : "Le contrôle EUDR n'a pas abouti.",
+        variant: "warning",
+        duration: 7000,
+      });
+    } finally {
+      await rafraichirParcelles();
+    }
+    return true;
   }
 
   async function handleVerifierTout() {
@@ -2187,6 +2410,8 @@ export default function ParcellePage() {
         <OngletCarteGlobale
           externalFlyTarget={mapTarget}
           onFlyTargetConsumed={() => setMapTarget(null)}
+          canDrawContour={peutTracerContour}
+          onSaveContour={handleSaveContour}
         />
       )}
       {tab === "carte" && (
@@ -2197,6 +2422,8 @@ export default function ParcellePage() {
           isLoading={carteQ.isFetching}
           onRefresh={() => carteQ.refetch()}
           onVerifier={handleVerifier}
+          canDrawContour={peutTracerContour}
+          onSaveContour={handleSaveContour}
         />
       )}
       {tab === "liste" && (
