@@ -656,20 +656,30 @@ export async function verifierTout(req: Request, res: Response): Promise<void> {
   try {
     const coopId = COOP_ID(req);
     const nonVerifiees = await db
-      .select({ id: parcellesTable.id })
+      .select({ id: parcellesTable.id, polygone: parcellesTable.polygone })
       .from(parcellesTable)
       .where(and(
         eq(parcellesTable.cooperativeId, coopId),
         eq(parcellesTable.actif, true),
-        eq(parcellesTable.eudrStatut, "non_verifie"),
+        or(eq(parcellesTable.eudrStatut, "non_verifie"), sql`${parcellesTable.eudrStatut} IS NULL`),
       ));
 
-    let ok = 0;
-    for (const { id } of nonVerifiees) {
-      try { await verifierEUDR(id); ok++; } catch { /* continue */ }
+    let evaluees = 0;
+    let sansPolygone = 0;
+    let erreurs = 0;
+    for (const parcelle of nonVerifiees) {
+      const hasPolygone = Array.isArray(parcelle.polygone) && parcelle.polygone.length >= 3;
+      if (!hasPolygone) sansPolygone++;
+      try {
+        await verifierEUDR(parcelle.id);
+        if (hasPolygone) evaluees++;
+      } catch (err) {
+        erreurs++;
+        req.log.warn({ err, parcelleId: parcelle.id }, "Échec de vérification EUDR en lot");
+      }
     }
 
-    res.json({ verifiees: ok, total: nonVerifiees.length });
+    res.json({ evaluees, total: nonVerifiees.length, sansPolygone, erreurs });
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur verifierTout");

@@ -908,9 +908,12 @@ function OngletListe({
 
   async function handleVerifierTout() {
     setVerifyLoading(true);
-    await onVerifierTout();
-    await refetch();
-    setVerifyLoading(false);
+    try {
+      await onVerifierTout();
+      await refetch();
+    } finally {
+      setVerifyLoading(false);
+    }
   }
 
   return (
@@ -2053,19 +2056,62 @@ export default function ParcellePage() {
 
   async function handleVerifier(id: number) {
     setIsVerifying(true);
-    await apiFetch(`/api/parcelles/${id}/verifier-eudr`, { method: "PUT" });
-    await qc.invalidateQueries({ queryKey: ["parcelles-carte"] });
-    await qc.invalidateQueries({ queryKey: ["parcelles-conformite"] });
-    setIsVerifying(false);
+    try {
+      await apiFetch(`/api/parcelles/${id}/verifier-eudr`, { method: "PUT" });
+      await qc.invalidateQueries({ queryKey: ["parcelles-carte"] });
+      await qc.invalidateQueries({ queryKey: ["parcelles-conformite"] });
+      toast({ title: "Vérification terminée", variant: "success" });
+    } catch (err) {
+      toast({
+        title: "Vérification impossible",
+        description: err instanceof Error ? err.message : "Une erreur est survenue.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsVerifying(false);
+    }
   }
 
   async function handleVerifierTout() {
     setIsVerifying(true);
-    await apiFetch("/api/parcelles/verifier-tout", { method: "POST" });
-    await qc.invalidateQueries({ queryKey: ["parcelles-carte"] });
-    await qc.invalidateQueries({ queryKey: ["parcelles-conformite"] });
-    await qc.invalidateQueries({ queryKey: ["parcelles-liste"] });
-    setIsVerifying(false);
+    try {
+      const result = await apiFetch<{
+        evaluees: number;
+        total: number;
+        sansPolygone: number;
+        erreurs: number;
+      }>("/api/parcelles/verifier-tout", { method: "POST" });
+      await qc.invalidateQueries({ queryKey: ["parcelles-carte"] });
+      await qc.invalidateQueries({ queryKey: ["parcelles-conformite"] });
+      await qc.invalidateQueries({ queryKey: ["parcelles-liste"] });
+
+      if (result.total === 0) {
+        toast({ title: "Aucune parcelle en attente de vérification" });
+        return;
+      }
+
+      const details = [
+        `${result.evaluees} évaluée(s) avec polygone`,
+        result.sansPolygone > 0
+          ? `${result.sansPolygone} sans polygone : statut maintenu « Non vérifié »`
+          : null,
+        result.erreurs > 0 ? `${result.erreurs} échec(s)` : null,
+      ].filter(Boolean).join(" · ");
+      toast({
+        title: "Contrôle EUDR terminé",
+        description: details,
+        variant: result.erreurs > 0 ? "warning" : "success",
+        duration: 7000,
+      });
+    } catch (err) {
+      toast({
+        title: "Vérification impossible",
+        description: err instanceof Error ? err.message : "Une erreur est survenue.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsVerifying(false);
+    }
   }
 
   async function handleExportGeoJSON() {
