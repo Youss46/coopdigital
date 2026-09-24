@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ExcelJS from "exceljs";
+import zlib from "zlib";
 
 const mockDb = {
   execute: vi.fn(),
+  select: vi.fn(),
 };
 
 const sql = vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({
@@ -52,7 +54,7 @@ vi.mock("../services/pdfHeaderService.js", () => ({
   drawFooter: vi.fn(),
 }));
 
-const { genererJournalExcel, listSessions } = await import("../services/caisseService.js");
+const { genererJournalExcel, genererRapportPdf, listSessions } = await import("../services/caisseService.js");
 
 const mouvements = [
   {
@@ -104,6 +106,38 @@ const mouvements = [
 
 function rowValues(worksheet: ExcelJS.Worksheet, rowNumber: number): unknown[] {
   return Array.from({ length: 7 }, (_, index) => worksheet.getCell(rowNumber, index + 1).value);
+}
+
+function extractPdfText(buffer: Buffer): string {
+  const text: string[] = [buffer.toString("latin1")];
+  let position = 0;
+  while (position < buffer.length) {
+    let marker = buffer.indexOf(Buffer.from("stream\r\n"), position);
+    let delimiterLength = 8;
+    const unixMarker = buffer.indexOf(Buffer.from("stream\n"), position);
+    if (marker === -1 || (unixMarker !== -1 && unixMarker < marker)) {
+      marker = unixMarker;
+      delimiterLength = 7;
+    }
+    if (marker === -1) break;
+    const end = buffer.indexOf(Buffer.from("endstream"), marker + delimiterLength);
+    if (end === -1) break;
+    try {
+      const stream = zlib.inflateSync(buffer.subarray(marker + delimiterLength, end)).toString("latin1");
+      for (const match of stream.matchAll(/\[([\s\S]*?)\]\s*TJ/g)) {
+        const chunks = [...match[1]!.matchAll(/<([0-9A-Fa-f]+)>/g)]
+          .map((chunk) => Buffer.from(chunk[1]!, "hex").toString("latin1"));
+        text.push(chunks.join(""));
+      }
+      for (const match of stream.matchAll(/<([0-9A-Fa-f]+)>\s*Tj/g)) {
+        text.push(Buffer.from(match[1]!, "hex").toString("latin1"));
+      }
+    } catch {
+      // Les flux non compressés sont déjà couverts par le contenu brut.
+    }
+    position = end + 9;
+  }
+  return text.join("");
 }
 
 describe("export tableur du journal de caisse", () => {
@@ -215,5 +249,59 @@ describe("noms des opérateurs des sessions de caisse", () => {
       ouvert_par_nom: "Kouassi Awa",
       ferme_par_nom: "Yao Serge",
     });
+  });
+});
+
+describe("bénéficiaire du paiement dans le rapport PDF de caisse", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("inclut le nom complet du producteur dans le PDF", async () => {
+    const caisseQuery = {
+      from: vi.fn(),
+      where: vi.fn(),
+      limit: vi.fn(),
+    };
+    caisseQuery.from.mockReturnValue(caisseQuery);
+    caisseQuery.where.mockReturnValue(caisseQuery);
+    caisseQuery.limit.mockResolvedValue([{
+      id: 12,
+      cooperativeId: 9,
+      nom: "Caisse centrale",
+      soldeActuelFcfa: "48000",
+    }]);
+    mockDb.select.mockReturnValue(caisseQuery);
+    mockDb.execute
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 51,
+          type: "sortie",
+          motif: "paiement_producteur",
+          montant_fcfa: "2000",
+          libelle: "Paiement producteur — règlement REC-51",
+          reference_operation: "PAI-51",
+          solde_apres_fcfa: "48000",
+          date_operation: "2026-09-24",
+          created_at: "2026-09-24T08:00:00.000Z",
+          enregistre_par_nom: "Operateur Test",
+          session_id: 6,
+          beneficiaire_nom: "Fofana Awa",
+          session_statut: "ouverte",
+          date_session: "2026-09-24",
+        }],
+      })
+      .mockResolvedValueOnce({ rows: [{ nom: "Cooperative Test" }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const pdf = await genererRapportPdf(12, {
+      dateDebut: "2026-09-24",
+      dateFin: "2026-09-24",
+    });
+    const text = extractPdfText(pdf);
+
+    expect(pdf.subarray(0, 4).toString()).toBe("%PDF");
+    expect(text).toContain("Fofana");
+    expect(text).toContain("Awa");
   });
 });

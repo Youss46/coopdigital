@@ -909,17 +909,32 @@ export async function genererRapportPdf(
     tableY += 22;
   } else {
     journal.mouvements.forEach((m, idx) => {
-      if (tableY > doc.page.height - 80) {
+      const motifBase = m.motif.replace(/_/g, " ");
+      const beneficiaire = m.motif === "paiement_producteur"
+        ? m.beneficiaire_nom?.trim()
+        : "";
+      const motifTexte = beneficiaire
+        ? `${motifBase}\nBénéficiaire : ${beneficiaire}`
+        : motifBase;
+      doc.font("Helvetica").fontSize(7);
+      const rowHeight = beneficiaire
+        ? Math.max(14, doc.heightOfString(motifTexte, {
+            width: colWidths[2]! - 4,
+            lineGap: 0,
+          }) + 6)
+        : 14;
+
+      if (tableY + rowHeight > doc.page.height - 80) {
         doc.addPage();
         tableY = 60;
       }
       const bg = idx % 2 === 0 ? "#ffffff" : "#f9fafb";
-      doc.save().rect(tableX, tableY, cW, 14).fillColor(bg).fill().restore();
+      doc.save().rect(tableX, tableY, cW, rowHeight).fillColor(bg).fill().restore();
       const entree = m.type === "entree";
       const cols = [
         m.date_operation ?? "—",
         entree ? "Entrée" : "Sortie",
-        m.motif.replace(/_/g, " "),
+        motifTexte,
         m.libelle ?? "—",
         m.enregistre_par_nom?.trim() || "Système",
         FCFA(m.montant_fcfa),
@@ -930,12 +945,20 @@ export async function genererRapportPdf(
         const color = i === 1 ? (entree ? "#166534" : "#991b1b") : "#222222";
         doc.font(i === 1 ? "Helvetica-Bold" : "Helvetica")
           .fontSize(7).fillColor(color)
-          .text(String(v).slice(0, i === 3 ? 38 : 30), cx, tableY + 3, { width: colWidths[i]! - 4, lineBreak: false });
+          .text(
+            i === 2 && beneficiaire ? String(v) : String(v).slice(0, i === 3 ? 38 : 30),
+            cx,
+            tableY + (i === 2 && beneficiaire ? 2 : Math.max(3, (rowHeight - 8) / 2)),
+            {
+              width: colWidths[i]! - 4,
+              lineBreak: i === 2 && Boolean(beneficiaire),
+            },
+          );
         cx += colWidths[i]!;
       });
       // Bordure inférieure
-      doc.moveTo(tableX, tableY + 14).lineTo(tableX + cW, tableY + 14).strokeColor("#e5e7eb").lineWidth(0.4).stroke();
-      tableY += 14;
+      doc.moveTo(tableX, tableY + rowHeight).lineTo(tableX + cW, tableY + rowHeight).strokeColor("#e5e7eb").lineWidth(0.4).stroke();
+      tableY += rowHeight;
     });
   }
   doc.y = tableY + 10;
