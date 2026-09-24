@@ -1052,6 +1052,10 @@ function OngletListe({
         </div>
       </div>
 
+      <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+        « Vérifier tout » ne trace pas les contours. Pour contrôler une parcelle sans polygone, ses limites réelles doivent d’abord être dessinées sur la carte.
+      </div>
+
       {isLoading ? (
         <div className="flex justify-center py-16">
           <RefreshCw size={20} className="animate-spin text-gray-400" />
@@ -1102,18 +1106,30 @@ function OngletListe({
                     </td>
                     {onShowOnMap && (
                       <td className="px-3 py-2.5">
-                        <button
-                          onClick={() => onShowOnMap(p.polygone, p.coordonneesPoint)}
-                          title="Voir sur la carte"
-                          className={`p-1.5 rounded-lg transition-colors ${
-                            p.polygone || p.coordonneesPoint
-                              ? "text-green-600 hover:bg-green-50"
-                              : "text-gray-300 cursor-default"
-                          }`}
-                          disabled={!p.polygone && !p.coordonneesPoint}
-                        >
-                          <MapPin size={14} />
-                        </button>
+                        {canDrawContour && (!p.polygone || p.polygone.length < 3) && p.coordonneesPoint && onTraceContour ? (
+                          <button
+                            onClick={() => onTraceContour(p.id)}
+                            title="Tracer le contour réel"
+                            aria-label={`Tracer le contour réel de ${p.codeParcelle ?? p.membre_nom}`}
+                            className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => onShowOnMap(p.polygone, p.coordonneesPoint)}
+                            title="Voir sur la carte"
+                            aria-label={`Voir ${p.codeParcelle ?? p.membre_nom} sur la carte`}
+                            className={`p-1.5 rounded-lg transition-colors ${
+                              p.polygone || p.coordonneesPoint
+                                ? "text-green-600 hover:bg-green-50"
+                                : "text-gray-300 cursor-default"
+                            }`}
+                            disabled={!p.polygone && !p.coordonneesPoint}
+                          >
+                            <MapPin size={14} />
+                          </button>
+                        )}
                       </td>
                     )}
                   </tr>
@@ -1296,11 +1312,15 @@ interface CoopConfig {
 function OngletCarteGlobale({
   externalFlyTarget,
   onFlyTargetConsumed,
+  externalDrawTargetId,
+  onExternalDrawTargetConsumed,
   canDrawContour,
   onSaveContour,
 }: {
   externalFlyTarget?: FlyTarget | null;
   onFlyTargetConsumed?: () => void;
+  externalDrawTargetId?: number | null;
+  onExternalDrawTargetConsumed?: () => void;
   canDrawContour: boolean;
   onSaveContour: (id: number, polygone: [number, number][]) => Promise<boolean>;
 }) {
@@ -1516,7 +1536,7 @@ function OngletCarteGlobale({
     }
   }
 
-  function startContourDrawing(parcelle: ParcelleCarte) {
+  const startContourDrawing = useCallback((parcelle: ParcelleCarte) => {
     if (!canDrawContour || (parcelle.polygone && parcelle.polygone.length >= 3)) return;
     setDrawingTarget(parcelle);
     setDrawVertices([]);
@@ -1527,7 +1547,15 @@ function OngletCarteGlobale({
         bounds: pointToBounds(parcelle.coordonneesPoint.lat, parcelle.coordonneesPoint.lng),
       });
     }
-  }
+  }, [canDrawContour]);
+
+  useEffect(() => {
+    if (externalDrawTargetId == null || !carteQ.data) return;
+    const target = parcelles.find(parcelle => parcelle.id === externalDrawTargetId);
+    if (!target) return;
+    startContourDrawing(target);
+    onExternalDrawTargetConsumed?.();
+  }, [externalDrawTargetId, carteQ.data, parcelles, startContourDrawing, onExternalDrawTargetConsumed]);
 
   async function saveContour() {
     if (!drawingTarget || drawVertices.length < 3 || savingContour) return;
@@ -2189,6 +2217,7 @@ export default function ParcellePage() {
   const [tab, setTab] = useState<Tab>("carte_globale");
   const [isVerifying, setIsVerifying] = useState(false);
   const [mapTarget, setMapTarget] = useState<FlyTarget | null>(null);
+  const [drawTargetId, setDrawTargetId] = useState<number | null>(null);
   const qc = useQueryClient();
   const { toast } = useToast();
   const peutModifierParcelle = usePermission("parcelles", "modifier_parcelle");
@@ -2206,6 +2235,12 @@ export default function ParcellePage() {
       setMapTarget(target);
       setTab("carte_globale");
     }
+  }
+
+  function handleTraceContour(id: number) {
+    setMapTarget(null);
+    setDrawTargetId(id);
+    setTab("carte_globale");
   }
 
   const carteQ = useQuery({
@@ -2414,6 +2449,8 @@ export default function ParcellePage() {
         <OngletCarteGlobale
           externalFlyTarget={mapTarget}
           onFlyTargetConsumed={() => setMapTarget(null)}
+          externalDrawTargetId={drawTargetId}
+          onExternalDrawTargetConsumed={() => setDrawTargetId(null)}
           canDrawContour={peutTracerContour}
           onSaveContour={handleSaveContour}
         />
@@ -2436,6 +2473,8 @@ export default function ParcellePage() {
           onVerifierTout={handleVerifierTout}
           isVerifying={isVerifying}
           onShowOnMap={handleShowOnMap}
+          onTraceContour={handleTraceContour}
+          canDrawContour={peutTracerContour}
         />
       )}
       {tab === "conformite" && (
