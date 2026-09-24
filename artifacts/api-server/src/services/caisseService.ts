@@ -566,7 +566,8 @@ export async function listSessions(caisseId: number, opts?: { dateDebut?: string
       s.solde_ouverture_fcfa, s.solde_fermeture_theorique_fcfa,
       s.solde_fermeture_reel_fcfa, s.ecart_fcfa,
       s.heure_ouverture::text, s.heure_fermeture::text,
-      u1.nom AS ouvert_par_nom, u2.nom AS ferme_par_nom,
+      concat_ws(' ', NULLIF(BTRIM(u1.nom), ''), NULLIF(BTRIM(u1.prenoms), '')) AS ouvert_par_nom,
+      concat_ws(' ', NULLIF(BTRIM(u2.nom), ''), NULLIF(BTRIM(u2.prenoms), '')) AS ferme_par_nom,
       COUNT(m.id) AS nb_mouvements
     FROM sessions_caisse s
     LEFT JOIN users u1 ON u1.id = s.ouvert_par
@@ -575,7 +576,7 @@ export async function listSessions(caisseId: number, opts?: { dateDebut?: string
     WHERE s.caisse_id = ${caisseId}
       ${opts?.dateDebut ? sql`AND s.date_session >= ${opts.dateDebut}` : sql``}
       ${opts?.dateFin   ? sql`AND s.date_session <= ${opts.dateFin}`   : sql``}
-    GROUP BY s.id, u1.nom, u2.nom
+    GROUP BY s.id, u1.nom, u1.prenoms, u2.nom, u2.prenoms
     ORDER BY s.date_session DESC
   `);
   return result.rows;
@@ -786,7 +787,8 @@ export async function genererRapportPdf(
     SELECT s.id, s.date_session::text, s.statut, s.solde_ouverture_fcfa,
       s.solde_fermeture_theorique_fcfa, s.solde_fermeture_reel_fcfa, s.ecart_fcfa,
       s.heure_ouverture::text, s.heure_fermeture::text,
-      u1.nom AS ouvert_par_nom, u2.nom AS ferme_par_nom
+      concat_ws(' ', NULLIF(BTRIM(u1.nom), ''), NULLIF(BTRIM(u1.prenoms), '')) AS ouvert_par_nom,
+      concat_ws(' ', NULLIF(BTRIM(u2.nom), ''), NULLIF(BTRIM(u2.prenoms), '')) AS ferme_par_nom
     FROM sessions_caisse s
     LEFT JOIN users u1 ON u1.id = s.ouvert_par
     LEFT JOIN users u2 ON u2.id = s.ferme_par

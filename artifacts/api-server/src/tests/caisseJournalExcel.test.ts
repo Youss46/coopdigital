@@ -52,7 +52,7 @@ vi.mock("../services/pdfHeaderService.js", () => ({
   drawFooter: vi.fn(),
 }));
 
-const { genererJournalExcel } = await import("../services/caisseService.js");
+const { genererJournalExcel, listSessions } = await import("../services/caisseService.js");
 
 const mouvements = [
   {
@@ -180,5 +180,36 @@ describe("export tableur du journal de caisse", () => {
       25,
       668235.5,
     ]);
+  });
+});
+
+describe("noms des opérateurs des sessions de caisse", () => {
+  it("renvoie les noms et prénoms des opérateurs d'ouverture et de fermeture", async () => {
+    mockDb.execute.mockResolvedValueOnce({
+      rows: [{
+        id: 21,
+        ouvert_par_nom: "Kouassi Awa",
+        ferme_par_nom: "Yao Serge",
+      }],
+    });
+
+    const sessions = await listSessions(12);
+    const query = mockDb.execute.mock.calls[0]?.[0] as {
+      strings: string[];
+      values: unknown[];
+    };
+    const queryText = query.strings.join("?");
+
+    expect(queryText).toContain(
+      "concat_ws(' ', NULLIF(BTRIM(u1.nom), ''), NULLIF(BTRIM(u1.prenoms), '')) AS ouvert_par_nom",
+    );
+    expect(queryText).toContain(
+      "concat_ws(' ', NULLIF(BTRIM(u2.nom), ''), NULLIF(BTRIM(u2.prenoms), '')) AS ferme_par_nom",
+    );
+    expect(queryText).toContain("GROUP BY s.id, u1.nom, u1.prenoms, u2.nom, u2.prenoms");
+    expect(sessions[0]).toMatchObject({
+      ouvert_par_nom: "Kouassi Awa",
+      ferme_par_nom: "Yao Serge",
+    });
   });
 });
