@@ -184,6 +184,10 @@ describe("export tableur du journal de caisse", () => {
 });
 
 describe("noms des opérateurs des sessions de caisse", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("renvoie les noms et prénoms des opérateurs d'ouverture et de fermeture", async () => {
     mockDb.execute.mockResolvedValueOnce({
       rows: [{
