@@ -453,7 +453,7 @@ export async function getJournal(caisseId: number, opts?: { dateDebut?: string; 
       m.reference_operation, m.solde_apres_fcfa,
       m.date_operation::text,
       m.created_at::text, m.session_id,
-      u.nom AS enregistre_par_nom,
+      concat_ws(' ', NULLIF(BTRIM(u.nom), ''), NULLIF(BTRIM(u.prenoms), '')) AS enregistre_par_nom,
       s.statut AS session_statut, s.date_session::text
     FROM mouvements_caisse m
     LEFT JOIN sessions_caisse s ON s.id = m.session_id

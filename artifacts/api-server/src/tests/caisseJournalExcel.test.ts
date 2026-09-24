@@ -65,7 +65,7 @@ const mouvements = [
     solde_apres_fcfa: "625000",
     date_operation: "2026-08-28",
     created_at: "2026-08-28T08:00:00.000Z",
-    enregistre_par_nom: "Kouassi",
+    enregistre_par_nom: "Kouassi Awa",
     session_id: 4,
     session_statut: "fermee",
     date_session: "2026-08-28",
@@ -128,7 +128,9 @@ describe("export tableur du journal de caisse", () => {
     const queryText = query.strings.join("?");
     expect(queryText).toContain("m.date_operation BETWEEN");
     expect(queryText).toContain("LEFT JOIN users u ON u.id = m.enregistre_par");
-    expect(queryText).toContain("u.nom AS enregistre_par_nom");
+    expect(queryText).toContain(
+      "concat_ws(' ', NULLIF(BTRIM(u.nom), ''), NULLIF(BTRIM(u.prenoms), '')) AS enregistre_par_nom",
+    );
     expect(queryText).toContain("ORDER BY m.date_operation, m.id");
     expect(query.values).toEqual([12, "2026-08-28", "2026-08-30"]);
 
@@ -151,7 +153,7 @@ describe("export tableur du journal de caisse", () => {
       "Entrée",
       "retrait banque",
       "Retrait du compte principal",
-      "Kouassi",
+      "Kouassi Awa",
       125000,
       625000,
     ]);
