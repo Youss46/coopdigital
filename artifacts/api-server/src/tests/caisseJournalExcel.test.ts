@@ -102,10 +102,26 @@ const mouvements = [
     session_statut: "fermee",
     date_session: "2026-08-30",
   },
+  {
+    id: 20,
+    type: "sortie",
+    motif: "paiement_producteur",
+    montant_fcfa: "25000",
+    libelle: "Paiement producteur — règlement REC-20",
+    reference_operation: "PAI-20",
+    solde_apres_fcfa: "643235.50",
+    date_operation: "2026-08-30",
+    created_at: "2026-08-30T10:00:00.000Z",
+    enregistre_par_nom: "Koffi Awa",
+    session_id: 6,
+    beneficiaire_nom: "Coulibaly Amani",
+    session_statut: "fermee",
+    date_session: "2026-08-30",
+  },
 ];
 
 function rowValues(worksheet: ExcelJS.Worksheet, rowNumber: number): unknown[] {
-  return Array.from({ length: 7 }, (_, index) => worksheet.getCell(rowNumber, index + 1).value);
+  return Array.from({ length: 8 }, (_, index) => worksheet.getCell(rowNumber, index + 1).value);
 }
 
 function extractPdfText(buffer: Buffer): string {
@@ -182,6 +198,7 @@ describe("export tableur du journal de caisse", () => {
       "Date comptable",
       "Type",
       "Motif",
+      "Bénéficiaire",
       "Libellé",
       "Opérateur",
       "Montant FCFA",
@@ -191,6 +208,7 @@ describe("export tableur du journal de caisse", () => {
       "2026-08-28",
       "Entrée",
       "retrait banque",
+      "",
       "Retrait du compte principal",
       "Kouassi Awa",
       125000,
@@ -200,6 +218,7 @@ describe("export tableur du journal de caisse", () => {
       "2026-08-29",
       "Entrée",
       "remboursement",
+      "",
       "Remboursement avance AVA-42",
       "Auteur Intégration",
       43210.5,
@@ -209,10 +228,21 @@ describe("export tableur du journal de caisse", () => {
       "2026-08-30",
       "Entrée",
       "remboursement",
+      "",
       "Remboursement historique",
       "Système",
       25,
       668235.5,
+    ]);
+    expect(rowValues(worksheet!, 5)).toEqual([
+      "2026-08-30",
+      "Sortie",
+      "paiement producteur",
+      "Coulibaly Amani",
+      "Paiement producteur — règlement REC-20",
+      "Koffi Awa",
+      25000,
+      643235.5,
     ]);
   });
 });
@@ -301,6 +331,8 @@ describe("bénéficiaire du paiement dans le rapport PDF de caisse", () => {
     const text = extractPdfText(pdf);
 
     expect(pdf.subarray(0, 4).toString()).toBe("%PDF");
+    expect(text).toContain("Bénéficiaire");
+    expect(text).toContain("paiement producteur");
     expect(text).toContain("Fofana");
     expect(text).toContain("Awa");
   });

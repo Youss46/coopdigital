@@ -491,8 +491,9 @@ export async function genererJournalExcel(
   worksheet.columns = [
     { header: "Date comptable", key: "date_operation", width: 18 },
     { header: "Type", key: "type", width: 14 },
-    { header: "Motif", key: "motif", width: 28 },
-    { header: "Libellé", key: "libelle", width: 42 },
+    { header: "Motif", key: "motif", width: 24 },
+    { header: "Bénéficiaire", key: "beneficiaire", width: 26 },
+    { header: "Libellé", key: "libelle", width: 34 },
     { header: "Opérateur", key: "operateur", width: 24 },
     { header: "Montant FCFA", key: "montant", width: 18 },
     { header: "Solde après FCFA", key: "solde", width: 20 },
@@ -509,6 +510,7 @@ export async function genererJournalExcel(
       date_operation: m.date_operation,
       type: m.type === "entree" ? "Entrée" : "Sortie",
       motif: m.motif.replace(/_/g, " "),
+      beneficiaire: m.motif === "paiement_producteur" ? m.beneficiaire_nom?.trim() ?? "" : "",
       libelle: m.libelle ?? "",
       operateur: m.enregistre_par_nom?.trim() || "Système",
       montant: Number.parseFloat(m.montant_fcfa) || 0,
@@ -887,8 +889,8 @@ export async function genererRapportPdf(
 
   // ── Tableau des mouvements
   doc.moveDown(0.5);
-  const headers = ["Date op.", "Type", "Motif", "Libellé", "Effectué par", "Montant", "Solde"];
-  const colWidths = [62, 32, 75, 115, 72, 68, 72];
+  const headers = ["Date op.", "Type", "Motif", "Bénéficiaire", "Libellé", "Effectué par", "Montant", "Solde"];
+  const colWidths = [55, 32, 68, 96, 78, 62, 52, 53];
   const tableX = margin;
   let tableY = doc.y;
 
@@ -913,13 +915,10 @@ export async function genererRapportPdf(
       const beneficiaire = m.motif === "paiement_producteur"
         ? m.beneficiaire_nom?.trim()
         : "";
-      const motifTexte = beneficiaire
-        ? `${motifBase}\nBénéficiaire : ${beneficiaire}`
-        : motifBase;
       doc.font("Helvetica").fontSize(7);
       const rowHeight = beneficiaire
-        ? Math.max(14, doc.heightOfString(motifTexte, {
-            width: colWidths[2]! - 4,
+        ? Math.max(14, doc.heightOfString(beneficiaire, {
+            width: colWidths[3]! - 4,
             lineGap: 0,
           }) + 6)
         : 14;
@@ -934,7 +933,8 @@ export async function genererRapportPdf(
       const cols = [
         m.date_operation ?? "—",
         entree ? "Entrée" : "Sortie",
-        motifTexte,
+        motifBase,
+        beneficiaire || "—",
         m.libelle ?? "—",
         m.enregistre_par_nom?.trim() || "Système",
         FCFA(m.montant_fcfa),
@@ -946,12 +946,12 @@ export async function genererRapportPdf(
         doc.font(i === 1 ? "Helvetica-Bold" : "Helvetica")
           .fontSize(7).fillColor(color)
           .text(
-            i === 2 && beneficiaire ? String(v) : String(v).slice(0, i === 3 ? 38 : 30),
+            i === 3 && beneficiaire ? String(v) : String(v).slice(0, i === 4 ? 38 : 30),
             cx,
-            tableY + (i === 2 && beneficiaire ? 2 : Math.max(3, (rowHeight - 8) / 2)),
+            tableY + (i === 3 && beneficiaire ? 2 : Math.max(3, (rowHeight - 8) / 2)),
             {
               width: colWidths[i]! - 4,
-              lineBreak: i === 2 && Boolean(beneficiaire),
+              lineBreak: i === 3 && Boolean(beneficiaire),
             },
           );
         cx += colWidths[i]!;

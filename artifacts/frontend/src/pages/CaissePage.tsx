@@ -98,12 +98,10 @@ interface Mouvement {
   beneficiaire_nom: string | null;
 }
 
-function labelMotifMouvement(mouvement: Pick<Mouvement, "motif" | "beneficiaire_nom">): string {
-  const motif = labelMotifCaisse(mouvement.motif);
-  const beneficiaire = mouvement.motif === "paiement_producteur"
-    ? mouvement.beneficiaire_nom?.trim()
-    : "";
-  return beneficiaire ? `${motif} — ${beneficiaire}` : motif;
+function beneficiaireMouvement(mouvement: Pick<Mouvement, "motif" | "beneficiaire_nom">): string {
+  return mouvement.motif === "paiement_producteur"
+    ? mouvement.beneficiaire_nom?.trim() || "—"
+    : "—";
 }
 
 interface Session {
@@ -1032,12 +1030,13 @@ function JournalCaisse({
             <p className="px-3 pt-2 text-xs text-gray-500 sm:hidden">
               Faites glisser le tableau horizontalement pour voir toutes les colonnes.
             </p>
-            <table className="w-full min-w-[1000px] text-sm">
+            <table className="w-full min-w-[1120px] text-sm">
               <thead>
                 <tr className="bg-gray-50 text-gray-500 text-xs">
                   <th className="text-left px-4 py-3 font-medium">Date opération</th>
                   <th className="text-left px-4 py-3 font-medium">Type</th>
                   <th className="text-left px-4 py-3 font-medium">Motif</th>
+                  <th className="text-left px-4 py-3 font-medium">Bénéficiaire</th>
                   <th className="text-left px-4 py-3 font-medium">Libellé</th>
                   <th className="text-left px-4 py-3 font-medium">Effectué par</th>
                   <th className="text-right px-4 py-3 font-medium">Montant</th>
@@ -1053,7 +1052,8 @@ function JournalCaisse({
                         {m.type === "entree" ? "↑ Entrée" : "↓ Sortie"}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-gray-600 text-xs">{labelMotifMouvement(m)}</td>
+                    <td className="px-4 py-3 text-gray-600 text-xs">{labelMotifCaisse(m.motif)}</td>
+                    <td className="px-4 py-3 text-gray-600 text-xs whitespace-nowrap">{beneficiaireMouvement(m)}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{m.libelle ?? "—"}</td>
                     <td className="px-4 py-3 text-gray-600 text-xs whitespace-nowrap">
                       {m.enregistre_par_nom?.trim() || "Système"}
@@ -1247,40 +1247,44 @@ function HistoriqueSessions({ caisses }: { caisses: Caisse[] | null }) {
                   <p className="font-bold text-gray-700">{detail.session.nb_mouvements}</p>
                 </div>
               </div>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 text-gray-500 text-xs">
-                    <th className="text-left px-3 py-2 font-medium">Date opération</th>
-                    <th className="text-left px-3 py-2 font-medium">Type</th>
-                    <th className="text-left px-3 py-2 font-medium">Motif</th>
-                    <th className="text-left px-3 py-2 font-medium">Effectué par</th>
-                    <th className="text-right px-3 py-2 font-medium">Montant</th>
-                    <th className="text-right px-3 py-2 font-medium">Solde après</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {detail.journal.mouvements.map((m) => (
-                    <tr key={m.id} className="border-t border-gray-50">
-                      <td className="px-3 py-2 text-gray-400 font-mono text-xs">{m.date_operation ?? "—"}</td>
-                      <td className="px-3 py-2">
-                        <span className={`text-xs font-medium ${m.type === "entree" ? "text-green-600" : "text-red-600"}`}>
-                          {m.type === "entree" ? "↑" : "↓"}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-gray-600 text-xs">{labelMotifMouvement(m)}</td>
-                      <td className="px-3 py-2 text-gray-600 text-xs whitespace-nowrap">
-                        {m.enregistre_par_nom?.trim() || "Système"}
-                      </td>
-                      <td className={`px-3 py-2 text-right font-semibold text-xs ${m.type === "entree" ? "text-green-600" : "text-red-600"}`}>
-                        {m.type === "entree" ? "+" : "-"}{FCFA(m.montant_fcfa)}
-                      </td>
-                      <td className="px-3 py-2 text-right text-gray-500 text-xs">
-                        {m.solde_apres_fcfa ? FCFA(m.solde_apres_fcfa) : "—"}
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px] text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 text-gray-500 text-xs">
+                      <th className="text-left px-3 py-2 font-medium">Date opération</th>
+                      <th className="text-left px-3 py-2 font-medium">Type</th>
+                      <th className="text-left px-3 py-2 font-medium">Motif</th>
+                      <th className="text-left px-3 py-2 font-medium">Bénéficiaire</th>
+                      <th className="text-left px-3 py-2 font-medium">Effectué par</th>
+                      <th className="text-right px-3 py-2 font-medium">Montant</th>
+                      <th className="text-right px-3 py-2 font-medium">Solde après</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {detail.journal.mouvements.map((m) => (
+                      <tr key={m.id} className="border-t border-gray-50">
+                        <td className="px-3 py-2 text-gray-400 font-mono text-xs">{m.date_operation ?? "—"}</td>
+                        <td className="px-3 py-2">
+                          <span className={`text-xs font-medium ${m.type === "entree" ? "text-green-600" : "text-red-600"}`}>
+                            {m.type === "entree" ? "↑" : "↓"}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-gray-600 text-xs">{labelMotifCaisse(m.motif)}</td>
+                        <td className="px-3 py-2 text-gray-600 text-xs whitespace-nowrap">{beneficiaireMouvement(m)}</td>
+                        <td className="px-3 py-2 text-gray-600 text-xs whitespace-nowrap">
+                          {m.enregistre_par_nom?.trim() || "Système"}
+                        </td>
+                        <td className={`px-3 py-2 text-right font-semibold text-xs ${m.type === "entree" ? "text-green-600" : "text-red-600"}`}>
+                          {m.type === "entree" ? "+" : "-"}{FCFA(m.montant_fcfa)}
+                        </td>
+                        <td className="px-3 py-2 text-right text-gray-500 text-xs">
+                          {m.solde_apres_fcfa ? FCFA(m.solde_apres_fcfa) : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
