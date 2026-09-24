@@ -440,6 +440,7 @@ export async function getJournal(caisseId: number, opts?: { dateDebut?: string; 
     libelle: string | null; reference_operation: string | null;
     solde_apres_fcfa: string | null; date_operation: string; created_at: string;
     enregistre_par_nom: string | null; session_id: number | null;
+    beneficiaire_nom: string | null;
     session_statut: string | null; date_session: string | null;
   }>(sql`
     SELECT
@@ -454,11 +455,15 @@ export async function getJournal(caisseId: number, opts?: { dateDebut?: string; 
       m.date_operation::text,
       m.created_at::text, m.session_id,
       concat_ws(' ', NULLIF(BTRIM(u.nom), ''), NULLIF(BTRIM(u.prenoms), '')) AS enregistre_par_nom,
+      concat_ws(' ', NULLIF(BTRIM(beneficiaire.nom), ''), NULLIF(BTRIM(beneficiaire.prenoms), '')) AS beneficiaire_nom,
       s.statut AS session_statut, s.date_session::text
     FROM mouvements_caisse m
     LEFT JOIN sessions_caisse s ON s.id = m.session_id
     LEFT JOIN users u ON u.id = m.enregistre_par
     LEFT JOIN paiements p ON m.reference_operation = ('PAI-' || p.id::text)
+    LEFT JOIN membres beneficiaire
+      ON beneficiaire.id = p.membre_id
+      AND beneficiaire.cooperative_id = m.cooperative_id
     WHERE m.caisse_id = ${caisseId}
       AND m.date_operation BETWEEN ${dateD} AND ${dateF}
     ORDER BY m.date_operation, m.id

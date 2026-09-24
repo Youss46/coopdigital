@@ -131,6 +131,11 @@ describe("export tableur du journal de caisse", () => {
     expect(queryText).toContain(
       "concat_ws(' ', NULLIF(BTRIM(u.nom), ''), NULLIF(BTRIM(u.prenoms), '')) AS enregistre_par_nom",
     );
+    expect(queryText).toContain(
+      "concat_ws(' ', NULLIF(BTRIM(beneficiaire.nom), ''), NULLIF(BTRIM(beneficiaire.prenoms), '')) AS beneficiaire_nom",
+    );
+    expect(queryText).toContain("beneficiaire.id = p.membre_id");
+    expect(queryText).toContain("beneficiaire.cooperative_id = m.cooperative_id");
     expect(queryText).toContain("ORDER BY m.date_operation, m.id");
     expect(query.values).toEqual([12, "2026-08-28", "2026-08-30"]);
 

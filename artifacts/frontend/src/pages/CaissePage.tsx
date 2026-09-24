@@ -95,6 +95,15 @@ interface Mouvement {
   id: number; type: string; motif: string; montant_fcfa: string;
   libelle: string | null; solde_apres_fcfa: string | null;
   date_operation: string; created_at: string; enregistre_par_nom: string | null; session_id: number;
+  beneficiaire_nom: string | null;
+}
+
+function labelMotifMouvement(mouvement: Pick<Mouvement, "motif" | "beneficiaire_nom">): string {
+  const motif = labelMotifCaisse(mouvement.motif);
+  const beneficiaire = mouvement.motif === "paiement_producteur"
+    ? mouvement.beneficiaire_nom?.trim()
+    : "";
+  return beneficiaire ? `${motif} — ${beneficiaire}` : motif;
 }
 
 interface Session {
@@ -1044,7 +1053,7 @@ function JournalCaisse({
                         {m.type === "entree" ? "↑ Entrée" : "↓ Sortie"}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-gray-600 text-xs">{labelMotifCaisse(m.motif)}</td>
+                    <td className="px-4 py-3 text-gray-600 text-xs">{labelMotifMouvement(m)}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{m.libelle ?? "—"}</td>
                     <td className="px-4 py-3 text-gray-600 text-xs whitespace-nowrap">
                       {m.enregistre_par_nom?.trim() || "Système"}
@@ -1258,7 +1267,7 @@ function HistoriqueSessions({ caisses }: { caisses: Caisse[] | null }) {
                           {m.type === "entree" ? "↑" : "↓"}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-gray-600 text-xs">{labelMotifCaisse(m.motif)}</td>
+                      <td className="px-3 py-2 text-gray-600 text-xs">{labelMotifMouvement(m)}</td>
                       <td className="px-3 py-2 text-gray-600 text-xs whitespace-nowrap">
                         {m.enregistre_par_nom?.trim() || "Système"}
                       </td>
