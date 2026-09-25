@@ -7,8 +7,17 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok = () => localStorage.getItem("coop_token") ?? "";
+const JOURNAL_FILTER_STORAGE_KEY = "coop.caisse.journal.filter";
 const JOURNAL_DATE_STORAGE_KEY = "coop.caisse.journal.date";
 const LEGACY_JOURNAL_PERIOD_STORAGE_KEY = "coop.caisse.journal.period";
+
+type JournalFilterMode = "jour" | "periode";
+type JournalFilter = {
+  mode: JournalFilterMode;
+  dateJournal: string;
+  dateDebut: string;
+  dateFin: string;
+};
 
 const todayAsDateInput = () => new Date().toISOString().slice(0, 10);
 
@@ -21,14 +30,45 @@ function isValidDateInput(value: unknown): value is string {
     && date.getUTCDate() === day;
 }
 
-function readJournalDate(): string {
-  const today = todayAsDateInput();
+function filtreJour(dateJournal: string): JournalFilter {
+  return { mode: "jour", dateJournal, dateDebut: dateJournal, dateFin: dateJournal };
+}
+
+function filtrePeriode(dateDebut: string, dateFin: string): JournalFilter {
+  return { mode: "periode", dateJournal: dateFin, dateDebut, dateFin };
+}
+
+function readJournalFilter(): JournalFilter {
+  const filtreParDefaut = filtreJour(todayAsDateInput());
   try {
+    const storedFilter = localStorage.getItem(JOURNAL_FILTER_STORAGE_KEY);
+    if (storedFilter) {
+      const parsed: unknown = JSON.parse(storedFilter);
+      if (
+        typeof parsed === "object"
+        && parsed !== null
+        && "mode" in parsed
+      ) {
+        if (parsed.mode === "jour" && "dateJournal" in parsed && isValidDateInput(parsed.dateJournal)) {
+          return filtreJour(parsed.dateJournal);
+        }
+        if (
+          parsed.mode === "periode"
+          && "dateDebut" in parsed
+          && "dateFin" in parsed
+          && isValidDateInput(parsed.dateDebut)
+          && isValidDateInput(parsed.dateFin)
+        ) {
+          return filtrePeriode(parsed.dateDebut, parsed.dateFin);
+        }
+      }
+    }
+
     const storedDate = localStorage.getItem(JOURNAL_DATE_STORAGE_KEY);
-    if (isValidDateInput(storedDate)) return storedDate;
+    if (isValidDateInput(storedDate)) return filtreJour(storedDate);
 
     const storedPeriod = localStorage.getItem(LEGACY_JOURNAL_PERIOD_STORAGE_KEY);
-    if (!storedPeriod) return today;
+    if (!storedPeriod) return filtreParDefaut;
     const parsed: unknown = JSON.parse(storedPeriod);
     if (
       typeof parsed === "object"
@@ -38,20 +78,25 @@ function readJournalDate(): string {
       && isValidDateInput(parsed.dateDebut)
       && isValidDateInput(parsed.dateFin)
     ) {
-      // Une ancienne plage devient une seule journée, en conservant sa borne
-      // de fin comme date sélectionnée.
-      return parsed.dateFin;
+      return parsed.dateDebut === parsed.dateFin
+        ? filtreJour(parsed.dateFin)
+        : filtrePeriode(parsed.dateDebut, parsed.dateFin);
     }
   } catch {
     // Une valeur de stockage corrompue ne doit pas bloquer l'ouverture de la caisse.
   }
-  return today;
+  return filtreParDefaut;
 }
 
-function saveJournalDate(date: string) {
-  if (!isValidDateInput(date)) return;
+function saveJournalFilter(filter: JournalFilter) {
+  if (
+    !isValidDateInput(filter.dateJournal)
+    || !isValidDateInput(filter.dateDebut)
+    || !isValidDateInput(filter.dateFin)
+  ) return;
   try {
-    localStorage.setItem(JOURNAL_DATE_STORAGE_KEY, date);
+    localStorage.setItem(JOURNAL_FILTER_STORAGE_KEY, JSON.stringify(filter));
+    localStorage.removeItem(JOURNAL_DATE_STORAGE_KEY);
     localStorage.removeItem(LEGACY_JOURNAL_PERIOD_STORAGE_KEY);
   } catch {
     // Le journal reste utilisable si le stockage local est indisponible.
@@ -742,20 +787,23 @@ function ModalTransfert({
 function JournalCaisse({
   caisses,
   initCaisseId,
-  dateJournal,
-  onDateJournalChange,
+  filter,
+  onFilterChange,
   onCaissesChanged,
 }: {
   caisses: Caisse[] | null;
   initCaisseId?: number;
-  dateJournal: string;
-  onDateJournalChange: (date: string) => void;
+  filter: JournalFilter;
+  onFilterChange: (filter: JournalFilter) => void;
   onCaissesChanged: () => Promise<void>;
 }) {
   const { toast } = useToast();
   const { utilisateur } = useAuth();
   const peutEcrire = ["pca", "directeur", "comptable", "caissier", "delegue"].includes(utilisateur?.role ?? "");
   const today = new Date().toISOString().slice(0, 10);
+  const { mode, dateJournal, dateDebut, dateFin } = filter;
+  const dateDebutEffective = mode === "jour" ? dateJournal : dateDebut;
+  const dateFinEffective = mode === "jour" ? dateJournal : dateFin;
   const [caisseId, setCaisseId] = useState<number | "">(initCaisseId ?? (caisses?.[0]?.id ?? ""));
   const [journal, setJournal] = useState<Journal | null>(null);
   const [loading, setLoading] = useState(false);
@@ -764,7 +812,17 @@ function JournalCaisse({
   const [modalVirementBanque, setModalVirementBanque] = useState(false);
   const [excelLoading, setExcelLoading] = useState(false);
   const journalRequestId = useRef(0);
-  const dateInvalide = !isValidDateInput(dateJournal);
+  const datesInvalides = !isValidDateInput(dateDebutEffective) || !isValidDateInput(dateFinEffective);
+  const periodeInvalide = mode === "periode" && !datesInvalides && dateDebut > dateFin;
+  const filtreInvalide = datesInvalides || periodeInvalide;
+  const erreurFiltre = datesInvalides
+    ? mode === "jour"
+      ? "Choisissez une date valide pour afficher les opérations."
+      : "Choisissez des dates valides pour afficher les opérations."
+    : periodeInvalide
+      ? "La date de fin doit être postérieure ou égale à la date de début."
+      : null;
+  const suffixeFichier = mode === "jour" ? dateJournal : `${dateDebut}-${dateFin}`;
 
   const invaliderJournal = useCallback(() => {
     journalRequestId.current += 1;
@@ -784,7 +842,7 @@ function JournalCaisse({
   const charger = useCallback(async (id?: number | "") => {
     const cid = id ?? caisseId;
     const requestId = ++journalRequestId.current;
-    if (dateInvalide) {
+    if (filtreInvalide) {
       setJournal(null);
       setLoading(false);
       return;
@@ -793,8 +851,8 @@ function JournalCaisse({
     setLoading(true);
     try {
       const params = new URLSearchParams({
-        date_debut: dateJournal,
-        date_fin: dateJournal,
+        date_debut: dateDebutEffective,
+        date_fin: dateFinEffective,
       });
       const r = await fetch(`${BASE}/api/caisse/${cid}/journal?${params.toString()}`,
         { headers: { Authorization: `Bearer ${tok()}` } });
@@ -809,7 +867,7 @@ function JournalCaisse({
     } finally {
       if (requestId === journalRequestId.current) setLoading(false);
     }
-  }, [caisseId, dateJournal, dateInvalide]);
+  }, [caisseId, dateDebutEffective, dateFinEffective, filtreInvalide]);
 
   // Le journal doit être visible après navigation ou changement de filtre,
   // pas uniquement après un clic manuel sur « Charger ».
@@ -836,12 +894,12 @@ function JournalCaisse({
   const [pdfLoading, setPdfLoading] = useState(false);
 
   const telechargerPdf = async () => {
-    if (!caisseId || pdfLoading || dateInvalide) return;
+    if (!caisseId || pdfLoading || filtreInvalide) return;
     setPdfLoading(true);
     try {
       const params = new URLSearchParams({
-        date_debut: dateJournal,
-        date_fin: dateJournal,
+        date_debut: dateDebutEffective,
+        date_fin: dateFinEffective,
       });
       const url = `${BASE}/api/caisse/${caisseId}/rapport-pdf?${params.toString()}`;
       const r = await fetch(url, { headers: { Authorization: `Bearer ${tok()}` } });
@@ -850,7 +908,7 @@ function JournalCaisse({
         throw new Error(json?.error ?? `Erreur ${r.status}`);
       }
       const blob = await r.blob();
-      openPdfViewer(URL.createObjectURL(blob), `rapport-caisse-${dateJournal}.pdf`);
+      openPdfViewer(URL.createObjectURL(blob), `rapport-caisse-${suffixeFichier}.pdf`);
     } catch (e) {
       toast({
         title: "Export impossible",
@@ -863,12 +921,12 @@ function JournalCaisse({
   };
 
   const telechargerExcel = async () => {
-    if (!caisseId || excelLoading || dateInvalide) return;
+    if (!caisseId || excelLoading || filtreInvalide) return;
     setExcelLoading(true);
     try {
       const params = new URLSearchParams({
-        date_debut: dateJournal,
-        date_fin: dateJournal,
+        date_debut: dateDebutEffective,
+        date_fin: dateFinEffective,
       });
       const url = `${BASE}/api/caisse/${caisseId}/journal/export?${params.toString()}`;
       const r = await fetch(url, { headers: { Authorization: `Bearer ${tok()}` } });
@@ -880,7 +938,7 @@ function JournalCaisse({
       const objectUrl = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = objectUrl;
-      anchor.download = `journal-caisse-${dateJournal}.xlsx`;
+      anchor.download = `journal-caisse-${suffixeFichier}.xlsx`;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
@@ -918,28 +976,63 @@ function JournalCaisse({
           <option value="">Sélectionner une caisse</option>
           {caisses?.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
         </select>
-        <label className="flex items-center gap-2 text-sm text-gray-600">
-          <span>Date</span>
-          <input type="date" aria-label="Date du journal" value={dateJournal} required
-            onChange={e => { invaliderJournal(); onDateJournalChange(e.target.value); }}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-        </label>
-        <button onClick={() => charger()} disabled={!caisseId || loading || dateInvalide}
+        <select
+          aria-label="Mode de filtre du journal"
+          value={mode}
+          onChange={e => {
+            invaliderJournal();
+            if (e.target.value === "periode") {
+              const date = isValidDateInput(dateJournal) ? dateJournal : today;
+              onFilterChange(filtrePeriode(date, date));
+            } else {
+              const date = isValidDateInput(dateFin) ? dateFin : dateJournal;
+              onFilterChange(filtreJour(date));
+            }
+          }}
+          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+        >
+          <option value="jour">Une journée</option>
+          <option value="periode">Période</option>
+        </select>
+        {mode === "jour" ? (
+          <label className="flex items-center gap-2 text-sm text-gray-600">
+            <span>Date</span>
+            <input type="date" aria-label="Date du journal" value={dateJournal} required
+              onChange={e => { invaliderJournal(); onFilterChange(filtreJour(e.target.value)); }}
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+          </label>
+        ) : (
+          <>
+            <label className="flex items-center gap-2 text-sm text-gray-600">
+              <span>Du</span>
+              <input type="date" aria-label="Date de début du journal" value={dateDebut} required
+                onChange={e => { invaliderJournal(); onFilterChange(filtrePeriode(e.target.value, dateFin)); }}
+                className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-600">
+              <span>Au</span>
+              <input type="date" aria-label="Date de fin du journal" value={dateFin} required
+                onChange={e => { invaliderJournal(); onFilterChange(filtrePeriode(dateDebut, e.target.value)); }}
+                className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+            </label>
+          </>
+        )}
+        <button onClick={() => charger()} disabled={!caisseId || loading || filtreInvalide}
           className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50">
           {loading ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" /> : <RefreshCw size={14} />}
           Charger
         </button>
       </div>
-      {dateInvalide && (
+      {erreurFiltre && (
         <p className="text-xs text-red-600 -mt-3 mb-4">
-          Choisissez une date valide pour afficher les opérations.
+          {erreurFiltre}
         </p>
       )}
 
       {/* Actions session */}
       {caisseId && (
         <div className="flex flex-wrap gap-2 mb-4">
-          {peutEcrire && !sessionOuverte && dateJournal === today && (
+          {peutEcrire && !sessionOuverte && mode === "jour" && dateJournal === today && (
             <button onClick={ouvrirSession}
               className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">
               <Unlock size={14} /> Ouvrir la session du jour
@@ -964,7 +1057,7 @@ function JournalCaisse({
           {journal && (
             <>
               <button onClick={() => void telechargerPdf()}
-                disabled={pdfLoading || dateInvalide}
+                disabled={pdfLoading || filtreInvalide}
                 className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
                 {pdfLoading
                   ? <RefreshCw size={14} className="animate-spin" />
@@ -972,7 +1065,7 @@ function JournalCaisse({
                 Télécharger PDF
               </button>
               <button onClick={() => void telechargerExcel()}
-                disabled={excelLoading || dateInvalide}
+                disabled={excelLoading || filtreInvalide}
                 className="flex items-center gap-1.5 px-3 py-2 border border-green-200 rounded-lg text-sm text-green-700 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed">
                 {excelLoading
                   ? <RefreshCw size={14} className="animate-spin" />
@@ -1011,7 +1104,7 @@ function JournalCaisse({
       {journal ? (
         journal.mouvements.length === 0 ? (
           <div className="text-center py-12 text-gray-400 bg-gray-50 rounded-xl">
-            <p>Aucun mouvement pour cette journée.</p>
+            <p>{mode === "jour" ? "Aucun mouvement pour cette journée." : "Aucun mouvement pour cette période."}</p>
           </div>
         ) : (
           <div
@@ -1065,7 +1158,7 @@ function JournalCaisse({
         )
       ) : !loading && (
         <div className="text-center py-12 text-gray-400 bg-gray-50 rounded-xl">
-          <p>Sélectionnez une caisse et une date, puis cliquez sur Charger.</p>
+          <p>Sélectionnez une caisse et un filtre, puis cliquez sur Charger.</p>
         </div>
       )}
 
@@ -1625,14 +1718,14 @@ export default function CaissePage() {
 
   const [tab, setTab] = useState<"etat" | "journal" | "historique" | "delegues">("etat");
   const [journalCaisseId, setJournalCaisseId] = useState<number | undefined>();
-  const [journalDate, setJournalDate] = useState<string>(readJournalDate);
+  const [journalFilter, setJournalFilter] = useState<JournalFilter>(readJournalFilter);
   const [caisses, setCaisses] = useState<Caisse[] | null>(null);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    saveJournalDate(journalDate);
-  }, [journalDate]);
+    saveJournalFilter(journalFilter);
+  }, [journalFilter]);
 
   const chargerCaisses = useCallback(async () => {
     setLoading(true);
@@ -1699,8 +1792,8 @@ export default function CaissePage() {
         <JournalCaisse
           caisses={caisses}
           initCaisseId={journalCaisseId}
-          dateJournal={journalDate}
-          onDateJournalChange={setJournalDate}
+          filter={journalFilter}
+          onFilterChange={setJournalFilter}
           onCaissesChanged={chargerCaisses}
         />
       )}
