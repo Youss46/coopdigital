@@ -445,16 +445,10 @@ export async function getJournal(caisseId: number, opts?: { dateDebut?: string; 
   }>(sql`
     SELECT
       m.id, m.type, m.motif, m.montant_fcfa,
-      CASE
-        WHEN m.type = 'entree' THEN COALESCE(
-          NULLIF(BTRIM(m.libelle), ''),
-          REPLACE(m.motif, '_', ' ')
-        )
-        WHEN m.motif = 'paiement_producteur' AND p.id IS NOT NULL
-          THEN 'Paiement producteur — règlement ' ||
-            COALESCE(NULLIF(BTRIM(p.numero_recu), ''), 'PAI-' || p.id::text)
-        ELSE m.libelle
-      END AS libelle,
+      COALESCE(
+        NULLIF(BTRIM(m.libelle), ''),
+        REPLACE(m.motif, '_', ' ')
+      ) AS libelle,
       m.reference_operation, m.solde_apres_fcfa,
       m.date_operation::text,
       m.created_at::text, m.session_id,
@@ -553,7 +547,7 @@ export async function genererJournalExcel(
       date_operation: m.date_operation,
       type: m.type === "entree" ? "Entrée" : "Sortie",
       motif: m.motif.replace(/_/g, " "),
-      beneficiaire: m.beneficiaire_nom?.trim() ?? "",
+      beneficiaire: m.beneficiaire_nom?.trim() || "—",
       libelle: m.libelle ?? "",
       operateur: m.enregistre_par_nom?.trim() || "Système",
       montant: Number.parseFloat(m.montant_fcfa) || 0,

@@ -169,6 +169,22 @@ const mouvements = [
     session_statut: "fermee",
     date_session: "2026-08-30",
   },
+  {
+    id: 24,
+    type: "sortie",
+    motif: "frais_fonctionnement",
+    montant_fcfa: "3000",
+    libelle: "frais fonctionnement",
+    reference_operation: null,
+    solde_apres_fcfa: "607235.50",
+    date_operation: "2026-08-30",
+    created_at: "2026-08-30T14:00:00.000Z",
+    enregistre_par_nom: "Koffi Awa",
+    session_id: 6,
+    beneficiaire_nom: null,
+    session_statut: "fermee",
+    date_session: "2026-08-30",
+  },
 ];
 
 function rowValues(worksheet: ExcelJS.Worksheet, rowNumber: number): unknown[] {
@@ -226,12 +242,13 @@ describe("export tableur du journal de caisse", () => {
       strings: string[];
       values: unknown[];
     };
-    const queryText = query.strings.join("?");
+    const queryText = query.strings.join("?").replace(/\s+/g, " ");
     expect(queryText).toContain("m.date_operation BETWEEN");
     expect(queryText).toContain("LEFT JOIN caisses c");
     expect(queryText).toContain("WHEN m.type = 'entree' THEN c.nom");
-    expect(queryText).toContain("NULLIF(BTRIM(m.libelle), '')");
-    expect(queryText).toContain("REPLACE(m.motif, '_', ' ')");
+    expect(queryText).toContain(
+      "COALESCE( NULLIF(BTRIM(m.libelle), ''), REPLACE(m.motif, '_', ' ') ) AS libelle",
+    );
     expect(queryText).toContain("LEFT JOIN users u ON u.id = m.enregistre_par");
     expect(queryText).toContain(
       "concat_ws(' ', NULLIF(BTRIM(u.nom), ''), NULLIF(BTRIM(u.prenoms), '')) AS enregistre_par_nom",
@@ -337,6 +354,16 @@ describe("export tableur du journal de caisse", () => {
       "Koffi Awa",
       8000,
       610235.5,
+    ]);
+    expect(rowValues(worksheet!, 9)).toEqual([
+      "2026-08-30",
+      "Sortie",
+      "frais fonctionnement",
+      "—",
+      "frais fonctionnement",
+      "Koffi Awa",
+      3000,
+      607235.5,
     ]);
   });
 });
@@ -463,6 +490,22 @@ describe("bénéficiaires des mouvements dans le rapport PDF de caisse", () => {
             session_statut: "ouverte",
             date_session: "2026-09-24",
           },
+          {
+            id: 55,
+            type: "sortie",
+            motif: "frais_fonctionnement",
+            montant_fcfa: "1000",
+            libelle: "frais fonctionnement",
+            reference_operation: null,
+            solde_apres_fcfa: "39000",
+            date_operation: "2026-09-24",
+            created_at: "2026-09-24T10:00:00.000Z",
+            enregistre_par_nom: "Operateur Test",
+            session_id: 6,
+            beneficiaire_nom: null,
+            session_statut: "ouverte",
+            date_session: "2026-09-24",
+          },
         ],
       })
       .mockResolvedValueOnce({ rows: [{ nom: "Cooperative Test" }] })
@@ -490,6 +533,7 @@ describe("bénéficiaires des mouvements dans le rapport PDF de caisse", () => {
     expect(text).toContain("REC-51");
     expect(text).toContain("retrait banque");
     expect(text).toContain("Caisse principale");
+    expect(text).toContain("frais fonctionnement");
   });
 
   it("répartit les mouvements longs sur plusieurs pages sans couper les libellés", async () => {

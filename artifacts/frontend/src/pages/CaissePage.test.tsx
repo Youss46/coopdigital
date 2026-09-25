@@ -548,9 +548,22 @@ describe("filtre journal de caisse par journée", () => {
           session_id: 3,
           beneficiaire_nom: "Caisse principale",
         },
+        {
+          id: 12,
+          type: "sortie",
+          motif: "frais_fonctionnement",
+          montant_fcfa: "3000",
+          libelle: "frais fonctionnement",
+          solde_apres_fcfa: "157000",
+          date_operation: "2026-09-25",
+          created_at: "2026-09-25T13:00:00.000Z",
+          enregistre_par_nom: "Awa Kouassi",
+          session_id: 3,
+          beneficiaire_nom: null,
+        },
       ],
       totalEntrees: 0,
-      totalSorties: 40000,
+      totalSorties: 43000,
     };
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
@@ -586,5 +599,7 @@ describe("filtre journal de caisse par journée", () => {
     expect(container.textContent).toContain("Koffi Mariam");
     expect(container.textContent).toContain("Fournisseur Externe Issa");
     expect(container.textContent).toContain("Caisse principale");
+    expect(container.textContent).toContain("frais fonctionnement");
+    expect(container.textContent).toContain("—");
   });
 });
