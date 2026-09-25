@@ -1824,6 +1824,7 @@ function ModalVirementBanque({ caisseId, caisseName, soldeCaisse, onClose, onDon
   const [libelle,        setLibelle]        = useState("");
   const [reference,      setReference]      = useState("");
   const [date,           setDate]           = useState(new Date().toISOString().slice(0, 10));
+  const [sens,           setSens]           = useState<"caisse-banque" | "banque-caisse">("caisse-banque");
   const [saving,         setSaving]         = useState(false);
   const [err,            setErr]            = useState<string | null>(null);
 
@@ -1840,18 +1841,22 @@ function ModalVirementBanque({ caisseId, caisseName, soldeCaisse, onClose, onDon
 
   const compteSel    = compteId !== "" ? comptes.find(c => c.id === compteId) : null;
   const soldeCaisseN = parseFloat(soldeCaisse);
+  const soldeBanqueN = parseFloat(compteSel?.solde_actuel_fcfa ?? "0");
+  const soldeSourceN = sens === "caisse-banque" ? soldeCaisseN : soldeBanqueN;
 
   async function handleSubmit() {
     if (!compteId) { setErr("Sélectionnez un compte bancaire"); return; }
     const m = parseInt(montant || "0", 10);
     if (!m || m <= 0) { setErr("Montant invalide"); return; }
-    if (m > soldeCaisseN) {
-      setErr(`Solde insuffisant en caisse (${new Intl.NumberFormat("fr-FR").format(soldeCaisseN)} FCFA disponible)`);
+    if (m > soldeSourceN) {
+      const source = sens === "caisse-banque" ? "caisse" : "banque";
+      setErr(`Solde insuffisant en ${source} (${new Intl.NumberFormat("fr-FR").format(soldeSourceN)} FCFA disponible)`);
       return;
     }
     setSaving(true); setErr(null);
     try {
-      const r = await fetch(`${BASE}/api/caisse/${caisseId}/virement-banque`, {
+      const route = sens === "caisse-banque" ? "virement-banque" : "virement-caisse";
+      const r = await fetch(`${BASE}/api/caisse/${caisseId}/${route}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok()}` },
         body: JSON.stringify({
@@ -1864,7 +1869,13 @@ function ModalVirementBanque({ caisseId, caisseName, soldeCaisse, onClose, onDon
       });
       const json = await r.json();
       if (!r.ok) throw new Error(json.error ?? json.erreur ?? "Erreur serveur");
-      toast({ title: "Virement effectué", description: `${new Intl.NumberFormat("fr-FR").format(m)} FCFA déposés sur ${compteSel?.nom ?? "le compte"}.` });
+      const montantFormate = new Intl.NumberFormat("fr-FR").format(m);
+      toast({
+        title: "Virement effectué",
+        description: sens === "caisse-banque"
+          ? `${montantFormate} FCFA déposés sur ${compteSel?.nom ?? "le compte"}.`
+          : `${montantFormate} FCFA transférés depuis ${compteSel?.nom ?? "le compte"} vers ${caisseName}.`,
+      });
       onDone();
     } catch (e) {
       setErr((e as Error).message);
@@ -1881,25 +1892,50 @@ function ModalVirementBanque({ caisseId, caisseName, soldeCaisse, onClose, onDon
               <Building2 size={16} className="text-blue-600" />
             </div>
             <div>
-              <h2 className="font-semibold text-gray-900 text-sm">Virement Caisse → Banque</h2>
-              <p className="text-xs text-gray-400">Depuis : {caisseName}</p>
+              <h2 className="font-semibold text-gray-900 text-sm">
+                {sens === "caisse-banque" ? "Virement Caisse → Banque" : "Virement Banque → Caisse"}
+              </h2>
+              <p className="text-xs text-gray-400">
+                {sens === "caisse-banque" ? `Depuis : ${caisseName}` : `Vers : ${caisseName}`}
+              </p>
             </div>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
 
         <div className="px-6 py-5 space-y-4">
-          {/* Solde caisse */}
+          <div className="grid grid-cols-2 gap-2" aria-label="Sens du virement">
+            <button type="button" aria-pressed={sens === "caisse-banque"}
+              onClick={() => { setSens("caisse-banque"); setErr(null); }}
+              className={`rounded-lg border px-2 py-2 text-xs font-medium ${
+                sens === "caisse-banque" ? "border-blue-500 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-500"
+              }`}>
+              Caisse → Banque
+            </button>
+            <button type="button" aria-pressed={sens === "banque-caisse"}
+              onClick={() => { setSens("banque-caisse"); setErr(null); }}
+              className={`rounded-lg border px-2 py-2 text-xs font-medium ${
+                sens === "banque-caisse" ? "border-blue-500 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-500"
+              }`}>
+              Banque → Caisse
+            </button>
+          </div>
+
+          {/* Solde source */}
           <div className="rounded-lg bg-gray-50 px-4 py-3 flex items-center justify-between text-sm">
-            <span className="text-gray-500">Solde disponible (caisse)</span>
+            <span className="text-gray-500">
+              Solde disponible ({sens === "caisse-banque" ? "caisse" : "banque"})
+            </span>
             <span className="font-bold text-gray-800">
-              {new Intl.NumberFormat("fr-FR").format(soldeCaisseN)} FCFA
+              {new Intl.NumberFormat("fr-FR").format(soldeSourceN)} FCFA
             </span>
           </div>
 
-          {/* Compte cible */}
+          {/* Compte bancaire source ou cible */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Compte bancaire de destination *</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Compte bancaire {sens === "caisse-banque" ? "de destination" : "source"} *
+            </label>
             {loadingComptes ? (
               <div className="text-xs text-gray-400 py-2">Chargement des comptes…</div>
             ) : comptes.length === 0 ? (
@@ -1935,7 +1971,11 @@ function ModalVirementBanque({ caisseId, caisseName, soldeCaisse, onClose, onDon
             {montant && parseInt(montant) > 0 && (
               <p className="text-xs text-gray-400 mt-1">
                 Solde caisse après : <span className="font-semibold text-gray-700">
-                  {new Intl.NumberFormat("fr-FR").format(soldeCaisseN - parseInt(montant))} FCFA
+                  {new Intl.NumberFormat("fr-FR").format(
+                    sens === "caisse-banque"
+                      ? soldeCaisseN - parseInt(montant)
+                      : soldeCaisseN + parseInt(montant),
+                  )} FCFA
                 </span>
               </p>
             )}
@@ -1979,7 +2019,7 @@ function ModalVirementBanque({ caisseId, caisseName, soldeCaisse, onClose, onDon
           <button onClick={handleSubmit} disabled={saving || comptes.length === 0}
             className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2">
             <Building2 size={14} />
-            {saving ? "Virement en cours…" : "Confirmer le dépôt"}
+            {saving ? "Virement en cours…" : sens === "caisse-banque" ? "Confirmer le dépôt" : "Confirmer le virement"}
           </button>
         </div>
       </div>

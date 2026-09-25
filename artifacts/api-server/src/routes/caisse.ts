@@ -28,6 +28,7 @@ router.put("/caisse/:id/fermer",           checkPermission("caisse", "fermer_ses
 router.post("/caisse/:id/mouvement",       checkPermission("caisse", "enregistrer_mvt"), ctrl.postMouvement);
 router.post("/caisse/:id/transfert",       checkPermission("caisse", "fermer_session"),  ctrl.postTransfert);
 router.post("/caisse/:id/virement-banque", checkPermission("caisse", "enregistrer_mvt"), ctrl.postVirementBanque);
+router.post("/caisse/:id/virement-caisse", checkPermission("caisse", "enregistrer_mvt"), ctrl.postVirementDepuisBanque);
 
 // ─── Journal & PDF ────────────────────────────────────────────────────────────
 router.get("/caisse/:id/journal",          checkPermission("caisse", "voir"),            ctrl.getJournal);

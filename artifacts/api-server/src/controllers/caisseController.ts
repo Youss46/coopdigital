@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import * as svc from "../services/caisseService.js";
+import * as banqueSvc from "../services/banqueService.js";
 import { db, usersTable, caissesDeleguesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
@@ -244,6 +245,47 @@ export async function postVirementBanque(req: Request, res: Response): Promise<v
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Erreur serveur";
     req.log.error({ err }, "postVirementBanqueCaisse");
+    res.status(400).json({ error: msg });
+  }
+}
+
+// ─── Virement Banque → Caisse depuis le parcours Caisse ───────────────────────
+
+export async function postVirementDepuisBanque(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) { res.status(401).json({ erreur: "Coopérative non associée" }); return; }
+
+  const caisseId = parseInt(String(req.params["id"]), 10);
+  const { compteBancaireId, montantFcfa, libelle, reference, dateOperation } = req.body as {
+    compteBancaireId?: number;
+    montantFcfa?: number;
+    libelle?: string;
+    reference?: string;
+    dateOperation?: string;
+  };
+  if (!Number.isInteger(caisseId) || caisseId <= 0) {
+    res.status(400).json({ erreur: "Identifiant de caisse invalide" });
+    return;
+  }
+  if (typeof compteBancaireId !== "number" || !Number.isInteger(compteBancaireId) || compteBancaireId <= 0 ||
+      typeof montantFcfa !== "number" || !Number.isInteger(montantFcfa) || montantFcfa <= 0) {
+    res.status(400).json({ erreur: "compteBancaireId et montantFcfa (> 0) requis" });
+    return;
+  }
+
+  try {
+    const result = await banqueSvc.virementVersCaisse(compteBancaireId, cooperativeId, {
+      caisseId,
+      montantFcfa,
+      libelle,
+      reference,
+      dateOperation,
+      userId: req.user?.id,
+    });
+    res.status(201).json(result);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Erreur serveur";
+    req.log.error({ err }, "postVirementDepuisBanqueCaisse");
     res.status(400).json({ error: msg });
   }
 }

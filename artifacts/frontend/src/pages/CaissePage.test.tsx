@@ -603,3 +603,117 @@ describe("filtre journal de caisse par journée", () => {
     expect(container.textContent).toContain("—");
   });
 });
+
+describe("virement bancaire entrant depuis la caisse", () => {
+  let container: HTMLDivElement;
+  let root: Root;
+
+  afterEach(() => {
+    act(() => root?.unmount());
+    container?.remove();
+    localStorage.clear();
+    vi.unstubAllGlobals();
+  });
+
+  it("permet de transférer depuis un compte bancaire sans quitter la caisse", async () => {
+    const caisseOuverte = {
+      ...caisse,
+      session_id: 3,
+      session_statut: "ouverte",
+    };
+    const compteBancaire = {
+      id: 41,
+      nom: "Compte courant",
+      banque: "BICICI",
+      solde_actuel_fcfa: "30000",
+    };
+    const requetes: Array<{ url: string; init?: RequestInit }> = [];
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      requetes.push({ url, init });
+      if (url.endsWith("/api/caisse")) {
+        return Promise.resolve(new Response(JSON.stringify([caisseOuverte]), { status: 200 }));
+      }
+      if (url.includes("/journal?")) {
+        return Promise.resolve(new Response(JSON.stringify(ancienJournal), { status: 200 }));
+      }
+      if (url.endsWith("/api/caisse/comptes-bancaires")) {
+        return Promise.resolve(new Response(JSON.stringify([compteBancaire]), { status: 200 }));
+      }
+      if (url.endsWith("/api/caisse/7/virement-caisse")) {
+        return Promise.resolve(new Response(JSON.stringify({ reference: "VIR-TEST" }), { status: 201 }));
+      }
+      throw new Error(`Appel inattendu: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root.render(createElement(CaissePage));
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    const journalButton = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Journal de caisse"),
+    );
+    expect(journalButton).toBeDefined();
+    await act(async () => {
+      journalButton!.click();
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    const virementButton = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Virt. Banque"),
+    );
+    expect(virementButton).toBeDefined();
+    await act(async () => {
+      virementButton!.click();
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    const sensBanqueCaisse = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Banque → Caisse"),
+    );
+    expect(sensBanqueCaisse).toBeDefined();
+    await act(async () => {
+      sensBanqueCaisse!.click();
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+    expect(container.textContent).toContain("Virement Banque → Caisse");
+    expect(container.textContent).toContain("Solde disponible (banque)");
+
+    const montantInput = Array.from(container.querySelectorAll<HTMLInputElement>("input")).find((input) =>
+      input.placeholder === "Ex: 1 000 000",
+    );
+    expect(montantInput).toBeDefined();
+    await act(async () => {
+      const setInputValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setInputValue?.call(montantInput, "5000");
+      montantInput!.dispatchEvent(new Event("input", { bubbles: true }));
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    const confirmer = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Confirmer le virement"),
+    );
+    expect(confirmer).toBeDefined();
+    await act(async () => {
+      confirmer!.click();
+      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    const requeteVirement = requetes.find(({ url, init }) =>
+      url.endsWith("/api/caisse/7/virement-caisse") && init?.method === "POST",
+    );
+    expect(requeteVirement).toBeDefined();
+    expect(JSON.parse(String(requeteVirement?.init?.body))).toMatchObject({
+      compteBancaireId: 41,
+      montantFcfa: 5000,
+    });
+    expect(requetes.some(({ url }) => url.startsWith("/api/banque"))).toBe(false);
+  });
+});
