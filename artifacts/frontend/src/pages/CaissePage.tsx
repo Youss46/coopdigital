@@ -7,12 +7,8 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok = () => localStorage.getItem("coop_token") ?? "";
-const JOURNAL_PERIOD_STORAGE_KEY = "coop.caisse.journal.period";
-
-type JournalPeriod = {
-  dateDebut: string;
-  dateFin: string;
-};
+const JOURNAL_DATE_STORAGE_KEY = "coop.caisse.journal.date";
+const LEGACY_JOURNAL_PERIOD_STORAGE_KEY = "coop.caisse.journal.period";
 
 const todayAsDateInput = () => new Date().toISOString().slice(0, 10);
 
@@ -25,13 +21,15 @@ function isValidDateInput(value: unknown): value is string {
     && date.getUTCDate() === day;
 }
 
-function readJournalPeriod(): JournalPeriod {
+function readJournalDate(): string {
   const today = todayAsDateInput();
   try {
-    const stored = localStorage.getItem(JOURNAL_PERIOD_STORAGE_KEY);
-    if (!stored) return { dateDebut: today, dateFin: today };
+    const storedDate = localStorage.getItem(JOURNAL_DATE_STORAGE_KEY);
+    if (isValidDateInput(storedDate)) return storedDate;
 
-    const parsed: unknown = JSON.parse(stored);
+    const storedPeriod = localStorage.getItem(LEGACY_JOURNAL_PERIOD_STORAGE_KEY);
+    if (!storedPeriod) return today;
+    const parsed: unknown = JSON.parse(storedPeriod);
     if (
       typeof parsed === "object"
       && parsed !== null
@@ -40,17 +38,21 @@ function readJournalPeriod(): JournalPeriod {
       && isValidDateInput(parsed.dateDebut)
       && isValidDateInput(parsed.dateFin)
     ) {
-      return { dateDebut: parsed.dateDebut, dateFin: parsed.dateFin };
+      // Une ancienne plage devient une seule journée, en conservant sa borne
+      // de fin comme date sélectionnée.
+      return parsed.dateFin;
     }
   } catch {
-    // Une valeur de stockage corrompue ne doit pas empêcher l'ouverture de la caisse.
+    // Une valeur de stockage corrompue ne doit pas bloquer l'ouverture de la caisse.
   }
-  return { dateDebut: today, dateFin: today };
+  return today;
 }
 
-function saveJournalPeriod(period: JournalPeriod) {
+function saveJournalDate(date: string) {
+  if (!isValidDateInput(date)) return;
   try {
-    localStorage.setItem(JOURNAL_PERIOD_STORAGE_KEY, JSON.stringify(period));
+    localStorage.setItem(JOURNAL_DATE_STORAGE_KEY, date);
+    localStorage.removeItem(LEGACY_JOURNAL_PERIOD_STORAGE_KEY);
   } catch {
     // Le journal reste utilisable si le stockage local est indisponible.
   }
@@ -740,18 +742,14 @@ function ModalTransfert({
 function JournalCaisse({
   caisses,
   initCaisseId,
-  dateDebut,
-  dateFin,
-  onDateDebutChange,
-  onDateFinChange,
+  dateJournal,
+  onDateJournalChange,
   onCaissesChanged,
 }: {
   caisses: Caisse[] | null;
   initCaisseId?: number;
-  dateDebut: string;
-  dateFin: string;
-  onDateDebutChange: (date: string) => void;
-  onDateFinChange: (date: string) => void;
+  dateJournal: string;
+  onDateJournalChange: (date: string) => void;
   onCaissesChanged: () => Promise<void>;
 }) {
   const { toast } = useToast();
@@ -766,8 +764,7 @@ function JournalCaisse({
   const [modalVirementBanque, setModalVirementBanque] = useState(false);
   const [excelLoading, setExcelLoading] = useState(false);
   const journalRequestId = useRef(0);
-  const periodeInvalide = dateDebut > dateFin;
-  const dateUnique = dateDebut === dateFin;
+  const dateInvalide = !isValidDateInput(dateJournal);
 
   const invaliderJournal = useCallback(() => {
     journalRequestId.current += 1;
@@ -787,7 +784,7 @@ function JournalCaisse({
   const charger = useCallback(async (id?: number | "") => {
     const cid = id ?? caisseId;
     const requestId = ++journalRequestId.current;
-    if (periodeInvalide) {
+    if (dateInvalide) {
       setJournal(null);
       setLoading(false);
       return;
@@ -796,8 +793,8 @@ function JournalCaisse({
     setLoading(true);
     try {
       const params = new URLSearchParams({
-        date_debut: dateDebut,
-        date_fin: dateFin,
+        date_debut: dateJournal,
+        date_fin: dateJournal,
       });
       const r = await fetch(`${BASE}/api/caisse/${cid}/journal?${params.toString()}`,
         { headers: { Authorization: `Bearer ${tok()}` } });
@@ -812,7 +809,7 @@ function JournalCaisse({
     } finally {
       if (requestId === journalRequestId.current) setLoading(false);
     }
-  }, [caisseId, dateDebut, dateFin, periodeInvalide]);
+  }, [caisseId, dateJournal, dateInvalide]);
 
   // Le journal doit être visible après navigation ou changement de filtre,
   // pas uniquement après un clic manuel sur « Charger ».
@@ -839,12 +836,12 @@ function JournalCaisse({
   const [pdfLoading, setPdfLoading] = useState(false);
 
   const telechargerPdf = async () => {
-    if (!caisseId || pdfLoading || periodeInvalide) return;
+    if (!caisseId || pdfLoading || dateInvalide) return;
     setPdfLoading(true);
     try {
       const params = new URLSearchParams({
-        date_debut: dateDebut,
-        date_fin: dateFin,
+        date_debut: dateJournal,
+        date_fin: dateJournal,
       });
       const url = `${BASE}/api/caisse/${caisseId}/rapport-pdf?${params.toString()}`;
       const r = await fetch(url, { headers: { Authorization: `Bearer ${tok()}` } });
@@ -853,7 +850,7 @@ function JournalCaisse({
         throw new Error(json?.error ?? `Erreur ${r.status}`);
       }
       const blob = await r.blob();
-      openPdfViewer(URL.createObjectURL(blob), `rapport-caisse-${dateDebut}-${dateFin}.pdf`);
+      openPdfViewer(URL.createObjectURL(blob), `rapport-caisse-${dateJournal}.pdf`);
     } catch (e) {
       toast({
         title: "Export impossible",
@@ -866,12 +863,12 @@ function JournalCaisse({
   };
 
   const telechargerExcel = async () => {
-    if (!caisseId || excelLoading || periodeInvalide) return;
+    if (!caisseId || excelLoading || dateInvalide) return;
     setExcelLoading(true);
     try {
       const params = new URLSearchParams({
-        date_debut: dateDebut,
-        date_fin: dateFin,
+        date_debut: dateJournal,
+        date_fin: dateJournal,
       });
       const url = `${BASE}/api/caisse/${caisseId}/journal/export?${params.toString()}`;
       const r = await fetch(url, { headers: { Authorization: `Bearer ${tok()}` } });
@@ -883,7 +880,7 @@ function JournalCaisse({
       const objectUrl = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = objectUrl;
-      anchor.download = `journal-caisse-${dateDebut}-${dateFin}.xlsx`;
+      anchor.download = `journal-caisse-${dateJournal}.xlsx`;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
@@ -922,31 +919,27 @@ function JournalCaisse({
           {caisses?.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
         </select>
         <label className="flex items-center gap-2 text-sm text-gray-600">
-          <span>Du</span>
-          <input type="date" value={dateDebut} onChange={e => { invaliderJournal(); onDateDebutChange(e.target.value); }}
+          <span>Date</span>
+          <input type="date" aria-label="Date du journal" value={dateJournal} required
+            onChange={e => { invaliderJournal(); onDateJournalChange(e.target.value); }}
             className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
         </label>
-        <label className="flex items-center gap-2 text-sm text-gray-600">
-          <span>Au</span>
-          <input type="date" value={dateFin} onChange={e => { invaliderJournal(); onDateFinChange(e.target.value); }}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-        </label>
-        <button onClick={() => charger()} disabled={!caisseId || loading || periodeInvalide}
+        <button onClick={() => charger()} disabled={!caisseId || loading || dateInvalide}
           className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50">
           {loading ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" /> : <RefreshCw size={14} />}
           Charger
         </button>
       </div>
-      {periodeInvalide && (
+      {dateInvalide && (
         <p className="text-xs text-red-600 -mt-3 mb-4">
-          La date de fin doit être postérieure ou égale à la date de début.
+          Choisissez une date valide pour afficher les opérations.
         </p>
       )}
 
       {/* Actions session */}
       {caisseId && (
         <div className="flex flex-wrap gap-2 mb-4">
-          {peutEcrire && !sessionOuverte && dateUnique && dateDebut === today && (
+          {peutEcrire && !sessionOuverte && dateJournal === today && (
             <button onClick={ouvrirSession}
               className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">
               <Unlock size={14} /> Ouvrir la session du jour
@@ -971,7 +964,7 @@ function JournalCaisse({
           {journal && (
             <>
               <button onClick={() => void telechargerPdf()}
-                disabled={pdfLoading || periodeInvalide}
+                disabled={pdfLoading || dateInvalide}
                 className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
                 {pdfLoading
                   ? <RefreshCw size={14} className="animate-spin" />
@@ -979,7 +972,7 @@ function JournalCaisse({
                 Télécharger PDF
               </button>
               <button onClick={() => void telechargerExcel()}
-                disabled={excelLoading || periodeInvalide}
+                disabled={excelLoading || dateInvalide}
                 className="flex items-center gap-1.5 px-3 py-2 border border-green-200 rounded-lg text-sm text-green-700 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed">
                 {excelLoading
                   ? <RefreshCw size={14} className="animate-spin" />
@@ -1018,7 +1011,7 @@ function JournalCaisse({
       {journal ? (
         journal.mouvements.length === 0 ? (
           <div className="text-center py-12 text-gray-400 bg-gray-50 rounded-xl">
-            <p>Aucun mouvement pour cette période.</p>
+            <p>Aucun mouvement pour cette journée.</p>
           </div>
         ) : (
           <div
@@ -1072,7 +1065,7 @@ function JournalCaisse({
         )
       ) : !loading && (
         <div className="text-center py-12 text-gray-400 bg-gray-50 rounded-xl">
-          <p>Sélectionnez une caisse et une période, puis cliquez sur Charger.</p>
+          <p>Sélectionnez une caisse et une date, puis cliquez sur Charger.</p>
         </div>
       )}
 
@@ -1632,22 +1625,14 @@ export default function CaissePage() {
 
   const [tab, setTab] = useState<"etat" | "journal" | "historique" | "delegues">("etat");
   const [journalCaisseId, setJournalCaisseId] = useState<number | undefined>();
-  const [journalPeriod, setJournalPeriod] = useState<JournalPeriod>(readJournalPeriod);
+  const [journalDate, setJournalDate] = useState<string>(readJournalDate);
   const [caisses, setCaisses] = useState<Caisse[] | null>(null);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  const setJournalDateDebut = useCallback((dateDebut: string) => {
-    setJournalPeriod(period => ({ ...period, dateDebut }));
-  }, []);
-
-  const setJournalDateFin = useCallback((dateFin: string) => {
-    setJournalPeriod(period => ({ ...period, dateFin }));
-  }, []);
-
   useEffect(() => {
-    saveJournalPeriod(journalPeriod);
-  }, [journalPeriod]);
+    saveJournalDate(journalDate);
+  }, [journalDate]);
 
   const chargerCaisses = useCallback(async () => {
     setLoading(true);
@@ -1714,10 +1699,8 @@ export default function CaissePage() {
         <JournalCaisse
           caisses={caisses}
           initCaisseId={journalCaisseId}
-          dateDebut={journalPeriod.dateDebut}
-           dateFin={journalPeriod.dateFin}
-          onDateDebutChange={setJournalDateDebut}
-          onDateFinChange={setJournalDateFin}
+          dateJournal={journalDate}
+          onDateJournalChange={setJournalDate}
           onCaissesChanged={chargerCaisses}
         />
       )}
