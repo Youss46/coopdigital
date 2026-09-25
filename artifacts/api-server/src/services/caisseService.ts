@@ -446,6 +446,10 @@ export async function getJournal(caisseId: number, opts?: { dateDebut?: string; 
     SELECT
       m.id, m.type, m.motif, m.montant_fcfa,
       CASE
+        WHEN m.type = 'entree' THEN COALESCE(
+          NULLIF(BTRIM(m.libelle), ''),
+          REPLACE(m.motif, '_', ' ')
+        )
         WHEN m.motif = 'paiement_producteur' AND p.id IS NOT NULL
           THEN 'Paiement producteur — règlement ' ||
             COALESCE(NULLIF(BTRIM(p.numero_recu), ''), 'PAI-' || p.id::text)
@@ -456,6 +460,7 @@ export async function getJournal(caisseId: number, opts?: { dateDebut?: string; 
       m.created_at::text, m.session_id,
       concat_ws(' ', NULLIF(BTRIM(u.nom), ''), NULLIF(BTRIM(u.prenoms), '')) AS enregistre_par_nom,
        CASE
+         WHEN m.type = 'entree' THEN c.nom
          WHEN m.motif = 'paiement_producteur' AND p.id IS NOT NULL
            THEN COALESCE(
              NULLIF(concat_ws(' ', NULLIF(BTRIM(beneficiaire.nom), ''), NULLIF(BTRIM(beneficiaire.prenoms), '')), ''),
@@ -472,6 +477,9 @@ export async function getJournal(caisseId: number, opts?: { dateDebut?: string; 
       s.statut AS session_statut, s.date_session::text
     FROM mouvements_caisse m
     LEFT JOIN sessions_caisse s ON s.id = m.session_id
+     LEFT JOIN caisses c
+       ON c.id = m.caisse_id
+       AND c.cooperative_id = m.cooperative_id
     LEFT JOIN users u ON u.id = m.enregistre_par
     LEFT JOIN paiements p ON m.reference_operation = ('PAI-' || p.id::text)
     LEFT JOIN membres beneficiaire
@@ -545,9 +553,7 @@ export async function genererJournalExcel(
       date_operation: m.date_operation,
       type: m.type === "entree" ? "Entrée" : "Sortie",
       motif: m.motif.replace(/_/g, " "),
-      beneficiaire: m.motif === "paiement_producteur" || m.motif === "avance"
-        ? m.beneficiaire_nom?.trim() ?? ""
-        : "",
+      beneficiaire: m.beneficiaire_nom?.trim() ?? "",
       libelle: m.libelle ?? "",
       operateur: m.enregistre_par_nom?.trim() || "Système",
       montant: Number.parseFloat(m.montant_fcfa) || 0,
@@ -948,9 +954,7 @@ export async function genererRapportPdf(
       const accent = entree ? "#16803c" : "#b42318";
       const headerFill = entree ? "#f0fdf4" : "#fef2f2";
       const motif = m.motif.replace(/_/g, " ");
-      const beneficiaire = m.motif === "paiement_producteur" || m.motif === "avance"
-        ? m.beneficiaire_nom?.trim() || "—"
-        : "—";
+      const beneficiaire = m.beneficiaire_nom?.trim() || "—";
       const operateur = m.enregistre_par_nom?.trim() || "Système";
       const libelle = m.libelle?.trim() || "—";
       const solde = m.solde_apres_fcfa ? FCFA(m.solde_apres_fcfa) : "—";

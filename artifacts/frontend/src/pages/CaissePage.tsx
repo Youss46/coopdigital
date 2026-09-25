@@ -145,10 +145,8 @@ interface Mouvement {
   beneficiaire_nom: string | null;
 }
 
-function beneficiaireMouvement(mouvement: Pick<Mouvement, "motif" | "beneficiaire_nom">): string {
-  return mouvement.motif === "paiement_producteur" || mouvement.motif === "avance"
-    ? mouvement.beneficiaire_nom?.trim() || "—"
-    : "—";
+function beneficiaireMouvement(mouvement: Pick<Mouvement, "beneficiaire_nom">): string {
+  return mouvement.beneficiaire_nom?.trim() || "—";
 }
 
 interface Session {

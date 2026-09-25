@@ -69,6 +69,7 @@ const mouvements = [
     created_at: "2026-08-28T08:00:00.000Z",
     enregistre_par_nom: "Kouassi Awa",
     session_id: 4,
+    beneficiaire_nom: "Caisse principale",
     session_statut: "fermee",
     date_session: "2026-08-28",
   },
@@ -84,6 +85,7 @@ const mouvements = [
     created_at: "2026-08-29T09:00:00.000Z",
     enregistre_par_nom: "Auteur Intégration",
     session_id: 5,
+    beneficiaire_nom: "Caisse principale",
     session_statut: "ouverte",
     date_session: "2026-08-29",
   },
@@ -99,6 +101,7 @@ const mouvements = [
     created_at: "2026-08-30T09:00:00.000Z",
     enregistre_par_nom: null,
     session_id: 6,
+    beneficiaire_nom: "Caisse principale",
     session_statut: "fermee",
     date_session: "2026-08-30",
   },
@@ -225,6 +228,10 @@ describe("export tableur du journal de caisse", () => {
     };
     const queryText = query.strings.join("?");
     expect(queryText).toContain("m.date_operation BETWEEN");
+    expect(queryText).toContain("LEFT JOIN caisses c");
+    expect(queryText).toContain("WHEN m.type = 'entree' THEN c.nom");
+    expect(queryText).toContain("NULLIF(BTRIM(m.libelle), '')");
+    expect(queryText).toContain("REPLACE(m.motif, '_', ' ')");
     expect(queryText).toContain("LEFT JOIN users u ON u.id = m.enregistre_par");
     expect(queryText).toContain(
       "concat_ws(' ', NULLIF(BTRIM(u.nom), ''), NULLIF(BTRIM(u.prenoms), '')) AS enregistre_par_nom",
@@ -265,7 +272,7 @@ describe("export tableur du journal de caisse", () => {
       "2026-08-28",
       "Entrée",
       "retrait banque",
-      "",
+      "Caisse principale",
       "Retrait du compte principal",
       "Kouassi Awa",
       125000,
@@ -275,7 +282,7 @@ describe("export tableur du journal de caisse", () => {
       "2026-08-29",
       "Entrée",
       "remboursement",
-      "",
+      "Caisse principale",
       "Remboursement avance AVA-42",
       "Auteur Intégration",
       43210.5,
@@ -285,7 +292,7 @@ describe("export tableur du journal de caisse", () => {
       "2026-08-30",
       "Entrée",
       "remboursement",
-      "",
+      "Caisse principale",
       "Remboursement historique",
       "Système",
       25,
@@ -369,7 +376,7 @@ describe("noms des opérateurs des sessions de caisse", () => {
   });
 });
 
-describe("bénéficiaire du paiement dans le rapport PDF de caisse", () => {
+describe("bénéficiaires des mouvements dans le rapport PDF de caisse", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -440,6 +447,22 @@ describe("bénéficiaire du paiement dans le rapport PDF de caisse", () => {
             session_statut: "ouverte",
             date_session: "2026-09-24",
           },
+          {
+            id: 54,
+            type: "entree",
+            motif: "retrait_banque",
+            montant_fcfa: "100000",
+            libelle: "retrait banque",
+            reference_operation: null,
+            solde_apres_fcfa: "140000",
+            date_operation: "2026-09-24",
+            created_at: "2026-09-24T09:30:00.000Z",
+            enregistre_par_nom: "Operateur Test",
+            session_id: 6,
+            beneficiaire_nom: "Caisse principale",
+            session_statut: "ouverte",
+            date_session: "2026-09-24",
+          },
         ],
       })
       .mockResolvedValueOnce({ rows: [{ nom: "Cooperative Test" }] })
@@ -465,6 +488,8 @@ describe("bénéficiaire du paiement dans le rapport PDF de caisse", () => {
     expect(text).toContain("Issa");
     expect(text).toContain("Fournisseur");
     expect(text).toContain("REC-51");
+    expect(text).toContain("retrait banque");
+    expect(text).toContain("Caisse principale");
   });
 
   it("répartit les mouvements longs sur plusieurs pages sans couper les libellés", async () => {

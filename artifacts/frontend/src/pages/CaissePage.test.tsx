@@ -506,7 +506,7 @@ describe("filtre journal de caisse par journée", () => {
     expect(fetchMock.mock.calls.filter(([input]) => String(input).includes("/journal?"))).toHaveLength(1);
   });
 
-  it("affiche les bénéficiaires des avances et paiements producteurs dans le journal", async () => {
+  it("affiche les bénéficiaires des sorties et entrées de caisse dans le journal", async () => {
     const avanceJournal = {
       mouvements: [
         {
@@ -534,6 +534,19 @@ describe("filtre journal de caisse par journée", () => {
           enregistre_par_nom: "Awa Kouassi",
           session_id: 3,
           beneficiaire_nom: "Fournisseur Externe Issa",
+        },
+        {
+          id: 11,
+          type: "entree",
+          motif: "retrait_banque",
+          montant_fcfa: "100000",
+          libelle: "retrait banque",
+          solde_apres_fcfa: "160000",
+          date_operation: "2026-09-25",
+          created_at: "2026-09-25T12:00:00.000Z",
+          enregistre_par_nom: "Awa Kouassi",
+          session_id: 3,
+          beneficiaire_nom: "Caisse principale",
         },
       ],
       totalEntrees: 0,
@@ -572,5 +585,6 @@ describe("filtre journal de caisse par journée", () => {
     expect(container.textContent).toContain("Bénéficiaire");
     expect(container.textContent).toContain("Koffi Mariam");
     expect(container.textContent).toContain("Fournisseur Externe Issa");
+    expect(container.textContent).toContain("Caisse principale");
   });
 });
