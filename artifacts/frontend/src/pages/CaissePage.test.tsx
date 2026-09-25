@@ -74,7 +74,7 @@ const nouveauJournal = {
   totalSorties: 2500,
 };
 
-describe("plage du journal de caisse", () => {
+describe("filtre journal de caisse par journée", () => {
   let container: HTMLDivElement;
   let root: Root;
 
@@ -85,14 +85,18 @@ describe("plage du journal de caisse", () => {
     vi.unstubAllGlobals();
   });
 
-  it("n'émet aucun appel journal ou export et retire l'ancien résultat pour une plage inversée", async () => {
+  it("envoie la date choisie comme journée entière, sans plage Du/Au", async () => {
+    localStorage.setItem("coop.caisse.journal.date", "2026-09-08");
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
       if (url.endsWith("/api/caisse")) {
         return Promise.resolve(new Response(JSON.stringify([caisse]), { status: 200 }));
       }
-      if (url.includes("/journal?")) {
+      if (url.includes("date_debut=2026-09-08&date_fin=2026-09-08")) {
         return Promise.resolve(new Response(JSON.stringify(ancienJournal), { status: 200 }));
+      }
+      if (url.includes("date_debut=2026-09-07&date_fin=2026-09-07")) {
+        return Promise.resolve(new Response(JSON.stringify(nouveauJournal), { status: 200 }));
       }
       throw new Error(`Appel inattendu: ${url}`);
     });
@@ -118,29 +122,25 @@ describe("plage du journal de caisse", () => {
     });
 
     expect(container.textContent).toContain("Ancienne opération");
-    const journalCallsBeforeInvalidPeriod = fetchMock.mock.calls.filter(([input]) =>
-      String(input).includes("/journal?"),
-    ).length;
-    expect(journalCallsBeforeInvalidPeriod).toBe(1);
-
     const dateInputs = Array.from(container.querySelectorAll<HTMLInputElement>('input[type="date"]'));
-    expect(dateInputs).toHaveLength(2);
+    expect(dateInputs).toHaveLength(1);
+    expect(dateInputs[0]?.getAttribute("aria-label")).toBe("Date du journal");
+    expect(fetchMock.mock.calls.some(([input]) =>
+      String(input).includes("date_debut=2026-09-08&date_fin=2026-09-08"),
+    )).toBe(true);
+
     await act(async () => {
       const setInputValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-      setInputValue?.call(dateInputs[1], "2026-09-01");
-      dateInputs[1]!.dispatchEvent(new Event("input", { bubbles: true }));
+      setInputValue?.call(dateInputs[0], "2026-09-07");
+      dateInputs[0]!.dispatchEvent(new Event("input", { bubbles: true }));
       await new Promise(resolve => setTimeout(resolve, 0));
     });
 
-    expect(container.textContent).toContain(
-      "La date de fin doit être postérieure ou égale à la date de début.",
-    );
+    expect(fetchMock.mock.calls.some(([input]) =>
+      String(input).includes("date_debut=2026-09-07&date_fin=2026-09-07"),
+    )).toBe(true);
+    expect(container.textContent).toContain("Opération de la caisse secondaire");
     expect(container.textContent).not.toContain("Ancienne opération");
-    expect(fetchMock.mock.calls.filter(([input]) => String(input).includes("/journal?"))).toHaveLength(
-      journalCallsBeforeInvalidPeriod,
-    );
-    expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/rapport-pdf?"))).toBe(false);
-    expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/journal/export?"))).toBe(false);
   });
 
   it("ignore la réponse tardive d'une caisse précédemment sélectionnée", async () => {
@@ -208,11 +208,8 @@ describe("plage du journal de caisse", () => {
     expect(container.textContent).not.toContain("Ancienne opération");
   });
 
-  it("ignore la réponse tardive d'une période précédemment sélectionnée", async () => {
-    localStorage.setItem(
-      "coop.caisse.journal.period",
-      JSON.stringify({ dateDebut: "2026-09-08", dateFin: "2026-09-08" }),
-    );
+  it("ignore la réponse tardive d'une date précédemment sélectionnée", async () => {
+    localStorage.setItem("coop.caisse.journal.date", "2026-09-08");
     let resolveAnciennePeriode!: (response: Response) => void;
     let resolveNouvellePeriode!: (response: Response) => void;
     const anciennePeriode = new Promise<Response>(resolve => {
@@ -228,7 +225,7 @@ describe("plage du journal de caisse", () => {
         return Promise.resolve(new Response(JSON.stringify([caisse]), { status: 200 }));
       }
       if (url.includes("date_debut=2026-09-08&date_fin=2026-09-08")) return anciennePeriode;
-      if (url.includes("date_debut=2026-09-07&date_fin=2026-09-08")) return nouvellePeriode;
+      if (url.includes("date_debut=2026-09-07&date_fin=2026-09-07")) return nouvellePeriode;
       throw new Error(`Appel inattendu: ${url}`);
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -253,7 +250,7 @@ describe("plage du journal de caisse", () => {
     });
 
     const dateInputs = Array.from(container.querySelectorAll<HTMLInputElement>('input[type="date"]'));
-    expect(dateInputs).toHaveLength(2);
+    expect(dateInputs).toHaveLength(1);
     await act(async () => {
       const setInputValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
       setInputValue?.call(dateInputs[0], "2026-09-07");
@@ -278,17 +275,14 @@ describe("plage du journal de caisse", () => {
     expect(container.textContent).not.toContain("Ancienne opération");
   });
 
-  it("restaure la période du journal après un remontage de la page", async () => {
-    localStorage.setItem(
-      "coop.caisse.journal.period",
-      JSON.stringify({ dateDebut: "2026-09-06", dateFin: "2026-09-08" }),
-    );
+  it("restaure la date du journal après un remontage de la page", async () => {
+    localStorage.setItem("coop.caisse.journal.date", "2026-09-08");
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
       if (url.endsWith("/api/caisse")) {
         return Promise.resolve(new Response(JSON.stringify([caisse]), { status: 200 }));
       }
-      if (url.includes("date_debut=2026-09-06&date_fin=2026-09-08")) {
+      if (url.includes("date_debut=2026-09-08&date_fin=2026-09-08")) {
         return Promise.resolve(new Response(JSON.stringify(ancienJournal), { status: 200 }));
       }
       throw new Error(`Appel inattendu: ${url}`);
@@ -315,9 +309,9 @@ describe("plage du journal de caisse", () => {
     });
 
     let dateInputs = Array.from(container.querySelectorAll<HTMLInputElement>('input[type="date"]'));
-    expect(dateInputs.map(input => input.value)).toEqual(["2026-09-06", "2026-09-08"]);
+    expect(dateInputs.map(input => input.value)).toEqual(["2026-09-08"]);
     expect(fetchMock.mock.calls.some(([input]) =>
-      String(input).includes("date_debut=2026-09-06&date_fin=2026-09-08"),
+      String(input).includes("date_debut=2026-09-08&date_fin=2026-09-08"),
     )).toBe(true);
 
     await act(async () => {
@@ -337,21 +331,24 @@ describe("plage du journal de caisse", () => {
     });
 
     dateInputs = Array.from(container.querySelectorAll<HTMLInputElement>('input[type="date"]'));
-    expect(dateInputs.map(input => input.value)).toEqual(["2026-09-06", "2026-09-08"]);
+    expect(dateInputs.map(input => input.value)).toEqual(["2026-09-08"]);
     expect(fetchMock.mock.calls.filter(([input]) =>
-      String(input).includes("date_debut=2026-09-06&date_fin=2026-09-08"),
+      String(input).includes("date_debut=2026-09-08&date_fin=2026-09-08"),
     ).length).toBeGreaterThanOrEqual(2);
   });
 
-  it("ne charge pas le journal avec une période restaurée inversée", async () => {
+  it("convertit une ancienne plage enregistrée en une seule journée", async () => {
     localStorage.setItem(
       "coop.caisse.journal.period",
-      JSON.stringify({ dateDebut: "2026-09-08", dateFin: "2026-09-06" }),
+      JSON.stringify({ dateDebut: "2026-09-06", dateFin: "2026-09-08" }),
     );
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
       if (url.endsWith("/api/caisse")) {
         return Promise.resolve(new Response(JSON.stringify([caisse]), { status: 200 }));
+      }
+      if (url.includes("date_debut=2026-09-08&date_fin=2026-09-08")) {
+        return Promise.resolve(new Response(JSON.stringify(nouveauJournal), { status: 200 }));
       }
       throw new Error(`Appel inattendu: ${url}`);
     });
@@ -376,11 +373,60 @@ describe("plage du journal de caisse", () => {
     });
 
     const dateInputs = Array.from(container.querySelectorAll<HTMLInputElement>('input[type="date"]'));
-    expect(dateInputs.map(input => input.value)).toEqual(["2026-09-08", "2026-09-06"]);
-    expect(container.textContent).toContain(
-      "La date de fin doit être postérieure ou égale à la date de début.",
+    expect(dateInputs.map(input => input.value)).toEqual(["2026-09-08"]);
+    expect(container.textContent).toContain("Opération de la caisse secondaire");
+    expect(fetchMock.mock.calls.some(([input]) =>
+      String(input).includes("date_debut=2026-09-08&date_fin=2026-09-08"),
+    )).toBe(true);
+    expect(localStorage.getItem("coop.caisse.journal.date")).toBe("2026-09-08");
+    expect(localStorage.getItem("coop.caisse.journal.period")).toBeNull();
+  });
+
+  it("retire le journal et bloque le chargement si la date est effacée", async () => {
+    localStorage.setItem("coop.caisse.journal.date", "2026-09-08");
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/caisse")) {
+        return Promise.resolve(new Response(JSON.stringify([caisse]), { status: 200 }));
+      }
+      if (url.includes("/journal?")) {
+        return Promise.resolve(new Response(JSON.stringify(ancienJournal), { status: 200 }));
+      }
+      throw new Error(`Appel inattendu: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root.render(createElement(CaissePage));
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    const journalButton = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Journal de caisse"),
     );
-    expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/journal?"))).toBe(false);
+    expect(journalButton).toBeDefined();
+    await act(async () => {
+      journalButton!.click();
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+    expect(container.textContent).toContain("Ancienne opération");
+
+    const dateInput = container.querySelector<HTMLInputElement>('input[type="date"]');
+    expect(dateInput).not.toBeNull();
+    await act(async () => {
+      const setInputValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setInputValue?.call(dateInput, "");
+      dateInput!.dispatchEvent(new Event("input", { bubbles: true }));
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    expect(container.textContent).toContain("Choisissez une date valide");
+    expect(container.textContent).not.toContain("Ancienne opération");
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).includes("/journal?"))).toHaveLength(1);
   });
 
   it("affiche les bénéficiaires des avances et paiements producteurs dans le journal", async () => {
