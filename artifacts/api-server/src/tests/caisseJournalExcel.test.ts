@@ -450,14 +450,69 @@ describe("bénéficiaire du paiement dans le rapport PDF de caisse", () => {
       dateFin: "2026-09-24",
     });
     const text = extractPdfText(pdf);
+    const normalizedText = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
 
     expect(pdf.subarray(0, 4).toString()).toBe("%PDF");
-    expect(text).toContain("Bénéficiaire");
+    expect(normalizedText).toContain("BENEFICIAIRE");
+    expect(normalizedText).toContain("EFFECTUE PAR");
+    expect(normalizedText).toContain("SOLDE APRES");
+    expect(normalizedText).toContain("LIBELLE");
+    expect(text).toContain("24/09/2026");
     expect(text).toContain("paiement producteur");
     expect(text).toContain("Fofana");
     expect(text).toContain("Awa");
     expect(text).toContain("Toure");
     expect(text).toContain("Issa");
     expect(text).toContain("Fournisseur");
+    expect(text).toContain("REC-51");
+  });
+
+  it("répartit les mouvements longs sur plusieurs pages sans couper les libellés", async () => {
+    const caisseQuery = {
+      from: vi.fn(),
+      where: vi.fn(),
+      limit: vi.fn(),
+    };
+    caisseQuery.from.mockReturnValue(caisseQuery);
+    caisseQuery.where.mockReturnValue(caisseQuery);
+    caisseQuery.limit.mockResolvedValue([{
+      id: 12,
+      cooperativeId: 9,
+      nom: "Caisse centrale",
+      soldeActuelFcfa: "48000",
+    }]);
+    mockDb.select.mockReturnValue(caisseQuery);
+
+    const rows = Array.from({ length: 15 }, (_, index) => ({
+      id: 100 + index,
+      type: index % 2 === 0 ? "sortie" : "entree",
+      motif: index % 2 === 0 ? "paiement_producteur" : "retrait_banque",
+      montant_fcfa: "125000",
+      libelle: `Operation ${index + 1} complete avec une description detaillee et une reference unique FIN-${index + 1}`,
+      reference_operation: `PDF-${index + 1}`,
+      solde_apres_fcfa: "48000",
+      date_operation: "2026-09-24",
+      created_at: "2026-09-24T08:00:00.000Z",
+      enregistre_par_nom: "Operateur de caisse",
+      session_id: 6,
+      beneficiaire_nom: `Beneficiaire de test ${index + 1}`,
+      session_statut: "ouverte",
+      date_session: "2026-09-24",
+    }));
+    mockDb.execute
+      .mockResolvedValueOnce({ rows })
+      .mockResolvedValueOnce({ rows: [{ nom: "Cooperative Test" }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const pdf = await genererRapportPdf(12, {
+      dateDebut: "2026-09-24",
+      dateFin: "2026-09-24",
+    });
+    const pageCount = [...pdf.toString("latin1").matchAll(/\/Type\s*\/Page\b/g)].length;
+    const text = extractPdfText(pdf);
+
+    expect(pageCount).toBeGreaterThan(1);
+    expect(text).toContain("Operation 15 complete");
+    expect(text).toContain("FIN-15");
   });
 });

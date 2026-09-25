@@ -924,79 +924,116 @@ export async function genererRapportPdf(
   });
   doc.y = resY + 44;
 
-  // ── Tableau des mouvements
-  doc.moveDown(0.5);
-  const headers = ["Date op.", "Type", "Motif", "Bénéficiaire", "Libellé", "Effectué par", "Montant", "Solde"];
-  const colWidths = [55, 32, 68, 96, 78, 62, 52, 53];
+  // ── Détail des mouvements
+  doc.moveDown(0.5)
+    .font("Helvetica-Bold").fontSize(10).fillColor("#1a4731")
+    .text("DÉTAIL DES MOUVEMENTS", margin, doc.y, { width: cW, lineBreak: false });
+  doc.moveDown(0.45);
   const tableX = margin;
   let tableY = doc.y;
 
-  // En-tête tableau
-  doc.save().rect(tableX, tableY, cW, 16).fillColor("#1a4731").fill().restore();
-  let cx = tableX + 3;
-  headers.forEach((h, i) => {
-    doc.font("Helvetica-Bold").fontSize(7.5).fillColor("#ffffff")
-      .text(h, cx, tableY + 4, { width: colWidths[i]! - 4, lineBreak: false });
-    cx += colWidths[i]!;
-  });
-  tableY += 16;
-
-  // Lignes
   if (journal.mouvements.length === 0) {
     doc.font("Helvetica-Oblique").fontSize(8).fillColor("#888888")
-      .text("Aucun mouvement enregistré pour cette session.", tableX + 4, tableY + 6);
-    tableY += 22;
+      .text("Aucun mouvement enregistré pour cette période.", tableX + 4, tableY + 6, { width: cW - 8 });
+    tableY += 24;
   } else {
-    journal.mouvements.forEach((m, idx) => {
-      const motifBase = m.motif.replace(/_/g, " ");
-      const beneficiaire = m.motif === "paiement_producteur" || m.motif === "avance"
-        ? m.beneficiaire_nom?.trim()
-        : "";
-      doc.font("Helvetica").fontSize(7);
-      const rowHeight = beneficiaire
-        ? Math.max(14, doc.heightOfString(beneficiaire, {
-            width: colWidths[3]! - 4,
-            lineGap: 0,
-          }) + 6)
-        : 14;
+    const topBandHeight = 19;
+    const innerX = tableX + 9;
+    const innerWidth = cW - 18;
+    const detailWidths = [innerWidth * 0.43, innerWidth * 0.34, innerWidth * 0.23];
+    const pageBottom = doc.page.height - 62;
 
-      if (tableY + rowHeight > doc.page.height - 80) {
-        doc.addPage();
-        tableY = 60;
-      }
-      const bg = idx % 2 === 0 ? "#ffffff" : "#f9fafb";
-      doc.save().rect(tableX, tableY, cW, rowHeight).fillColor(bg).fill().restore();
+    for (const [idx, m] of journal.mouvements.entries()) {
       const entree = m.type === "entree";
-      const cols = [
-        m.date_operation ?? "—",
-        entree ? "Entrée" : "Sortie",
-        motifBase,
-        beneficiaire || "—",
-        m.libelle ?? "—",
-        m.enregistre_par_nom?.trim() || "Système",
-        FCFA(m.montant_fcfa),
-        m.solde_apres_fcfa ? FCFA(m.solde_apres_fcfa) : "—",
+      const accent = entree ? "#16803c" : "#b42318";
+      const headerFill = entree ? "#f0fdf4" : "#fef2f2";
+      const motif = m.motif.replace(/_/g, " ");
+      const beneficiaire = m.motif === "paiement_producteur" || m.motif === "avance"
+        ? m.beneficiaire_nom?.trim() || "—"
+        : "—";
+      const operateur = m.enregistre_par_nom?.trim() || "Système";
+      const libelle = m.libelle?.trim() || "—";
+      const solde = m.solde_apres_fcfa ? FCFA(m.solde_apres_fcfa) : "—";
+      const dateParts = (m.date_operation ?? "").slice(0, 10).split("-");
+      const dateLabel = dateParts.length === 3
+        ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`
+        : m.date_operation ?? "—";
+
+      const details = [
+        { label: "BÉNÉFICIAIRE", value: beneficiaire, width: detailWidths[0]! },
+        { label: "EFFECTUÉ PAR", value: operateur, width: detailWidths[1]! },
+        { label: "SOLDE APRÈS", value: solde, width: detailWidths[2]! },
       ];
-      cx = tableX + 3;
-      cols.forEach((v, i) => {
-        const color = i === 1 ? (entree ? "#166534" : "#991b1b") : "#222222";
-        doc.font(i === 1 ? "Helvetica-Bold" : "Helvetica")
-          .fontSize(7).fillColor(color)
-          .text(
-            i === 3 && beneficiaire ? String(v) : String(v).slice(0, i === 4 ? 38 : 30),
-            cx,
-            tableY + (i === 3 && beneficiaire ? 2 : Math.max(3, (rowHeight - 8) / 2)),
-            {
-              width: colWidths[i]! - 4,
-              lineBreak: i === 3 && Boolean(beneficiaire),
-            },
-          );
-        cx += colWidths[i]!;
+      const detailValueHeights = details.map(({ value, width }) => {
+        doc.font("Helvetica").fontSize(7.5);
+        return doc.heightOfString(value, { width: width - 8, lineGap: 0 });
       });
-      // Bordure inférieure
-      doc.moveTo(tableX, tableY + rowHeight).lineTo(tableX + cW, tableY + rowHeight).strokeColor("#e5e7eb").lineWidth(0.4).stroke();
-      tableY += rowHeight;
-    });
+      const detailHeight = 6 + 2 + Math.max(...detailValueHeights) + 5;
+      doc.font("Helvetica").fontSize(8);
+      const libelleHeight = doc.heightOfString(libelle, { width: innerWidth, lineGap: 0 });
+      const libelleBlockHeight = 6 + 2 + libelleHeight + 5;
+      const cardHeight = topBandHeight + detailHeight + libelleBlockHeight;
+
+      if (tableY + cardHeight > pageBottom) {
+        doc.addPage();
+        await drawHeader(doc, caisse.cooperativeId, {
+          titre_document: "RAPPORT DE CAISSE (SUITE)",
+          reference: dateD === dateF ? dateD : `${dateD} → ${dateF}`,
+          hauteur_reservee: 100,
+        });
+        tableY = Math.max(doc.y + 8, 110);
+      }
+
+      const cardFill = idx % 2 === 0 ? "#ffffff" : "#fafafa";
+      doc.save().rect(tableX, tableY, cW, cardHeight).fillColor(cardFill).fill().restore();
+      doc.save().lineWidth(0.6).strokeColor("#d9e2dc")
+        .rect(tableX, tableY, cW, cardHeight).stroke().restore();
+
+      doc.save().rect(tableX, tableY, cW, topBandHeight).fillColor(headerFill).fill().restore();
+      doc.save().rect(tableX, tableY, 3, topBandHeight).fillColor(accent).fill().restore();
+
+      const amountWidth = 132;
+      const motifX = innerX + 130;
+      const motifWidth = Math.max(40, cW - (motifX - tableX) - amountWidth - 15);
+      doc.font("Helvetica").fontSize(7.5).fillColor("#475467")
+        .text(dateLabel, innerX, tableY + 5, { width: 67, lineBreak: false });
+      doc.font("Helvetica-Bold").fontSize(7).fillColor(accent)
+        .text(entree ? "ENTRÉE" : "SORTIE", innerX + 70, tableY + 5, { width: 52, lineBreak: false });
+      doc.font("Helvetica").fontSize(8).fillColor("#344054")
+        .text(motif, motifX, tableY + 4.5, { width: motifWidth, lineBreak: false });
+      doc.font("Helvetica-Bold").fontSize(9).fillColor(accent)
+        .text(FCFA(m.montant_fcfa), tableX + cW - amountWidth - 9, tableY + 4.5, {
+          width: amountWidth,
+          align: "right",
+          lineBreak: false,
+        });
+
+      const detailY = tableY + topBandHeight + 4;
+      let detailX = innerX;
+      details.forEach(({ label, value, width }, index) => {
+        if (index > 0) {
+          doc.save().moveTo(detailX - 4, detailY).lineTo(detailX - 4, detailY + detailHeight - 3)
+            .strokeColor("#e4e7ec").lineWidth(0.5).stroke().restore();
+        }
+        doc.font("Helvetica-Bold").fontSize(6.3).fillColor("#667085")
+          .text(label, detailX, detailY, { width: width - 8, lineBreak: false });
+        doc.font("Helvetica").fontSize(7.5).fillColor("#222222")
+          .text(value, detailX, detailY + 8, { width: width - 8, lineGap: 0 });
+        detailX += width;
+      });
+
+      const libelleY = detailY + detailHeight;
+      doc.save().moveTo(innerX, libelleY).lineTo(tableX + cW - 9, libelleY)
+        .strokeColor("#e4e7ec").lineWidth(0.5).stroke().restore();
+      doc.font("Helvetica-Bold").fontSize(6.3).fillColor("#667085")
+        .text("LIBELLÉ", innerX, libelleY + 3, { width: innerWidth, lineBreak: false });
+      doc.font("Helvetica").fontSize(8).fillColor("#222222")
+        .text(libelle, innerX, libelleY + 11, { width: innerWidth, lineGap: 0 });
+
+      doc.save().lineWidth(0.6).strokeColor("#d9e2dc")
+        .rect(tableX, tableY, cW, cardHeight).stroke().restore();
+      tableY += cardHeight + 5;
+    }
   }
   doc.y = tableY + 10;
 
