@@ -337,7 +337,7 @@ describe("filtre journal de caisse par journée", () => {
     ).length).toBeGreaterThanOrEqual(2);
   });
 
-  it("convertit une ancienne plage enregistrée en une seule journée", async () => {
+  it("restaure une ancienne plage enregistrée comme période", async () => {
     localStorage.setItem(
       "coop.caisse.journal.period",
       JSON.stringify({ dateDebut: "2026-09-06", dateFin: "2026-09-08" }),
@@ -347,7 +347,7 @@ describe("filtre journal de caisse par journée", () => {
       if (url.endsWith("/api/caisse")) {
         return Promise.resolve(new Response(JSON.stringify([caisse]), { status: 200 }));
       }
-      if (url.includes("date_debut=2026-09-08&date_fin=2026-09-08")) {
+      if (url.includes("date_debut=2026-09-06&date_fin=2026-09-08")) {
         return Promise.resolve(new Response(JSON.stringify(nouveauJournal), { status: 200 }));
       }
       throw new Error(`Appel inattendu: ${url}`);
@@ -373,13 +373,90 @@ describe("filtre journal de caisse par journée", () => {
     });
 
     const dateInputs = Array.from(container.querySelectorAll<HTMLInputElement>('input[type="date"]'));
-    expect(dateInputs.map(input => input.value)).toEqual(["2026-09-08"]);
+    expect(dateInputs.map(input => input.value)).toEqual(["2026-09-06", "2026-09-08"]);
+    expect(dateInputs.map(input => input.getAttribute("aria-label"))).toEqual([
+      "Date de début du journal",
+      "Date de fin du journal",
+    ]);
     expect(container.textContent).toContain("Opération de la caisse secondaire");
+    expect(fetchMock.mock.calls.some(([input]) =>
+      String(input).includes("date_debut=2026-09-06&date_fin=2026-09-08"),
+    )).toBe(true);
+    expect(localStorage.getItem("coop.caisse.journal.filter")).toContain('"mode":"periode"');
+    expect(localStorage.getItem("coop.caisse.journal.date")).toBeNull();
+    expect(localStorage.getItem("coop.caisse.journal.period")).toBeNull();
+  });
+
+  it("permet de passer d'une journée à une période puis de revenir à une journée", async () => {
+    localStorage.setItem("coop.caisse.journal.date", "2026-09-08");
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/caisse")) {
+        return Promise.resolve(new Response(JSON.stringify([caisse]), { status: 200 }));
+      }
+      if (url.includes("date_debut=2026-09-06&date_fin=2026-09-08")) {
+        return Promise.resolve(new Response(JSON.stringify(nouveauJournal), { status: 200 }));
+      }
+      if (url.includes("date_debut=2026-09-08&date_fin=2026-09-08")) {
+        return Promise.resolve(new Response(JSON.stringify(ancienJournal), { status: 200 }));
+      }
+      throw new Error(`Appel inattendu: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root.render(createElement(CaissePage));
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    const journalButton = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Journal de caisse"),
+    );
+    expect(journalButton).toBeDefined();
+    await act(async () => {
+      journalButton!.click();
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    const modeSelect = container.querySelector<HTMLSelectElement>('select[aria-label="Mode de filtre du journal"]');
+    expect(modeSelect).not.toBeNull();
+    await act(async () => {
+      const setSelectValue = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+      setSelectValue?.call(modeSelect, "periode");
+      modeSelect!.dispatchEvent(new Event("change", { bubbles: true }));
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    let dateInputs = Array.from(container.querySelectorAll<HTMLInputElement>('input[type="date"]'));
+    expect(dateInputs.map(input => input.value)).toEqual(["2026-09-08", "2026-09-08"]);
+    await act(async () => {
+      const setInputValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setInputValue?.call(dateInputs[0], "2026-09-06");
+      dateInputs[0]!.dispatchEvent(new Event("input", { bubbles: true }));
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    expect(fetchMock.mock.calls.some(([input]) =>
+      String(input).includes("date_debut=2026-09-06&date_fin=2026-09-08"),
+    )).toBe(true);
+    expect(container.textContent).toContain("Opération de la caisse secondaire");
+
+    await act(async () => {
+      const setSelectValue = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+      setSelectValue?.call(modeSelect, "jour");
+      modeSelect!.dispatchEvent(new Event("change", { bubbles: true }));
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    dateInputs = Array.from(container.querySelectorAll<HTMLInputElement>('input[type="date"]'));
+    expect(dateInputs.map(input => input.value)).toEqual(["2026-09-08"]);
     expect(fetchMock.mock.calls.some(([input]) =>
       String(input).includes("date_debut=2026-09-08&date_fin=2026-09-08"),
     )).toBe(true);
-    expect(localStorage.getItem("coop.caisse.journal.date")).toBe("2026-09-08");
-    expect(localStorage.getItem("coop.caisse.journal.period")).toBeNull();
   });
 
   it("retire le journal et bloque le chargement si la date est effacée", async () => {
