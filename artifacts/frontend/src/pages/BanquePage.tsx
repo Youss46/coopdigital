@@ -318,58 +318,59 @@ export default function BanquePage() {
         <div className="space-y-4">
 
           {/* Résumé compte */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <div className="flex flex-wrap gap-6">
-              <div>
+          <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-5">
+            <div className="grid grid-cols-1 gap-3 sm:flex sm:flex-wrap sm:gap-6">
+              <div className="min-w-0">
                 <p className="text-xs text-gray-400 uppercase tracking-wide">Solde actuel</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{FCFA(selected.solde_actuel_fcfa)}</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1 break-words">{FCFA(selected.solde_actuel_fcfa)}</p>
               </div>
               {mouvNonRappro.length > 0 && (
-                <div>
+                <div className="min-w-0">
                   <p className="text-xs text-gray-400 uppercase tracking-wide">Non rapproché</p>
-                  <p className={`text-lg font-semibold mt-1 ${soldeNonRapproche >= 0 ? "text-green-600" : "text-red-600"}`}>
+                  <p className={`text-base sm:text-lg font-semibold mt-1 break-words ${soldeNonRapproche >= 0 ? "text-green-600" : "text-red-600"}`}>
                     {soldeNonRapproche >= 0 ? "+" : ""}{FCFA(Math.abs(soldeNonRapproche))}
                     <span className="text-xs text-gray-400 font-normal ml-1">({mouvNonRappro.length} ligne(s))</span>
                   </p>
                 </div>
               )}
               {selected.iban && (
-                <div>
+                <div className="min-w-0">
                   <p className="text-xs text-gray-400 uppercase tracking-wide">IBAN / RIB</p>
-                  <p className="text-sm font-mono text-gray-700 mt-1">{selected.iban}</p>
+                  <p className="text-sm font-mono text-gray-700 mt-1 break-all">{selected.iban}</p>
                 </div>
               )}
             </div>
           </div>
 
           {/* Filtres */}
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 items-center">
+          <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4">
+            <div className="grid grid-cols-1 gap-3 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
               <Filter className="h-4 w-4 text-gray-400 hidden sm:block" />
-              <div className="flex items-center gap-1.5">
+              <div className="flex min-w-0 items-center gap-2 sm:w-[220px]">
                 <label className="text-xs text-gray-500 whitespace-nowrap">Du</label>
-                <input type="date" value={dateDebut} onChange={e => setDateDebut(e.target.value)}
-                  className="text-xs sm:text-sm border border-gray-200 rounded px-2 py-1 w-full" />
+                <input type="date" aria-label="Date de début" value={dateDebut} onChange={e => setDateDebut(e.target.value)}
+                  className="min-w-0 flex-1 text-xs sm:text-sm border border-gray-200 rounded px-2 py-2 sm:py-1" />
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex min-w-0 items-center gap-2 sm:w-[220px]">
                 <label className="text-xs text-gray-500 whitespace-nowrap">Au</label>
-                <input type="date" value={dateFin} onChange={e => setDateFin(e.target.value)}
-                  className="text-xs sm:text-sm border border-gray-200 rounded px-2 py-1 w-full" />
+                <input type="date" aria-label="Date de fin" value={dateFin} onChange={e => setDateFin(e.target.value)}
+                  className="min-w-0 flex-1 text-xs sm:text-sm border border-gray-200 rounded px-2 py-2 sm:py-1" />
               </div>
               <select value={filterType} onChange={e => setFilterType(e.target.value)}
-                className="text-xs sm:text-sm border border-gray-200 rounded px-2 py-1 col-span-2 sm:col-span-1">
+                aria-label="Type de mouvement"
+                className="w-full sm:w-auto text-xs sm:text-sm border border-gray-200 rounded px-2 py-2 sm:py-1">
                 <option value="tous">Tous les types</option>
                 <option value="credit">Crédits</option>
                 <option value="debit">Débits</option>
               </select>
-              <label className="flex items-center gap-1.5 text-xs sm:text-sm text-gray-600 cursor-pointer col-span-2 sm:col-span-1">
+              <label className="flex items-center gap-2 text-xs sm:text-sm text-gray-600 cursor-pointer">
                 <input type="checkbox" checked={nonRapproche} onChange={e => setNonRapproche(e.target.checked)}
-                  className="rounded" />
+                  className="h-4 w-4 shrink-0 rounded" />
                 Non rapprochés seulement
               </label>
               {(dateDebut || dateFin || filterType !== "tous" || nonRapproche) && (
                 <button onClick={() => { setDateDebut(""); setDateFin(""); setFilterType("tous"); setNonRapproche(false); }}
-                  className="text-xs text-gray-400 hover:text-red-500 col-span-2 sm:col-span-1">
+                  className="text-left text-xs text-gray-400 hover:text-red-500 sm:text-center">
                   Réinitialiser
                 </button>
               )}
@@ -383,7 +384,9 @@ export default function BanquePage() {
             ) : mouvements.length === 0 ? (
               <div className="py-12 text-center text-gray-400 text-sm">Aucun mouvement pour cette période</div>
             ) : (
-              <table className="w-full text-sm">
+              <>
+              <div className="hidden md:block overflow-x-auto">
+              <table className="w-full min-w-[820px] text-sm">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
@@ -439,6 +442,54 @@ export default function BanquePage() {
                   ))}
                 </tbody>
               </table>
+              </div>
+              <div className="md:hidden divide-y divide-gray-100" role="list" aria-label="Mouvements du compte">
+                {mouvements.map(m => (
+                  <article key={m.id} role="listitem" className="space-y-2.5 px-3.5 py-3.5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-gray-700">{DATE_FR(m.date_operation)}</p>
+                        <p className="mt-0.5 text-[11px] text-gray-400">
+                          {m.created_at?.slice(11, 16) || "—"}
+                          <span className="mx-1">·</span>
+                          {m.rapproche ? "Rapproché" : "À rapprocher"}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className={`text-sm font-semibold ${m.type === "credit" ? "text-green-700" : "text-red-600"}`}>
+                          {m.type === "credit" ? "+" : "−"} {FCFA(m.montant_fcfa)}
+                        </p>
+                        <p className="text-[10px] uppercase tracking-wide text-gray-400">
+                          {m.type === "credit" ? "Crédit" : "Débit"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className="break-words text-sm font-medium leading-5 text-gray-900">
+                        {m.libelle ?? LABEL_MOTIF(m.type, m.motif)}
+                      </p>
+                      <p className="mt-0.5 break-words text-xs text-gray-500">
+                        Effectué par : {m.enregistre_par_nom?.trim() || "Système"}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 border-t border-gray-100 pt-2 text-xs">
+                      <div className="min-w-0">
+                        <p className="text-[10px] uppercase tracking-wide text-gray-400">Référence</p>
+                        <p className="break-all font-mono text-gray-600">{m.reference ?? "—"}</p>
+                      </div>
+                      <div className="min-w-0 text-right">
+                        <p className="text-[10px] uppercase tracking-wide text-gray-400">Solde après</p>
+                        <p className="break-words font-medium text-gray-700">
+                          {m.solde_apres_fcfa ? FCFA(m.solde_apres_fcfa) : "—"}
+                        </p>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+              </>
             )}
           </div>
         </div>
