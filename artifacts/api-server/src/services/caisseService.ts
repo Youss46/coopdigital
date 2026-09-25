@@ -457,7 +457,11 @@ export async function getJournal(caisseId: number, opts?: { dateDebut?: string; 
       concat_ws(' ', NULLIF(BTRIM(u.nom), ''), NULLIF(BTRIM(u.prenoms), '')) AS enregistre_par_nom,
        CASE
          WHEN m.motif = 'paiement_producteur' AND p.id IS NOT NULL
-           THEN NULLIF(concat_ws(' ', NULLIF(BTRIM(beneficiaire.nom), ''), NULLIF(BTRIM(beneficiaire.prenoms), '')), '')
+           THEN COALESCE(
+             NULLIF(concat_ws(' ', NULLIF(BTRIM(beneficiaire.nom), ''), NULLIF(BTRIM(beneficiaire.prenoms), '')), ''),
+             NULLIF(concat_ws(' ', NULLIF(BTRIM(beneficiaire_livraison_membre.nom), ''), NULLIF(BTRIM(beneficiaire_livraison_membre.prenoms), '')), ''),
+             NULLIF(concat_ws(' ', NULLIF(BTRIM(beneficiaire_fournisseur.nom), ''), NULLIF(BTRIM(beneficiaire_fournisseur.prenoms), '')), '')
+           )
          WHEN m.motif = 'avance'
            THEN COALESCE(
              NULLIF(concat_ws(' ', NULLIF(BTRIM(beneficiaire_avance_membre.nom), ''), NULLIF(BTRIM(beneficiaire_avance_membre.prenoms), '')), ''),
@@ -473,6 +477,15 @@ export async function getJournal(caisseId: number, opts?: { dateDebut?: string; 
     LEFT JOIN membres beneficiaire
       ON beneficiaire.id = p.membre_id
       AND beneficiaire.cooperative_id = m.cooperative_id
+    LEFT JOIN livraisons livraison_paiement
+      ON livraison_paiement.id = p.livraison_id
+      AND livraison_paiement.cooperative_id = m.cooperative_id
+    LEFT JOIN membres beneficiaire_livraison_membre
+      ON beneficiaire_livraison_membre.id = livraison_paiement.membre_id
+      AND beneficiaire_livraison_membre.cooperative_id = m.cooperative_id
+    LEFT JOIN fournisseurs beneficiaire_fournisseur
+      ON beneficiaire_fournisseur.id = livraison_paiement.fournisseur_id
+      AND beneficiaire_fournisseur.cooperative_id = m.cooperative_id
      LEFT JOIN avances avance_membre
        ON m.motif = 'avance'
        AND m.reference_operation = ('AVA-' || avance_membre.id::text)

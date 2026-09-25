@@ -383,23 +383,38 @@ describe("plage du journal de caisse", () => {
     expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/journal?"))).toBe(false);
   });
 
-  it("affiche le bénéficiaire d'une avance dans le journal", async () => {
+  it("affiche les bénéficiaires des avances et paiements producteurs dans le journal", async () => {
     const avanceJournal = {
-      mouvements: [{
-        id: 9,
-        type: "sortie",
-        motif: "avance",
-        montant_fcfa: "15000",
-        libelle: "Avance – Koffi Mariam",
-        solde_apres_fcfa: "85000",
-        date_operation: "2026-09-25",
-        created_at: "2026-09-25T10:00:00.000Z",
-        enregistre_par_nom: "Awa Kouassi",
-        session_id: 3,
-        beneficiaire_nom: "Koffi Mariam",
-      }],
+      mouvements: [
+        {
+          id: 9,
+          type: "sortie",
+          motif: "avance",
+          montant_fcfa: "15000",
+          libelle: "Avance – Koffi Mariam",
+          solde_apres_fcfa: "85000",
+          date_operation: "2026-09-25",
+          created_at: "2026-09-25T10:00:00.000Z",
+          enregistre_par_nom: "Awa Kouassi",
+          session_id: 3,
+          beneficiaire_nom: "Koffi Mariam",
+        },
+        {
+          id: 10,
+          type: "sortie",
+          motif: "paiement_producteur",
+          montant_fcfa: "25000",
+          libelle: "Paiement producteur — règlement REC-10",
+          solde_apres_fcfa: "60000",
+          date_operation: "2026-09-25",
+          created_at: "2026-09-25T11:00:00.000Z",
+          enregistre_par_nom: "Awa Kouassi",
+          session_id: 3,
+          beneficiaire_nom: "Fournisseur Externe Issa",
+        },
+      ],
       totalEntrees: 0,
-      totalSorties: 15000,
+      totalSorties: 40000,
     };
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
@@ -433,5 +448,6 @@ describe("plage du journal de caisse", () => {
 
     expect(container.textContent).toContain("Bénéficiaire");
     expect(container.textContent).toContain("Koffi Mariam");
+    expect(container.textContent).toContain("Fournisseur Externe Issa");
   });
 });

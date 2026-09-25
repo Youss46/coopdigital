@@ -150,6 +150,22 @@ const mouvements = [
     session_statut: "fermee",
     date_session: "2026-08-30",
   },
+  {
+    id: 23,
+    type: "sortie",
+    motif: "paiement_producteur",
+    montant_fcfa: "8000",
+    libelle: "Paiement producteur — règlement REC-21",
+    reference_operation: "PAI-21",
+    solde_apres_fcfa: "610235.50",
+    date_operation: "2026-08-30",
+    created_at: "2026-08-30T13:00:00.000Z",
+    enregistre_par_nom: "Koffi Awa",
+    session_id: 6,
+    beneficiaire_nom: "Fournisseur Externe Issa",
+    session_statut: "fermee",
+    date_session: "2026-08-30",
+  },
 ];
 
 function rowValues(worksheet: ExcelJS.Worksheet, rowNumber: number): unknown[] {
@@ -218,6 +234,11 @@ describe("export tableur du journal de caisse", () => {
     );
     expect(queryText).toContain("beneficiaire.id = p.membre_id");
     expect(queryText).toContain("beneficiaire.cooperative_id = m.cooperative_id");
+    expect(queryText).toContain("livraison_paiement.id = p.livraison_id");
+    expect(queryText).toContain("livraison_paiement.cooperative_id = m.cooperative_id");
+    expect(queryText).toContain("beneficiaire_livraison_membre.id = livraison_paiement.membre_id");
+    expect(queryText).toContain("beneficiaire_fournisseur.id = livraison_paiement.fournisseur_id");
+    expect(queryText).toContain("beneficiaire_fournisseur.cooperative_id = m.cooperative_id");
     expect(queryText).toContain("m.reference_operation = ('AVA-' || avance_membre.id::text)");
     expect(queryText).toContain("m.reference_operation = ('AVD-' || avance_delegue.id::text)");
     expect(queryText).toContain("avance_delegue.cooperative_id = m.cooperative_id");
@@ -299,6 +320,16 @@ describe("export tableur du journal de caisse", () => {
       "Koffi Awa",
       10000,
       618235.5,
+    ]);
+    expect(rowValues(worksheet!, 8)).toEqual([
+      "2026-08-30",
+      "Sortie",
+      "paiement producteur",
+      "Fournisseur Externe Issa",
+      "Paiement producteur — règlement REC-21",
+      "Koffi Awa",
+      8000,
+      610235.5,
     ]);
   });
 });
@@ -393,6 +424,22 @@ describe("bénéficiaire du paiement dans le rapport PDF de caisse", () => {
             session_statut: "ouverte",
             date_session: "2026-09-24",
           },
+          {
+            id: 53,
+            type: "sortie",
+            motif: "paiement_producteur",
+            montant_fcfa: "3000",
+            libelle: "Paiement producteur — règlement REC-53",
+            reference_operation: "PAI-53",
+            solde_apres_fcfa: "40000",
+            date_operation: "2026-09-24",
+            created_at: "2026-09-24T09:00:00.000Z",
+            enregistre_par_nom: "Operateur Test",
+            session_id: 6,
+            beneficiaire_nom: "Fournisseur Toure",
+            session_statut: "ouverte",
+            date_session: "2026-09-24",
+          },
         ],
       })
       .mockResolvedValueOnce({ rows: [{ nom: "Cooperative Test" }] })
@@ -411,5 +458,6 @@ describe("bénéficiaire du paiement dans le rapport PDF de caisse", () => {
     expect(text).toContain("Awa");
     expect(text).toContain("Toure");
     expect(text).toContain("Issa");
+    expect(text).toContain("Fournisseur");
   });
 });
