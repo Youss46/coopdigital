@@ -340,7 +340,7 @@ export async function getFournisseurs(
         code: computeCodeMembre(m.numeroMembre, m.dateAdhesion),
         nom: m.nom,
         prenoms: m.prenoms,
-        telephone: m.telephone,
+        telephone: m.telephone ?? "",
         section: m.section ?? null,
         village: m.village ?? null,
         typeMembre: (m.typeFournisseur ?? "membre") as string,

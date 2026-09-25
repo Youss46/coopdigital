@@ -5,6 +5,7 @@ import { cacheFournisseurs, getCachedFournisseurs } from "../lib/idb";
 import { useOffline } from "../contexts/OfflineContext";
 import { useAuth } from "../contexts/AuthContext";
 import type { Fournisseur } from "../lib/types";
+import { matchesFournisseurSearch } from "../lib/fournisseurSearch";
 
 interface Props {
   onSelect: (f: Fournisseur) => void;
@@ -59,15 +60,7 @@ export default function FournisseurSearch({
   }
 
   const filtered = search.trim()
-    ? items.filter((f) => {
-        const s = search.toLowerCase();
-        return (
-          f.nom.toLowerCase().includes(s) ||
-          f.prenoms.toLowerCase().includes(s) ||
-          f.code.toLowerCase().includes(s) ||
-          f.telephone.includes(s)
-        );
-      })
+    ? items.filter((f) => matchesFournisseurSearch(f, search))
     : items.slice(0, 30);
 
   function initials(f: Fournisseur) {
