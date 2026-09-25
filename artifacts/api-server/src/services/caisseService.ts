@@ -455,7 +455,16 @@ export async function getJournal(caisseId: number, opts?: { dateDebut?: string; 
       m.date_operation::text,
       m.created_at::text, m.session_id,
       concat_ws(' ', NULLIF(BTRIM(u.nom), ''), NULLIF(BTRIM(u.prenoms), '')) AS enregistre_par_nom,
-      concat_ws(' ', NULLIF(BTRIM(beneficiaire.nom), ''), NULLIF(BTRIM(beneficiaire.prenoms), '')) AS beneficiaire_nom,
+       CASE
+         WHEN m.motif = 'paiement_producteur' AND p.id IS NOT NULL
+           THEN NULLIF(concat_ws(' ', NULLIF(BTRIM(beneficiaire.nom), ''), NULLIF(BTRIM(beneficiaire.prenoms), '')), '')
+         WHEN m.motif = 'avance'
+           THEN COALESCE(
+             NULLIF(concat_ws(' ', NULLIF(BTRIM(beneficiaire_avance_membre.nom), ''), NULLIF(BTRIM(beneficiaire_avance_membre.prenoms), '')), ''),
+             NULLIF(concat_ws(' ', NULLIF(BTRIM(beneficiaire_avance_delegue.nom), ''), NULLIF(BTRIM(beneficiaire_avance_delegue.prenoms), '')), '')
+           )
+         ELSE NULL
+       END AS beneficiaire_nom,
       s.statut AS session_statut, s.date_session::text
     FROM mouvements_caisse m
     LEFT JOIN sessions_caisse s ON s.id = m.session_id
@@ -464,6 +473,19 @@ export async function getJournal(caisseId: number, opts?: { dateDebut?: string; 
     LEFT JOIN membres beneficiaire
       ON beneficiaire.id = p.membre_id
       AND beneficiaire.cooperative_id = m.cooperative_id
+     LEFT JOIN avances avance_membre
+       ON m.motif = 'avance'
+       AND m.reference_operation = ('AVA-' || avance_membre.id::text)
+     LEFT JOIN membres beneficiaire_avance_membre
+       ON beneficiaire_avance_membre.id = avance_membre.membre_id
+       AND beneficiaire_avance_membre.cooperative_id = m.cooperative_id
+     LEFT JOIN avances_delegues avance_delegue
+       ON m.motif = 'avance'
+       AND m.reference_operation = ('AVD-' || avance_delegue.id::text)
+       AND avance_delegue.cooperative_id = m.cooperative_id
+     LEFT JOIN users beneficiaire_avance_delegue
+       ON beneficiaire_avance_delegue.id = avance_delegue.delegue_id
+       AND beneficiaire_avance_delegue.cooperative_id = m.cooperative_id
     WHERE m.caisse_id = ${caisseId}
       AND m.date_operation BETWEEN ${dateD} AND ${dateF}
     ORDER BY m.date_operation, m.id
@@ -510,7 +532,9 @@ export async function genererJournalExcel(
       date_operation: m.date_operation,
       type: m.type === "entree" ? "Entrée" : "Sortie",
       motif: m.motif.replace(/_/g, " "),
-      beneficiaire: m.motif === "paiement_producteur" ? m.beneficiaire_nom?.trim() ?? "" : "",
+      beneficiaire: m.motif === "paiement_producteur" || m.motif === "avance"
+        ? m.beneficiaire_nom?.trim() ?? ""
+        : "",
       libelle: m.libelle ?? "",
       operateur: m.enregistre_par_nom?.trim() || "Système",
       montant: Number.parseFloat(m.montant_fcfa) || 0,
@@ -912,7 +936,7 @@ export async function genererRapportPdf(
   } else {
     journal.mouvements.forEach((m, idx) => {
       const motifBase = m.motif.replace(/_/g, " ");
-      const beneficiaire = m.motif === "paiement_producteur"
+      const beneficiaire = m.motif === "paiement_producteur" || m.motif === "avance"
         ? m.beneficiaire_nom?.trim()
         : "";
       doc.font("Helvetica").fontSize(7);

@@ -118,6 +118,38 @@ const mouvements = [
     session_statut: "fermee",
     date_session: "2026-08-30",
   },
+  {
+    id: 21,
+    type: "sortie",
+    motif: "avance",
+    montant_fcfa: "15000",
+    libelle: "Avance – Koffi Mariam",
+    reference_operation: "AVA-43",
+    solde_apres_fcfa: "628235.50",
+    date_operation: "2026-08-30",
+    created_at: "2026-08-30T11:00:00.000Z",
+    enregistre_par_nom: "Koffi Awa",
+    session_id: 6,
+    beneficiaire_nom: "Koffi Mariam",
+    session_statut: "fermee",
+    date_session: "2026-08-30",
+  },
+  {
+    id: 22,
+    type: "sortie",
+    motif: "avance",
+    montant_fcfa: "10000",
+    libelle: "Avance délégué – Yao Serge (AVD-8)",
+    reference_operation: "AVD-8",
+    solde_apres_fcfa: "618235.50",
+    date_operation: "2026-08-30",
+    created_at: "2026-08-30T12:00:00.000Z",
+    enregistre_par_nom: "Koffi Awa",
+    session_id: 6,
+    beneficiaire_nom: "Yao Serge",
+    session_statut: "fermee",
+    date_session: "2026-08-30",
+  },
 ];
 
 function rowValues(worksheet: ExcelJS.Worksheet, rowNumber: number): unknown[] {
@@ -182,10 +214,14 @@ describe("export tableur du journal de caisse", () => {
       "concat_ws(' ', NULLIF(BTRIM(u.nom), ''), NULLIF(BTRIM(u.prenoms), '')) AS enregistre_par_nom",
     );
     expect(queryText).toContain(
-      "concat_ws(' ', NULLIF(BTRIM(beneficiaire.nom), ''), NULLIF(BTRIM(beneficiaire.prenoms), '')) AS beneficiaire_nom",
+      "NULLIF(concat_ws(' ', NULLIF(BTRIM(beneficiaire.nom), ''), NULLIF(BTRIM(beneficiaire.prenoms), '')), '')",
     );
     expect(queryText).toContain("beneficiaire.id = p.membre_id");
     expect(queryText).toContain("beneficiaire.cooperative_id = m.cooperative_id");
+    expect(queryText).toContain("m.reference_operation = ('AVA-' || avance_membre.id::text)");
+    expect(queryText).toContain("m.reference_operation = ('AVD-' || avance_delegue.id::text)");
+    expect(queryText).toContain("avance_delegue.cooperative_id = m.cooperative_id");
+    expect(queryText).toContain("beneficiaire_avance_delegue.cooperative_id = m.cooperative_id");
     expect(queryText).toContain("ORDER BY m.date_operation, m.id");
     expect(query.values).toEqual([12, "2026-08-28", "2026-08-30"]);
 
@@ -243,6 +279,26 @@ describe("export tableur du journal de caisse", () => {
       "Koffi Awa",
       25000,
       643235.5,
+    ]);
+    expect(rowValues(worksheet!, 6)).toEqual([
+      "2026-08-30",
+      "Sortie",
+      "avance",
+      "Koffi Mariam",
+      "Avance – Koffi Mariam",
+      "Koffi Awa",
+      15000,
+      628235.5,
+    ]);
+    expect(rowValues(worksheet!, 7)).toEqual([
+      "2026-08-30",
+      "Sortie",
+      "avance",
+      "Yao Serge",
+      "Avance délégué – Yao Serge (AVD-8)",
+      "Koffi Awa",
+      10000,
+      618235.5,
     ]);
   });
 });
@@ -304,22 +360,40 @@ describe("bénéficiaire du paiement dans le rapport PDF de caisse", () => {
     mockDb.select.mockReturnValue(caisseQuery);
     mockDb.execute
       .mockResolvedValueOnce({
-        rows: [{
-          id: 51,
-          type: "sortie",
-          motif: "paiement_producteur",
-          montant_fcfa: "2000",
-          libelle: "Paiement producteur — règlement REC-51",
-          reference_operation: "PAI-51",
-          solde_apres_fcfa: "48000",
-          date_operation: "2026-09-24",
-          created_at: "2026-09-24T08:00:00.000Z",
-          enregistre_par_nom: "Operateur Test",
-          session_id: 6,
-          beneficiaire_nom: "Fofana Awa",
-          session_statut: "ouverte",
-          date_session: "2026-09-24",
-        }],
+        rows: [
+          {
+            id: 51,
+            type: "sortie",
+            motif: "paiement_producteur",
+            montant_fcfa: "2000",
+            libelle: "Paiement producteur — règlement REC-51",
+            reference_operation: "PAI-51",
+            solde_apres_fcfa: "48000",
+            date_operation: "2026-09-24",
+            created_at: "2026-09-24T08:00:00.000Z",
+            enregistre_par_nom: "Operateur Test",
+            session_id: 6,
+            beneficiaire_nom: "Fofana Awa",
+            session_statut: "ouverte",
+            date_session: "2026-09-24",
+          },
+          {
+            id: 52,
+            type: "sortie",
+            motif: "avance",
+            montant_fcfa: "5000",
+            libelle: "Avance – Toure Issa",
+            reference_operation: "AVA-52",
+            solde_apres_fcfa: "43000",
+            date_operation: "2026-09-24",
+            created_at: "2026-09-24T08:30:00.000Z",
+            enregistre_par_nom: "Operateur Test",
+            session_id: 6,
+            beneficiaire_nom: "Toure Issa",
+            session_statut: "ouverte",
+            date_session: "2026-09-24",
+          },
+        ],
       })
       .mockResolvedValueOnce({ rows: [{ nom: "Cooperative Test" }] })
       .mockResolvedValueOnce({ rows: [] });
@@ -335,5 +409,7 @@ describe("bénéficiaire du paiement dans le rapport PDF de caisse", () => {
     expect(text).toContain("paiement producteur");
     expect(text).toContain("Fofana");
     expect(text).toContain("Awa");
+    expect(text).toContain("Toure");
+    expect(text).toContain("Issa");
   });
 });

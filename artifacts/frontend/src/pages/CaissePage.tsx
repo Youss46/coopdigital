@@ -99,7 +99,7 @@ interface Mouvement {
 }
 
 function beneficiaireMouvement(mouvement: Pick<Mouvement, "motif" | "beneficiaire_nom">): string {
-  return mouvement.motif === "paiement_producteur"
+  return mouvement.motif === "paiement_producteur" || mouvement.motif === "avance"
     ? mouvement.beneficiaire_nom?.trim() || "—"
     : "—";
 }

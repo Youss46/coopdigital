@@ -382,4 +382,56 @@ describe("plage du journal de caisse", () => {
     );
     expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/journal?"))).toBe(false);
   });
+
+  it("affiche le bénéficiaire d'une avance dans le journal", async () => {
+    const avanceJournal = {
+      mouvements: [{
+        id: 9,
+        type: "sortie",
+        motif: "avance",
+        montant_fcfa: "15000",
+        libelle: "Avance – Koffi Mariam",
+        solde_apres_fcfa: "85000",
+        date_operation: "2026-09-25",
+        created_at: "2026-09-25T10:00:00.000Z",
+        enregistre_par_nom: "Awa Kouassi",
+        session_id: 3,
+        beneficiaire_nom: "Koffi Mariam",
+      }],
+      totalEntrees: 0,
+      totalSorties: 15000,
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/caisse")) {
+        return Promise.resolve(new Response(JSON.stringify([caisse]), { status: 200 }));
+      }
+      if (url.includes("/journal?")) {
+        return Promise.resolve(new Response(JSON.stringify(avanceJournal), { status: 200 }));
+      }
+      throw new Error(`Appel inattendu: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root.render(createElement(CaissePage));
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    const journalButton = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Journal de caisse"),
+    );
+    expect(journalButton).toBeDefined();
+    await act(async () => {
+      journalButton!.click();
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    expect(container.textContent).toContain("Bénéficiaire");
+    expect(container.textContent).toContain("Koffi Mariam");
+  });
 });
