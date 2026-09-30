@@ -8,3 +8,7 @@ Une avance membre conserve un plan de retenue flexible (`integral`, `partiel` ou
 **Why:** l’octroi est une sortie réelle de fonds. La caisse centrale, le compte Mobile Marchand ou le compte bancaire correspondant doit être débité du montant exact dans la même transaction que la création de l’avance.
 
 **How to apply:** toujours afficher et transmettre `modePaiement` dans tous les formulaires d’octroi, y compris les opérations hors ligne. Refuser l’opération si la trésorerie choisie est absente, fermée ou insuffisante. Respecter `deductionSource`: `livraison` réduit le net de la livraison, `commission` est réservé au règlement de commission et ne doit pas être retenu sur une livraison. `reportDate` est le début d’éligibilité de la retenue, indépendant du plan; `dateEcheance` est une limite de remboursement et ne déclenche jamais un débit automatique.
+
+Un report futur suspend le statut « En retard » jusqu’à la reprise, même si la date limite est passée.
+**Why:** Une avance ne doit pas être signalée en retard pendant la période où le plan interdit encore toute retenue.
+**How to apply:** garder l’avance « En cours » jusqu’à la date `reportDate` incluse; si le solde reste dû, la marquer « En retard » à partir du lendemain.

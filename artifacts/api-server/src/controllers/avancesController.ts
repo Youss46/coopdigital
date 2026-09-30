@@ -103,6 +103,7 @@ export async function listAvances(req: Request, res: Response): Promise<void> {
     const today = new Date().toISOString().split("T")[0]!;
     const avancesAvecStatut = avances.map((avance) => {
       const avanceActive = avance.statut === "en_cours" || avance.statut === "en_retard";
+      // Un report futur suspend le statut « En retard » jusqu'à la reprise des retenues.
       const reportEnCours = avance.reportDate !== null && avance.reportDate >= today;
       return {
         ...avance,

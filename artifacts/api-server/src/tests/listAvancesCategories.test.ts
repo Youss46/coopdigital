@@ -89,6 +89,7 @@ vi.mock("drizzle-orm", () => ({
   isNull: (column: string): Predicate => (row) => row[column] === null,
   lt: (column: string, value: unknown): Predicate => (row) =>
     row[column] !== null && String(row[column]) < String(value),
+  inArray: (column: string, values: unknown[]): Predicate => (row) => values.includes(row[column]),
   and: (...conditions: Predicate[]): Predicate => (row) => conditions.every((condition) => condition(row)),
   or: (...conditions: Predicate[]): Predicate => (row) => conditions.some((condition) => condition(row)),
   desc: vi.fn(() => ({})),
