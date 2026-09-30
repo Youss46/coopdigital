@@ -101,14 +101,18 @@ export async function listAvances(req: Request, res: Response): Promise<void> {
       .orderBy(desc(avancesTable.createdAt));
 
     const today = new Date().toISOString().split("T")[0]!;
-    const avancesAvecStatut = avances.map((avance) => ({
-      ...avance,
-      statut: avance.statut !== "rembourse"
-        && avance.dateEcheance !== null
-        && avance.dateEcheance < today
-        ? "en_retard" as const
-        : avance.statut,
-    }));
+    const avancesAvecStatut = avances.map((avance) => {
+      const avanceActive = avance.statut === "en_cours" || avance.statut === "en_retard";
+      const reportEnCours = avance.reportDate !== null && avance.reportDate >= today;
+      return {
+        ...avance,
+        statut: avanceActive && reportEnCours
+          ? "en_cours" as const
+          : avanceActive && avance.dateEcheance !== null && avance.dateEcheance < today
+            ? "en_retard" as const
+            : avance.statut,
+      };
+    });
     const avancesFiltres = statut
       ? avancesAvecStatut.filter((avance) => avance.statut === statut)
       : avancesAvecStatut;

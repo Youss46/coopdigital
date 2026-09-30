@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Request, Response } from "express";
 
 type Row = Record<string, unknown>;
@@ -124,9 +124,9 @@ function selectChain() {
   return chain;
 }
 
-function request(): Request {
+function request(query: Record<string, string> = {}): Request {
   return {
-    query: {},
+    query,
     params: {},
     user: { cooperativeId: 42, id: 7, role: "pca" },
     log: { error: vi.fn() },
@@ -144,7 +144,56 @@ function response(): Response {
 describe("listes des avances ordinaires", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    fixtures.rows.splice(3);
     mockDb.select.mockImplementation(selectChain);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    fixtures.rows.splice(3);
+  });
+
+  it("garde une avance reportée en cours jusqu'à sa date de reprise", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-30T12:00:00.000Z"));
+    fixtures.rows.push(
+      {
+        ...fixtures.rows[0]!,
+        id: 4,
+        membreId: 14,
+        categorieMembre: "producteur",
+        statut: "en_cours",
+        planType: "reporte",
+        reportDate: "2027-02-28",
+        dateEcheance: "2026-09-28",
+      },
+      {
+        ...fixtures.rows[1]!,
+        id: 5,
+        membreId: 15,
+        categorieMembre: "producteur",
+        statut: "en_cours",
+        planType: "integral",
+        reportDate: null,
+        dateEcheance: "2026-09-28",
+      },
+    );
+
+    const res = response();
+    await listAvances(request(), res);
+
+    const payload = vi.mocked(res.json).mock.calls[0]![0] as {
+      avances: Array<{ id: number; statut: string }>;
+    };
+    expect(payload.avances.find((avance) => avance.id === 4)?.statut).toBe("en_cours");
+    expect(payload.avances.find((avance) => avance.id === 5)?.statut).toBe("en_retard");
+
+    const resEnRetard = response();
+    await listAvances(request({ statut: "en_retard" }), resEnRetard);
+    const avancesEnRetard = vi.mocked(resEnRetard.json).mock.calls[0]![0] as {
+      avances: Array<{ id: number }>;
+    };
+    expect(avancesEnRetard.avances.map((avance) => avance.id)).toEqual([5]);
   });
 
   it.each([
