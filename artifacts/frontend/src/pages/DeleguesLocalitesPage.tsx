@@ -64,6 +64,8 @@ interface MembreDelegue {
 interface Avance {
   id: number;
   membreId: number;
+  membreNom?: string | null;
+  membrePrenoms?: string | null;
   montantOctroyeFcfa: number;
   montantRembourseFcfa: number;
   soldeRestantFcfa: number;
@@ -217,6 +219,12 @@ function TableauChargement({ colonnes }: { colonnes: number }) {
 
 type Onglet = "membres" | "avances" | "commissions" | "taux" | "livraisons";
 type FiltreStatutLivraison = "tous" | "EN_ATTENTE" | "PAYÉ";
+type FiltreAvances = "toutes" | "en_retard" | "en_cours";
+
+function filtrerAvances(avances: Avance[], filtre: FiltreAvances): Avance[] {
+  if (filtre === "toutes") return avances;
+  return avances.filter(avance => avance.statut === filtre);
+}
 
 function normaliserRecherche(value: string): string {
   return value
@@ -377,6 +385,7 @@ export default function DeleguesLocalitesPage() {
       ? "avances"
       : "membres"
   ));
+  const [filtreAvances, setFiltreAvances] = useState<FiltreAvances>("toutes");
   const [search, setSearch] = useState("");
   const [filtreLivraisons, setFiltreLivraisons] = useState<FiltreStatutLivraison>("tous");
   const [searchLivraisons, setSearchLivraisons] = useState("");
@@ -472,7 +481,11 @@ export default function DeleguesLocalitesPage() {
     ? (resultatMagasinier ?? [])
     : (resultatComplet?.membres ?? []);
 
-  const { data: toutesAvances = [] } = useQuery<Avance[]>({
+  const {
+    data: toutesAvances = [],
+    isLoading: loadToutesAvances,
+    isError: erreurToutesAvances,
+  } = useQuery<Avance[]>({
     queryKey: ["avances-delegues-localites"],
     queryFn: () => apiFetch<{ avances: Avance[]; total: number }>(`/api/delegues-localites/avances`).then(r => r.avances ?? []),
     enabled: !isMagasinier,
@@ -767,6 +780,25 @@ export default function DeleguesLocalitesPage() {
 
   const totalEnAttente = recapCommissions.reduce((s, r) => s + r.enAttenteFcfa, 0);
   const membreAvancesSelectionne = membres.find(m => m.id === membreAvancesId) ?? null;
+  const avancesToutesFiltrees = filtrerAvances(toutesAvances, filtreAvances);
+  const avancesMembreFiltrees = filtrerAvances(avancesMembreSelectionne, filtreAvances);
+  const soldeAvancesFiltrees = (avances: Avance[]) => avances
+    .filter(avanceEstActive)
+    .reduce((total, avance) => total + avance.soldeRestantFcfa, 0);
+  const membresParId = new Map(membres.map(membre => [membre.id, membre]));
+  const nomMembreAvance = (avance: Avance) => {
+    const membre = membresParId.get(avance.membreId);
+    return [
+      avance.membrePrenoms ?? membre?.prenoms ?? "",
+      avance.membreNom ?? membre?.nom ?? "",
+    ].filter(Boolean).join(" ") || `Délégué de localités #${avance.membreId}`;
+  };
+  const ouvrirAvancesMembre = (membreId: number | null) => {
+    setMembreAvancesId(membreId);
+    setShowOctroi(false);
+    setRembourserAvanceId(null);
+    setAvanceHistoriqueId(null);
+  };
   const planLibelle = (avance: Pick<Avance, "planType" | "montantPartielFcfa" | "reportDate" | "dateEcheance" | "deductionSource">) => {
     const source = avance.deductionSource === "commission" ? "commission" : "livraison";
     const sourceLabel = source === "commission" ? "commission" : "livraison";
@@ -930,12 +962,7 @@ export default function DeleguesLocalitesPage() {
             <ComboboxDelegueLocalite
               membres={membres}
               value={membreAvancesId}
-              onChange={id => {
-                setMembreAvancesId(id);
-                setShowOctroi(false);
-                setRembourserAvanceId(null);
-                setAvanceHistoriqueId(null);
-              }}
+              onChange={ouvrirAvancesMembre}
             />
             {membreAvancesId !== null && peutOctroyer && (
               <button
@@ -947,13 +974,100 @@ export default function DeleguesLocalitesPage() {
             )}
           </div>
 
-          {!membreAvancesId ? (
-            <div className="bg-white rounded-xl border border-gray-200">
-              <EmptyState
-                icone={Wallet}
-                titre="Sélectionnez un délégué de localités"
-                description="Vous pourrez consulter ses avances, choisir un plan de retenue et suivre les remboursements sur ses commissions."
-              />
+          <div className="flex gap-2 overflow-x-auto pb-1" role="group" aria-label="Filtrer les avances">
+            {([
+              { id: "toutes", label: "Toutes" },
+              { id: "en_retard", label: "En retard" },
+              { id: "en_cours", label: "En cours" },
+            ] as const).map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={filtreAvances === id}
+                onClick={() => setFiltreAvances(id)}
+                className={`shrink-0 rounded-full border px-3.5 py-2 text-sm font-medium transition-colors ${
+                  filtreAvances === id
+                    ? "border-[#1a4731] bg-[#1a4731] text-white"
+                    : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {membreAvancesId === null ? (
+            <div className="space-y-3">
+              {loadToutesAvances ? (
+                <TableauChargement colonnes={5} />
+              ) : erreurToutesAvances ? (
+                <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                  Impossible de charger la liste des avances. Actualisez la page pour réessayer.
+                </div>
+              ) : avancesToutesFiltrees.length === 0 ? (
+                <div className="bg-white rounded-xl border border-gray-200">
+                  <EmptyState
+                    icone={Wallet}
+                    titre={filtreAvances === "toutes" ? "Aucune avance enregistrée" : "Aucune avance dans cette catégorie"}
+                    description={filtreAvances === "toutes"
+                      ? "Les avances des délégués de localités apparaîtront ici."
+                      : "Essayez un autre filtre pour consulter les avances."}
+                  />
+                </div>
+              ) : (
+                <>
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3">
+                    <p className="text-sm font-medium text-gray-700">
+                      {avancesToutesFiltrees.length} avance{avancesToutesFiltrees.length > 1 ? "s" : ""}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Solde restant des avances actives : <strong className="text-amber-700">{formaterMontant(soldeAvancesFiltrees(avancesToutesFiltrees))}</strong>
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3">
+                    {avancesToutesFiltrees.map(avance => (
+                      <article key={avance.id} className="rounded-xl border border-gray-200 bg-white p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold text-gray-900">{nomMembreAvance(avance)}</p>
+                            <p className="mt-1 text-xs text-gray-500">
+                              Octroyée le {formaterDate(avance.dateOctroi)}
+                              {avance.motif ? ` · ${avance.motif}` : ""}
+                            </p>
+                          </div>
+                          <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${classeStatutAvance(avance.statut)}`}>
+                            {libelleStatutAvance(avance.statut)}
+                          </span>
+                        </div>
+                        <p className="mt-3 text-xs text-gray-600">{planLibelle(avance)}</p>
+                        <div className="mt-3 grid grid-cols-2 gap-3 rounded-lg bg-gray-50 p-3 text-xs">
+                          <div>
+                            <p className="text-gray-500">Montant octroyé</p>
+                            <p className="mt-0.5 font-semibold text-gray-800">{formaterMontant(avance.montantOctroyeFcfa)}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-500">Remboursé</p>
+                            <p className="mt-0.5 font-semibold text-gray-800">{formaterMontant(avance.montantRembourseFcfa)}</p>
+                          </div>
+                          <div className="col-span-2 border-t border-gray-200 pt-2">
+                            <p className="text-gray-500">Solde restant</p>
+                            <p className="mt-0.5 font-semibold text-amber-700">{formaterMontant(avance.soldeRestantFcfa)}</p>
+                          </div>
+                        </div>
+                        <div className="mt-3 flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => ouvrirAvancesMembre(avance.membreId)}
+                            className="inline-flex items-center gap-1 text-sm font-semibold text-[#1a4731] hover:underline"
+                          >
+                            Gérer les avances de ce délégué <ChevronRight size={15} />
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           ) : (
             <>
@@ -1098,9 +1212,15 @@ export default function DeleguesLocalitesPage() {
 
               {loadAvancesMembreSelectionne ? (
                 <TableauChargement colonnes={6} />
-              ) : avancesMembreSelectionne.length === 0 ? (
+              ) : avancesMembreFiltrees.length === 0 ? (
                 <div className="bg-white rounded-xl border border-gray-200">
-                  <EmptyState icone={Wallet} titre="Aucune avance enregistrée" description="Les avances de ce délégué de localités apparaîtront ici." />
+                  <EmptyState
+                    icone={Wallet}
+                    titre={avancesMembreSelectionne.length === 0 ? "Aucune avance enregistrée" : "Aucune avance dans cette catégorie"}
+                    description={avancesMembreSelectionne.length === 0
+                      ? "Les avances de ce délégué de localités apparaîtront ici."
+                      : "Essayez un autre filtre pour consulter ses avances."}
+                  />
                 </div>
               ) : (
                 <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
@@ -1116,7 +1236,7 @@ export default function DeleguesLocalitesPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {avancesMembreSelectionne.map(a => {
+                      {avancesMembreFiltrees.map(a => {
                         const active = avanceEstActive(a);
                         const rembourseEnCours = rembourserAvanceId === a.id;
                         const historiqueOuvert = avanceHistoriqueId === a.id;
@@ -1234,9 +1354,9 @@ export default function DeleguesLocalitesPage() {
                     </tbody>
                     <tfoot>
                       <tr className="bg-gray-50 border-t border-gray-200">
-                        <td colSpan={2} className="px-4 py-3 text-xs font-medium text-gray-500">{avancesMembreSelectionne.length} avance{avancesMembreSelectionne.length > 1 ? "s" : ""}</td>
-                        <td className="px-4 py-3 text-right font-semibold text-gray-700">{formaterMontant(avancesMembreSelectionne.reduce((s, a) => s + a.montantRembourseFcfa, 0))}</td>
-                        <td className="px-4 py-3 text-right font-bold text-amber-700">{formaterMontant(avancesMembreSelectionne.filter(avanceEstActive).reduce((s, a) => s + a.soldeRestantFcfa, 0))}</td>
+                        <td colSpan={2} className="px-4 py-3 text-xs font-medium text-gray-500">{avancesMembreFiltrees.length} avance{avancesMembreFiltrees.length > 1 ? "s" : ""}</td>
+                        <td className="px-4 py-3 text-right font-semibold text-gray-700">{formaterMontant(avancesMembreFiltrees.reduce((s, a) => s + a.montantRembourseFcfa, 0))}</td>
+                        <td className="px-4 py-3 text-right font-bold text-amber-700">{formaterMontant(soldeAvancesFiltrees(avancesMembreFiltrees))}</td>
                         <td colSpan={2} />
                       </tr>
                     </tfoot>
