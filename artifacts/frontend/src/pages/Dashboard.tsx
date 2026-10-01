@@ -659,6 +659,7 @@ function ModalTonnageCertif({
 
 export default function Dashboard() {
   const { utilisateur } = useAuth();
+  const [, navigate] = useLocation();
   const [preset, setPreset] = useState<Preset>("mois");
   const [persoDebut, setPersoDebut] = useState("");
   const [persoFin, setPersoFin]   = useState("");
@@ -685,6 +686,8 @@ export default function Dashboard() {
   });
   const { data: livraisons } = useGetDashboardLivraisons();
   const { data: avancesRetard } = useGetDashboardAvancesRetard();
+  const totalAvancesRetard = avancesRetard?.length ?? 0;
+  const avancesRetardAffichees = avancesRetard?.slice(0, 5) ?? [];
 
   if (utilisateur?.role === "responsable_tracabilite") {
     return <DashboardRT />;
@@ -852,17 +855,20 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Avances dont l'échéance est passée ou reportée */}
+        {/* Avances en retard */}
         <div className="bg-white rounded-xl border border-gray-200">
           <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
             <AlertTriangle size={16} className="text-red-400" />
-            <h2 className="font-semibold text-gray-900 text-sm">Suivi des avances</h2>
+            <h2 className="font-semibold text-gray-900 text-sm">Avances en retard</h2>
+            <span className="ml-auto rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+              {totalAvancesRetard}
+            </span>
           </div>
           <div className="divide-y divide-gray-50">
-            {!avancesRetard || avancesRetard.length === 0 ? (
-              <p className="text-center text-gray-400 text-sm py-8">Aucune avance à suivre</p>
+            {totalAvancesRetard === 0 ? (
+              <p className="text-center text-gray-400 text-sm py-8">Aucune avance en retard</p>
             ) : (
-              avancesRetard.map((a) => (
+              avancesRetardAffichees.map((a) => (
                 <div key={a.id} className="px-5 py-3 flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-900">
@@ -873,18 +879,24 @@ export default function Dashboard() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className={`text-sm font-semibold ${
-                      a.statut === "en_retard" ? "text-red-600" : "text-gray-900"
-                    }`}>{formaterFCFA(a.soldeRestantFcfa)}</p>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      a.statut === "en_retard" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
-                    }`}>
-                      {a.statut === "en_retard" ? "En retard" : "En cours"}
-                    </span>
+                    <p className="text-sm font-semibold text-red-600">{formaterFCFA(a.soldeRestantFcfa)}</p>
+                    <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">En retard</span>
                   </div>
                 </div>
               ))
             )}
+            {totalAvancesRetard > 5 && (
+              <p className="px-5 py-2 text-xs text-gray-500">
+                et {totalAvancesRetard - avancesRetardAffichees.length} autre(s) avance(s) en retard
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => navigate("/avances")}
+              className="w-full border-t border-gray-100 px-5 py-3 text-sm font-medium text-amber-700 hover:text-amber-900"
+            >
+              Voir toutes les avances
+            </button>
           </div>
         </div>
       </div>

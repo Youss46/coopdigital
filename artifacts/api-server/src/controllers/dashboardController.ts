@@ -308,7 +308,7 @@ export async function getDashboardAvancesRetard(req: Request, res: Response): Pr
         or(
           eq(avancesTable.statut, "en_retard"),
           lt(avancesTable.dateEcheance, aujourd_hui),
-          gte(avancesTable.reportDate, aujourd_hui),
+          lt(avancesTable.reportDate, aujourd_hui),
         )!,
       ))
       .orderBy(desc(avancesTable.dateEcheance));
@@ -322,7 +322,11 @@ export async function getDashboardAvancesRetard(req: Request, res: Response): Pr
         avance.reportDate,
         aujourd_hui,
       ),
-    }));
+    }))
+      .filter((avance) => avance.statut === "en_retard")
+      .sort((a, b) => (
+        (a.dateEcheance ?? "9999-12-31").localeCompare(b.dateEcheance ?? "9999-12-31")
+      ));
 
     res.json(avances);
   } catch (err) {

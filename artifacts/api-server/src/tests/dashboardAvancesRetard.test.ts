@@ -139,7 +139,7 @@ describe("avances suivies sur le tableau de bord", () => {
     vi.useRealTimers();
   });
 
-  it("affiche l'échéance reportée et garde l'avance en cours jusqu'à la reprise", async () => {
+  it("n'affiche que les avances réellement en retard, sans les reports futurs", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-10-01T12:00:00.000Z"));
     mockDb.select.mockImplementation(selectChain);
@@ -152,11 +152,8 @@ describe("avances suivies sur le tableau de bord", () => {
       dateEcheance: string | null;
       statut: string;
     }>;
-    expect(avances.map(({ id }) => id)).toEqual([1, 2]);
-    expect(avances.find(({ id }) => id === 1)).toMatchObject({
-      dateEcheance: "2027-02-28",
-      statut: "en_cours",
-    });
+    expect(avances.map(({ id }) => id)).toEqual([2]);
+    expect(avances.find(({ id }) => id === 1)).toBeUndefined();
     expect(avances.find(({ id }) => id === 2)?.statut).toBe("en_retard");
   });
 });
