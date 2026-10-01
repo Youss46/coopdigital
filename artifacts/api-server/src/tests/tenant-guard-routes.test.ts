@@ -53,6 +53,8 @@ vi.mock("../controllers/avancesDeleguesController.js", () => ({
   getAvancesDelegueResumeHandler: okHandler,
   patchPlanAvanceDelegueHandler: okHandler,
   getAvancesDeleguesReporteesHandler: okHandler,
+  annulerAvanceDelegueHandler: okHandler,
+  cloturerSoldeAvanceDelegueHandler: okHandler,
 }));
 
 vi.mock("../controllers/commissionMembreDelegueController.js", () => ({
