@@ -9,6 +9,7 @@ import {
 } from "../controllers/commissionMembreDelegueController.js";
 import {
   createAvance,
+  getAvancesDeleguesLocalitesResume,
   getAvancesReportees,
   getRemboursementsAvanceMembre,
   listAvances,
@@ -46,6 +47,7 @@ router.get("/delegues-localites/commissions/recap",           checkPermission("c
 // Avances des membres délégués : même mécanisme que les délégués terrain,
 // mais strictement borné aux membres de cette catégorie.
 router.get("/delegues-localites/avances-reportees", checkPermission("avances", "lire"), scopeDelegueLocalite, getAvancesReportees);
+router.get("/delegues-localites/avances/resume", checkPermission("avances", "lire"), scopeDelegueLocalite, getAvancesDeleguesLocalitesResume);
 router.get("/delegues-localites/avances", checkPermission("avances", "lire"), scopeDelegueLocalite, listAvances);
 router.get("/delegues-localites/:membreId/avances", checkPermission("avances", "lire"), scopeDelegueLocalite, listAvances);
 router.post("/delegues-localites/:membreId/avances", checkPermission("avances", "octroyer"), scopeDelegueLocalite, createAvance);

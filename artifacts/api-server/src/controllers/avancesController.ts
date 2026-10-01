@@ -31,6 +31,54 @@ import { apiError } from "../lib/apiError";
 import { getEcheanceAvanceEffective, getStatutAvanceEffectif } from "../lib/avanceEffectiveDate";
 
 const CATEGORIE_DELEGUE_LOCALITE = "délégué de localités";
+const STATUTS_AVANCE = new Set(["en_cours", "en_retard", "rembourse", "annulee", "cloturee"]);
+
+function statutAvanceEffectifSql(today: string) {
+  const echeanceEffective = sql`
+    COALESCE(
+      GREATEST(${avancesTable.dateEcheance}, ${avancesTable.reportDate}),
+      ${avancesTable.dateEcheance},
+      ${avancesTable.reportDate}
+    )
+  `;
+  return sql`
+    CASE
+      WHEN ${avancesTable.statut} NOT IN ('en_cours', 'en_retard')
+        THEN ${avancesTable.statut}
+      WHEN ${avancesTable.reportDate} IS NOT NULL
+        AND ${avancesTable.reportDate} >= ${today}::date
+        THEN 'en_cours'
+      WHEN ${echeanceEffective} IS NOT NULL
+        THEN CASE
+          WHEN ${echeanceEffective} < ${today}::date THEN 'en_retard'
+          ELSE 'en_cours'
+        END
+      ELSE ${avancesTable.statut}
+    END
+  `;
+}
+
+function construireConditionsAvances(
+  req: Request,
+  res: Response,
+  cooperativeId: number,
+  membreId?: number,
+): ReturnType<typeof eq>[] {
+  const conditions: ReturnType<typeof eq>[] = [
+    eq(membresTable.cooperativeId, cooperativeId),
+    estPorteeDelegueLocalite(res)
+      ? eq(membresTable.categorieMembre, CATEGORIE_DELEGUE_LOCALITE)
+      : or(
+          isNull(membresTable.categorieMembre),
+          ne(membresTable.categorieMembre, CATEGORIE_DELEGUE_LOCALITE),
+        )!,
+  ];
+  if (membreId) conditions.push(eq(avancesTable.membreId, membreId));
+  if (req.user?.role === "delegue" && req.user?.id) {
+    conditions.push(eq(membresTable.delegueId, req.user.id));
+  }
+  return conditions;
+}
 
 function estPorteeDelegueLocalite(res: Response): boolean {
   return res.locals.membreDelegueLocalite === true;
@@ -53,20 +101,106 @@ export async function listAvances(req: Request, res: Response): Promise<void> {
     const membreId = membreDelegueLocaliteCible(res)
       ?? (req.params["membreId"] ? parseInt(String(req.params["membreId"])) : undefined)
       ?? (req.query["membre_id"] ? parseInt(String(req.query["membre_id"])) : undefined);
+    const today = new Date().toISOString().split("T")[0]!;
+    const conditions = construireConditionsAvances(req, res, cooperativeId, membreId);
+    const listeGlobaleDeleguesLocalites = estPorteeDelegueLocalite(res) && membreId === undefined;
 
-    const conditions: ReturnType<typeof eq>[] = [
-      eq(membresTable.cooperativeId, cooperativeId),
-      estPorteeDelegueLocalite(res)
-        ? eq(membresTable.categorieMembre, CATEGORIE_DELEGUE_LOCALITE)
-        : or(
-            isNull(membresTable.categorieMembre),
-            ne(membresTable.categorieMembre, CATEGORIE_DELEGUE_LOCALITE),
-          )!,
-    ];
-    if (membreId) conditions.push(eq(avancesTable.membreId, membreId));
-    // Un délégué ne voit que les avances des membres qui lui sont rattachés
-    if (req.user?.role === "delegue" && req.user?.id) {
-      conditions.push(eq(membresTable.delegueId, req.user.id));
+    if (listeGlobaleDeleguesLocalites) {
+      if (statut && !STATUTS_AVANCE.has(statut)) {
+        res.status(400).json({ erreur: "Statut d’avance invalide" });
+        return;
+      }
+
+      const parsedLimit = Number.parseInt(String(req.query["limit"] ?? "50"), 10);
+      const limit = Number.isInteger(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 100) : 50;
+      const parsedPage = Number.parseInt(String(req.query["page"] ?? "1"), 10);
+      const requestedPage = Number.isInteger(parsedPage) ? Math.max(parsedPage, 1) : 1;
+      const statutEffectif = statutAvanceEffectifSql(today);
+      const conditionSoldeActif = statut
+        ? sql`(${statutEffectif})::text = ${statut} AND (${statutEffectif})::text IN ('en_cours', 'en_retard')`
+        : sql`(${statutEffectif})::text IN ('en_cours', 'en_retard')`;
+      const totalExpr = statut
+        ? sql<number>`COUNT(*) FILTER (WHERE (${statutEffectif})::text = ${statut})::int`
+        : sql<number>`COUNT(*)::int`;
+
+      const [agregat] = await db
+        .select({
+          total: totalExpr,
+          soldeActifFcfa: sql<number>`
+            COALESCE(
+              SUM(
+                CASE
+                  WHEN ${conditionSoldeActif}
+                    THEN ${avancesTable.soldeRestantFcfa}
+                  ELSE 0
+                END
+              ),
+              0
+            )
+          `,
+        })
+        .from(avancesTable)
+        .leftJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
+        .where(and(...conditions));
+
+      const total = Number(agregat?.total ?? 0);
+      const totalPages = Math.ceil(total / limit);
+      const page = Math.min(requestedPage, Math.max(totalPages, 1));
+      const conditionsPage = [...conditions];
+      if (statut) conditionsPage.push(sql`(${statutEffectif})::text = ${statut}`);
+
+      const avances = await db
+        .select({
+          id: avancesTable.id,
+          membreId: avancesTable.membreId,
+          montantOctroyeFcfa: avancesTable.montantOctroyeFcfa,
+          montantRembourseFcfa: avancesTable.montantRembourse_fcfa,
+          soldeRestantFcfa: avancesTable.soldeRestantFcfa,
+          dateOctroi: avancesTable.dateOctroi,
+          dateEcheance: avancesTable.dateEcheance,
+          motif: avancesTable.motif,
+          statut: avancesTable.statut,
+          planType: avancesTable.planType,
+          montantPartielFcfa: avancesTable.montantPartielFcfa,
+          reportDate: avancesTable.reportDate,
+          deductionSource: avancesTable.deductionSource,
+          agentId: avancesTable.agentId,
+          agentSaisiseurId: avancesTable.agentSaisiseurId,
+          agentSaisiseurNom: saisiseurAlias.nom,
+          statutActionAt: avancesTable.statutActionAt,
+          statutActionUserId: avancesTable.statutActionUserId,
+          statutActionReason: avancesTable.statutActionReason,
+          montantAbandonneFcfa: avancesTable.montantAbandonneFcfa,
+          createdAt: avancesTable.createdAt,
+          membreNom: membresTable.nom,
+          membrePrenoms: membresTable.prenoms,
+        })
+        .from(avancesTable)
+        .leftJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
+        .leftJoin(saisiseurAlias, eq(avancesTable.agentSaisiseurId, saisiseurAlias.id))
+        .where(and(...conditionsPage))
+        .orderBy(desc(avancesTable.createdAt), desc(avancesTable.id))
+        .limit(limit)
+        .offset((page - 1) * limit);
+
+      const avancesAvecStatut = avances.map((avance) => ({
+        ...avance,
+        dateEcheance: getEcheanceAvanceEffective(avance.dateEcheance, avance.reportDate),
+        statut: getStatutAvanceEffectif(avance.statut, avance.dateEcheance, avance.reportDate, today),
+      }));
+      const avancesPage = statut
+        ? avancesAvecStatut.filter((avance) => avance.statut === statut)
+        : avancesAvecStatut;
+
+      res.json({
+        avances: avancesPage,
+        total,
+        page,
+        limit,
+        totalPages,
+        soldeActifFcfa: Number(agregat?.soldeActifFcfa ?? 0),
+      });
+      return;
     }
 
     const avances = await db
@@ -99,9 +233,8 @@ export async function listAvances(req: Request, res: Response): Promise<void> {
       .leftJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
       .leftJoin(saisiseurAlias, eq(avancesTable.agentSaisiseurId, saisiseurAlias.id))
       .where(and(...conditions))
-      .orderBy(desc(avancesTable.createdAt));
+      .orderBy(desc(avancesTable.createdAt), desc(avancesTable.id));
 
-    const today = new Date().toISOString().split("T")[0]!;
     const avancesAvecStatut = avances.map((avance) => {
       return {
         ...avance,
@@ -116,6 +249,52 @@ export async function listAvances(req: Request, res: Response): Promise<void> {
     res.json({ avances: avancesFiltres, total: avancesFiltres.length });
   } catch (err) {
     req.log.error({ err }, "Erreur listAvances");
+    res.status(500).json({ erreur: "Erreur interne du serveur" });
+  }
+}
+
+export async function getAvancesDeleguesLocalitesResume(req: Request, res: Response): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
+  try {
+    const today = new Date().toISOString().split("T")[0]!;
+    const statutEffectif = statutAvanceEffectifSql(today);
+    const conditions = construireConditionsAvances(req, res, cooperativeId);
+    const resumes = await db
+      .select({
+        membreId: avancesTable.membreId,
+        soldeActifFcfa: sql<number>`
+          COALESCE(
+            SUM(
+              CASE
+                WHEN (${statutEffectif})::text IN ('en_cours', 'en_retard')
+                  THEN ${avancesTable.soldeRestantFcfa}
+                ELSE 0
+              END
+            ),
+            0
+          )
+        `,
+        aUneAvanceEnRetard: sql<boolean>`COALESCE(BOOL_OR((${statutEffectif})::text = 'en_retard'), FALSE)`,
+      })
+      .from(avancesTable)
+      .leftJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
+      .where(and(...conditions))
+      .groupBy(avancesTable.membreId);
+
+    res.json({
+      resumes: resumes.map((resume) => ({
+        membreId: Number(resume.membreId),
+        soldeActifFcfa: Number(resume.soldeActifFcfa ?? 0),
+        aUneAvanceEnRetard: Boolean(resume.aUneAvanceEnRetard),
+      })),
+    });
+  } catch (err) {
+    req.log.error({ err }, "Erreur getAvancesDeleguesLocalitesResume");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }
 }

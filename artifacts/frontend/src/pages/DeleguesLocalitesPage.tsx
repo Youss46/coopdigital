@@ -16,6 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok = () => localStorage.getItem("coop_token") ?? "";
 const hdr = () => ({ Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" });
+const AVANCES_PAGE_SIZE = 50;
 
 type TypeTresorerieAvance = "caisse" | "mobile_marchand" | "banque";
 interface TresorerieAvance {
@@ -80,6 +81,21 @@ interface Avance {
   motifCloture?: string | null;
   clotureAt?: string | null;
   montantAbandonneFcfa?: number | null;
+}
+
+interface AvancesPage {
+  avances: Avance[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  soldeActifFcfa: number;
+}
+
+interface ResumeAvanceMembre {
+  membreId: number;
+  soldeActifFcfa: number;
+  aUneAvanceEnRetard: boolean;
 }
 
 interface RemboursementAvance {
@@ -386,6 +402,7 @@ export default function DeleguesLocalitesPage() {
       : "membres"
   ));
   const [filtreAvances, setFiltreAvances] = useState<FiltreAvances>("toutes");
+  const [pageAvances, setPageAvances] = useState(1);
   const [search, setSearch] = useState("");
   const [filtreLivraisons, setFiltreLivraisons] = useState<FiltreStatutLivraison>("tous");
   const [searchLivraisons, setSearchLivraisons] = useState("");
@@ -481,28 +498,37 @@ export default function DeleguesLocalitesPage() {
     ? (resultatMagasinier ?? [])
     : (resultatComplet?.membres ?? []);
 
-  const {
-    data: toutesAvances = [],
-    isLoading: loadToutesAvances,
-    isError: erreurToutesAvances,
-  } = useQuery<Avance[]>({
-    queryKey: ["avances-delegues-localites"],
-    queryFn: () => apiFetch<{ avances: Avance[]; total: number }>(`/api/delegues-localites/avances`).then(r => r.avances ?? []),
-    enabled: !isMagasinier,
+  const { data: resumesAvances = [], isError: erreurResumeAvances } = useQuery<ResumeAvanceMembre[]>({
+    queryKey: ["avances-delegues-localites-resumes"],
+    queryFn: () => apiFetch<{ resumes: ResumeAvanceMembre[] }>("/api/delegues-localites/avances/resume")
+      .then(r => r.resumes ?? []),
+    enabled: !isMagasinier && onglet === "membres",
     staleTime: 30_000,
   });
-
-  const avancesParMembre = new Map<number, Avance[]>();
-  for (const a of toutesAvances) {
-    if (!avancesParMembre.has(a.membreId)) avancesParMembre.set(a.membreId, []);
-    avancesParMembre.get(a.membreId)!.push(a);
-  }
+  const avancesParMembre = new Map(resumesAvances.map(resume => [resume.membreId, resume]));
 
   function soldeAvances(membreId: number): number {
-    return (avancesParMembre.get(membreId) ?? [])
-      .filter(avanceEstActive)
-      .reduce((s, a) => s + a.soldeRestantFcfa, 0);
+    return avancesParMembre.get(membreId)?.soldeActifFcfa ?? 0;
   }
+
+  const {
+    data: avancesPage,
+    isLoading: loadToutesAvances,
+    isError: erreurToutesAvances,
+  } = useQuery<AvancesPage>({
+    queryKey: ["avances-delegues-localites", pageAvances, filtreAvances],
+    queryFn: () => {
+      const params = new URLSearchParams({
+        page: String(pageAvances),
+        limit: String(AVANCES_PAGE_SIZE),
+      });
+      if (filtreAvances !== "toutes") params.set("statut", filtreAvances);
+      return apiFetch<AvancesPage>(`/api/delegues-localites/avances?${params.toString()}`);
+    },
+    enabled: !isMagasinier && onglet === "avances" && membreAvancesId === null,
+    staleTime: 30_000,
+  });
+  const avancesToutesFiltrees = avancesPage?.avances ?? [];
 
   const { data: avancesModal = [], isLoading: loadAvances } = useQuery<Avance[]>({
     queryKey: ["avances-membre", modalMembre?.id],
@@ -595,6 +621,7 @@ export default function DeleguesLocalitesPage() {
       qc.invalidateQueries({ queryKey: ["avances-membre", modalMembre?.id] });
       qc.invalidateQueries({ queryKey: ["avances-delegue-localite", membreAvancesId] });
       qc.invalidateQueries({ queryKey: ["avances-delegues-localites"] });
+      qc.invalidateQueries({ queryKey: ["avances-delegues-localites-resumes"] });
       qc.invalidateQueries({ queryKey: ["avances-delegues-localites-reportees"] });
       setShowOctroi(false);
       setFormOctroi({ montant: "", dateOctroi: new Date().toISOString().split("T")[0]!, dateEcheance: "", motif: "", modePaiement: "especes", compteTresorerieId: "", numeroCheque: "", dateEcheanceCheque: "", planType: "integral", montantPartiel: "", reportDate: "", deductionSource: "livraison" });
@@ -613,6 +640,7 @@ export default function DeleguesLocalitesPage() {
       qc.invalidateQueries({ queryKey: ["avances-membre", modalMembre?.id] });
       qc.invalidateQueries({ queryKey: ["avances-delegue-localite", membreAvancesId] });
       qc.invalidateQueries({ queryKey: ["avances-delegues-localites"] });
+      qc.invalidateQueries({ queryKey: ["avances-delegues-localites-resumes"] });
       qc.invalidateQueries({ queryKey: ["remboursements-avance-delegue-localite", membreCibleAvanceId] });
       setRembourserAvanceId(null);
       setFormRembours({ montant: "", note: "" });
@@ -630,6 +658,7 @@ export default function DeleguesLocalitesPage() {
       qc.invalidateQueries({ queryKey: ["avances-membre"] });
       qc.invalidateQueries({ queryKey: ["avances-delegue-localite"] });
       qc.invalidateQueries({ queryKey: ["avances-delegues-localites"] });
+      qc.invalidateQueries({ queryKey: ["avances-delegues-localites-resumes"] });
       qc.invalidateQueries({ queryKey: ["avances-delegues-localites-reportees"] });
       setAvanceACloturer(null);
       setMotifCloture("");
@@ -659,6 +688,7 @@ export default function DeleguesLocalitesPage() {
       qc.invalidateQueries({ queryKey: ["avances-membre", modalMembre?.id] });
       qc.invalidateQueries({ queryKey: ["avances-delegue-localite", membreAvancesId] });
       qc.invalidateQueries({ queryKey: ["avances-delegues-localites"] });
+      qc.invalidateQueries({ queryKey: ["avances-delegues-localites-resumes"] });
       qc.invalidateQueries({ queryKey: ["avances-delegues-localites-reportees"] });
       setAvancePlanEdition(null);
       setErrPlan("");
@@ -676,6 +706,7 @@ export default function DeleguesLocalitesPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["commissions-membres-delegues-recap"] });
       qc.invalidateQueries({ queryKey: ["avances-delegues-localites"] });
+      qc.invalidateQueries({ queryKey: ["avances-delegues-localites-resumes"] });
       setModalCommission(null);
       setDetailCommissions([]);
       setAvancesModalComm([]);
@@ -780,7 +811,6 @@ export default function DeleguesLocalitesPage() {
 
   const totalEnAttente = recapCommissions.reduce((s, r) => s + r.enAttenteFcfa, 0);
   const membreAvancesSelectionne = membres.find(m => m.id === membreAvancesId) ?? null;
-  const avancesToutesFiltrees = filtrerAvances(toutesAvances, filtreAvances);
   const avancesMembreFiltrees = filtrerAvances(avancesMembreSelectionne, filtreAvances);
   const soldeAvancesFiltrees = (avances: Avance[]) => avances
     .filter(avanceEstActive)
@@ -863,6 +893,12 @@ export default function DeleguesLocalitesPage() {
             />
           </div>
 
+          {erreurResumeAvances && (
+            <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              Impossible de charger les soldes et alertes d’avances des membres. Réessayez en actualisant la page.
+            </div>
+          )}
+
           {isLoading ? (
             <TableauChargement colonnes={4} />
           ) : filtres.length === 0 ? (
@@ -881,8 +917,7 @@ export default function DeleguesLocalitesPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {filtres.map(m => {
                 const solde = soldeAvances(m.id);
-                const avancesM = avancesParMembre.get(m.id) ?? [];
-                const enRetard = avancesM.some(a => a.statut === "en_retard");
+                const enRetard = avancesParMembre.get(m.id)?.aUneAvanceEnRetard ?? false;
                 return (
                   <div
                     key={m.id}
@@ -984,7 +1019,10 @@ export default function DeleguesLocalitesPage() {
                 key={id}
                 type="button"
                 aria-pressed={filtreAvances === id}
-                onClick={() => setFiltreAvances(id)}
+                onClick={() => {
+                  setFiltreAvances(id);
+                  setPageAvances(1);
+                }}
                 className={`shrink-0 rounded-full border px-3.5 py-2 text-sm font-medium transition-colors ${
                   filtreAvances === id
                     ? "border-[#1a4731] bg-[#1a4731] text-white"
@@ -1018,10 +1056,10 @@ export default function DeleguesLocalitesPage() {
                 <>
                   <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3">
                     <p className="text-sm font-medium text-gray-700">
-                      {avancesToutesFiltrees.length} avance{avancesToutesFiltrees.length > 1 ? "s" : ""}
+                      {avancesPage?.total ?? 0} avance{(avancesPage?.total ?? 0) > 1 ? "s" : ""}
                     </p>
                     <p className="text-xs text-gray-500">
-                      Solde restant des avances actives : <strong className="text-amber-700">{formaterMontant(soldeAvancesFiltrees(avancesToutesFiltrees))}</strong>
+                      Solde restant des avances actives : <strong className="text-amber-700">{formaterMontant(avancesPage?.soldeActifFcfa ?? 0)}</strong>
                     </p>
                   </div>
                   <div className="grid grid-cols-1 gap-3">
@@ -1066,6 +1104,29 @@ export default function DeleguesLocalitesPage() {
                       </article>
                     ))}
                   </div>
+                  {avancesPage && avancesPage.totalPages > 1 && (
+                    <nav aria-label="Pagination des avances" className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2">
+                      <button
+                        type="button"
+                        disabled={avancesPage.page <= 1}
+                        onClick={() => setPageAvances(page => Math.max(1, page - 1))}
+                        className="rounded-lg px-3 py-2 text-sm font-medium text-[#1a4731] hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Précédent
+                      </button>
+                      <span className="text-xs text-gray-500">
+                        Page {avancesPage.page} sur {avancesPage.totalPages}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={avancesPage.page >= avancesPage.totalPages}
+                        onClick={() => setPageAvances(page => Math.min(avancesPage.totalPages, page + 1))}
+                        className="rounded-lg px-3 py-2 text-sm font-medium text-[#1a4731] hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Suivant
+                      </button>
+                    </nav>
+                  )}
                 </>
               )}
             </div>

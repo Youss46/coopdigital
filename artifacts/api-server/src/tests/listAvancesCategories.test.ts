@@ -56,6 +56,7 @@ const fixtures = vi.hoisted(() => ({
     },
   ] as Row[],
 }));
+const initialRows = fixtures.rows.map((row) => ({ ...row }));
 
 const mockDb = vi.hoisted(() => ({ select: vi.fn() }));
 
@@ -90,10 +91,19 @@ vi.mock("drizzle-orm", () => ({
   lt: (column: string, value: unknown): Predicate => (row) =>
     row[column] !== null && String(row[column]) < String(value),
   inArray: (column: string, values: unknown[]): Predicate => (row) => values.includes(row[column]),
-  and: (...conditions: Predicate[]): Predicate => (row) => conditions.every((condition) => condition(row)),
+  and: (...conditions: unknown[]): Predicate => (row) => conditions.every((condition) => {
+    if (typeof condition === "function") return (condition as Predicate)(row);
+    if (!condition || typeof condition !== "object") return true;
+    const expression = condition as { strings?: string[]; values?: unknown[] };
+    if (!expression.strings?.join("").includes("::text = ")) return true;
+    return effectiveStatus(row) === expression.values?.at(-1);
+  }),
   or: (...conditions: Predicate[]): Predicate => (row) => conditions.some((condition) => condition(row)),
   desc: vi.fn(() => ({})),
-  sql: vi.fn(() => ({})),
+  sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({
+    strings: Array.from(strings),
+    values,
+  })),
 }));
 
 vi.mock("drizzle-orm/pg-core", () => ({ alias: vi.fn((table: unknown) => table) }));
@@ -108,20 +118,75 @@ vi.mock("../lib/campagneGuard.js", () => ({
   assertCampagneActiveExiste: vi.fn(),
 }));
 
-const { listAvances, getAvancesEncours, getAvancesReportees } =
+const { listAvances, getAvancesDeleguesLocalitesResume, getAvancesEncours, getAvancesReportees } =
   await import("../controllers/avancesController.js");
 
-function selectChain() {
+function effectiveStatus(row: Row): string {
+  const status = String(row["statut"] ?? "");
+  if (status !== "en_cours" && status !== "en_retard") return status;
+  const today = new Date().toISOString().slice(0, 10);
+  const reportDate = typeof row["reportDate"] === "string" ? row["reportDate"] : null;
+  const dueDate = typeof row["dateEcheance"] === "string" ? row["dateEcheance"] : null;
+  if (reportDate && reportDate >= today) return "en_cours";
+  const effectiveDueDate = [reportDate, dueDate].filter((date): date is string => date !== null).sort().at(-1);
+  if (effectiveDueDate) return effectiveDueDate < today ? "en_retard" : "en_cours";
+  return status;
+}
+
+function selectChain(selection: Record<string, unknown> = {}) {
   let rows = fixtures.rows;
-  const chain = {
+  let offset = 0;
+  let limit = Number.POSITIVE_INFINITY;
+  const requestedStatus = (selection["total"] as { values?: unknown[] } | undefined)?.values?.at(-1);
+  const chain: Record<string, any> = {};
+  const result = () => {
+    if ("aUneAvanceEnRetard" in selection) {
+      const byMember = new Map<number, Row[]>();
+      for (const row of rows) {
+        const membreId = Number(row["membreId"]);
+        byMember.set(membreId, [...(byMember.get(membreId) ?? []), row]);
+      }
+      return [...byMember.entries()].map(([membreId, membreRows]) => ({
+        membreId,
+        soldeActifFcfa: membreRows
+          .filter((row) => ["en_cours", "en_retard"].includes(effectiveStatus(row)))
+          .reduce((sum, row) => sum + Number(row["soldeRestantFcfa"] ?? 0), 0),
+        aUneAvanceEnRetard: membreRows.some((row) => effectiveStatus(row) === "en_retard"),
+      }));
+    }
+    if ("total" in selection) {
+      const filteredRows = requestedStatus
+        ? rows.filter((row) => effectiveStatus(row) === requestedStatus)
+        : rows;
+      return [{
+        total: filteredRows.length,
+        soldeActifFcfa: filteredRows
+          .filter((row) => ["en_cours", "en_retard"].includes(effectiveStatus(row)))
+          .reduce((sum, row) => sum + Number(row["soldeRestantFcfa"] ?? 0), 0),
+      }];
+    }
+    return rows.slice(offset, offset + limit);
+  };
+  Object.assign(chain, {
     from: vi.fn(() => chain),
     leftJoin: vi.fn(() => chain),
-    where: vi.fn((predicate: Predicate) => {
-      rows = rows.filter(predicate);
+    where: vi.fn((predicate: unknown) => {
+      if (typeof predicate === "function") rows = rows.filter(predicate as Predicate);
       return chain;
     }),
-    orderBy: vi.fn(async () => rows),
-  };
+    orderBy: vi.fn(() => chain),
+    limit: vi.fn((value: number) => {
+      limit = value;
+      return chain;
+    }),
+    offset: vi.fn((value: number) => {
+      offset = value;
+      return chain;
+    }),
+    groupBy: vi.fn(() => chain),
+    then: (resolve: (value: Row[]) => unknown, reject?: (reason: unknown) => unknown) =>
+      Promise.resolve(result()).then(resolve, reject),
+  });
   return chain;
 }
 
@@ -145,13 +210,13 @@ function response(): Response {
 describe("listes des avances ordinaires", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    fixtures.rows.splice(3);
+    fixtures.rows.splice(0, fixtures.rows.length, ...initialRows.map((row) => ({ ...row })));
     mockDb.select.mockImplementation(selectChain);
   });
 
   afterEach(() => {
     vi.useRealTimers();
-    fixtures.rows.splice(3);
+    fixtures.rows.splice(0, fixtures.rows.length, ...initialRows.map((row) => ({ ...row })));
   });
 
   it("garde une avance reportée en cours jusqu'à sa date de reprise", async () => {
@@ -224,5 +289,107 @@ describe("listes des avances ordinaires", () => {
     expect(res.status).not.toHaveBeenCalledWith(500);
     const payload = vi.mocked(res.json).mock.calls[0]![0] as { avances: Array<{ membreId: number }> };
     expect(payload.avances.map((avance) => avance.membreId)).toEqual([13]);
+  });
+
+  it("retourne une seule page de la liste globale avec les totaux globaux", async () => {
+    const template = fixtures.rows[2]!;
+    fixtures.rows.splice(
+      0,
+      fixtures.rows.length,
+      ...Array.from({ length: 55 }, (_, index) => ({
+        ...template,
+        id: 100 + index,
+        membreId: 1000 + index,
+        createdAt: new Date(`2026-01-${String((index % 28) + 1).padStart(2, "0")}T00:00:00.000Z`),
+      })),
+    );
+    const res = response();
+    res.locals.membreDelegueLocalite = true;
+
+    await listAvances(request({ page: "2", limit: "10" }), res);
+
+    const payload = vi.mocked(res.json).mock.calls[0]![0] as {
+      avances: Array<{ id: number }>;
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    };
+    expect(payload).toMatchObject({ total: 55, page: 2, limit: 10, totalPages: 6 });
+    expect(payload.avances).toHaveLength(10);
+    expect(payload.avances[0]?.id).toBe(110);
+  });
+
+  it("filtre les statuts effectifs avant de paginer la liste globale", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-30T12:00:00.000Z"));
+    const template = fixtures.rows[2]!;
+    fixtures.rows.splice(
+      0,
+      fixtures.rows.length,
+      {
+        ...template,
+        id: 301,
+        statut: "en_cours",
+        dateEcheance: "2026-09-20",
+        reportDate: null,
+        soldeRestantFcfa: 4000,
+      },
+      {
+        ...template,
+        id: 302,
+        statut: "en_cours",
+        dateEcheance: "2026-12-20",
+        reportDate: null,
+        soldeRestantFcfa: 5000,
+      },
+    );
+    const res = response();
+    res.locals.membreDelegueLocalite = true;
+
+    await listAvances(request({ statut: "en_retard", page: "1", limit: "1" }), res);
+
+    const payload = vi.mocked(res.json).mock.calls[0]![0] as {
+      avances: Array<{ id: number; statut: string }>;
+      total: number;
+      soldeActifFcfa: number;
+    };
+    expect(payload.total).toBe(1);
+    expect(payload.soldeActifFcfa).toBe(4000);
+    expect(payload.avances).toEqual([expect.objectContaining({ id: 301, statut: "en_retard" })]);
+  });
+
+  it("regroupe le solde actif et le signalement de retard par membre", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-30T12:00:00.000Z"));
+    const template = fixtures.rows[2]!;
+    fixtures.rows.splice(
+      0,
+      fixtures.rows.length,
+      {
+        ...template,
+        id: 401,
+        statut: "en_cours",
+        dateEcheance: "2026-09-20",
+        reportDate: null,
+        soldeRestantFcfa: 4000,
+      },
+      {
+        ...template,
+        id: 402,
+        statut: "en_cours",
+        dateEcheance: "2026-12-20",
+        reportDate: null,
+        soldeRestantFcfa: 5000,
+      },
+    );
+    const res = response();
+    res.locals.membreDelegueLocalite = true;
+
+    await getAvancesDeleguesLocalitesResume(request(), res);
+
+    expect(vi.mocked(res.json).mock.calls[0]![0]).toEqual({
+      resumes: [{ membreId: 13, soldeActifFcfa: 9000, aUneAvanceEnRetard: true }],
+    });
   });
 });
