@@ -184,9 +184,10 @@ describe("listes des avances ordinaires", () => {
     await listAvances(request(), res);
 
     const payload = vi.mocked(res.json).mock.calls[0]![0] as {
-      avances: Array<{ id: number; statut: string }>;
+      avances: Array<{ id: number; statut: string; dateEcheance: string | null }>;
     };
     expect(payload.avances.find((avance) => avance.id === 4)?.statut).toBe("en_cours");
+    expect(payload.avances.find((avance) => avance.id === 4)?.dateEcheance).toBe("2027-02-28");
     expect(payload.avances.find((avance) => avance.id === 5)?.statut).toBe("en_retard");
 
     const resEnRetard = response();

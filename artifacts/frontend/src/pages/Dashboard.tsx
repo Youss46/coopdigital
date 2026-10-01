@@ -852,15 +852,15 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Avances en retard */}
+        {/* Avances dont l'échéance est passée ou reportée */}
         <div className="bg-white rounded-xl border border-gray-200">
           <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
             <AlertTriangle size={16} className="text-red-400" />
-            <h2 className="font-semibold text-gray-900 text-sm">Avances en retard</h2>
+            <h2 className="font-semibold text-gray-900 text-sm">Suivi des avances</h2>
           </div>
           <div className="divide-y divide-gray-50">
             {!avancesRetard || avancesRetard.length === 0 ? (
-              <p className="text-center text-gray-400 text-sm py-8">Aucune avance en retard</p>
+              <p className="text-center text-gray-400 text-sm py-8">Aucune avance à suivre</p>
             ) : (
               avancesRetard.map((a) => (
                 <div key={a.id} className="px-5 py-3 flex items-center justify-between">
@@ -873,8 +873,14 @@ export default function Dashboard() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold text-red-600">{formaterFCFA(a.soldeRestantFcfa)}</p>
-                    <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">En retard</span>
+                    <p className={`text-sm font-semibold ${
+                      a.statut === "en_retard" ? "text-red-600" : "text-gray-900"
+                    }`}>{formaterFCFA(a.soldeRestantFcfa)}</p>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      a.statut === "en_retard" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
+                    }`}>
+                      {a.statut === "en_retard" ? "En retard" : "En cours"}
+                    </span>
                   </div>
                 </div>
               ))

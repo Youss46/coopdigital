@@ -161,6 +161,7 @@ function configureTransaction(
     soldeRestantFcfa: 10_000,
     planType: "reporte",
     reportDate: "2026-09-01",
+    dateEcheance: "2026-09-01",
   };
 
   const select = vi.fn()
@@ -231,6 +232,12 @@ describe("corrigerDateApplicationAvance", () => {
         },
       }),
     ]));
+    expect(updates.find(({ tableName }) => tableName === "avances")?.values).toEqual(
+      expect.objectContaining({
+        reportDate: "2026-09-01",
+        dateEcheance: "2026-09-01",
+      }),
+    );
 
     const historiqueUpdate = updates.find(
       ({ tableName }) => tableName === "remboursements_avances_membres",

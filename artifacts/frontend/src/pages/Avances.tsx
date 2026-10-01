@@ -8,6 +8,7 @@ import {
   useGetScoringResume,
   getGetAvancesQueryKey,
   getGetAvancesEncoursQueryKey,
+  getGetDashboardAvancesRetardQueryKey,
   getGetScoringResumeQueryKey,
   Avance,
 } from "@workspace/api-client-react";
@@ -447,7 +448,7 @@ export default function Avances() {
                       {planKey === "partiel" && a.montantPartielFcfa && (
                         <p className="text-xs text-gray-400 mt-0.5">{formaterFCFA(a.montantPartielFcfa)}/livr.</p>
                       )}
-                      {planKey === "reporte" && a.reportDate && (
+                      {planKey === "reporte" && a.reportDate && a.reportDate !== a.dateEcheance && (
                         <p className="text-xs text-gray-400 mt-0.5">Dès {formaterDate(a.reportDate)}</p>
                       )}
                     </td>
@@ -900,6 +901,9 @@ export default function Avances() {
           onSaved={() => {
             setPlanTarget(null);
             queryClient.invalidateQueries({ queryKey: getGetAvancesQueryKey() });
+            queryClient.invalidateQueries({ queryKey: getGetAvancesEncoursQueryKey() });
+            queryClient.invalidateQueries({ queryKey: ["avances-reportees"] });
+            queryClient.invalidateQueries({ queryKey: getGetDashboardAvancesRetardQueryKey() });
           }}
         />
       )}
@@ -1042,7 +1046,7 @@ function PlanAvanceMembreModal({
           {planType === "reporte" && (
             <div className="space-y-3 bg-amber-50 border border-amber-200 rounded-xl p-3">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-amber-900">Reprendre les déductions à partir du</label>
+                <label className="text-xs font-medium text-amber-900">Nouvelle échéance et reprise des déductions</label>
                 <input
                   type="date"
                   className="w-full border border-amber-200 bg-white rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500"
@@ -1050,7 +1054,7 @@ function PlanAvanceMembreModal({
                   onChange={(e) => setReportDate(e.target.value)}
                 />
                 <p className="text-xs text-amber-700">
-                  Les retenues d’une pesée antérieure à cette date seront annulées si son règlement n’est pas encore payé.
+                  Cette date remplace l’échéance actuelle. Les retenues antérieures seront annulées si leur règlement n’est pas encore payé.
                 </p>
               </div>
               <div className="space-y-1">

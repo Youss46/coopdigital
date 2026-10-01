@@ -1,7 +1,8 @@
 import { type Request, type Response } from "express";
 import { db, usersTable, membresTable, avancesTable, livraisonsTable, paiementsTable, ventesExportateursTable, exportateursTable, parcellesTable, missionsTerrainTable, campagnesTable, fournisseursTable, bonsCarburantTable, transfertsStockTable } from "@workspace/db";
-import { eq, sql, desc, gte, lte, and, isNull, or } from "drizzle-orm";
+import { eq, sql, desc, gte, lte, lt, and, inArray, isNull, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
+import { getEcheanceAvanceEffective, getStatutAvanceEffectif } from "../lib/avanceEffectiveDate";
 
 const dashboardAgentUserAlias = alias(usersTable, "dashboard_agent_user");
 
@@ -282,7 +283,7 @@ export async function getDashboardAvancesRetard(req: Request, res: Response): Pr
   try {
     const aujourd_hui = new Date().toISOString().split("T")[0]!;
 
-    const avances = await db
+    const avancesCandidates = await db
       .select({
         id: avancesTable.id,
         membreId: avancesTable.membreId,
@@ -291,6 +292,7 @@ export async function getDashboardAvancesRetard(req: Request, res: Response): Pr
         soldeRestantFcfa: avancesTable.soldeRestantFcfa,
         dateOctroi: avancesTable.dateOctroi,
         dateEcheance: avancesTable.dateEcheance,
+        reportDate: avancesTable.reportDate,
         motif: avancesTable.motif,
         statut: avancesTable.statut,
         agentId: avancesTable.agentId,
@@ -300,8 +302,27 @@ export async function getDashboardAvancesRetard(req: Request, res: Response): Pr
       })
       .from(avancesTable)
       .leftJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
-      .where(and(eq(membresTable.cooperativeId, cooperativeId), eq(avancesTable.statut, "en_retard")))
+      .where(and(
+        eq(membresTable.cooperativeId, cooperativeId),
+        inArray(avancesTable.statut, ["en_cours", "en_retard"]),
+        or(
+          eq(avancesTable.statut, "en_retard"),
+          lt(avancesTable.dateEcheance, aujourd_hui),
+          gte(avancesTable.reportDate, aujourd_hui),
+        )!,
+      ))
       .orderBy(desc(avancesTable.dateEcheance));
+
+    const avances = avancesCandidates.map((avance) => ({
+      ...avance,
+      dateEcheance: getEcheanceAvanceEffective(avance.dateEcheance, avance.reportDate),
+      statut: getStatutAvanceEffectif(
+        avance.statut,
+        avance.dateEcheance,
+        avance.reportDate,
+        aujourd_hui,
+      ),
+    }));
 
     res.json(avances);
   } catch (err) {

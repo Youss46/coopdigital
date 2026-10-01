@@ -28,6 +28,7 @@ import { CampagneFermeeError, assertCampagneActiveExiste } from "../lib/campagne
 import { CreateAvanceBody, RembourserAvanceBody } from "@workspace/api-zod";
 import { generateEcrituresAvance } from "../services/comptabiliteService";
 import { apiError } from "../lib/apiError";
+import { getEcheanceAvanceEffective, getStatutAvanceEffectif } from "../lib/avanceEffectiveDate";
 
 const CATEGORIE_DELEGUE_LOCALITE = "délégué de localités";
 
@@ -102,16 +103,10 @@ export async function listAvances(req: Request, res: Response): Promise<void> {
 
     const today = new Date().toISOString().split("T")[0]!;
     const avancesAvecStatut = avances.map((avance) => {
-      const avanceActive = avance.statut === "en_cours" || avance.statut === "en_retard";
-      // Un report futur suspend le statut « En retard » jusqu'à la reprise des retenues.
-      const reportEnCours = avance.reportDate !== null && avance.reportDate >= today;
       return {
         ...avance,
-        statut: avanceActive && reportEnCours
-          ? "en_cours" as const
-          : avanceActive && avance.dateEcheance !== null && avance.dateEcheance < today
-            ? "en_retard" as const
-            : avance.statut,
+        dateEcheance: getEcheanceAvanceEffective(avance.dateEcheance, avance.reportDate),
+        statut: getStatutAvanceEffectif(avance.statut, avance.dateEcheance, avance.reportDate, today),
       };
     });
     const avancesFiltres = statut
@@ -876,7 +871,7 @@ export async function updatePlanAvanceMembre(req: Request, res: Response): Promi
 
 // ─── Correction d'une date de retenue négociée après une pesée ───────────────
 /**
- * Reporte la première date d'application d'une avance.
+ * Remplace la date limite de l'avance par la nouvelle date de reprise des retenues.
  *
  * Une retenue déjà appliquée à une livraison antérieure à cette date est
  * annulée uniquement si le règlement lié n'a pas encore été payé. La pesée
@@ -1056,6 +1051,7 @@ export async function corrigerDateApplicationAvance(req: Request, res: Response)
         .set({
           planType: "reporte",
           reportDate: date_application,
+          dateEcheance: date_application,
           montantPartielFcfa: null,
           deductionSource: deduction_source === "livraison" || deduction_source === "commission"
             ? deduction_source
@@ -1077,8 +1073,8 @@ export async function corrigerDateApplicationAvance(req: Request, res: Response)
     res.json({
       ...result,
       message: result.reglementsRecalcules > 0
-        ? `${result.reglementsRecalcules} règlement(s) remis en attente avec le montant recalculé.`
-        : "La date d'application a été reportée.",
+        ? `${result.reglementsRecalcules} règlement(s) remis en attente avec le montant recalculé; l'échéance et la date de reprise ont été mises à jour.`
+        : "L'échéance et la date de reprise des retenues ont été mises à jour.",
     });
   } catch (err) {
     req.log.error({ err, avanceId: id }, "Erreur corrigerDateApplicationAvance");
