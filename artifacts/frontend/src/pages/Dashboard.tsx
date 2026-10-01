@@ -892,10 +892,10 @@ export default function Dashboard() {
             )}
             <button
               type="button"
-              onClick={() => navigate("/avances")}
+              onClick={() => navigate("/delegues-localites?tab=avances")}
               className="w-full border-t border-gray-100 px-5 py-3 text-sm font-medium text-amber-700 hover:text-amber-900"
             >
-              Voir toutes les avances
+              Voir les avances des délégués
             </button>
           </div>
         </div>

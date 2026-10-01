@@ -372,7 +372,11 @@ export default function DeleguesLocalitesPage() {
   const peutPayerCommissions = usePermission("commissions_delegues", "payer");
   const peutGererTaux = usePermission("commissions_delegues", "gerer_taux");
 
-  const [onglet, setOnglet] = useState<Onglet>("membres");
+  const [onglet, setOnglet] = useState<Onglet>(() => (
+    new URLSearchParams(window.location.search).get("tab") === "avances"
+      ? "avances"
+      : "membres"
+  ));
   const [search, setSearch] = useState("");
   const [filtreLivraisons, setFiltreLivraisons] = useState<FiltreStatutLivraison>("tous");
   const [searchLivraisons, setSearchLivraisons] = useState("");
