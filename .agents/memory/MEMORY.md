@@ -135,6 +135,7 @@
 - [Formats Sage paramétrables](sage-parametric-import.md) — ne jamais supposer l’ordre des colonnes; aligner la trame exportée sur le format d’import Sage réellement configuré.
 - [Compte auxiliaire Sage absent](sage-auxiliary-empty.md) — laisser le champ compte tiers vide sans compte personnalisé; ne jamais utiliser un identifiant technique ou `00` comme secours.
 - [Règlement carte producteur](producer-card-settlement.md) — la carte identifie le membre; le débit bancaire reste différé, verrouillé et déclenché explicitement sans ventilation mixte.
+- [Préfinancements exportateurs](exporter-prefinancing.md) — les avances par chèque avant vente sont généralement récupérées par compensation sur les ventes futures au même exportateur.
 - [Idempotence des paiements groupés de salaires](salary-group-payment-idempotency.md) — verrouiller les bulletins avant tout débit et partager la transaction sur caisse, banque et mobile.
 - [Chèque d’avance à débit différé](advance-cheque-deferred-debit.md) — l’octroi crée un chèque émis sans mouvement bancaire immédiat; numéro obligatoire, échéance facultative.
 - [Contrats des contrôles de schéma](schema-check-contracts.md) — chaque migration contrôlée doit avoir un contrat dans le manifeste et un objet représentatif dans la fixture isolée.
