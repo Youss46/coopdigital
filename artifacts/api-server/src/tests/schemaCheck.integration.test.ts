@@ -30,6 +30,20 @@ describe.skipIf(!enabled)("contrôles du schéma PostgreSQL", () => {
     await client.query(
       `CREATE SCHEMA ${quoteIdentifier(schemaName)};
 
+       CREATE TABLE ${qualifiedIdentifier(schemaName, "lots")} (
+         id integer NOT NULL
+       );
+       CREATE TABLE ${qualifiedIdentifier(schemaName, "membres")} (
+         id integer NOT NULL,
+         cooperative_id integer NOT NULL,
+         identifiant_source text,
+         annee_naissance integer,
+         telephone text
+       );
+       CREATE UNIQUE INDEX ${quoteIdentifier("membres_cooperative_identifiant_source_unique")}
+         ON ${qualifiedIdentifier(schemaName, "membres")}
+         (cooperative_id, identifiant_source);
+
        CREATE TABLE ${qualifiedIdentifier(schemaName, "sessions_pesee")} (
          id integer NOT NULL
        );
@@ -129,6 +143,41 @@ describe.skipIf(!enabled)("contrôles du schéma PostgreSQL", () => {
         );
         ALTER TABLE ${qualifiedIdentifier(schemaName, "avances_delegues")}
           ADD CONSTRAINT ${quoteIdentifier("avances_delegues_terminal_metadata_check")}
+          CHECK (true);
+
+        CREATE TABLE ${qualifiedIdentifier(schemaName, "ventes_exportateurs")} (
+          id integer NOT NULL,
+          montant_avance_imputee_fcfa integer NOT NULL
+        );
+        ALTER TABLE ${qualifiedIdentifier(schemaName, "ventes_exportateurs")}
+          ADD CONSTRAINT ${quoteIdentifier("ventes_exportateurs_avance_imputee_nonnegatif_check")}
+          CHECK (true);
+
+        CREATE TABLE ${qualifiedIdentifier(schemaName, "avances_exportateurs")} (
+          id integer NOT NULL,
+          cooperative_id integer NOT NULL,
+          numero_cheque text NOT NULL,
+          montant_fcfa integer NOT NULL
+        );
+        CREATE UNIQUE INDEX ${quoteIdentifier("avances_exportateurs_coop_numero_unique")}
+          ON ${qualifiedIdentifier(schemaName, "avances_exportateurs")}
+          (cooperative_id, numero_cheque);
+        ALTER TABLE ${qualifiedIdentifier(schemaName, "avances_exportateurs")}
+          ADD CONSTRAINT ${quoteIdentifier("avances_exportateurs_montant_positive_check")}
+          CHECK (true);
+
+        CREATE TABLE ${qualifiedIdentifier(schemaName, "imputations_avances_exportateurs")} (
+          id integer NOT NULL,
+          avance_exportateur_id integer NOT NULL,
+          vente_exportateur_id integer NOT NULL,
+          montant_fcfa integer NOT NULL
+        );
+        CREATE INDEX ${quoteIdentifier("imputations_avances_exportateurs_avance_idx")}
+          ON ${qualifiedIdentifier(schemaName, "imputations_avances_exportateurs")} (avance_exportateur_id);
+        CREATE INDEX ${quoteIdentifier("imputations_avances_exportateurs_vente_idx")}
+          ON ${qualifiedIdentifier(schemaName, "imputations_avances_exportateurs")} (vente_exportateur_id);
+        ALTER TABLE ${qualifiedIdentifier(schemaName, "imputations_avances_exportateurs")}
+          ADD CONSTRAINT ${quoteIdentifier("imputations_avances_exportateurs_montant_positive")}
           CHECK (true);`,
     );
   });

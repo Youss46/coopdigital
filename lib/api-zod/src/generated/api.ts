@@ -870,6 +870,7 @@ export const GetLotTracabiliteResponse = zod.object({
   "dateVente": zod.string(),
   "dateEcheanceReglement": zod.string().nullish(),
   "montantRecuFcfa": zod.number(),
+  "montantAvanceImputeeFcfa": zod.number(),
   "soldeDuFcfa": zod.number(),
   "statut": zod.enum(['en_attente', 'partiel', 'regle', 'en_retard']),
   "createdAt": zod.string()
@@ -1072,6 +1073,7 @@ export const GetExportateurByIdResponse = zod.object({
   "dateVente": zod.string(),
   "dateEcheanceReglement": zod.string().nullish(),
   "montantRecuFcfa": zod.number(),
+  "montantAvanceImputeeFcfa": zod.number(),
   "soldeDuFcfa": zod.number(),
   "statut": zod.enum(['en_attente', 'partiel', 'regle', 'en_retard']),
   "createdAt": zod.string()
@@ -1100,6 +1102,7 @@ export const GetVentesResponseItem = zod.object({
   "dateVente": zod.string(),
   "dateEcheanceReglement": zod.string().nullish(),
   "montantRecuFcfa": zod.number(),
+  "montantAvanceImputeeFcfa": zod.number(),
   "soldeDuFcfa": zod.number(),
   "statut": zod.enum(['en_attente', 'partiel', 'regle', 'en_retard']),
   "createdAt": zod.string()
@@ -1160,6 +1163,7 @@ export const GetCreancesResponse = zod.object({
   "dateVente": zod.string(),
   "dateEcheanceReglement": zod.string().nullish(),
   "montantRecuFcfa": zod.number(),
+  "montantAvanceImputeeFcfa": zod.number(),
   "soldeDuFcfa": zod.number(),
   "statut": zod.enum(['en_attente', 'partiel', 'regle', 'en_retard']),
   "createdAt": zod.string()
@@ -1207,6 +1211,7 @@ export const EncaisserVenteResponse = zod.object({
   "dateVente": zod.string(),
   "dateEcheanceReglement": zod.string().nullish(),
   "montantRecuFcfa": zod.number(),
+  "montantAvanceImputeeFcfa": zod.number(),
   "soldeDuFcfa": zod.number(),
   "statut": zod.enum(['en_attente', 'partiel', 'regle', 'en_retard']),
   "createdAt": zod.string()
@@ -1415,6 +1420,303 @@ export const AnnulerChequeRecuResponse = zod.object({
   "paiementId": zod.number(),
   "paiementLigneId": zod.number(),
   "exportateurNom": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Lister les avances par chèque des exportateurs
+ */
+export const GetAvancesExportateursResponseItem = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "exportateurId": zod.number(),
+  "exportateurNom": zod.string(),
+  "numeroCheque": zod.string(),
+  "banque": zod.string(),
+  "montantFcfa": zod.number(),
+  "dateReception": zod.string(),
+  "dateEcheance": zod.string().nullish(),
+  "statut": zod.enum(['a_deposer', 'depose', 'encaisse', 'rejete', 'annule']),
+  "dateDepot": zod.string().nullish(),
+  "dateEncaissement": zod.string().nullish(),
+  "dateRejet": zod.string().nullish(),
+  "motifRejet": zod.string().nullish(),
+  "dateAnnulation": zod.string().nullish(),
+  "motifAnnulation": zod.string().nullish(),
+  "compteBancaireId": zod.number().nullish(),
+  "mouvementBanqueId": zod.number().nullish(),
+  "createdBy": zod.number().nullish(),
+  "montantImputeFcfa": zod.number(),
+  "montantDisponibleFcfa": zod.number(),
+  "createdAt": zod.string()
+})
+export const GetAvancesExportateursResponse = zod.array(GetAvancesExportateursResponseItem)
+
+
+/**
+ * @summary Enregistrer un chèque reçu avant les ventes
+ */
+export const creerAvanceExportateurBodyNumeroChequeMax = 80;
+
+export const creerAvanceExportateurBodyBanqueMax = 200;
+
+
+
+
+export const CreerAvanceExportateurBody = zod.object({
+  "exportateurId": zod.number(),
+  "numeroCheque": zod.string().min(1).max(creerAvanceExportateurBodyNumeroChequeMax),
+  "banque": zod.string().min(1).max(creerAvanceExportateurBodyBanqueMax),
+  "montantFcfa": zod.number().min(1),
+  "dateReception": zod.string(),
+  "dateEcheance": zod.string().nullish()
+})
+
+
+/**
+ * @summary Détail d'une avance et de ses imputations
+ */
+export const GetAvanceExportateurParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetAvanceExportateurResponse = zod.object({
+  "avance": zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "exportateurId": zod.number(),
+  "exportateurNom": zod.string(),
+  "numeroCheque": zod.string(),
+  "banque": zod.string(),
+  "montantFcfa": zod.number(),
+  "dateReception": zod.string(),
+  "dateEcheance": zod.string().nullish(),
+  "statut": zod.enum(['a_deposer', 'depose', 'encaisse', 'rejete', 'annule']),
+  "dateDepot": zod.string().nullish(),
+  "dateEncaissement": zod.string().nullish(),
+  "dateRejet": zod.string().nullish(),
+  "motifRejet": zod.string().nullish(),
+  "dateAnnulation": zod.string().nullish(),
+  "motifAnnulation": zod.string().nullish(),
+  "compteBancaireId": zod.number().nullish(),
+  "mouvementBanqueId": zod.number().nullish(),
+  "createdBy": zod.number().nullish(),
+  "montantImputeFcfa": zod.number(),
+  "montantDisponibleFcfa": zod.number(),
+  "createdAt": zod.string()
+}),
+  "imputations": zod.array(zod.object({
+  "id": zod.number(),
+  "avanceExportateurId": zod.number(),
+  "venteExportateurId": zod.number(),
+  "dateVente": zod.string(),
+  "montantFcfa": zod.number(),
+  "dateImputation": zod.string(),
+  "createdBy": zod.number().nullish(),
+  "createdAt": zod.string()
+})),
+  "ventesEligibles": zod.array(zod.object({
+  "id": zod.number(),
+  "dateVente": zod.string(),
+  "poidsKg": zod.string(),
+  "montantTotalFcfa": zod.number(),
+  "montantRecuFcfa": zod.number(),
+  "montantAvanceImputeeFcfa": zod.number(),
+  "soldeDuFcfa": zod.number(),
+  "statut": zod.string()
+}))
+})
+
+
+/**
+ * @summary Ventes réelles non réglées du même exportateur
+ */
+export const GetVentesEligiblesAvanceExportateurParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetVentesEligiblesAvanceExportateurResponseItem = zod.object({
+  "id": zod.number(),
+  "dateVente": zod.string(),
+  "poidsKg": zod.string(),
+  "montantTotalFcfa": zod.number(),
+  "montantRecuFcfa": zod.number(),
+  "montantAvanceImputeeFcfa": zod.number(),
+  "soldeDuFcfa": zod.number(),
+  "statut": zod.string()
+})
+export const GetVentesEligiblesAvanceExportateurResponse = zod.array(GetVentesEligiblesAvanceExportateurResponseItem)
+
+
+/**
+ * @summary Compenser une avance encaissée sur une vente réelle
+ */
+export const ImputerAvanceExportateurParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const ImputerAvanceExportateurBody = zod.object({
+  "venteExportateurId": zod.number(),
+  "montantFcfa": zod.number().min(1)
+})
+
+
+/**
+ * @summary Marquer le chèque d'avance comme déposé
+ */
+export const DeposerAvanceExportateurParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeposerAvanceExportateurBody = zod.object({
+  "dateDepot": zod.string().optional()
+})
+
+export const DeposerAvanceExportateurResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "exportateurId": zod.number(),
+  "exportateurNom": zod.string(),
+  "numeroCheque": zod.string(),
+  "banque": zod.string(),
+  "montantFcfa": zod.number(),
+  "dateReception": zod.string(),
+  "dateEcheance": zod.string().nullish(),
+  "statut": zod.enum(['a_deposer', 'depose', 'encaisse', 'rejete', 'annule']),
+  "dateDepot": zod.string().nullish(),
+  "dateEncaissement": zod.string().nullish(),
+  "dateRejet": zod.string().nullish(),
+  "motifRejet": zod.string().nullish(),
+  "dateAnnulation": zod.string().nullish(),
+  "motifAnnulation": zod.string().nullish(),
+  "compteBancaireId": zod.number().nullish(),
+  "mouvementBanqueId": zod.number().nullish(),
+  "createdBy": zod.number().nullish(),
+  "montantImputeFcfa": zod.number(),
+  "montantDisponibleFcfa": zod.number(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Confirmer l'encaissement bancaire du chèque d'avance
+ */
+export const EncaisserAvanceExportateurParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const EncaisserAvanceExportateurBody = zod.object({
+  "compteBancaireId": zod.number(),
+  "dateEncaissement": zod.string().optional()
+})
+
+export const EncaisserAvanceExportateurResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "exportateurId": zod.number(),
+  "exportateurNom": zod.string(),
+  "numeroCheque": zod.string(),
+  "banque": zod.string(),
+  "montantFcfa": zod.number(),
+  "dateReception": zod.string(),
+  "dateEcheance": zod.string().nullish(),
+  "statut": zod.enum(['a_deposer', 'depose', 'encaisse', 'rejete', 'annule']),
+  "dateDepot": zod.string().nullish(),
+  "dateEncaissement": zod.string().nullish(),
+  "dateRejet": zod.string().nullish(),
+  "motifRejet": zod.string().nullish(),
+  "dateAnnulation": zod.string().nullish(),
+  "motifAnnulation": zod.string().nullish(),
+  "compteBancaireId": zod.number().nullish(),
+  "mouvementBanqueId": zod.number().nullish(),
+  "createdBy": zod.number().nullish(),
+  "montantImputeFcfa": zod.number(),
+  "montantDisponibleFcfa": zod.number(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Rejeter le chèque d'avance
+ */
+export const RejeterAvanceExportateurParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const RejeterAvanceExportateurBody = zod.object({
+  "motifRejet": zod.string().min(1),
+  "dateRejet": zod.string().optional()
+})
+
+export const RejeterAvanceExportateurResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "exportateurId": zod.number(),
+  "exportateurNom": zod.string(),
+  "numeroCheque": zod.string(),
+  "banque": zod.string(),
+  "montantFcfa": zod.number(),
+  "dateReception": zod.string(),
+  "dateEcheance": zod.string().nullish(),
+  "statut": zod.enum(['a_deposer', 'depose', 'encaisse', 'rejete', 'annule']),
+  "dateDepot": zod.string().nullish(),
+  "dateEncaissement": zod.string().nullish(),
+  "dateRejet": zod.string().nullish(),
+  "motifRejet": zod.string().nullish(),
+  "dateAnnulation": zod.string().nullish(),
+  "motifAnnulation": zod.string().nullish(),
+  "compteBancaireId": zod.number().nullish(),
+  "mouvementBanqueId": zod.number().nullish(),
+  "createdBy": zod.number().nullish(),
+  "montantImputeFcfa": zod.number(),
+  "montantDisponibleFcfa": zod.number(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Annuler le chèque d'avance
+ */
+export const AnnulerAvanceExportateurParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const AnnulerAvanceExportateurBody = zod.object({
+  "motifAnnulation": zod.string().min(1)
+})
+
+export const AnnulerAvanceExportateurResponse = zod.object({
+  "id": zod.number(),
+  "cooperativeId": zod.number(),
+  "exportateurId": zod.number(),
+  "exportateurNom": zod.string(),
+  "numeroCheque": zod.string(),
+  "banque": zod.string(),
+  "montantFcfa": zod.number(),
+  "dateReception": zod.string(),
+  "dateEcheance": zod.string().nullish(),
+  "statut": zod.enum(['a_deposer', 'depose', 'encaisse', 'rejete', 'annule']),
+  "dateDepot": zod.string().nullish(),
+  "dateEncaissement": zod.string().nullish(),
+  "dateRejet": zod.string().nullish(),
+  "motifRejet": zod.string().nullish(),
+  "dateAnnulation": zod.string().nullish(),
+  "motifAnnulation": zod.string().nullish(),
+  "compteBancaireId": zod.number().nullish(),
+  "mouvementBanqueId": zod.number().nullish(),
+  "createdBy": zod.number().nullish(),
+  "montantImputeFcfa": zod.number(),
+  "montantDisponibleFcfa": zod.number(),
   "createdAt": zod.string()
 })
 
@@ -8765,4 +9067,5 @@ export const GetMembreCertificationResponse = zod.object({
 export const GetRapportPdfCertificationParams = zod.object({
   "id": zod.coerce.number()
 })
+
 

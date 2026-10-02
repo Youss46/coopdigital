@@ -60,6 +60,7 @@ export function featureKeyForPath(pathname: string): string | null {
     ["/reglements", "reglements"], ["/primes", "primes"], ["/fournisseurs", "fournisseurs"], ["/exportateurs", "exportateurs"],
     ["/ventes", "ventes"], ["/creances", "creances"], ["/prix", "prix"], ["/budget", "budget"], ["/emprunts", "emprunts"],
     ["/subventions", "subventions"], ["/dons", "dons"], ["/caisse", "caisse"], ["/banque", "banque"], ["/cheques", "cheques"],
+    ["/avances-exportateurs", "cheques"],
     ["/fiscalite", "fiscalite"], ["/salaires", "salaires"], ["/rh", "rh"], ["/formations", "formations"], ["/equipements", "equipements"],
     ["/archives", "archives"], ["/previsions", "previsions"], ["/reporting", "reporting"], ["/rapport-gestion", "rapport_gestion"],
     ["/anomalies", "anomalies"], ["/audit", "audit"], ["/gouvernance", "gouvernance"], ["/communication", "communication"],

@@ -1144,6 +1144,246 @@ paths:
               schema:
                 $ref: "#/components/schemas/ChequeRecu"
 
+  /avances-exportateurs:
+    get:
+      operationId: getAvancesExportateurs
+      tags: [exportateurs]
+      summary: Lister les avances par chèque des exportateurs
+      responses:
+        "200":
+          description: Avances exportateurs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AvanceExportateur"
+    post:
+      operationId: creerAvanceExportateur
+      tags: [exportateurs]
+      summary: Enregistrer un chèque reçu avant les ventes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreerAvanceExportateurInput"
+      responses:
+        "201":
+          description: Avance exportateur créée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvanceExportateur"
+        "409":
+          description: Numéro de chèque déjà utilisé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /avances-exportateurs/{id}:
+    get:
+      operationId: getAvanceExportateur
+      tags: [exportateurs]
+      summary: Détail d'une avance et de ses imputations
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Détail de l'avance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvanceExportateurDetail"
+        "404":
+          description: Avance introuvable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /avances-exportateurs/{id}/ventes:
+    get:
+      operationId: getVentesEligiblesAvanceExportateur
+      tags: [exportateurs]
+      summary: Ventes réelles non réglées du même exportateur
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Ventes éligibles à l'imputation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VenteEligibleAvanceExportateur"
+        "404":
+          description: Avance introuvable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /avances-exportateurs/{id}/imputations:
+    post:
+      operationId: imputerAvanceExportateur
+      tags: [exportateurs]
+      summary: Compenser une avance encaissée sur une vente réelle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImputerAvanceExportateurInput"
+      responses:
+        "201":
+          description: Imputation enregistrée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImputationAvanceExportateur"
+        "409":
+          description: Imputation incompatible avec le solde disponible
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /avances-exportateurs/{id}/deposer:
+    post:
+      operationId: deposerAvanceExportateur
+      tags: [exportateurs]
+      summary: Marquer le chèque d'avance comme déposé
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dateDepot: { type: string }
+      responses:
+        "200":
+          description: Chèque déposé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvanceExportateur"
+        "409":
+          description: Transition de statut invalide
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /avances-exportateurs/{id}/encaisser:
+    post:
+      operationId: encaisserAvanceExportateur
+      tags: [exportateurs]
+      summary: Confirmer l'encaissement bancaire du chèque d'avance
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EncaisserChequeRecuInput"
+      responses:
+        "200":
+          description: Chèque encaissé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvanceExportateur"
+        "409":
+          description: Le chèque doit être déposé avant son encaissement
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /avances-exportateurs/{id}/rejeter:
+    post:
+      operationId: rejeterAvanceExportateur
+      tags: [exportateurs]
+      summary: Rejeter le chèque d'avance
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RejeterChequeRecuInput"
+      responses:
+        "200":
+          description: Chèque rejeté
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvanceExportateur"
+        "409":
+          description: Transition de statut invalide
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /avances-exportateurs/{id}/annuler:
+    post:
+      operationId: annulerAvanceExportateur
+      tags: [exportateurs]
+      summary: Annuler le chèque d'avance
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnnulerChequeRecuInput"
+      responses:
+        "200":
+          description: Chèque annulé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvanceExportateur"
+        "409":
+          description: Transition de statut invalide
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   # ── M07 Communication ─────────────────────────────────────────
   /communication/sms-groupe:
     post:
@@ -8883,7 +9123,7 @@ components:
 
     VenteDetail:
       type: object
-      required: [id, exportateurId, poidsKg, prixUnitaireFcfa, montantTotalFcfa, dateVente, montantRecuFcfa, soldeDuFcfa, statut, createdAt]
+      required: [id, exportateurId, poidsKg, prixUnitaireFcfa, montantTotalFcfa, dateVente, montantRecuFcfa, montantAvanceImputeeFcfa, soldeDuFcfa, statut, createdAt]
       properties:
         id:
           type: integer
@@ -8906,6 +9146,8 @@ components:
         dateEcheanceReglement:
           type: ["string", "null"]
         montantRecuFcfa:
+          type: integer
+        montantAvanceImputeeFcfa:
           type: integer
         soldeDuFcfa:
           type: integer
@@ -9092,6 +9334,145 @@ components:
           type: string
 
   # Les actions des chèques reçus restent séparées de celles des chèques émis.
+
+    CreerAvanceExportateurInput:
+      type: object
+      required: [exportateurId, numeroCheque, banque, montantFcfa, dateReception]
+      properties:
+        exportateurId:
+          type: integer
+        numeroCheque:
+          type: string
+          minLength: 1
+          maxLength: 80
+        banque:
+          type: string
+          minLength: 1
+          maxLength: 200
+        montantFcfa:
+          type: integer
+          minimum: 1
+        dateReception:
+          type: string
+        dateEcheance:
+          type: ["string", "null"]
+
+    ImputerAvanceExportateurInput:
+      type: object
+      required: [venteExportateurId, montantFcfa]
+      properties:
+        venteExportateurId:
+          type: integer
+        montantFcfa:
+          type: integer
+          minimum: 1
+
+    AvanceExportateur:
+      type: object
+      required: [id, cooperativeId, exportateurId, exportateurNom, numeroCheque, banque, montantFcfa, dateReception, statut, montantImputeFcfa, montantDisponibleFcfa, createdAt]
+      properties:
+        id:
+          type: integer
+        cooperativeId:
+          type: integer
+        exportateurId:
+          type: integer
+        exportateurNom:
+          type: string
+        numeroCheque:
+          type: string
+        banque:
+          type: string
+        montantFcfa:
+          type: integer
+        dateReception:
+          type: string
+        dateEcheance:
+          type: ["string", "null"]
+        statut:
+          type: string
+          enum: [a_deposer, depose, encaisse, rejete, annule]
+        dateDepot:
+          type: ["string", "null"]
+        dateEncaissement:
+          type: ["string", "null"]
+        dateRejet:
+          type: ["string", "null"]
+        motifRejet:
+          type: ["string", "null"]
+        dateAnnulation:
+          type: ["string", "null"]
+        motifAnnulation:
+          type: ["string", "null"]
+        compteBancaireId:
+          type: ["integer", "null"]
+        mouvementBanqueId:
+          type: ["integer", "null"]
+        createdBy:
+          type: ["integer", "null"]
+        montantImputeFcfa:
+          type: integer
+        montantDisponibleFcfa:
+          type: integer
+        createdAt:
+          type: string
+
+    VenteEligibleAvanceExportateur:
+      type: object
+      required: [id, dateVente, poidsKg, montantTotalFcfa, montantRecuFcfa, montantAvanceImputeeFcfa, soldeDuFcfa, statut]
+      properties:
+        id:
+          type: integer
+        dateVente:
+          type: string
+        poidsKg:
+          type: string
+        montantTotalFcfa:
+          type: integer
+        montantRecuFcfa:
+          type: integer
+        montantAvanceImputeeFcfa:
+          type: integer
+        soldeDuFcfa:
+          type: integer
+        statut:
+          type: string
+
+    ImputationAvanceExportateur:
+      type: object
+      required: [id, avanceExportateurId, venteExportateurId, dateVente, montantFcfa, dateImputation, createdAt]
+      properties:
+        id:
+          type: integer
+        avanceExportateurId:
+          type: integer
+        venteExportateurId:
+          type: integer
+        dateVente:
+          type: string
+        montantFcfa:
+          type: integer
+        dateImputation:
+          type: string
+        createdBy:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+
+    AvanceExportateurDetail:
+      type: object
+      required: [avance, imputations, ventesEligibles]
+      properties:
+        avance:
+          $ref: "#/components/schemas/AvanceExportateur"
+        imputations:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImputationAvanceExportateur"
+        ventesEligibles:
+          type: array
+          items:
+            $ref: "#/components/schemas/VenteEligibleAvanceExportateur"
 
     CreancesSummary:
       type: object

@@ -44,6 +44,8 @@ import type {
   AuthResponse,
   Avance,
   AvanceAvecPersonnel,
+  AvanceExportateur,
+  AvanceExportateurDetail,
   AvanceInput,
   AvancePagination,
   AvancePersonnel,
@@ -119,11 +121,13 @@ import type {
   CreateVehiculeBody,
   CreateVerificationBalance201,
   CreateVerificationBody,
+  CreerAvanceExportateurInput,
   DashboardKpi,
   DashboardLivraison,
   DeleteDepenseVehicule200,
   DeleteEquipement200,
   DepenseVehicule,
+  DeposerAvanceExportateurBody,
   DeposerChequeRecuBody,
   DesactiverMembresSansCampagne200,
   Devise,
@@ -234,6 +238,8 @@ import type {
   HypothesesInput,
   ImportBalanceSageBody,
   ImportMembresBody,
+  ImputationAvanceExportateur,
+  ImputerAvanceExportateurInput,
   Intrant,
   IntrantInput,
   IntrantResume,
@@ -391,6 +397,7 @@ import type {
   ValiderToutEcrituresEnAttente200,
   Vehicule,
   VenteDetail,
+  VenteEligibleAvanceExportateur,
   VenteInput,
   VoteAg,
   VoteInput
@@ -4030,6 +4037,668 @@ export const useAnnulerChequeRecu = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getAnnulerChequeRecuMutationOptions(options));
+    }
+
+export const getGetAvancesExportateursUrl = () => {
+
+
+
+
+  return `/api/avances-exportateurs`
+}
+
+/**
+ * @summary Lister les avances par chèque des exportateurs
+ */
+export const getAvancesExportateurs = async ( options?: RequestInit): Promise<AvanceExportateur[]> => {
+
+  return customFetch<AvanceExportateur[]>(getGetAvancesExportateursUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAvancesExportateursQueryKey = () => {
+    return [
+    `/api/avances-exportateurs`
+    ] as const;
+    }
+
+
+export const getGetAvancesExportateursQueryOptions = <TData = Awaited<ReturnType<typeof getAvancesExportateurs>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAvancesExportateurs>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAvancesExportateursQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAvancesExportateurs>>> = ({ signal }) => getAvancesExportateurs({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAvancesExportateurs>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAvancesExportateursQueryResult = NonNullable<Awaited<ReturnType<typeof getAvancesExportateurs>>>
+export type GetAvancesExportateursQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Lister les avances par chèque des exportateurs
+ */
+
+export function useGetAvancesExportateurs<TData = Awaited<ReturnType<typeof getAvancesExportateurs>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAvancesExportateurs>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAvancesExportateursQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreerAvanceExportateurUrl = () => {
+
+
+
+
+  return `/api/avances-exportateurs`
+}
+
+/**
+ * @summary Enregistrer un chèque reçu avant les ventes
+ */
+export const creerAvanceExportateur = async (creerAvanceExportateurInput: CreerAvanceExportateurInput, options?: RequestInit): Promise<AvanceExportateur> => {
+
+  return customFetch<AvanceExportateur>(getCreerAvanceExportateurUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      creerAvanceExportateurInput,)
+  }
+);}
+
+
+
+
+export const getCreerAvanceExportateurMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof creerAvanceExportateur>>, TError,{data: BodyType<CreerAvanceExportateurInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof creerAvanceExportateur>>, TError,{data: BodyType<CreerAvanceExportateurInput>}, TContext> => {
+
+const mutationKey = ['creerAvanceExportateur'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof creerAvanceExportateur>>, {data: BodyType<CreerAvanceExportateurInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  creerAvanceExportateur(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreerAvanceExportateurMutationResult = NonNullable<Awaited<ReturnType<typeof creerAvanceExportateur>>>
+    export type CreerAvanceExportateurMutationBody = BodyType<CreerAvanceExportateurInput>
+    export type CreerAvanceExportateurMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Enregistrer un chèque reçu avant les ventes
+ */
+export const useCreerAvanceExportateur = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof creerAvanceExportateur>>, TError,{data: BodyType<CreerAvanceExportateurInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof creerAvanceExportateur>>,
+        TError,
+        {data: BodyType<CreerAvanceExportateurInput>},
+        TContext
+      > => {
+      return useMutation(getCreerAvanceExportateurMutationOptions(options));
+    }
+
+export const getGetAvanceExportateurUrl = (id: number,) => {
+
+
+
+
+  return `/api/avances-exportateurs/${id}`
+}
+
+/**
+ * @summary Détail d'une avance et de ses imputations
+ */
+export const getAvanceExportateur = async (id: number, options?: RequestInit): Promise<AvanceExportateurDetail> => {
+
+  return customFetch<AvanceExportateurDetail>(getGetAvanceExportateurUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAvanceExportateurQueryKey = (id: number,) => {
+    return [
+    `/api/avances-exportateurs/${id}`
+    ] as const;
+    }
+
+
+export const getGetAvanceExportateurQueryOptions = <TData = Awaited<ReturnType<typeof getAvanceExportateur>>, TError = ErrorType<ErrorResponse>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAvanceExportateur>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAvanceExportateurQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAvanceExportateur>>> = ({ signal }) => getAvanceExportateur(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAvanceExportateur>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAvanceExportateurQueryResult = NonNullable<Awaited<ReturnType<typeof getAvanceExportateur>>>
+export type GetAvanceExportateurQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Détail d'une avance et de ses imputations
+ */
+
+export function useGetAvanceExportateur<TData = Awaited<ReturnType<typeof getAvanceExportateur>>, TError = ErrorType<ErrorResponse>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAvanceExportateur>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAvanceExportateurQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetVentesEligiblesAvanceExportateurUrl = (id: number,) => {
+
+
+
+
+  return `/api/avances-exportateurs/${id}/ventes`
+}
+
+/**
+ * @summary Ventes réelles non réglées du même exportateur
+ */
+export const getVentesEligiblesAvanceExportateur = async (id: number, options?: RequestInit): Promise<VenteEligibleAvanceExportateur[]> => {
+
+  return customFetch<VenteEligibleAvanceExportateur[]>(getGetVentesEligiblesAvanceExportateurUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetVentesEligiblesAvanceExportateurQueryKey = (id: number,) => {
+    return [
+    `/api/avances-exportateurs/${id}/ventes`
+    ] as const;
+    }
+
+
+export const getGetVentesEligiblesAvanceExportateurQueryOptions = <TData = Awaited<ReturnType<typeof getVentesEligiblesAvanceExportateur>>, TError = ErrorType<ErrorResponse>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVentesEligiblesAvanceExportateur>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetVentesEligiblesAvanceExportateurQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVentesEligiblesAvanceExportateur>>> = ({ signal }) => getVentesEligiblesAvanceExportateur(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getVentesEligiblesAvanceExportateur>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetVentesEligiblesAvanceExportateurQueryResult = NonNullable<Awaited<ReturnType<typeof getVentesEligiblesAvanceExportateur>>>
+export type GetVentesEligiblesAvanceExportateurQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Ventes réelles non réglées du même exportateur
+ */
+
+export function useGetVentesEligiblesAvanceExportateur<TData = Awaited<ReturnType<typeof getVentesEligiblesAvanceExportateur>>, TError = ErrorType<ErrorResponse>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVentesEligiblesAvanceExportateur>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetVentesEligiblesAvanceExportateurQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getImputerAvanceExportateurUrl = (id: number,) => {
+
+
+
+
+  return `/api/avances-exportateurs/${id}/imputations`
+}
+
+/**
+ * @summary Compenser une avance encaissée sur une vente réelle
+ */
+export const imputerAvanceExportateur = async (id: number,
+    imputerAvanceExportateurInput: ImputerAvanceExportateurInput, options?: RequestInit): Promise<ImputationAvanceExportateur> => {
+
+  return customFetch<ImputationAvanceExportateur>(getImputerAvanceExportateurUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      imputerAvanceExportateurInput,)
+  }
+);}
+
+
+
+
+export const getImputerAvanceExportateurMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof imputerAvanceExportateur>>, TError,{id: number;data: BodyType<ImputerAvanceExportateurInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof imputerAvanceExportateur>>, TError,{id: number;data: BodyType<ImputerAvanceExportateurInput>}, TContext> => {
+
+const mutationKey = ['imputerAvanceExportateur'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof imputerAvanceExportateur>>, {id: number;data: BodyType<ImputerAvanceExportateurInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  imputerAvanceExportateur(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ImputerAvanceExportateurMutationResult = NonNullable<Awaited<ReturnType<typeof imputerAvanceExportateur>>>
+    export type ImputerAvanceExportateurMutationBody = BodyType<ImputerAvanceExportateurInput>
+    export type ImputerAvanceExportateurMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Compenser une avance encaissée sur une vente réelle
+ */
+export const useImputerAvanceExportateur = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof imputerAvanceExportateur>>, TError,{id: number;data: BodyType<ImputerAvanceExportateurInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof imputerAvanceExportateur>>,
+        TError,
+        {id: number;data: BodyType<ImputerAvanceExportateurInput>},
+        TContext
+      > => {
+      return useMutation(getImputerAvanceExportateurMutationOptions(options));
+    }
+
+export const getDeposerAvanceExportateurUrl = (id: number,) => {
+
+
+
+
+  return `/api/avances-exportateurs/${id}/deposer`
+}
+
+/**
+ * @summary Marquer le chèque d'avance comme déposé
+ */
+export const deposerAvanceExportateur = async (id: number,
+    deposerAvanceExportateurBody?: DeposerAvanceExportateurBody, options?: RequestInit): Promise<AvanceExportateur> => {
+
+  return customFetch<AvanceExportateur>(getDeposerAvanceExportateurUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      deposerAvanceExportateurBody,)
+  }
+);}
+
+
+
+
+export const getDeposerAvanceExportateurMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deposerAvanceExportateur>>, TError,{id: number;data?: BodyType<DeposerAvanceExportateurBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deposerAvanceExportateur>>, TError,{id: number;data?: BodyType<DeposerAvanceExportateurBody>}, TContext> => {
+
+const mutationKey = ['deposerAvanceExportateur'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deposerAvanceExportateur>>, {id: number;data?: BodyType<DeposerAvanceExportateurBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  deposerAvanceExportateur(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeposerAvanceExportateurMutationResult = NonNullable<Awaited<ReturnType<typeof deposerAvanceExportateur>>>
+    export type DeposerAvanceExportateurMutationBody = BodyType<DeposerAvanceExportateurBody> | undefined
+    export type DeposerAvanceExportateurMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Marquer le chèque d'avance comme déposé
+ */
+export const useDeposerAvanceExportateur = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deposerAvanceExportateur>>, TError,{id: number;data?: BodyType<DeposerAvanceExportateurBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deposerAvanceExportateur>>,
+        TError,
+        {id: number;data?: BodyType<DeposerAvanceExportateurBody>},
+        TContext
+      > => {
+      return useMutation(getDeposerAvanceExportateurMutationOptions(options));
+    }
+
+export const getEncaisserAvanceExportateurUrl = (id: number,) => {
+
+
+
+
+  return `/api/avances-exportateurs/${id}/encaisser`
+}
+
+/**
+ * @summary Confirmer l'encaissement bancaire du chèque d'avance
+ */
+export const encaisserAvanceExportateur = async (id: number,
+    encaisserChequeRecuInput: EncaisserChequeRecuInput, options?: RequestInit): Promise<AvanceExportateur> => {
+
+  return customFetch<AvanceExportateur>(getEncaisserAvanceExportateurUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      encaisserChequeRecuInput,)
+  }
+);}
+
+
+
+
+export const getEncaisserAvanceExportateurMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof encaisserAvanceExportateur>>, TError,{id: number;data: BodyType<EncaisserChequeRecuInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof encaisserAvanceExportateur>>, TError,{id: number;data: BodyType<EncaisserChequeRecuInput>}, TContext> => {
+
+const mutationKey = ['encaisserAvanceExportateur'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof encaisserAvanceExportateur>>, {id: number;data: BodyType<EncaisserChequeRecuInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  encaisserAvanceExportateur(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EncaisserAvanceExportateurMutationResult = NonNullable<Awaited<ReturnType<typeof encaisserAvanceExportateur>>>
+    export type EncaisserAvanceExportateurMutationBody = BodyType<EncaisserChequeRecuInput>
+    export type EncaisserAvanceExportateurMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Confirmer l'encaissement bancaire du chèque d'avance
+ */
+export const useEncaisserAvanceExportateur = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof encaisserAvanceExportateur>>, TError,{id: number;data: BodyType<EncaisserChequeRecuInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof encaisserAvanceExportateur>>,
+        TError,
+        {id: number;data: BodyType<EncaisserChequeRecuInput>},
+        TContext
+      > => {
+      return useMutation(getEncaisserAvanceExportateurMutationOptions(options));
+    }
+
+export const getRejeterAvanceExportateurUrl = (id: number,) => {
+
+
+
+
+  return `/api/avances-exportateurs/${id}/rejeter`
+}
+
+/**
+ * @summary Rejeter le chèque d'avance
+ */
+export const rejeterAvanceExportateur = async (id: number,
+    rejeterChequeRecuInput: RejeterChequeRecuInput, options?: RequestInit): Promise<AvanceExportateur> => {
+
+  return customFetch<AvanceExportateur>(getRejeterAvanceExportateurUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      rejeterChequeRecuInput,)
+  }
+);}
+
+
+
+
+export const getRejeterAvanceExportateurMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rejeterAvanceExportateur>>, TError,{id: number;data: BodyType<RejeterChequeRecuInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof rejeterAvanceExportateur>>, TError,{id: number;data: BodyType<RejeterChequeRecuInput>}, TContext> => {
+
+const mutationKey = ['rejeterAvanceExportateur'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof rejeterAvanceExportateur>>, {id: number;data: BodyType<RejeterChequeRecuInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  rejeterAvanceExportateur(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RejeterAvanceExportateurMutationResult = NonNullable<Awaited<ReturnType<typeof rejeterAvanceExportateur>>>
+    export type RejeterAvanceExportateurMutationBody = BodyType<RejeterChequeRecuInput>
+    export type RejeterAvanceExportateurMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Rejeter le chèque d'avance
+ */
+export const useRejeterAvanceExportateur = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rejeterAvanceExportateur>>, TError,{id: number;data: BodyType<RejeterChequeRecuInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof rejeterAvanceExportateur>>,
+        TError,
+        {id: number;data: BodyType<RejeterChequeRecuInput>},
+        TContext
+      > => {
+      return useMutation(getRejeterAvanceExportateurMutationOptions(options));
+    }
+
+export const getAnnulerAvanceExportateurUrl = (id: number,) => {
+
+
+
+
+  return `/api/avances-exportateurs/${id}/annuler`
+}
+
+/**
+ * @summary Annuler le chèque d'avance
+ */
+export const annulerAvanceExportateur = async (id: number,
+    annulerChequeRecuInput: AnnulerChequeRecuInput, options?: RequestInit): Promise<AvanceExportateur> => {
+
+  return customFetch<AvanceExportateur>(getAnnulerAvanceExportateurUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      annulerChequeRecuInput,)
+  }
+);}
+
+
+
+
+export const getAnnulerAvanceExportateurMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof annulerAvanceExportateur>>, TError,{id: number;data: BodyType<AnnulerChequeRecuInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof annulerAvanceExportateur>>, TError,{id: number;data: BodyType<AnnulerChequeRecuInput>}, TContext> => {
+
+const mutationKey = ['annulerAvanceExportateur'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof annulerAvanceExportateur>>, {id: number;data: BodyType<AnnulerChequeRecuInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  annulerAvanceExportateur(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AnnulerAvanceExportateurMutationResult = NonNullable<Awaited<ReturnType<typeof annulerAvanceExportateur>>>
+    export type AnnulerAvanceExportateurMutationBody = BodyType<AnnulerChequeRecuInput>
+    export type AnnulerAvanceExportateurMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Annuler le chèque d'avance
+ */
+export const useAnnulerAvanceExportateur = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof annulerAvanceExportateur>>, TError,{id: number;data: BodyType<AnnulerChequeRecuInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof annulerAvanceExportateur>>,
+        TError,
+        {id: number;data: BodyType<AnnulerChequeRecuInput>},
+        TContext
+      > => {
+      return useMutation(getAnnulerAvanceExportateurMutationOptions(options));
     }
 
 export const getSendSmsGroupeUrl = () => {

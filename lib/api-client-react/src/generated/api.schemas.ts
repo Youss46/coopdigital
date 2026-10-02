@@ -1610,6 +1610,7 @@ export interface VenteDetail {
   /** @nullable */
   dateEcheanceReglement?: string | null;
   montantRecuFcfa: number;
+  montantAvanceImputeeFcfa: number;
   soldeDuFcfa: number;
   statut: VenteDetailStatut;
   createdAt: string;
@@ -1878,6 +1879,106 @@ export interface ChequeRecu {
   /** @nullable */
   exportateurNom?: string | null;
   createdAt: string;
+}
+
+export interface CreerAvanceExportateurInput {
+  exportateurId: number;
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  numeroCheque: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  banque: string;
+  /** @minimum 1 */
+  montantFcfa: number;
+  dateReception: string;
+  /** @nullable */
+  dateEcheance?: string | null;
+}
+
+export interface ImputerAvanceExportateurInput {
+  venteExportateurId: number;
+  /** @minimum 1 */
+  montantFcfa: number;
+}
+
+export type AvanceExportateurStatut = typeof AvanceExportateurStatut[keyof typeof AvanceExportateurStatut];
+
+
+export const AvanceExportateurStatut = {
+  a_deposer: 'a_deposer',
+  depose: 'depose',
+  encaisse: 'encaisse',
+  rejete: 'rejete',
+  annule: 'annule',
+} as const;
+
+export interface AvanceExportateur {
+  id: number;
+  cooperativeId: number;
+  exportateurId: number;
+  exportateurNom: string;
+  numeroCheque: string;
+  banque: string;
+  montantFcfa: number;
+  dateReception: string;
+  /** @nullable */
+  dateEcheance?: string | null;
+  statut: AvanceExportateurStatut;
+  /** @nullable */
+  dateDepot?: string | null;
+  /** @nullable */
+  dateEncaissement?: string | null;
+  /** @nullable */
+  dateRejet?: string | null;
+  /** @nullable */
+  motifRejet?: string | null;
+  /** @nullable */
+  dateAnnulation?: string | null;
+  /** @nullable */
+  motifAnnulation?: string | null;
+  /** @nullable */
+  compteBancaireId?: number | null;
+  /** @nullable */
+  mouvementBanqueId?: number | null;
+  /** @nullable */
+  createdBy?: number | null;
+  montantImputeFcfa: number;
+  montantDisponibleFcfa: number;
+  createdAt: string;
+}
+
+export interface VenteEligibleAvanceExportateur {
+  id: number;
+  dateVente: string;
+  poidsKg: string;
+  montantTotalFcfa: number;
+  montantRecuFcfa: number;
+  montantAvanceImputeeFcfa: number;
+  soldeDuFcfa: number;
+  statut: string;
+}
+
+export interface ImputationAvanceExportateur {
+  id: number;
+  avanceExportateurId: number;
+  venteExportateurId: number;
+  dateVente: string;
+  montantFcfa: number;
+  dateImputation: string;
+  /** @nullable */
+  createdBy?: number | null;
+  createdAt: string;
+}
+
+export interface AvanceExportateurDetail {
+  avance: AvanceExportateur;
+  imputations: ImputationAvanceExportateur[];
+  ventesEligibles: VenteEligibleAvanceExportateur[];
 }
 
 export interface CreancesSummary {
@@ -5578,6 +5679,10 @@ export type DeposerChequeRecuBody = {
   dateDepot?: string;
 };
 
+export type DeposerAvanceExportateurBody = {
+  dateDepot?: string;
+};
+
 export type GetGrandLivreParams = {
 compte?: string;
 date_debut?: string;
@@ -6200,3 +6305,4 @@ jours?: number;
 export type GetCertificationsCriteres200 = { [key: string]: unknown };
 
 export type GetMembreCertification200 = { [key: string]: unknown };
+

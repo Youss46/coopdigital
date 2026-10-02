@@ -58,6 +58,7 @@ export * from "./banque";
 export * from "./cheques";
 export * from "./reglements_cartes_producteurs";
 export * from "./cheques_recus";
+export * from "./avances_exportateurs";
 export * from "./mobile_marchand";
 export * from "./portailNotifications";
 export * from "./expeditions";

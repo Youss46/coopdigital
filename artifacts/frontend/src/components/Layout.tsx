@@ -55,6 +55,7 @@ import {
   Scale,
   PackageCheck,
   LockKeyhole,
+  FileCheck2,
 } from "lucide-react";
 import { NAV_ITEMS, type NavItemConfig } from "@/config/navigation";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -136,6 +137,7 @@ const NAV_ICON_LIST: React.ElementType[] = [
   FolderKanban,   // /investissements
   TrendingDown,   // /charges-diverses
   BookOpen,       // /comptabilite
+  FileCheck2,     // /avances-exportateurs
   Banknote,       // /salaires
   Users,          // /rh
   GraduationCap,  // /formations

@@ -165,7 +165,7 @@ export async function creerChequeRecu(
     if (!paiementLigne) throw new Error("La ligne du règlement n'a pas pu être créée");
 
     const montantRecu = vente.montantRecuFcfa + data.montantFcfa;
-    const solde = vente.montantTotalFcfa - montantRecu;
+    const solde = Math.max(0, vente.soldeDuFcfa - data.montantFcfa);
     const statut: "en_attente" | "partiel" | "regle" | "en_retard" =
       solde <= 0
         ? "regle"
@@ -326,12 +326,15 @@ export async function rejeterChequeRecu(
       .limit(1);
     if (vente) {
       const montantRecu = Math.max(0, vente.montantRecuFcfa - cheque.montantFcfa);
-      const solde = Math.max(0, vente.montantTotalFcfa - montantRecu);
+      const solde = Math.min(
+        Math.max(0, vente.soldeDuFcfa + cheque.montantFcfa),
+        Math.max(0, vente.montantTotalFcfa - montantRecu - vente.montantAvanceImputeeFcfa),
+      );
       const statut = solde === 0
         ? "regle"
         : vente.dateEcheanceReglement && new Date(vente.dateEcheanceReglement) < new Date()
           ? "en_retard"
-          : montantRecu > 0 ? "partiel" : "en_attente";
+        : montantRecu + (vente.montantAvanceImputeeFcfa ?? 0) > 0 ? "partiel" : "en_attente";
       await tx.update(ventesExportateursTable).set({
         montantRecuFcfa: montantRecu,
         soldeDuFcfa: solde,
@@ -405,12 +408,15 @@ export async function annulerChequeRecu(
       .limit(1);
     if (vente) {
       const montantRecu = Math.max(0, vente.montantRecuFcfa - cheque.montantFcfa);
-      const solde = Math.max(0, vente.montantTotalFcfa - montantRecu);
+      const solde = Math.min(
+        Math.max(0, vente.soldeDuFcfa + cheque.montantFcfa),
+        Math.max(0, vente.montantTotalFcfa - montantRecu - vente.montantAvanceImputeeFcfa),
+      );
       const statut = solde === 0
         ? "regle"
         : vente.dateEcheanceReglement && new Date(vente.dateEcheanceReglement) < new Date()
           ? "en_retard"
-          : montantRecu > 0 ? "partiel" : "en_attente";
+        : montantRecu + (vente.montantAvanceImputeeFcfa ?? 0) > 0 ? "partiel" : "en_attente";
       await tx.update(ventesExportateursTable).set({
         montantRecuFcfa: montantRecu,
         soldeDuFcfa: solde,

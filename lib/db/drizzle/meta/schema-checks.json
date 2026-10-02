@@ -275,6 +275,63 @@
           "name": "telephone"
         }
       ]
+    },
+    {
+      "migration": "0175_avances_exportateurs_prefinancement",
+      "objects": [
+        {
+          "kind": "table",
+          "schema": "public",
+          "table": "avances_exportateurs"
+        },
+        {
+          "kind": "column",
+          "schema": "public",
+          "table": "ventes_exportateurs",
+          "name": "montant_avance_imputee_fcfa"
+        },
+        {
+          "kind": "constraint",
+          "schema": "public",
+          "table": "ventes_exportateurs",
+          "name": "ventes_exportateurs_avance_imputee_nonnegatif_check"
+        },
+        {
+          "kind": "index",
+          "schema": "public",
+          "table": "avances_exportateurs",
+          "name": "avances_exportateurs_coop_numero_unique"
+        },
+        {
+          "kind": "constraint",
+          "schema": "public",
+          "table": "avances_exportateurs",
+          "name": "avances_exportateurs_montant_positive_check"
+        },
+        {
+          "kind": "table",
+          "schema": "public",
+          "table": "imputations_avances_exportateurs"
+        },
+        {
+          "kind": "index",
+          "schema": "public",
+          "table": "imputations_avances_exportateurs",
+          "name": "imputations_avances_exportateurs_avance_idx"
+        },
+        {
+          "kind": "index",
+          "schema": "public",
+          "table": "imputations_avances_exportateurs",
+          "name": "imputations_avances_exportateurs_vente_idx"
+        },
+        {
+          "kind": "constraint",
+          "schema": "public",
+          "table": "imputations_avances_exportateurs",
+          "name": "imputations_avances_exportateurs_montant_positive"
+        }
+      ]
     }
   ]
 }

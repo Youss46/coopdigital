@@ -26,7 +26,8 @@ export type SourceEcriture =
   // Commissions délégués localités
   | "commission_delegue"
   // Charges diverses d'exploitation
-  | "charges_diverses";
+  | "charges_diverses"
+  | "avance_exportateur";
 
 interface ProposerEcriturePayload {
   source: SourceEcriture;
@@ -67,11 +68,11 @@ const AUTO_KEY_MAP: Record<SourceEcriture, keyof typeof configComptableTable.$in
   prime_paiement:    "autoPrimes",
   commission_delegue:"autoCommissions",
   charges_diverses:  "autoMaintenances",   // exploitation courante — même toggle que les charges opérationnelles
+  avance_exportateur:"autoEncaissements",
 };
 
-// Mapping vers les valeurs d'enum PostgreSQL existantes
-// (les nouveaux types TS granulaires n'ont pas de valeur PG dédiée)
-const DB_SOURCE_MAP: Record<SourceEcriture, "livraison" | "vente" | "avance" | "paiement" | "encaissement" | "salaire" | "stock" | "don"> = {
+// Les sources granulaires restent distinctes dans PostgreSQL pour la traçabilité.
+const DB_SOURCE_MAP: Record<SourceEcriture, "livraison" | "vente" | "avance" | "paiement" | "encaissement" | "salaire" | "stock" | "don" | "avance_exportateur"> = {
   livraison:     "livraison",
   paiement:      "paiement",
   avance:        "avance",
@@ -94,6 +95,7 @@ const DB_SOURCE_MAP: Record<SourceEcriture, "livraison" | "vente" | "avance" | "
   prime_paiement:    "paiement",
   commission_delegue:"paiement",
   charges_diverses:  "paiement",
+  avance_exportateur:"avance_exportateur",
 };
 
 async function getConfigComptable(

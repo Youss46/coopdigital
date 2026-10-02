@@ -60,6 +60,7 @@ import FormationsRsePage from "@/pages/FormationsRsePage";
 import CaissePage from "@/pages/CaissePage";
 import BanquePage from "@/pages/BanquePage";
 import ChequesPage from "@/pages/ChequesPage";
+import AvancesExportateursPage from "@/pages/AvancesExportateursPage";
 import MobileMarchandPage from "@/pages/MobileMarchandPage";
 import FiscalitePage from "@/pages/FiscalitePage";
 import ReconciliationPage from "@/pages/ReconciliationPage";
@@ -322,6 +323,9 @@ function AppRoutes() {
       </Route>
       <Route path="/cheques">
         <ProtectedRoute component={ChequesPage} />
+      </Route>
+      <Route path="/avances-exportateurs">
+        <ProtectedRoute component={AvancesExportateursPage} />
       </Route>
       <Route path="/mobile-marchand">
         <ProtectedRoute component={MobileMarchandPage} />

@@ -19,6 +19,7 @@ const venteSelect = {
   dateVente: ventesExportateursTable.dateVente,
   dateEcheanceReglement: ventesExportateursTable.dateEcheanceReglement,
   montantRecuFcfa: ventesExportateursTable.montantRecuFcfa,
+  montantAvanceImputeeFcfa: ventesExportateursTable.montantAvanceImputeeFcfa,
   soldeDuFcfa: ventesExportateursTable.soldeDuFcfa,
   statut: ventesExportateursTable.statut,
   createdAt: ventesExportateursTable.createdAt,
@@ -545,7 +546,7 @@ export async function encaisserVente(req: Request, res: Response): Promise<void>
       }
 
       const montantEncaisse = locked.montantRecuFcfa + body.montantFcfa;
-      const solde = locked.montantTotalFcfa - montantEncaisse;
+      const solde = Math.max(0, locked.soldeDuFcfa - body.montantFcfa);
       let statut: "en_attente" | "partiel" | "regle" | "en_retard" = "partiel";
       if (solde <= 0) statut = "regle";
       else if (locked.dateEcheanceReglement && new Date(locked.dateEcheanceReglement) < new Date()) statut = "en_retard";

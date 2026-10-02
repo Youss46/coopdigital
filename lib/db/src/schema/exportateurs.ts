@@ -1,4 +1,5 @@
-import { pgTable, serial, integer, text, numeric, date, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, numeric, date, timestamp, pgEnum, check } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { cooperativesTable } from "./cooperatives";
@@ -52,6 +53,7 @@ export const ventesExportateursTable = pgTable("ventes_exportateurs", {
   dateVente: date("date_vente", { mode: "string" }).notNull(),
   dateEcheanceReglement: date("date_echeance_reglement", { mode: "string" }),
   montantRecuFcfa: integer("montant_recu_fcfa").notNull().default(0),
+  montantAvanceImputeeFcfa: integer("montant_avance_imputee_fcfa").notNull().default(0),
   soldeDuFcfa: integer("solde_du_fcfa").notNull(),
   statut: venteStatutEnum("statut").notNull().default("en_attente"),
   deviseFacturation:        text("devise_facturation").notNull().default("XOF"),
@@ -60,13 +62,19 @@ export const ventesExportateursTable = pgTable("ventes_exportateurs", {
   montantFcfaConverti:      numeric("montant_fcfa_converti",    { precision: 16, scale: 2 }),
   gainPerteChangeFcfa:      numeric("gain_perte_change_fcfa",   { precision: 16, scale: 2 }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => [
+  check(
+    "ventes_exportateurs_avance_imputee_nonnegatif_check",
+    sql`${table.montantAvanceImputeeFcfa} >= 0`,
+  ),
+]);
 
 export const insertExportateurSchema = createInsertSchema(exportateursTable).omit({ id: true, createdAt: true });
 export const insertVenteSchema = createInsertSchema(ventesExportateursTable).omit({
   id: true,
   montantTotalFcfa: true,
   montantRecuFcfa: true,
+  montantAvanceImputeeFcfa: true,
   soldeDuFcfa: true,
   statut: true,
   createdAt: true,

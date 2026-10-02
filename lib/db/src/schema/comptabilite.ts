@@ -2,9 +2,9 @@ import { pgTable, pgEnum, serial, integer, varchar, date, timestamp, boolean, te
 import { sql } from "drizzle-orm";
 
 export const typeCompteEnum = pgEnum("type_compte", ["actif", "passif", "charge", "produit"]);
-export const sourceEcritureEnum = pgEnum("source_ecriture", ["livraison", "vente", "avance", "paiement", "manuel", "encaissement", "salaire", "stock", "don"]);
+export const sourceEcritureEnum = pgEnum("source_ecriture", ["livraison", "vente", "avance", "paiement", "manuel", "encaissement", "salaire", "stock", "don", "avance_exportateur"]);
 export const statutExerciceEnum = pgEnum("statut_exercice", ["ouvert", "cloture"]);
-export const sourceEcritureAttenteEnum = pgEnum("source_ecriture_attente", ["livraison", "paiement", "avance", "vente", "encaissement", "salaire", "stock", "don"]);
+export const sourceEcritureAttenteEnum = pgEnum("source_ecriture_attente", ["livraison", "paiement", "avance", "vente", "encaissement", "salaire", "stock", "don", "avance_exportateur"]);
 export const statutEcritureAttenteEnum = pgEnum("statut_ecriture_attente", ["en_attente", "validee", "rejetee", "modifiee"]);
 
 export const planComptableTable = pgTable("plan_comptable", {
