@@ -25,6 +25,8 @@ vi.mock("@workspace/db", () => {
     createdAt: {},
     createdBy: {},
     dateImputation: {},
+    montantRestitueFcfa: {},
+    dateRestitution: {},
     dateReception: {},
     dateEcheance: {},
     banque: {},
@@ -66,6 +68,7 @@ vi.mock("../services/comptabiliteService.js", () => ({
 const {
   encaisserAvanceExportateur,
   imputerAvanceExportateur,
+  restaurerImputationsAvanceExportateurDansTransaction,
 } = await import("../services/avancesExportateursService.js");
 
 function selectChain<T>(rows: T[]) {
@@ -99,6 +102,14 @@ function updateChain<T>(rows: T[]) {
     where: vi.fn().mockReturnThis(),
     returning: vi.fn().mockResolvedValue(rows),
   };
+}
+
+function lockedSelectChain<T>(rows: T[]) {
+  return Object.assign(Promise.resolve(rows), {
+    from: vi.fn().mockReturnThis(),
+    innerJoin: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
+  });
 }
 
 describe("avances par chèque des exportateurs", () => {
@@ -221,6 +232,68 @@ describe("avances par chèque des exportateurs", () => {
         montantFcfa: 5000,
       })],
     );
+  });
+
+  it("restitue le solde d'une imputation et contre-passe l'écriture comptable", async () => {
+    const tx = {
+      select: vi.fn().mockReturnValue(lockedSelectChain([{
+        id: 88,
+        avanceExportateurId: 31,
+        montantFcfa: 5000,
+        montantRestitueFcfa: 1000,
+      }])),
+      update: vi.fn().mockReturnValue(updateChain([{ id: 88 }])),
+    };
+
+    const montantRestitue = await restaurerImputationsAvanceExportateurDansTransaction(
+      tx as never,
+      7,
+      6,
+      50,
+      "2026-10-02",
+    );
+
+    expect(montantRestitue).toBe(4000);
+    expect(tx.update.mock.results[0]?.value.set).toHaveBeenCalledWith({
+      montantRestitueFcfa: 5000,
+      dateRestitution: "2026-10-02",
+    });
+    expect(proposerEcrituresDansTransaction).toHaveBeenCalledWith(
+      tx,
+      7,
+      [expect.objectContaining({
+        source: "avance_exportateur",
+        sourceId: 31,
+        compteDebit: "4111",
+        compteCredit: "4191",
+        montantFcfa: 4000,
+        numeroPiece: "RIMPVX-88",
+      })],
+    );
+  });
+
+  it("ne restitue pas une imputation déjà rétablie", async () => {
+    const tx = {
+      select: vi.fn().mockReturnValue(lockedSelectChain([{
+        id: 88,
+        avanceExportateurId: 31,
+        montantFcfa: 5000,
+        montantRestitueFcfa: 5000,
+      }])),
+      update: vi.fn(),
+    };
+
+    const montantRestitue = await restaurerImputationsAvanceExportateurDansTransaction(
+      tx as never,
+      7,
+      6,
+      50,
+      "2026-10-02",
+    );
+
+    expect(montantRestitue).toBe(0);
+    expect(tx.update).not.toHaveBeenCalled();
+    expect(proposerEcrituresDansTransaction).not.toHaveBeenCalled();
   });
 
   it("n'enregistre pas de mouvement bancaire si le chèque n'a pas été déposé", async () => {

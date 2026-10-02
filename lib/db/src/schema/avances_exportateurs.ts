@@ -50,11 +50,17 @@ export const imputationsAvancesExportateursTable = pgTable("imputations_avances_
     .notNull()
     .references(() => ventesExportateursTable.id),
   montantFcfa: integer("montant_fcfa").notNull(),
+  montantRestitueFcfa: integer("montant_restitue_fcfa").notNull().default(0),
+  dateRestitution: date("date_restitution", { mode: "string" }),
   dateImputation: date("date_imputation", { mode: "string" }).notNull().default(sql`CURRENT_DATE`),
   createdBy: integer("created_by"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   check("imputations_avances_exportateurs_montant_positive", sql`${table.montantFcfa} > 0`),
+  check(
+    "imputations_avances_exportateurs_restitution_borne_check",
+    sql`${table.montantRestitueFcfa} >= 0 and ${table.montantRestitueFcfa} <= ${table.montantFcfa}`,
+  ),
   index("imputations_avances_exportateurs_avance_idx").on(table.avanceExportateurId),
   index("imputations_avances_exportateurs_vente_idx").on(table.venteExportateurId),
 ]);

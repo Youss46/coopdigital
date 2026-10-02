@@ -6,6 +6,7 @@ import { generateEcrituresVente, generateEcrituresEncaissement, generateEcriture
 import { calculerPoidsDisponibleVente } from "../services/venteReceptionService";
 import { creerChequeRecuDansTransaction } from "../services/chequesRecusService.js";
 import { genererNumeroRecu } from "../services/recuService.js";
+import { restaurerImputationsAvanceExportateurDansTransaction } from "../services/avancesExportateursService.js";
 
 const venteSelect = {
   id: ventesExportateursTable.id,
@@ -24,6 +25,12 @@ const venteSelect = {
   statut: ventesExportateursTable.statut,
   createdAt: ventesExportateursTable.createdAt,
 };
+
+class SignalementRefusError extends Error {
+  constructor(readonly statusCode: number, message: string) {
+    super(message);
+  }
+}
 
 export async function listExportateurs(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
@@ -682,53 +689,46 @@ export async function signalerRefus(req: Request, res: Response): Promise<void> 
       entrepotRetourId?: number;
     };
 
-  if (!poidsRefuleKg || !nombreSacsRefoules || !dateRefus || !entrepotRetourId) {
+  if (!poidsRefuleKg || poidsRefuleKg <= 0 || !nombreSacsRefoules || nombreSacsRefoules <= 0 || !dateRefus || !entrepotRetourId) {
     res.status(400).json({ erreur: "poidsRefuleKg, nombreSacsRefoules, dateRefus et entrepotRetourId sont requis" });
     return;
   }
 
   try {
-    // Récupérer la vente avec ses détails (et vérifier qu'elle appartient à la coop)
-    const [vente] = await db
-      .select({
-        id: ventesExportateursTable.id,
-        poidsKg: ventesExportateursTable.poidsKg,
-        prixUnitaireFcfa: ventesExportateursTable.prixUnitaireFcfa,
-        soldeDuFcfa: ventesExportateursTable.soldeDuFcfa,
-        statut: ventesExportateursTable.statut,
-      })
-      .from(ventesExportateursTable)
-      .innerJoin(exportateursTable, eq(exportateursTable.id, ventesExportateursTable.exportateurId))
-      .where(
-        and(
+    const refus = await db.transaction(async (tx) => {
+      // Verrouiller la vente pour sérialiser le refus avec une éventuelle imputation.
+      const [vente] = await tx
+        .select({
+          id: ventesExportateursTable.id,
+          exportateurId: ventesExportateursTable.exportateurId,
+          poidsKg: ventesExportateursTable.poidsKg,
+          prixUnitaireFcfa: ventesExportateursTable.prixUnitaireFcfa,
+          soldeDuFcfa: ventesExportateursTable.soldeDuFcfa,
+          montantAvanceImputeeFcfa: ventesExportateursTable.montantAvanceImputeeFcfa,
+          statut: ventesExportateursTable.statut,
+        })
+        .from(ventesExportateursTable)
+        .innerJoin(exportateursTable, eq(exportateursTable.id, ventesExportateursTable.exportateurId))
+        .where(and(
           eq(ventesExportateursTable.id, venteId),
           eq(exportateursTable.cooperativeId, cooperativeId),
-        )
-      )
-      .limit(1);
+        ))
+        .for("update")
+        .limit(1);
 
-    if (!vente) {
-      res.status(404).json({ erreur: "Vente introuvable" });
-      return;
-    }
+      if (!vente) throw new SignalementRefusError(404, "Vente introuvable");
+      if (vente.statut === "regle" && vente.montantAvanceImputeeFcfa <= 0) {
+        throw new SignalementRefusError(400, "Impossible de signaler un refus sur une vente réglée sans avance imputée");
+      }
 
-    if (vente.statut === "regle") {
-      res.status(400).json({ erreur: "Impossible de signaler un refus sur une vente réglée" });
-      return;
-    }
+      const poidsVenteKg = parseFloat(String(vente.poidsKg));
+      const poidsRefouleNum = parseFloat(String(poidsRefuleKg));
+      if (!Number.isFinite(poidsVenteKg) || !Number.isFinite(poidsRefouleNum)) {
+        throw new SignalementRefusError(400, "Poids de vente ou de refus invalide");
+      }
+      const estRefusTotal = poidsRefouleNum >= poidsVenteKg;
+      const montantAnnuleFcfa = Math.round(poidsRefouleNum * vente.prixUnitaireFcfa);
 
-    // Calcul : refus total ou partiel ?
-    const poidsVenteKg = parseFloat(String(vente.poidsKg));
-    const poidsRefouleNum = parseFloat(String(poidsRefuleKg));
-    const estRefusTotal = poidsRefouleNum >= poidsVenteKg;
-
-    const montantAnnuleFcfa = Math.round(poidsRefouleNum * vente.prixUnitaireFcfa);
-    const nouveauSoldeDuFcfa = estRefusTotal ? 0 : Math.max(0, vente.soldeDuFcfa - montantAnnuleFcfa);
-    const nouveauStatut = estRefusTotal ? "refoule" : "partiellement_refoule";
-
-    let refus!: typeof traitementsRefusTable.$inferSelect;
-
-    await db.transaction(async (tx) => {
       // 1. Créer le refus
       const [r] = await tx
         .insert(traitementsRefusTable)
@@ -743,15 +743,31 @@ export async function signalerRefus(req: Request, res: Response): Promise<void> 
           statut: "en_attente",
         })
         .returning();
-      refus = r!;
+      if (!r) throw new Error("Le refus n'a pas pu être créé");
 
-      // 2. Mettre à jour le statut et le solde de la vente
+      // 2. Libérer les imputations actives. Les lignes d'origine restent visibles
+      // dans l'historique et leur contrepassation comptable partage cette transaction.
+      const montantRestitueTotal = await restaurerImputationsAvanceExportateurDansTransaction(
+        tx,
+        cooperativeId,
+        vente.exportateurId,
+        venteId,
+        dateRefus,
+      );
+
+      // 3. Recalculer le dû : sur un refus partiel, les avances libérées
+      // redeviennent dues sur la quantité conservée.
+      const nouveauSoldeDuFcfa = estRefusTotal
+        ? 0
+        : Math.max(0, vente.soldeDuFcfa - montantAnnuleFcfa + montantRestitueTotal);
+      const nouveauStatut = estRefusTotal ? "refoule" : "partiellement_refoule";
       const [venteUpdated] = await tx
         .update(ventesExportateursTable)
         .set({
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           statut: nouveauStatut as any,
           soldeDuFcfa: nouveauSoldeDuFcfa,
+          montantAvanceImputeeFcfa: Math.max(0, vente.montantAvanceImputeeFcfa - montantRestitueTotal),
           nombreSacsRefoules: sql`COALESCE(nombre_sacs_refoules, 0) + ${nombreSacsRefoules}`,
           poidsRefuleKg: sql`COALESCE(poids_refoule_kg::numeric, 0) + ${poidsRefouleNum}`,
         })
@@ -770,10 +786,15 @@ export async function signalerRefus(req: Request, res: Response): Promise<void> 
       // L'entrepotRetourId est stocké dans traitements_refus pour pré-remplir
       // le modal de traitement. Le mouvement de stock sera créé uniquement
       // dans traiterRefus() si la décision est 'retour_stock'.
+      return r;
     });
 
     res.status(201).json({ refus, vente: null });
   } catch (err) {
+    if (err instanceof SignalementRefusError) {
+      res.status(err.statusCode).json({ erreur: err.message });
+      return;
+    }
     req.log.error({ err }, "Erreur signalerRefus");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
   }

@@ -9,13 +9,14 @@ import {
 import { and, desc, eq, gt, ne, sql } from "drizzle-orm";
 import { enregistrerMouvement } from "./banqueService.js";
 import { proposerEcrituresDansTransaction } from "./comptabiliteService.js";
+import type { ComptabiliteTransaction } from "./comptabiliteService.js";
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
 const montantImputeSql = sql<number>`coalesce((
-  select sum(${imputationsAvancesExportateursTable.montantFcfa})
+  select sum(${imputationsAvancesExportateursTable.montantFcfa} - ${imputationsAvancesExportateursTable.montantRestitueFcfa})
   from ${imputationsAvancesExportateursTable}
   where ${imputationsAvancesExportateursTable.avanceExportateurId} = ${avancesExportateursTable.id}
 ), 0)::int`;
@@ -129,6 +130,8 @@ export async function getAvanceExportateurDetail(id: number, cooperativeId: numb
         venteExportateurId: imputationsAvancesExportateursTable.venteExportateurId,
         dateVente: ventesExportateursTable.dateVente,
         montantFcfa: imputationsAvancesExportateursTable.montantFcfa,
+        montantRestitueFcfa: imputationsAvancesExportateursTable.montantRestitueFcfa,
+        dateRestitution: imputationsAvancesExportateursTable.dateRestitution,
         dateImputation: imputationsAvancesExportateursTable.dateImputation,
         createdBy: imputationsAvancesExportateursTable.createdBy,
         createdAt: imputationsAvancesExportateursTable.createdAt,
@@ -298,6 +301,71 @@ export async function encaisserAvanceExportateur(
   });
 }
 
+export async function restaurerImputationsAvanceExportateurDansTransaction(
+  tx: ComptabiliteTransaction,
+  cooperativeId: number,
+  exportateurId: number,
+  venteExportateurId: number,
+  dateRestitution: string,
+): Promise<number> {
+  const allocations = await tx
+    .select({
+      id: imputationsAvancesExportateursTable.id,
+      avanceExportateurId: imputationsAvancesExportateursTable.avanceExportateurId,
+      montantFcfa: imputationsAvancesExportateursTable.montantFcfa,
+      montantRestitueFcfa: imputationsAvancesExportateursTable.montantRestitueFcfa,
+    })
+    .from(imputationsAvancesExportateursTable)
+    .innerJoin(
+      avancesExportateursTable,
+      eq(avancesExportateursTable.id, imputationsAvancesExportateursTable.avanceExportateurId),
+    )
+    .where(and(
+      eq(imputationsAvancesExportateursTable.venteExportateurId, venteExportateurId),
+      eq(avancesExportateursTable.cooperativeId, cooperativeId),
+      eq(avancesExportateursTable.exportateurId, exportateurId),
+    ));
+
+  const ecrituresRestitution: Parameters<typeof proposerEcrituresDansTransaction>[2] = [];
+  let montantRestitueTotal = 0;
+  for (const allocation of allocations) {
+    const montantRestitue = allocation.montantFcfa - allocation.montantRestitueFcfa;
+    if (montantRestitue <= 0) continue;
+
+    const [updatedAllocation] = await tx
+      .update(imputationsAvancesExportateursTable)
+      .set({
+        montantRestitueFcfa: allocation.montantFcfa,
+        dateRestitution,
+      })
+      .where(and(
+        eq(imputationsAvancesExportateursTable.id, allocation.id),
+        sql`${imputationsAvancesExportateursTable.montantRestitueFcfa} < ${imputationsAvancesExportateursTable.montantFcfa}`,
+      ))
+      .returning({ id: imputationsAvancesExportateursTable.id });
+    if (!updatedAllocation) throw new Error("L'imputation n'a pas pu être restituée");
+
+    montantRestitueTotal += montantRestitue;
+    ecrituresRestitution.push({
+      source: "avance_exportateur",
+      sourceId: allocation.avanceExportateurId,
+      libelle: `Restitution imputation avance exportateur — vente #${venteExportateurId}`,
+      compteDebit: "4111",
+      compteCredit: "4191",
+      montantFcfa: montantRestitue,
+      date: dateRestitution,
+      numeroPiece: `RIMPVX-${allocation.id}`,
+      tiersId: exportateurId,
+      tiersType: "exportateur",
+    });
+  }
+
+  if (ecrituresRestitution.length > 0) {
+    await proposerEcrituresDansTransaction(tx, cooperativeId, ecrituresRestitution);
+  }
+  return montantRestitueTotal;
+}
+
 export async function imputerAvanceExportateur(
   id: number,
   cooperativeId: number,
@@ -346,7 +414,7 @@ export async function imputerAvanceExportateur(
 
     const [allocationTotals] = await tx
       .select({
-        montantImputeFcfa: sql<number>`coalesce(sum(${imputationsAvancesExportateursTable.montantFcfa}), 0)::int`,
+        montantImputeFcfa: sql<number>`coalesce(sum(${imputationsAvancesExportateursTable.montantFcfa} - ${imputationsAvancesExportateursTable.montantRestitueFcfa}), 0)::int`,
       })
       .from(imputationsAvancesExportateursTable)
       .where(eq(imputationsAvancesExportateursTable.avanceExportateurId, id));

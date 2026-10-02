@@ -170,7 +170,9 @@ describe.skipIf(!enabled)("contrôles du schéma PostgreSQL", () => {
           id integer NOT NULL,
           avance_exportateur_id integer NOT NULL,
           vente_exportateur_id integer NOT NULL,
-          montant_fcfa integer NOT NULL
+          montant_fcfa integer NOT NULL,
+          montant_restitue_fcfa integer NOT NULL,
+          date_restitution date
         );
         CREATE INDEX ${quoteIdentifier("imputations_avances_exportateurs_avance_idx")}
           ON ${qualifiedIdentifier(schemaName, "imputations_avances_exportateurs")} (avance_exportateur_id);
@@ -178,6 +180,9 @@ describe.skipIf(!enabled)("contrôles du schéma PostgreSQL", () => {
           ON ${qualifiedIdentifier(schemaName, "imputations_avances_exportateurs")} (vente_exportateur_id);
         ALTER TABLE ${qualifiedIdentifier(schemaName, "imputations_avances_exportateurs")}
           ADD CONSTRAINT ${quoteIdentifier("imputations_avances_exportateurs_montant_positive")}
+          CHECK (true);
+        ALTER TABLE ${qualifiedIdentifier(schemaName, "imputations_avances_exportateurs")}
+          ADD CONSTRAINT ${quoteIdentifier("imputations_avances_exportateurs_restitution_borne_check")}
           CHECK (true);`,
     );
   });

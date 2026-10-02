@@ -332,6 +332,29 @@
           "name": "imputations_avances_exportateurs_montant_positive"
         }
       ]
+    },
+    {
+      "migration": "0176_restituer_imputations_avances_exportateurs",
+      "objects": [
+        {
+          "kind": "column",
+          "schema": "public",
+          "table": "imputations_avances_exportateurs",
+          "name": "montant_restitue_fcfa"
+        },
+        {
+          "kind": "column",
+          "schema": "public",
+          "table": "imputations_avances_exportateurs",
+          "name": "date_restitution"
+        },
+        {
+          "kind": "constraint",
+          "schema": "public",
+          "table": "imputations_avances_exportateurs",
+          "name": "imputations_avances_exportateurs_restitution_borne_check"
+        }
+      ]
     }
   ]
 }

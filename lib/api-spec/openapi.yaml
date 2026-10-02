@@ -9440,7 +9440,7 @@ components:
 
     ImputationAvanceExportateur:
       type: object
-      required: [id, avanceExportateurId, venteExportateurId, dateVente, montantFcfa, dateImputation, createdAt]
+      required: [id, avanceExportateurId, venteExportateurId, dateVente, montantFcfa, montantRestitueFcfa, dateRestitution, dateImputation, createdAt]
       properties:
         id:
           type: integer
@@ -9452,6 +9452,10 @@ components:
           type: string
         montantFcfa:
           type: integer
+        montantRestitueFcfa:
+          type: integer
+        dateRestitution:
+          type: ["string", "null"]
         dateImputation:
           type: string
         createdBy:

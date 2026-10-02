@@ -1512,6 +1512,8 @@ export const GetAvanceExportateurResponse = zod.object({
   "venteExportateurId": zod.number(),
   "dateVente": zod.string(),
   "montantFcfa": zod.number(),
+  "montantRestitueFcfa": zod.number(),
+  "dateRestitution": zod.string().nullable(),
   "dateImputation": zod.string(),
   "createdBy": zod.number().nullish(),
   "createdAt": zod.string()

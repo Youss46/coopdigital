@@ -1969,6 +1969,9 @@ export interface ImputationAvanceExportateur {
   venteExportateurId: number;
   dateVente: string;
   montantFcfa: number;
+  montantRestitueFcfa: number;
+  /** @nullable */
+  dateRestitution: string | null;
   dateImputation: string;
   /** @nullable */
   createdBy?: number | null;

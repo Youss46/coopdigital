@@ -449,7 +449,7 @@ export default function AvancesExportateursPage() {
                   <section className="advance-section">
                     <div className="advance-section-head"><h3><History size={14} style={{ verticalAlign: "middle", marginRight: 6 }} />Imputations enregistrées</h3><span>{detail?.imputations.length ?? 0} ligne{(detail?.imputations.length ?? 0) === 1 ? "" : "s"}</span></div>
                     {!detail?.imputations.length ? <div className="advance-callout"><Banknote size={14} /> Aucune imputation effectuée à ce jour.</div> :
-                      <div className="advance-list">{detail.imputations.map(imp => <div className="advance-list-row" key={imp.id}><div><strong>Vente du {fmtDate(imp.dateVente)}</strong><small>Imputé le {fmtDate(imp.dateImputation)} · Réf. vente #{imp.venteExportateurId}</small></div><strong>{fmtMoney(imp.montantFcfa)}</strong></div>)}</div>}
+                      <div className="advance-list">{detail.imputations.map(imp => <div className="advance-list-row" key={imp.id}><div><strong>Vente du {fmtDate(imp.dateVente)}</strong><small>Imputé le {fmtDate(imp.dateImputation)} · Réf. vente #{imp.venteExportateurId}{imp.montantRestitueFcfa > 0 ? ` · Restitué ${fmtMoney(imp.montantRestitueFcfa)} le ${fmtDate(imp.dateRestitution)}` : ""}</small></div><strong>{fmtMoney(imp.montantFcfa)}</strong></div>)}</div>}
                   </section>
                   <section className="advance-section">
                     <div className="advance-section-head"><h3>Références</h3><span>Traçabilité</span></div>
