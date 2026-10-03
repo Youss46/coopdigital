@@ -45,6 +45,7 @@ import {
 import { useFeatureAccess } from "@/hooks/useFeatureAccess";
 import { usePermission } from "@/hooks/usePermission";
 import { useToast } from "@/hooks/use-toast";
+import { MoneyInput } from "@/components/ui/money-input";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 const today = () => new Date().toISOString().slice(0, 10);
@@ -484,7 +485,7 @@ export default function AvancesExportateursPage() {
                   {!exportateursLoading && !exportateursError && exportateurs.length === 0 && <small style={{ display: "block", marginTop: 6, color: "#a4513c", fontSize: 10 }}>Aucun exportateur enregistré. Ajoutez-en un avant de saisir un chèque.</small>}
                 </div>
                 <div className="advance-two-fields"><div className="advance-field"><label>Numéro du chèque *</label><input value={form.numeroCheque} onChange={e => setForm(f => ({ ...f, numeroCheque: e.target.value }))} placeholder="Ex. 0084172" maxLength={80} data-testid="input-check-number" /></div><div className="advance-field"><label>Banque émettrice *</label><input value={form.banque} onChange={e => setForm(f => ({ ...f, banque: e.target.value }))} placeholder="Ex. BICICI" maxLength={200} data-testid="input-check-bank" /></div></div>
-                <div className="advance-two-fields"><div className="advance-field"><label>Montant (FCFA) *</label><input type="number" min="1" step="1" inputMode="numeric" value={form.montantFcfa} onChange={e => setForm(f => ({ ...f, montantFcfa: e.target.value }))} placeholder="0" data-testid="input-check-amount" /></div><div className="advance-field"><label>Date de réception *</label><input type="date" value={form.dateReception} onChange={e => setForm(f => ({ ...f, dateReception: e.target.value }))} data-testid="input-received-date" /></div></div>
+                <div className="advance-two-fields"><div className="advance-field"><label>Montant (FCFA) *</label><MoneyInput min="1" value={form.montantFcfa} onChange={montantFcfa => setForm(f => ({ ...f, montantFcfa }))} placeholder="0" data-testid="input-check-amount" /></div><div className="advance-field"><label>Date de réception *</label><input type="date" value={form.dateReception} onChange={e => setForm(f => ({ ...f, dateReception: e.target.value }))} data-testid="input-received-date" /></div></div>
                 <div className="advance-field"><label>Date d’échéance <span style={{ fontWeight: 500, color: "#89928a" }}>· facultative</span></label><input type="date" value={form.dateEcheance} onChange={e => setForm(f => ({ ...f, dateEcheance: e.target.value }))} data-testid="input-due-date" /></div>
                 <div className="advance-callout"><ShieldCheck size={14} /> L’enregistrement crée uniquement le suivi du chèque. Il ne crée ni vente ni paiement.</div>
               </div>
