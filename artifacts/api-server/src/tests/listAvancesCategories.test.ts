@@ -216,6 +216,7 @@ describe("listes des avances ordinaires", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllEnvs();
     fixtures.rows.splice(0, fixtures.rows.length, ...initialRows.map((row) => ({ ...row })));
   });
 
@@ -391,5 +392,20 @@ describe("listes des avances ordinaires", () => {
     expect(vi.mocked(res.json).mock.calls[0]![0]).toEqual({
       resumes: [{ membreId: 13, soldeActifFcfa: 9000, aUneAvanceEnRetard: true }],
     });
+  });
+
+  it("renvoie le détail de l’erreur au client en développement", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    const message = "Failed query: SELECT diagnostic";
+    mockDb.select.mockImplementationOnce(() => {
+      throw new Error(message);
+    });
+    const res = response();
+    res.locals.membreDelegueLocalite = true;
+
+    await getAvancesDeleguesLocalitesResume(request(), res);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(vi.mocked(res.json).mock.calls[0]![0]).toEqual({ erreur: message });
   });
 });

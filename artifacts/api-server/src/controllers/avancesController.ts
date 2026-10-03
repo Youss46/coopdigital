@@ -295,7 +295,7 @@ export async function getAvancesDeleguesLocalitesResume(req: Request, res: Respo
     });
   } catch (err) {
     req.log.error({ err }, "Erreur getAvancesDeleguesLocalitesResume");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 

@@ -498,7 +498,11 @@ export default function DeleguesLocalitesPage() {
     ? (resultatMagasinier ?? [])
     : (resultatComplet?.membres ?? []);
 
-  const { data: resumesAvances = [], isError: erreurResumeAvances } = useQuery<ResumeAvanceMembre[]>({
+  const {
+    data: resumesAvances = [],
+    isError: erreurResumeAvances,
+    error: detailErreurResumeAvances,
+  } = useQuery<ResumeAvanceMembre[]>({
     queryKey: ["avances-delegues-localites-resumes"],
     queryFn: () => apiFetch<{ resumes: ResumeAvanceMembre[] }>("/api/delegues-localites/avances/resume")
       .then(r => r.resumes ?? []),
@@ -895,7 +899,12 @@ export default function DeleguesLocalitesPage() {
 
           {erreurResumeAvances && (
             <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-              Impossible de charger les soldes et alertes d’avances des membres. Réessayez en actualisant la page.
+              <p className="font-semibold">Impossible de charger les soldes et alertes d’avances des membres.</p>
+              <p className="mt-1 break-words">
+                {detailErreurResumeAvances instanceof Error && detailErreurResumeAvances.message
+                  ? detailErreurResumeAvances.message
+                  : String(detailErreurResumeAvances ?? "Cause de l’erreur inconnue.")}
+              </p>
             </div>
           )}
 
