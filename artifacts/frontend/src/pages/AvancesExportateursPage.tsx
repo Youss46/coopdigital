@@ -146,7 +146,9 @@ export default function AvancesExportateursPage() {
         if (!response.ok) throw new Error("Impossible de charger les comptes bancaires.");
         return response.json() as Promise<CompteBancaire[]>;
       },
-        enabled: peutEncaisser && dialog?.type === "encaisser",
+      enabled:
+        (peutEncaisser && dialog?.type === "encaisser") ||
+        (peutLire && selectedId !== null && detail?.avance.compteBancaireId != null),
     });
 
   const invalidateCurrent = (id?: number) => {
@@ -264,6 +266,18 @@ export default function AvancesExportateursPage() {
   }
 
   const selectedAdvance = detail?.avance ?? avances.find(a => a.id === selectedId);
+  const compteCredite = selectedAdvance?.compteBancaireId == null
+    ? undefined
+    : comptes.find(compte => compte.id === selectedAdvance.compteBancaireId);
+  const libelleCompteCredite = selectedAdvance?.compteBancaireId == null
+    ? "—"
+    : comptesLoading
+      ? "Chargement…"
+      : comptesError
+        ? "Détails indisponibles"
+        : compteCredite
+          ? `${compteCredite.nom} · ${compteCredite.banque}`
+          : "Compte indisponible";
   const filteredCountLabel = visibleAvances.length === 1 ? "1 chèque" : `${visibleAvances.length} chèques`;
   const selectedSales = ventesEligibles;
   const currentSale = selectedSales.find(v => String(v.id) === venteId);
@@ -457,8 +471,8 @@ export default function AvancesExportateursPage() {
                     <div className="advance-list">
                       <div className="advance-list-row"><div>Date de réception</div><strong>{fmtDate(selectedAdvance.dateReception)}</strong></div>
                       <div className="advance-list-row"><div>Date d’échéance</div><strong>{fmtDate(selectedAdvance.dateEcheance)}</strong></div>
-                      {selectedAdvance.dateEncaissement && <div className="advance-list-row"><div>Compte crédité</div><strong>{selectedAdvance.compteBancaireId ? `Compte #${selectedAdvance.compteBancaireId}` : "—"}</strong></div>}
-                      {selectedAdvance.mouvementBanqueId && <div className="advance-list-row"><div>Mouvement bancaire</div><strong>#{selectedAdvance.mouvementBanqueId}</strong></div>}
+                      {selectedAdvance.dateEncaissement && <div className="advance-list-row"><div>Compte crédité</div><strong>{libelleCompteCredite}</strong></div>}
+                      {selectedAdvance.mouvementBanqueId && <div className="advance-list-row"><div>Référence du mouvement</div><strong>Chèque n° {selectedAdvance.numeroCheque} · {fmtDate(selectedAdvance.dateEncaissement)}</strong></div>}
                       <div className="advance-list-row"><div>Créé le</div><strong>{fmtDate(selectedAdvance.createdAt)}</strong></div>
                     </div>
                   </section>
