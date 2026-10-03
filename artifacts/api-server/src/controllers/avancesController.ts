@@ -34,6 +34,7 @@ const CATEGORIE_DELEGUE_LOCALITE = "délégué de localités";
 const STATUTS_AVANCE = new Set(["en_cours", "en_retard", "rembourse", "annulee", "cloturee"]);
 
 function statutAvanceEffectifSql(today: string) {
+  const statutTexte = sql`${avancesTable.statut}::text`;
   const echeanceEffective = sql`
     COALESCE(
       GREATEST(${avancesTable.dateEcheance}, ${avancesTable.reportDate}),
@@ -43,8 +44,8 @@ function statutAvanceEffectifSql(today: string) {
   `;
   return sql`
     CASE
-      WHEN ${avancesTable.statut} NOT IN ('en_cours', 'en_retard')
-        THEN ${avancesTable.statut}
+      WHEN ${statutTexte} NOT IN ('en_cours', 'en_retard')
+        THEN ${statutTexte}
       WHEN ${avancesTable.reportDate} IS NOT NULL
         AND ${avancesTable.reportDate} >= ${today}::date
         THEN 'en_cours'
@@ -53,7 +54,7 @@ function statutAvanceEffectifSql(today: string) {
           WHEN ${echeanceEffective} < ${today}::date THEN 'en_retard'
           ELSE 'en_cours'
         END
-      ELSE ${avancesTable.statut}
+      ELSE ${statutTexte}
     END
   `;
 }
