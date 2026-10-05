@@ -221,7 +221,7 @@ export async function previewAutoLot(req: Request, res: Response): Promise<void>
                 THEN (
                   SELECT sp.livraison_id
                   FROM sessions_pesee sp
-                  WHERE sp.id = CAST(REGEXP_REPLACE(ms.motif, '^.*session #([0-9]+).*$', '\\1') AS INTEGER)
+                  WHERE sp.id = CAST(REGEXP_REPLACE(ms.motif, '^.*#([0-9]+)[)]?$', '\\1') AS INTEGER)
                 )
               ELSE NULL
             END AS livraison_id,
@@ -275,7 +275,7 @@ export async function previewAutoLot(req: Request, res: Response): Promise<void>
 
       // Si le central suffit, ne pas entamer les autres entrepôts.
       // Sinon, consommer le central en premier puis compléter avec les autres dépôts.
-      livraisonsPourSelection = poidsCentralKg >= quantiteCibleKg
+      livraisonsPourSelection = poidsCentralKg + 0.001 >= quantiteCibleKg
         ? central
         : [...central, ...autres];
     }

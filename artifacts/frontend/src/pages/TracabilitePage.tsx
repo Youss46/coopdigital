@@ -1549,7 +1549,7 @@ export default function TracabilitePage() {
               Constituer un lot par quantité cible
             </h3>
             <p className="text-xs text-gray-500 mb-4">
-              Indiquez la quantité souhaitée. Les livraisons des membres et des fournisseurs seront sélectionnées des plus anciennes aux plus récentes, quel que soit l’entrepôt choisi.
+              Indiquez la quantité souhaitée. Les livraisons dont l’entrée est enregistrée au magasin central sont sélectionnées en premier. Si elles ne suffisent pas, les autres entrepôts complètent le poids manquant.
             </p>
             <div className="flex items-end gap-3 flex-wrap">
               <div className="flex-1 min-w-[140px]">

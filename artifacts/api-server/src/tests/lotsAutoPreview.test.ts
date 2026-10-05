@@ -6,7 +6,10 @@ type Predicate = (row: Row) => boolean;
 
 const state = vi.hoisted(() => ({
   rows: [] as Row[],
+  centralRows: [] as Row[],
+  locationRows: [] as Array<{ livraisonId: number; estCentral: boolean }>,
   select: vi.fn(),
+  execute: vi.fn(),
 }));
 
 vi.mock("@workspace/db", () => {
@@ -15,7 +18,7 @@ vi.mock("@workspace/db", () => {
   });
 
   return {
-    db: { select: state.select },
+    db: { select: state.select, execute: state.execute },
     lotsTable: table("lots"),
     lotLivraisonsTable: table("lot_livraisons"),
     livraisonsTable: table("livraisons"),
@@ -35,6 +38,15 @@ vi.mock("@workspace/db", () => {
 vi.mock("drizzle-orm", () => {
   const predicate = (condition: unknown): Predicate =>
     typeof condition === "function" ? condition as Predicate : () => true;
+  const sql = Object.assign(
+    (strings: TemplateStringsArray, ...values: unknown[]) => ({
+      strings: Array.from(strings),
+      values,
+    }),
+    {
+      join: (chunks: unknown[], separator: unknown) => ({ chunks, separator }),
+    },
+  );
 
   return {
     eq: (column: string, value: unknown): Predicate => (row) => row[column] === value,
@@ -46,10 +58,7 @@ vi.mock("drizzle-orm", () => {
       (row) => conditions.some((condition) => predicate(condition)(row)),
     inArray: (): Predicate => () => true,
     desc: vi.fn(() => ({})),
-    sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({
-      strings: Array.from(strings),
-      values,
-    }),
+    sql,
   };
 });
 
@@ -80,29 +89,38 @@ function buildResponse(): Response {
 
 describe("previewAutoLot", () => {
   beforeEach(() => {
+    state.centralRows = [{
+      id: 10,
+      "entrepots.cooperativeId": 42,
+      "entrepots.pourFournisseursExt": false,
+    }];
+    state.locationRows = [
+      { livraisonId: 1, estCentral: true },
+      { livraisonId: 2, estCentral: false },
+    ];
     state.rows = [
-      {
-        id: 1,
-        poidsKg: "3000",
-        produitBrutKg: "3000",
-        nombreSacs: 30,
-        dateLivraison: "2026-01-01",
-        "livraisons.membreId": 101,
-        "livraisons.fournisseurId": null,
-        "membres.cooperativeId": 42,
-        "fournisseurs.cooperativeId": null,
-        "lot_livraisons.livraisonId": null,
-      },
       {
         id: 2,
         poidsKg: "2000",
         produitBrutKg: "2000",
         nombreSacs: 20,
-        dateLivraison: "2026-01-02",
+        dateLivraison: "2026-01-01",
         "livraisons.membreId": null,
         "livraisons.fournisseurId": 201,
         "membres.cooperativeId": null,
         "fournisseurs.cooperativeId": 42,
+        "lot_livraisons.livraisonId": null,
+      },
+      {
+        id: 1,
+        poidsKg: "3000",
+        produitBrutKg: "3000",
+        nombreSacs: 30,
+        dateLivraison: "2026-01-02",
+        "livraisons.membreId": 101,
+        "livraisons.fournisseurId": null,
+        "membres.cooperativeId": 42,
+        "fournisseurs.cooperativeId": null,
         "lot_livraisons.livraisonId": null,
       },
       {
@@ -119,19 +137,28 @@ describe("previewAutoLot", () => {
       },
     ];
 
-    state.select.mockImplementation(() => {
-      let filteredRows = state.rows;
+    state.select.mockImplementation((selection: { id?: string }) => {
+      let filteredRows = selection.id === "entrepots.id" ? state.centralRows : state.rows;
       const query = {
         from: () => query,
         leftJoin: () => query,
         where: (condition: Predicate) => {
-          filteredRows = state.rows.filter(condition);
+          filteredRows = filteredRows.filter(condition);
           return query;
         },
-        orderBy: () => filteredRows,
+        orderBy: () => query,
+        limit: (count: number) => {
+          filteredRows = filteredRows.slice(0, count);
+          return query;
+        },
+        then: (
+          resolve: (rows: Row[]) => unknown,
+          reject?: (reason: unknown) => unknown,
+        ) => Promise.resolve(filteredRows).then(resolve, reject),
       };
       return query;
     });
+    state.execute.mockImplementation(async () => ({ rows: state.locationRows }));
   });
 
   it("sélectionne membres et fournisseurs sans inclure les autres coopératives", async () => {
@@ -146,6 +173,22 @@ describe("previewAutoLot", () => {
       livraisonIds: [1, 2],
       poidsTotalKg: 5000,
       deficitKg: 0,
+    }));
+  });
+
+  it("utilise uniquement le central quand son stock suffit, même si un autre entrepôt est plus ancien", async () => {
+    const response = buildResponse();
+
+    await previewAutoLot(
+      buildRequest({ quantiteCibleKg: 3000, toutesOrigines: true }),
+      response,
+    );
+
+    expect(response.json).toHaveBeenCalledWith(expect.objectContaining({
+      livraisonIds: [1],
+      poidsTotalKg: 3000,
+      deficitKg: 0,
+      nbDisponibles: 2,
     }));
   });
 
