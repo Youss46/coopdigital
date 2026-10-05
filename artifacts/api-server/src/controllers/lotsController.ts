@@ -154,7 +154,24 @@ export async function previewAutoLot(req: Request, res: Response): Promise<void>
   const toutesOrigines = body.toutesOrigines === true;
 
   try {
-    // Livraisons disponibles (non encore dans un lot) pour cette coopérative, triées FIFO
+    // Les livraisons non lotées restent disponibles, quelle que soit leur origine.
+    // L'entrepôt central est le premier entrepôt coopératif non réservé aux fournisseurs,
+    // comme pour la destination par défaut d'un lot.
+    const [entrepotCentral] = toutesOrigines
+      ? await db
+          .select({ id: entrepotsTable.id })
+          .from(entrepotsTable)
+          .where(
+            and(
+              eq(entrepotsTable.cooperativeId, cooperativeId),
+              eq(entrepotsTable.pourFournisseursExt, false),
+            ),
+          )
+          .orderBy(entrepotsTable.id)
+          .limit(1)
+      : [];
+
+    // Livraisons disponibles (non encore dans un lot) pour cette coopérative, triées FIFO.
     const disponibles = await db
       .select({ id: livraisonsTable.id, poidsKg: livraisonsTable.poidsKg, produitBrutKg: livraisonsTable.produitBrutKg, nombreSacs: livraisonsTable.nombreSacs })
       .from(livraisonsTable)
@@ -181,6 +198,87 @@ export async function previewAutoLot(req: Request, res: Response): Promise<void>
         ),
       )
       .orderBy(livraisonsTable.dateLivraison); // FIFO — les plus anciennes en premier
+    const nbDisponiblesTotal = disponibles.length;
+
+    let livraisonsPourSelection = disponibles;
+    if (toutesOrigines && disponibles.length > 0) {
+      const idsDemandes = sql.join(
+        disponibles.map((livraison) => sql`${livraison.id}`),
+        sql`, `,
+      );
+      const entreesInitiales = await db.execute<{
+        livraisonId: number;
+        estCentral: boolean;
+      }>(sql`
+        WITH entrees_livraisons AS (
+          SELECT
+            CASE
+              WHEN ms.motif ~ '^Livraison( fournisseur externe)? #[0-9]+$'
+                THEN CAST(REGEXP_REPLACE(ms.motif, '^.*#([0-9]+)$', '\\1') AS INTEGER)
+              WHEN ms.motif ~ '^Session pesée #[0-9]+$'
+                OR ms.motif ~ '^Livraison membre-délégué — session #[0-9]+$'
+                OR ms.motif ~ '^Transfert .*pesée physique réception \\(session #[0-9]+\\)$'
+                THEN (
+                  SELECT sp.livraison_id
+                  FROM sessions_pesee sp
+                  WHERE sp.id = CAST(REGEXP_REPLACE(ms.motif, '^.*session #([0-9]+).*$', '\\1') AS INTEGER)
+                )
+              ELSE NULL
+            END AS livraison_id,
+            ms.entrepot_id = ${entrepotCentral?.id ?? null} AS est_central,
+            ms.created_at AS date_entree,
+            ms.id AS mouvement_id
+          FROM mouvements_stock ms
+          INNER JOIN entrepots e ON e.id = ms.entrepot_id
+          WHERE e.cooperative_id = ${cooperativeId}
+            AND ms.type = 'entree'
+            AND (
+              ms.motif ~ '^Livraison( fournisseur externe)? #[0-9]+$'
+              OR ms.motif ~ '^Session pesée #[0-9]+$'
+              OR ms.motif ~ '^Livraison membre-délégué — session #[0-9]+$'
+              OR ms.motif ~ '^Transfert .*pesée physique réception \\(session #[0-9]+\\)$'
+            )
+
+          UNION ALL
+
+          SELECT
+            em.livraison_id,
+            false AS est_central,
+            em.date_mouvement AS date_entree,
+            em.id AS mouvement_id
+          FROM entrepot_mouvement em
+          INNER JOIN entrepots_delegues ed ON ed.id = em.entrepot_id
+          WHERE ed.cooperative_id = ${cooperativeId}
+            AND em.type_mouvement = 'entree'
+            AND em.motif = 'livraison_membre'
+            AND em.livraison_id IS NOT NULL
+        )
+        SELECT DISTINCT ON (livraison_id)
+          livraison_id AS "livraisonId",
+          est_central AS "estCentral"
+        FROM entrees_livraisons
+        WHERE livraison_id IN (${idsDemandes})
+        ORDER BY livraison_id, date_entree, est_central DESC, mouvement_id
+      `);
+
+      const livraisonsEntreesAuCentral = new Set(
+        entreesInitiales.rows
+          .filter((entree) => entree.estCentral)
+          .map((entree) => entree.livraisonId),
+      );
+      const central = disponibles.filter((livraison) => livraisonsEntreesAuCentral.has(livraison.id));
+      const autres = disponibles.filter((livraison) => !livraisonsEntreesAuCentral.has(livraison.id));
+      const poidsCentralKg = central.reduce(
+        (total, livraison) => total + parseFloat(String(livraison.produitBrutKg ?? livraison.poidsKg)),
+        0,
+      );
+
+      // Si le central suffit, ne pas entamer les autres entrepôts.
+      // Sinon, consommer le central en premier puis compléter avec les autres dépôts.
+      livraisonsPourSelection = poidsCentralKg >= quantiteCibleKg
+        ? central
+        : [...central, ...autres];
+    }
 
     // Phase 1 — FIFO strict : n'inclure une livraison que si elle ne fait PAS dépasser la cible
     // On travaille sur le poids brut (produit_brut_kg) = poids entré en stock.
@@ -190,7 +288,7 @@ export async function previewAutoLot(req: Request, res: Response): Promise<void>
     let cumul = 0;
     let totalSacs = 0;
 
-    for (const l of disponibles) {
+    for (const l of livraisonsPourSelection) {
       const poids = parseFloat(String(l.produitBrutKg ?? l.poidsKg));
       if (cumul + poids <= quantiteCibleKg) {
         selectedIds.push(l.id);
@@ -250,7 +348,7 @@ export async function previewAutoLot(req: Request, res: Response): Promise<void>
       livraisonIds: selectedIds,
       poidsTotalKg: Math.round(cumul * 100) / 100,
       nbLivraisons: selectedIds.length,
-      nbDisponibles: disponibles.length,   // total avant filtrage
+      nbDisponibles: nbDisponiblesTotal,   // total avant priorité de l'entrepôt
       deficitKg,
       nombreSacsTotal: totalSacs,
       fractionLivraisonId,
