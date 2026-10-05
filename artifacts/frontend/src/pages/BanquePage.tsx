@@ -805,6 +805,9 @@ function ModalMouvement({
               <TrendingDown className="h-4 w-4" /> Crédit (sortie)
             </button>
           </div>
+          <p className="text-[11px] text-gray-500">
+            Une entrée de fonds débite le compte bancaire; une sortie le crédite.
+          </p>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Motif *</label>
