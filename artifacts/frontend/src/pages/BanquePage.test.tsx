@@ -92,7 +92,7 @@ describe("mise en page mobile de la Banque", () => {
     expect(mobileList?.className).toContain("md:hidden");
     expect(mobileList?.querySelectorAll('[role="listitem"]')).toHaveLength(1);
     expect(mobileList?.textContent).toContain("Paiement de transport vers le fournisseur");
-    expect(mobileList?.textContent).toContain("Crédit (sortie)");
+    expect(mobileList?.textContent).toContain("Sortie");
     expect(mobileList?.textContent).toContain("Ekolan Awa");
     expect(mobileList?.textContent).toContain("CHQ-2026-014");
     expect(mobileList?.textContent).toContain("À rapprocher");
@@ -113,7 +113,7 @@ describe("mise en page mobile de la Banque", () => {
       newMovementButton!.click();
       await new Promise(resolve => setTimeout(resolve, 0));
     });
-    expect(container.textContent).toContain("Débit (entrée)");
-    expect(container.textContent).toContain("Crédit (sortie)");
+    expect(container.textContent).toContain("Entrée");
+    expect(container.textContent).toContain("Sortie");
   });
 });

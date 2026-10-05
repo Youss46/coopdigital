@@ -360,8 +360,8 @@ export default function BanquePage() {
                 aria-label="Type de mouvement"
                 className="w-full sm:w-auto text-xs sm:text-sm border border-gray-200 rounded px-2 py-2 sm:py-1">
                 <option value="tous">Tous les types</option>
-                <option value="credit">Entrées (débit comptable)</option>
-                <option value="debit">Sorties (crédit comptable)</option>
+                <option value="credit">Entrées</option>
+                <option value="debit">Sorties</option>
               </select>
               <label className="flex items-center gap-2 text-xs sm:text-sm text-gray-600 cursor-pointer">
                 <input type="checkbox" checked={nonRapproche} onChange={e => setNonRapproche(e.target.checked)}
@@ -392,8 +392,8 @@ export default function BanquePage() {
                     <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                     <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Libellé</th>
                     <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Référence</th>
-                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase" title="Entrée de fonds : débit du compte bancaire">Débit (entrée)</th>
-                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase" title="Sortie de fonds : crédit du compte bancaire">Crédit (sortie)</th>
+                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase" title="Entrée sur le compte bancaire">Entrée</th>
+                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase" title="Sortie du compte bancaire">Sortie</th>
                     <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase hidden sm:table-cell">Solde après</th>
                     <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase hidden sm:table-cell">Rappr.</th>
                   </tr>
@@ -460,7 +460,7 @@ export default function BanquePage() {
                           {m.type === "credit" ? "+" : "−"} {FCFA(m.montant_fcfa)}
                         </p>
                         <p className="text-[10px] uppercase tracking-wide text-gray-400">
-                          {m.type === "credit" ? "Débit (entrée)" : "Crédit (sortie)"}
+                          {m.type === "credit" ? "Entrée" : "Sortie"}
                         </p>
                       </div>
                     </div>
@@ -795,18 +795,18 @@ function ModalMouvement({
               className={`flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
                 sens === "entree" ? "bg-green-50 border-green-400 text-green-700" : "border-gray-200 text-gray-600 hover:bg-gray-50"
               }`}>
-              <TrendingUp className="h-4 w-4" /> Débit (entrée)
+              <TrendingUp className="h-4 w-4" /> Entrée
             </button>
             <button type="button"
               onClick={() => handleSensChange("sortie")}
               className={`flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
                 sens === "sortie" ? "bg-red-50 border-red-400 text-red-700" : "border-gray-200 text-gray-600 hover:bg-gray-50"
               }`}>
-              <TrendingDown className="h-4 w-4" /> Crédit (sortie)
+              <TrendingDown className="h-4 w-4" /> Sortie
             </button>
           </div>
           <p className="text-[11px] text-gray-500">
-            Une entrée de fonds débite le compte bancaire; une sortie le crédite.
+            Une entrée augmente le solde bancaire; une sortie le diminue.
           </p>
 
           <div>
