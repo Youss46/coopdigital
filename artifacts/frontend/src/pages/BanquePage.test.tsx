@@ -92,6 +92,7 @@ describe("mise en page mobile de la Banque", () => {
     expect(mobileList?.className).toContain("md:hidden");
     expect(mobileList?.querySelectorAll('[role="listitem"]')).toHaveLength(1);
     expect(mobileList?.textContent).toContain("Paiement de transport vers le fournisseur");
+    expect(mobileList?.textContent).toContain("Crédit (sortie)");
     expect(mobileList?.textContent).toContain("Ekolan Awa");
     expect(mobileList?.textContent).toContain("CHQ-2026-014");
     expect(mobileList?.textContent).toContain("À rapprocher");
@@ -103,5 +104,16 @@ describe("mise en page mobile de la Banque", () => {
     expect(container.querySelector('input[aria-label="Date de début"]')).not.toBeNull();
     expect(container.querySelector('input[aria-label="Date de fin"]')).not.toBeNull();
     expect(container.querySelector('select[aria-label="Type de mouvement"]')).not.toBeNull();
+
+    const newMovementButton = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.trim() === "Mouvement",
+    );
+    expect(newMovementButton).toBeDefined();
+    await act(async () => {
+      newMovementButton!.click();
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+    expect(container.textContent).toContain("Débit (entrée)");
+    expect(container.textContent).toContain("Crédit (sortie)");
   });
 });

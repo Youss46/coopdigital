@@ -16,18 +16,18 @@ const FCFA = (n: number | string | null | undefined) =>
 const DATE_FR = (d: string) =>
   new Date(d + "T00:00:00").toLocaleDateString("fr-FR");
 
-const MOTIFS_CREDIT = [
+const MOTIFS_ENTREE = [
   { value: "virement_entrant",   label: "Virement entrant" },
   { value: "depot_especes",      label: "Dépôt espèces (depuis caisse)" },
   { value: "remboursement_recu", label: "Remboursement reçu" },
-  { value: "autre_credit",       label: "Autre crédit" },
+  { value: "autre_credit",       label: "Autre entrée" },
 ];
-const MOTIFS_DEBIT = [
+const MOTIFS_SORTIE = [
   { value: "virement_sortant",      label: "Virement sortant" },
   { value: "retrait_especes",       label: "Retrait espèces (vers caisse)" },
   { value: "frais_bancaires",       label: "Frais bancaires" },
   { value: "remboursement_emprunt", label: "Remboursement emprunt" },
-  { value: "autre_debit",           label: "Autre débit" },
+  { value: "autre_debit",           label: "Autre sortie" },
 ];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -45,7 +45,7 @@ interface Compte {
 
 interface Mouvement {
   id: number;
-  type: "credit" | "debit";
+  type: "credit" | "debit"; // API : credit = entrée, debit = sortie
   motif: string;
   montant_fcfa: string;
   libelle: string | null;
@@ -360,8 +360,8 @@ export default function BanquePage() {
                 aria-label="Type de mouvement"
                 className="w-full sm:w-auto text-xs sm:text-sm border border-gray-200 rounded px-2 py-2 sm:py-1">
                 <option value="tous">Tous les types</option>
-                <option value="credit">Crédits</option>
-                <option value="debit">Débits</option>
+                <option value="credit">Entrées (débit comptable)</option>
+                <option value="debit">Sorties (crédit comptable)</option>
               </select>
               <label className="flex items-center gap-2 text-xs sm:text-sm text-gray-600 cursor-pointer">
                 <input type="checkbox" checked={nonRapproche} onChange={e => setNonRapproche(e.target.checked)}
@@ -392,8 +392,8 @@ export default function BanquePage() {
                     <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                     <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Libellé</th>
                     <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Référence</th>
-                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Crédit</th>
-                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Débit</th>
+                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase" title="Entrée de fonds : débit du compte bancaire">Débit (entrée)</th>
+                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase" title="Sortie de fonds : crédit du compte bancaire">Crédit (sortie)</th>
                     <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase hidden sm:table-cell">Solde après</th>
                     <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase hidden sm:table-cell">Rappr.</th>
                   </tr>
@@ -460,7 +460,7 @@ export default function BanquePage() {
                           {m.type === "credit" ? "+" : "−"} {FCFA(m.montant_fcfa)}
                         </p>
                         <p className="text-[10px] uppercase tracking-wide text-gray-400">
-                          {m.type === "credit" ? "Crédit" : "Débit"}
+                          {m.type === "credit" ? "Débit (entrée)" : "Crédit (sortie)"}
                         </p>
                       </div>
                     </div>
@@ -609,7 +609,7 @@ export default function BanquePage() {
 
 // ─── Helper motif label ────────────────────────────────────────────────────────
 
-const ALL_MOTIFS = [...MOTIFS_CREDIT, ...MOTIFS_DEBIT];
+const ALL_MOTIFS = [...MOTIFS_ENTREE, ...MOTIFS_SORTIE];
 function LABEL_MOTIF(_type: string, motif: string) {
   return ALL_MOTIFS.find(m => m.value === motif)?.label ?? motif;
 }
@@ -729,7 +729,7 @@ function ModalMouvement({
   onSaved: () => void;
   toast: ReturnType<typeof useToast>["toast"];
 }) {
-  const [type,          setType]          = useState<"credit" | "debit">("credit");
+  const [sens,          setSens]          = useState<"entree" | "sortie">("entree");
   const [motif,         setMotif]         = useState("virement_entrant");
   const [montant,       setMontant]       = useState("");
   const [libelle,       setLibelle]       = useState("");
@@ -738,11 +738,11 @@ function ModalMouvement({
   const [dateValeur,    setDateValeur]    = useState("");
   const [loading,       setLoading]       = useState(false);
 
-  const motifs = type === "credit" ? MOTIFS_CREDIT : MOTIFS_DEBIT;
+  const motifs = sens === "entree" ? MOTIFS_ENTREE : MOTIFS_SORTIE;
 
-  const handleTypeChange = (t: "credit" | "debit") => {
-    setType(t);
-    setMotif(t === "credit" ? "virement_entrant" : "virement_sortant");
+  const handleSensChange = (nouveauSens: "entree" | "sortie") => {
+    setSens(nouveauSens);
+    setMotif(nouveauSens === "entree" ? "virement_entrant" : "virement_sortant");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -751,11 +751,14 @@ function ModalMouvement({
     if (!montantInt) { toast({ title: "Montant requis", variant: "destructive" }); return; }
     setLoading(true);
     try {
+      // L'API conserve son vocabulaire de relevé bancaire : crédit = entrée, débit = sortie.
+      // La page présente le sens comptable de la coopérative : débit = entrée, crédit = sortie.
+      const typeMouvementApi = sens === "entree" ? "credit" : "debit";
       const r = await fetch(`${BASE}/api/banque/${compte.id}/mouvement`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok()}` },
         body: JSON.stringify({
-          type, motif, montantFcfa: montantInt,
+          type: typeMouvementApi, motif, montantFcfa: montantInt,
           libelle: libelle.trim() || undefined,
           reference: reference.trim() || undefined,
           dateOperation: dateOp,
@@ -765,7 +768,7 @@ function ModalMouvement({
       if (!r.ok) throw new Error((await r.json()).erreur ?? "Erreur serveur");
       const data = await r.json();
       toast({
-        title: type === "credit" ? "Crédit enregistré" : "Débit enregistré",
+        title: sens === "entree" ? "Entrée enregistrée" : "Sortie enregistrée",
         description: data.alerte ?? FCFA(montantInt),
       });
       onSaved();
@@ -785,21 +788,21 @@ function ModalMouvement({
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
 
-          {/* Type crédit / débit */}
+          {/* Sens comptable du mouvement sur le compte bancaire */}
           <div className="grid grid-cols-2 gap-2">
             <button type="button"
-              onClick={() => handleTypeChange("credit")}
+              onClick={() => handleSensChange("entree")}
               className={`flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
-                type === "credit" ? "bg-green-50 border-green-400 text-green-700" : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                sens === "entree" ? "bg-green-50 border-green-400 text-green-700" : "border-gray-200 text-gray-600 hover:bg-gray-50"
               }`}>
-              <TrendingUp className="h-4 w-4" /> Crédit
+              <TrendingUp className="h-4 w-4" /> Débit (entrée)
             </button>
             <button type="button"
-              onClick={() => handleTypeChange("debit")}
+              onClick={() => handleSensChange("sortie")}
               className={`flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
-                type === "debit" ? "bg-red-50 border-red-400 text-red-700" : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                sens === "sortie" ? "bg-red-50 border-red-400 text-red-700" : "border-gray-200 text-gray-600 hover:bg-gray-50"
               }`}>
-              <TrendingDown className="h-4 w-4" /> Débit
+              <TrendingDown className="h-4 w-4" /> Crédit (sortie)
             </button>
           </div>
 
@@ -843,11 +846,11 @@ function ModalMouvement({
 
           {/* Solde prévisionnel */}
           {montant && parseInt(montant) > 0 && (
-            <div className={`rounded-lg p-3 text-sm ${type === "credit" ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"}`}>
+            <div className={`rounded-lg p-3 text-sm ${sens === "entree" ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"}`}>
               Solde après opération :{" "}
               <strong>
                 {FCFA(
-                  type === "credit"
+                  sens === "entree"
                     ? parseFloat(compte.solde_actuel_fcfa) + parseInt(montant)
                     : parseFloat(compte.solde_actuel_fcfa) - parseInt(montant)
                 )}
@@ -862,9 +865,9 @@ function ModalMouvement({
             </button>
             <button type="submit" disabled={loading}
               className={`flex-1 py-2 text-white rounded-lg text-sm disabled:opacity-50 ${
-                type === "credit" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
+                sens === "entree" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
               }`}>
-              {loading ? "Enregistrement…" : type === "credit" ? "Enregistrer crédit" : "Enregistrer débit"}
+              {loading ? "Enregistrement…" : sens === "entree" ? "Enregistrer l’entrée" : "Enregistrer la sortie"}
             </button>
           </div>
         </form>
