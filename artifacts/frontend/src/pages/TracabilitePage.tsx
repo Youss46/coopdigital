@@ -959,7 +959,7 @@ export function DetailModal({
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="bg-gray-50 border-b border-gray-100">
-                          <th className="text-left px-3 py-2 font-medium text-gray-500">Membre</th>
+                          <th className="text-left px-3 py-2 font-medium text-gray-500">Origine</th>
                           <th className="text-left px-3 py-2 font-medium text-gray-500">Poids</th>
                           <th className="text-left px-3 py-2 font-medium text-gray-500 hidden sm:table-cell">Montant net</th>
                           <th className="text-left px-3 py-2 font-medium text-gray-500 hidden sm:table-cell">Date</th>
@@ -969,7 +969,25 @@ export function DetailModal({
                         {data.livraisons.map((l) => (
                           <tr key={l.id} className="border-b border-gray-50 last:border-0">
                             <td className="px-3 py-2 font-medium text-gray-800">
-                              {l.membreNom} {l.membrePrenoms}
+                              {(() => {
+                                const livraison = l as typeof l & {
+                                  fournisseurId?: number | null;
+                                  fournisseurNom?: string | null;
+                                  fournisseurPrenoms?: string | null;
+                                };
+                                const estFournisseur = livraison.fournisseurId != null;
+                                const nom = estFournisseur
+                                  ? `${livraison.fournisseurNom ?? ""} ${livraison.fournisseurPrenoms ?? ""}`.trim()
+                                  : `${l.membreNom ?? ""} ${l.membrePrenoms ?? ""}`.trim();
+                                return (
+                                  <>
+                                    <div>{nom || "—"}</div>
+                                    <div className="text-[10px] font-normal text-gray-500">
+                                      {estFournisseur ? "Fournisseur" : "Membre"}
+                                    </div>
+                                  </>
+                                );
+                              })()}
                             </td>
                             <td className="px-3 py-2 text-gray-700">{formaterPoids(l.produitBrutKg ?? l.poidsKg)}</td>
                             <td className="px-3 py-2 text-gray-600 hidden sm:table-cell">
@@ -1209,13 +1227,7 @@ export default function TracabilitePage() {
 
   const entrepotSelectionne = entrepots.find((e) => String(e.id) === entrepotId);
   const entrepotNom = entrepotSelectionne?.nom ?? null;
-  const pourFournisseurs = entrepotSelectionne?.pourFournisseursExt === true;
-
-  const livraisonsAfficher = livraisonsDispos.filter((l) =>
-    pourFournisseurs
-      ? (l as { fournisseurId?: number | null }).fournisseurId != null
-      : (l as { membreId?: number | null }).membreId != null
-  );
+  const livraisonsAfficher = livraisonsDispos;
 
   const toggleSelection = (id: number) => {
     setFractionPendante(null); // annuler le fractionnement si on change manuellement la sélection
@@ -1268,7 +1280,7 @@ export default function TracabilitePage() {
       const res = await fetch(`${BASE}/api/lots/preview-auto`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
-        body: JSON.stringify({ quantiteCibleKg: cible, pourFournisseurs }),
+        body: JSON.stringify({ quantiteCibleKg: cible, toutesOrigines: true }),
       });
       const data = await res.json() as {
         erreur?: string;
@@ -1537,7 +1549,7 @@ export default function TracabilitePage() {
               Constituer un lot par quantité cible
             </h3>
             <p className="text-xs text-gray-500 mb-4">
-              Indiquez la quantité souhaitée. Les livraisons disponibles seront sélectionnées automatiquement, des plus anciennes aux plus récentes.
+              Indiquez la quantité souhaitée. Les livraisons des membres et des fournisseurs seront sélectionnées des plus anciennes aux plus récentes, quel que soit l’entrepôt choisi.
             </p>
             <div className="flex items-end gap-3 flex-wrap">
               <div className="flex-1 min-w-[140px]">
@@ -1637,7 +1649,7 @@ export default function TracabilitePage() {
                 </label>
                 <select
                   value={entrepotId}
-                  onChange={(e) => { setEntrepotId(e.target.value); setSelection([]); }}
+                  onChange={(e) => setEntrepotId(e.target.value)}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700 bg-white"
                 >
                   <option value="">— Sélectionner un entrepôt —</option>
@@ -1669,11 +1681,9 @@ export default function TracabilitePage() {
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
               <h3 className="font-semibold text-gray-900">
                 Livraisons disponibles ({livraisonsAfficher.length})
-                {pourFournisseurs && (
-                  <span className="ml-2 text-xs font-medium text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">
-                    Fournisseurs ext.
-                  </span>
-                )}
+                <span className="ml-2 text-xs font-medium text-gray-600 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded-full">
+                  Toutes origines
+                </span>
               </h3>
               <div className="flex items-center gap-3">
                 {(selection.length > 0 || fractionPendante) && (
@@ -1695,11 +1705,7 @@ export default function TracabilitePage() {
 
             {livraisonsAfficher.length === 0 ? (
               <div className="p-8 text-center text-gray-400 text-sm">
-                {livraisonsDispos.length === 0
-                  ? "Toutes les livraisons sont déjà dans un lot"
-                  : pourFournisseurs
-                  ? "Aucune livraison fournisseur disponible pour cet entrepôt"
-                  : "Aucune livraison membre disponible"}
+                Toutes les livraisons sont déjà dans un lot
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -1708,7 +1714,7 @@ export default function TracabilitePage() {
                     <tr className="bg-gray-50 border-b border-gray-100">
                       <th className="w-10 px-4 py-3"></th>
                       <th className="text-left px-4 py-3 font-medium text-gray-500">
-                        {pourFournisseurs ? "Fournisseur" : "Membre"}
+                        Origine
                       </th>
                       <th className="text-left px-4 py-3 font-medium text-gray-500">Poids</th>
                       <th className="text-left px-4 py-3 font-medium text-gray-500">Sacs</th>
@@ -1722,8 +1728,13 @@ export default function TracabilitePage() {
                   </thead>
                   <tbody>
                     {livraisonsAfficher.map((l) => {
-                      const lv = l as typeof l & { fournisseurNom?: string | null; fournisseurPrenoms?: string | null };
-                      const nomAffiche = pourFournisseurs
+                      const lv = l as typeof l & {
+                        fournisseurId?: number | null;
+                        fournisseurNom?: string | null;
+                        fournisseurPrenoms?: string | null;
+                      };
+                      const estFournisseur = lv.fournisseurId != null;
+                      const nomAffiche = estFournisseur
                         ? `${lv.fournisseurNom ?? ""} ${lv.fournisseurPrenoms ?? ""}`.trim() || "—"
                         : `${l.membreNom ?? ""} ${l.membrePrenoms ?? ""}`.trim() || "—";
                       const sel = selection.includes(l.id);
@@ -1750,7 +1761,12 @@ export default function TracabilitePage() {
                               {isFraction && !sel && <span className="text-white text-[8px] leading-none font-bold">½</span>}
                             </div>
                           </td>
-                          <td className="px-4 py-3 font-medium text-gray-900">{nomAffiche}</td>
+                          <td className="px-4 py-3 font-medium text-gray-900">
+                            <div>{nomAffiche}</div>
+                            <div className="text-[10px] font-normal text-gray-500">
+                              {estFournisseur ? "Fournisseur" : "Membre"}
+                            </div>
+                          </td>
                           <td className="px-4 py-3 text-gray-700">
                             {isFraction ? (
                               <span>

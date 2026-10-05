@@ -29,6 +29,7 @@ class LotAnnulationError extends Error {}
 const livraisonSelect = {
   id: livraisonsTable.id,
   membreId: livraisonsTable.membreId,
+  fournisseurId: livraisonsTable.fournisseurId,
   poidsKg: livraisonsTable.poidsKg,
   produitBrutKg: livraisonsTable.produitBrutKg,
   prixUnitaireFcfa: livraisonsTable.prixUnitaireFcfa,
@@ -40,6 +41,8 @@ const livraisonSelect = {
   createdAt: livraisonsTable.createdAt,
   membreNom: membresTable.nom,
   membrePrenoms: membresTable.prenoms,
+  fournisseurNom: fournisseursTable.nom,
+  fournisseurPrenoms: fournisseursTable.prenoms,
 };
 
 const lotExpeditionSelect = {
@@ -137,13 +140,18 @@ export async function previewAutoLot(req: Request, res: Response): Promise<void>
     return;
   }
 
-  const body = req.body as { quantiteCibleKg?: number; pourFournisseurs?: boolean };
+  const body = req.body as {
+    quantiteCibleKg?: number;
+    pourFournisseurs?: boolean;
+    toutesOrigines?: boolean;
+  };
   const quantiteCibleKg = Number(body.quantiteCibleKg);
   if (!quantiteCibleKg || quantiteCibleKg <= 0) {
     res.status(400).json({ erreur: "quantiteCibleKg doit être un nombre positif" });
     return;
   }
   const pourFournisseurs = body.pourFournisseurs === true;
+  const toutesOrigines = body.toutesOrigines === true;
 
   try {
     // Livraisons disponibles (non encore dans un lot) pour cette coopérative, triées FIFO
@@ -156,15 +164,20 @@ export async function previewAutoLot(req: Request, res: Response): Promise<void>
       .where(
         and(
           isNull(lotLivraisonsTable.livraisonId),
-          pourFournisseurs
-            ? and(
-                isNotNull(livraisonsTable.fournisseurId),
+          toutesOrigines
+            ? or(
+                eq(membresTable.cooperativeId, cooperativeId),
                 eq(fournisseursTable.cooperativeId, cooperativeId),
               )
-            : and(
-                isNotNull(livraisonsTable.membreId),
-                eq(membresTable.cooperativeId, cooperativeId),
-              ),
+            : pourFournisseurs
+              ? and(
+                  isNotNull(livraisonsTable.fournisseurId),
+                  eq(fournisseursTable.cooperativeId, cooperativeId),
+                )
+              : and(
+                  isNotNull(livraisonsTable.membreId),
+                  eq(membresTable.cooperativeId, cooperativeId),
+                ),
         ),
       )
       .orderBy(livraisonsTable.dateLivraison); // FIFO — les plus anciennes en premier
@@ -838,6 +851,7 @@ export async function getLotTracabilite(req: Request, res: Response): Promise<vo
           .select(livraisonSelect)
           .from(livraisonsTable)
           .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+          .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
           .where(inArray(livraisonsTable.id, livraisonIds))
       : [];
 
