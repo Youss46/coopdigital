@@ -848,6 +848,63 @@ export interface MembresImportResult {
   message: string;
 }
 
+export interface GeoJsonImportSummary {
+  totalFeatures: number;
+  codesFound: number;
+  importable: number;
+  alreadyHasPolygon: number;
+  notMatched: number;
+  duplicateInFile: number;
+  duplicateInDatabase: number;
+  missingCode: number;
+  invalidGeometry: number;
+  inactiveParcel: number;
+  identicalDuplicates: number;
+}
+
+export type GeoJsonImportRowStatus = typeof GeoJsonImportRowStatus[keyof typeof GeoJsonImportRowStatus];
+
+
+export const GeoJsonImportRowStatus = {
+  importable: 'importable',
+  already_has_polygon: 'already_has_polygon',
+  not_matched: 'not_matched',
+  duplicate_in_file: 'duplicate_in_file',
+  duplicate_database: 'duplicate_database',
+  missing_code: 'missing_code',
+  invalid_geometry: 'invalid_geometry',
+  inactive_parcel: 'inactive_parcel',
+} as const;
+
+export interface GeoJsonImportRow {
+  featureIndex: number;
+  featureCount: number;
+  /** @nullable */
+  code: string | null;
+  /** @nullable */
+  memberName: string | null;
+  status: GeoJsonImportRowStatus;
+  detail: string;
+  /** @nullable */
+  superficieHa: number | null;
+}
+
+export interface GeoJsonImportPreview {
+  fileName: string;
+  codeFields: string[];
+  selectedField: string;
+  summary: GeoJsonImportSummary;
+  rows: GeoJsonImportRow[];
+}
+
+export interface GeoJsonImportResult {
+  imported: number;
+  skippedExisting: number;
+  summary: GeoJsonImportSummary;
+  eudrVerificationRequired: boolean;
+  message: string;
+}
+
 export interface LivraisonDetail {
   id: number;
   membreId: number;
@@ -5594,6 +5651,16 @@ export type PreviewMembresImportBody = {
 export type ImportMembresBody = {
   fichier: Blob;
   dateAdhesion: string;
+};
+
+export type PreviewParcellesGeoJsonImportBody = {
+  fichier: Blob;
+  champCode?: string;
+};
+
+export type ImportParcellesGeoJsonBody = {
+  fichier: Blob;
+  champCode?: string;
 };
 
 export type GetAvancesParams = {

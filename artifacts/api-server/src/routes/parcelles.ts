@@ -1,6 +1,12 @@
 import { Router, type IRouter } from "express";
 import { checkPermission } from "../middlewares/permissions";
 import {
+  importParcellesGeoJson,
+  parcellesGeoJsonUpload,
+  parcellesGeoJsonUploadErrorHandler,
+  previewParcellesGeoJsonImport,
+} from "../controllers/parcellesGeoJsonImportController";
+import {
   listParcelles,
   getParcellesCarte,
   getParcelleById,
@@ -27,6 +33,8 @@ router.get(  "/parcelles/gps-terrain",          checkPermission("parcelles", "vo
 router.get(  "/parcelles/zones-filtres",         checkPermission("parcelles", "voir_carte"),        getZonesFiltres);
 router.get(  "/parcelles/carte",               checkPermission("parcelles", "voir_carte"),        getParcellesCarte);
 router.get(  "/parcelles/export-geojson",       checkPermission("parcelles", "exporter_geojson"),  exportGeoJSONController);
+router.post( "/parcelles/import-geojson/preview", checkPermission("parcelles", "modifier_parcelle"), parcellesGeoJsonUpload.single("fichier"), parcellesGeoJsonUploadErrorHandler, previewParcellesGeoJsonImport);
+router.post( "/parcelles/import-geojson",        checkPermission("parcelles", "modifier_parcelle"), parcellesGeoJsonUpload.single("fichier"), parcellesGeoJsonUploadErrorHandler, importParcellesGeoJson);
 router.get(  "/parcelles/export-eudr",          checkPermission("parcelles", "voir_carte"),         exportEudrData);
 router.get(  "/parcelles/conformite",           checkPermission("parcelles", "voir_carte"),        getConformite);
 router.get(  "/parcelles/stats-gps",            checkPermission("parcelles", "voir_carte"),        getStatsGps);

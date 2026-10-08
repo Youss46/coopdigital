@@ -3,10 +3,11 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { usePermission } from "@/hooks/usePermission";
+import GeoJsonImportDialog from "@/components/GeoJsonImportDialog";
 import { MapContainer, TileLayer, Polygon, CircleMarker, Popup, Polyline, useMapEvents, useMap } from "react-leaflet";
 import L from "leaflet";
 import {
-  Map, List, ShieldCheck, Download, Plus, RefreshCw, X, CheckCircle2,
+  Map, List, ShieldCheck, Download, Plus, RefreshCw, X, CheckCircle2, Upload,
   AlertTriangle, XCircle, Clock, HelpCircle, ChevronRight, Leaf, Navigation,
   Globe, Users, Layers, Filter, FileDown, Printer, Search, MapPin, Pencil,
 } from "lucide-react";
@@ -2216,6 +2217,7 @@ type Tab = "carte" | "carte_globale" | "liste" | "conformite";
 export default function ParcellePage() {
   const [tab, setTab] = useState<Tab>("carte_globale");
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isGeoJsonImportOpen, setIsGeoJsonImportOpen] = useState(false);
   const [mapTarget, setMapTarget] = useState<FlyTarget | null>(null);
   const [drawTargetId, setDrawTargetId] = useState<number | null>(null);
   const qc = useQueryClient();
@@ -2412,13 +2414,26 @@ export default function ParcellePage() {
             Géolocalisation et conformité au règlement européen sur la déforestation
           </p>
         </div>
-        <button
-          onClick={handleExportGeoJSON}
-          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
-        >
-          <Download size={14} />
-          Export GeoJSON EUDR
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {peutModifierParcelle && (
+            <button
+              type="button"
+              onClick={() => setIsGeoJsonImportOpen(true)}
+              data-testid="button-open-geojson-import"
+              className="flex items-center gap-2 rounded-lg border border-[#1a4731] bg-[#1a4731] px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#123b28]"
+            >
+              <Upload size={14} />
+              Importer GeoJSON
+            </button>
+          )}
+          <button
+            onClick={handleExportGeoJSON}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
+          >
+            <Download size={14} />
+            Export GeoJSON EUDR
+          </button>
+        </div>
       </div>
 
       {/* Onglets */}
@@ -2483,6 +2498,10 @@ export default function ParcellePage() {
           isLoading={conformiteQ.isLoading}
         />
       )}
+      <GeoJsonImportDialog
+        open={isGeoJsonImportOpen}
+        onOpenChange={setIsGeoJsonImportOpen}
+      />
     </div>
   );
 }

@@ -158,6 +158,72 @@ export const ImportMembresBody = zod.object({
 
 
 /**
+ * @summary Prévisualiser l'import de contours GeoJSON
+ */
+export const PreviewParcellesGeoJsonImportBody = zod.object({
+  "fichier": zod.instanceof(File),
+  "champCode": zod.string().optional()
+})
+
+export const PreviewParcellesGeoJsonImportResponse = zod.object({
+  "fileName": zod.string(),
+  "codeFields": zod.array(zod.string()),
+  "selectedField": zod.string(),
+  "summary": zod.object({
+  "totalFeatures": zod.number(),
+  "codesFound": zod.number(),
+  "importable": zod.number(),
+  "alreadyHasPolygon": zod.number(),
+  "notMatched": zod.number(),
+  "duplicateInFile": zod.number(),
+  "duplicateInDatabase": zod.number(),
+  "missingCode": zod.number(),
+  "invalidGeometry": zod.number(),
+  "inactiveParcel": zod.number(),
+  "identicalDuplicates": zod.number()
+}),
+  "rows": zod.array(zod.object({
+  "featureIndex": zod.number(),
+  "featureCount": zod.number(),
+  "code": zod.string().nullable(),
+  "memberName": zod.string().nullable(),
+  "status": zod.enum(['importable', 'already_has_polygon', 'not_matched', 'duplicate_in_file', 'duplicate_database', 'missing_code', 'invalid_geometry', 'inactive_parcel']),
+  "detail": zod.string(),
+  "superficieHa": zod.number().nullable()
+}))
+})
+
+
+/**
+ * @summary Importer des contours GeoJSON dans les parcelles existantes
+ */
+export const ImportParcellesGeoJsonBody = zod.object({
+  "fichier": zod.instanceof(File),
+  "champCode": zod.string().optional()
+})
+
+export const ImportParcellesGeoJsonResponse = zod.object({
+  "imported": zod.number(),
+  "skippedExisting": zod.number(),
+  "summary": zod.object({
+  "totalFeatures": zod.number(),
+  "codesFound": zod.number(),
+  "importable": zod.number(),
+  "alreadyHasPolygon": zod.number(),
+  "notMatched": zod.number(),
+  "duplicateInFile": zod.number(),
+  "duplicateInDatabase": zod.number(),
+  "missingCode": zod.number(),
+  "invalidGeometry": zod.number(),
+  "inactiveParcel": zod.number(),
+  "identicalDuplicates": zod.number()
+}),
+  "eudrVerificationRequired": zod.boolean(),
+  "message": zod.string()
+})
+
+
+/**
  * @summary Lookup membre par QR code
  */
 export const GetMembreByQrParams = zod.object({
