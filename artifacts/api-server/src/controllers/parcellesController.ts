@@ -690,7 +690,7 @@ export async function exportEudrData(req: Request, res: Response): Promise<void>
         eudrStatut:           parcellesTable.eudrStatut,
         superficieCalculeeHa: parcellesTable.superficieCalculeeHa,
         superficieDeclareeHa: parcellesTable.superficieDeclareeHa,
-        hasPolygone: sql<boolean>`(${parcellesTable.polygone} IS NOT NULL)`,
+        hasPolygone: sql<boolean>`(${parcellesTable.polygone} IS NOT NULL OR ${parcellesTable.geometrie} IS NOT NULL)`,
         hasPoint:    sql<boolean>`(${parcellesTable.coordonneesPoint} IS NOT NULL)`,
         eudrDateVerification: parcellesTable.eudrDateVerification,
         codeParcelle:         parcellesTable.codeParcelle,
