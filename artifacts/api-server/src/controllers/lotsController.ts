@@ -247,7 +247,7 @@ export async function previewAutoLot(req: Request, res: Response): Promise<void>
             false AS est_central,
             em.date_mouvement AS date_entree,
             em.id AS mouvement_id
-          FROM entrepot_mouvement em
+          FROM entrepot_mouvements em
           INNER JOIN entrepots_delegues ed ON ed.id = em.entrepot_id
           WHERE ed.cooperative_id = ${cooperativeId}
             AND em.type_mouvement = 'entree'

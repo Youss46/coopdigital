@@ -174,6 +174,9 @@ describe("previewAutoLot", () => {
       poidsTotalKg: 5000,
       deficitKg: 0,
     }));
+    const sqlRequete = (state.execute.mock.calls[0]?.[0] as { strings: string[] }).strings.join("");
+    expect(sqlRequete).toContain("FROM entrepot_mouvements em");
+    expect(sqlRequete).not.toContain("FROM entrepot_mouvement em");
   });
 
   it("utilise uniquement le central quand son stock suffit, même si un autre entrepôt est plus ancien", async () => {
