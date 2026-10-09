@@ -355,6 +355,35 @@
           "name": "imputations_avances_exportateurs_restitution_borne_check"
         }
       ]
+    },
+    {
+      "migration": "0177_import_parcelles_polygones",
+      "objects": [
+        {
+          "kind": "column",
+          "schema": "public",
+          "table": "parcelles",
+          "name": "geometrie"
+        },
+        {
+          "kind": "column",
+          "schema": "public",
+          "table": "parcelles",
+          "name": "surface_polygone_ha"
+        },
+        {
+          "kind": "column",
+          "schema": "public",
+          "table": "parcelles",
+          "name": "distance_gps_m"
+        },
+        {
+          "kind": "column",
+          "schema": "public",
+          "table": "parcelles",
+          "name": "statut_polygone"
+        }
+      ]
     }
   ]
 }

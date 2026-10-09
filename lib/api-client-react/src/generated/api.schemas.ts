@@ -848,61 +848,19 @@ export interface MembresImportResult {
   message: string;
 }
 
-export interface GeoJsonImportSummary {
-  totalFeatures: number;
-  codesFound: number;
-  importable: number;
-  alreadyHasPolygon: number;
-  notMatched: number;
-  duplicateInFile: number;
-  duplicateInDatabase: number;
-  missingCode: number;
-  invalidGeometry: number;
-  inactiveParcel: number;
-  identicalDuplicates: number;
-}
-
-export type GeoJsonImportRowStatus = typeof GeoJsonImportRowStatus[keyof typeof GeoJsonImportRowStatus];
-
-
-export const GeoJsonImportRowStatus = {
-  importable: 'importable',
-  already_has_polygon: 'already_has_polygon',
-  not_matched: 'not_matched',
-  duplicate_in_file: 'duplicate_in_file',
-  duplicate_database: 'duplicate_database',
-  missing_code: 'missing_code',
-  invalid_geometry: 'invalid_geometry',
-  inactive_parcel: 'inactive_parcel',
-} as const;
-
-export interface GeoJsonImportRow {
-  featureIndex: number;
-  featureCount: number;
+export interface PolygoneImportRejet {
+  feature: number;
   /** @nullable */
   code: string | null;
-  /** @nullable */
-  memberName: string | null;
-  status: GeoJsonImportRowStatus;
-  detail: string;
-  /** @nullable */
-  superficieHa: number | null;
+  raison: string;
 }
 
-export interface GeoJsonImportPreview {
-  fileName: string;
-  codeFields: string[];
-  selectedField: string;
-  summary: GeoJsonImportSummary;
-  rows: GeoJsonImportRow[];
-}
-
-export interface GeoJsonImportResult {
-  imported: number;
-  skippedExisting: number;
-  summary: GeoJsonImportSummary;
-  eudrVerificationRequired: boolean;
-  message: string;
+export interface PolygonesImportResult {
+  total: number;
+  mis_a_jour: number;
+  non_rattaches: string[];
+  rejetes: PolygoneImportRejet[];
+  a_verifier: number;
 }
 
 export interface LivraisonDetail {
@@ -5653,14 +5611,12 @@ export type ImportMembresBody = {
   dateAdhesion: string;
 };
 
-export type PreviewParcellesGeoJsonImportBody = {
-  fichier: Blob;
-  champCode?: string;
+export type ImportParcellesPolygonesParams = {
+dry_run?: boolean;
 };
 
-export type ImportParcellesGeoJsonBody = {
+export type ImportParcellesPolygonesBody = {
   fichier: Blob;
-  champCode?: string;
 };
 
 export type GetAvancesParams = {

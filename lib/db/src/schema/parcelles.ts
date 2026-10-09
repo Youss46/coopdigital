@@ -20,6 +20,10 @@ export const parcellesTable = pgTable("parcelles", {
   region:                  varchar("region"),
   coordonneesPoint:        jsonb("coordonnees_point").$type<{ lat: number; lng: number } | null>(),
   polygone:                jsonb("polygone").$type<[number, number][] | null>(),
+  geometrie:               jsonb("geometrie").$type<{ type: "Polygon"; coordinates: [number, number][][] } | null>(),
+  surfacePolygoneHa:       numeric("surface_polygone_ha", { precision: 10, scale: 4 }),
+  distanceGpsM:            numeric("distance_gps_m", { precision: 12, scale: 2 }),
+  statutPolygone:          varchar("statut_polygone", { length: 40 }),
   superficieDeclareeHa:    numeric("superficie_declaree_ha", { precision: 10, scale: 4 }),
   superficieCalculeeHa:    numeric("superficie_calculee_ha", { precision: 10, scale: 4 }),
 

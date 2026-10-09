@@ -3,6 +3,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { usePermission } from "@/hooks/usePermission";
+import { useAuth } from "@/contexts/AuthContext";
 import GeoJsonImportDialog from "@/components/GeoJsonImportDialog";
 import { MapContainer, TileLayer, Polygon, CircleMarker, Popup, Polyline, useMapEvents, useMap } from "react-leaflet";
 import L from "leaflet";
@@ -45,6 +46,8 @@ interface ParcelleCarte {
   id: number;
   codeParcelle: string | null;
   polygone: [number, number][] | null;
+  geometrie: [number, number][][] | null;
+  statutPolygone: string | null;
   coordonneesPoint: { lat: number; lng: number } | null;
   eudrStatut: string | null;
   culturePrincipale: string | null;
@@ -296,16 +299,19 @@ function LeafletMap({
       {parcelles.map(p => {
         const cfg = getEudrConfig(p.eudrStatut);
         const isSelected = p.id === selectedId;
+        const polygonePositions = p.geometrie ?? p.polygone;
+        const contourExterieur = p.geometrie?.[0] ?? p.polygone;
+        const contourAVerifier = p.statutPolygone?.toLowerCase() === "a_verifier";
         const ha = parseFloat(String(p.superficieCalculeeHa ?? p.superficieDeclareeHa ?? 0));
 
-        if (p.polygone && p.polygone.length >= 3) {
+        if (contourExterieur && contourExterieur.length >= 3 && polygonePositions) {
           return (
             <Polygon
               key={p.id}
-              positions={p.polygone}
+              positions={polygonePositions}
               pathOptions={{
-                color: cfg.color,
-                fillColor: cfg.fill,
+                color: contourAVerifier ? "#f59e0b" : cfg.color,
+                fillColor: contourAVerifier ? "#f59e0b" : cfg.fill,
                 fillOpacity: 0.5,
                 weight: isSelected ? 3 : 1.5,
               }}
@@ -316,6 +322,7 @@ function LeafletMap({
                   <p className="font-semibold">{p.codeParcelle}</p>
                   <p className="text-gray-600">{p.membreNom} {p.membrePrenoms}</p>
                   <p className="text-gray-500">{ha > 0 ? `${ha} ha` : "—"}</p>
+                  {contourAVerifier && <p className="font-semibold text-amber-700" data-testid={`statut-polygone-${p.id}`}>Contour à vérifier</p>}
                   <BadgeEudr statut={p.eudrStatut} />
                 </div>
               </Popup>
@@ -2222,7 +2229,9 @@ export default function ParcellePage() {
   const [drawTargetId, setDrawTargetId] = useState<number | null>(null);
   const qc = useQueryClient();
   const { toast } = useToast();
+  const { utilisateur } = useAuth();
   const peutModifierParcelle = usePermission("parcelles", "modifier_parcelle");
+  const peutImporterPolygones = utilisateur?.role === "pca" || utilisateur?.role === "directeur";
   const peutVerifierEudr = usePermission("parcelles", "verifier_eudr");
   const peutTracerContour = peutModifierParcelle && peutVerifierEudr;
 
@@ -2415,15 +2424,15 @@ export default function ParcellePage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {peutModifierParcelle && (
+          {peutImporterPolygones && (
             <button
               type="button"
               onClick={() => setIsGeoJsonImportOpen(true)}
-              data-testid="button-open-geojson-import"
+              data-testid="button-open-polygons-import"
               className="flex items-center gap-2 rounded-lg border border-[#1a4731] bg-[#1a4731] px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#123b28]"
             >
               <Upload size={14} />
-              Importer GeoJSON
+              Importer les polygones
             </button>
           )}
           <button

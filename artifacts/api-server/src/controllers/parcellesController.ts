@@ -120,6 +120,8 @@ export async function getParcellesCarte(req: Request, res: Response): Promise<vo
       id:               parcellesTable.id,
       codeParcelle:     parcellesTable.codeParcelle,
       polygone:         parcellesTable.polygone,
+      geometrie:        parcellesTable.geometrie,
+      statutPolygone:   parcellesTable.statutPolygone,
       coordonneesPoint: parcellesTable.coordonneesPoint,
       eudrStatut:       parcellesTable.eudrStatut,
       culturePrincipale: parcellesTable.culturePrincipale,
@@ -133,12 +135,33 @@ export async function getParcellesCarte(req: Request, res: Response): Promise<vo
       .innerJoin(membresTable, eq(parcellesTable.membreId, membresTable.id))
       .where(and(...conditions));
 
+    const parcellesPourCarte = rows.map((row) => {
+      const geometrie = row.geometrie?.type === "Polygon"
+        ? row.geometrie.coordinates.map((ring) =>
+            ring.map(([longitude, latitude]) => [latitude, longitude] as [number, number]))
+        : null;
+      const contourExterieur = geometrie?.[0]?.map((point) => [...point] as [number, number]) ?? null;
+      if (
+        contourExterieur
+        && contourExterieur.length > 1
+        && contourExterieur[0]![0] === contourExterieur.at(-1)![0]
+        && contourExterieur[0]![1] === contourExterieur.at(-1)![1]
+      ) {
+        contourExterieur.pop();
+      }
+      return {
+        ...row,
+        polygone: row.polygone ?? contourExterieur,
+        geometrie,
+      };
+    });
+
     const zones = await db
       .select()
       .from(zonesRisqueEudrTable)
       .where(eq(zonesRisqueEudrTable.cooperativeId, coopId));
 
-    res.json({ parcelles: rows, zones });
+    res.json({ parcelles: parcellesPourCarte, zones });
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "Erreur getParcellesCarte");

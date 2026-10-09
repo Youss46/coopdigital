@@ -219,11 +219,18 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
-  /parcelles/import-geojson/preview:
+  /parcelles/import-polygones:
     post:
-      operationId: previewParcellesGeoJsonImport
+      operationId: importParcellesPolygones
       tags: [parcelles]
-      summary: Prévisualiser l'import de contours GeoJSON
+      summary: Importer les polygones GeoJSON des parcelles existantes
+      parameters:
+        - name: dry_run
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
       requestBody:
         required: true
         content:
@@ -235,49 +242,33 @@ paths:
                 fichier:
                   type: string
                   format: binary
-                champCode:
-                  type: string
       responses:
         "200":
-          description: Rapprochement des contours avec les parcelles de la coopérative
+          description: Rapport du contrôle ou de l'import des polygones
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/GeoJsonImportPreview"
+                $ref: "#/components/schemas/PolygonesImportResult"
         "400":
           description: Fichier ou géométrie invalide
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-
-  /parcelles/import-geojson:
-    post:
-      operationId: importParcellesGeoJson
-      tags: [parcelles]
-      summary: Importer des contours GeoJSON dans les parcelles existantes
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              required: [fichier]
-              properties:
-                fichier:
-                  type: string
-                  format: binary
-                champCode:
-                  type: string
-      responses:
-        "200":
-          description: Résultat de l'import des contours
+        "401":
+          description: Authentification ou coopérative manquante
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/GeoJsonImportResult"
-        "400":
-          description: Fichier ou géométrie invalide
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Rôle non autorisé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "413":
+          description: Fichier supérieur à 10 Mo
           content:
             application/json:
               schema:
@@ -8195,62 +8186,28 @@ components:
         parcels: { type: integer }
         message: { type: string }
 
-    GeoJsonImportPreview:
+    PolygonesImportResult:
       type: object
-      required: [fileName, codeFields, selectedField, summary, rows]
+      required: [total, mis_a_jour, non_rattaches, rejetes, a_verifier]
       properties:
-        fileName: { type: string }
-        codeFields:
+        total: { type: integer }
+        mis_a_jour: { type: integer }
+        non_rattaches:
           type: array
           items: { type: string }
-        selectedField: { type: string }
-        summary:
-          $ref: "#/components/schemas/GeoJsonImportSummary"
-        rows:
+        rejetes:
           type: array
           items:
-            $ref: "#/components/schemas/GeoJsonImportRow"
+            $ref: "#/components/schemas/PolygoneImportRejet"
+        a_verifier: { type: integer }
 
-    GeoJsonImportSummary:
+    PolygoneImportRejet:
       type: object
-      required: [totalFeatures, codesFound, importable, alreadyHasPolygon, notMatched, duplicateInFile, duplicateInDatabase, missingCode, invalidGeometry, inactiveParcel, identicalDuplicates]
+      required: [feature, code, raison]
       properties:
-        totalFeatures: { type: integer }
-        codesFound: { type: integer }
-        importable: { type: integer }
-        alreadyHasPolygon: { type: integer }
-        notMatched: { type: integer }
-        duplicateInFile: { type: integer }
-        duplicateInDatabase: { type: integer }
-        missingCode: { type: integer }
-        invalidGeometry: { type: integer }
-        inactiveParcel: { type: integer }
-        identicalDuplicates: { type: integer }
-
-    GeoJsonImportRow:
-      type: object
-      required: [featureIndex, featureCount, code, memberName, status, detail, superficieHa]
-      properties:
-        featureIndex: { type: integer }
-        featureCount: { type: integer }
+        feature: { type: integer }
         code: { type: ["string", "null"] }
-        memberName: { type: ["string", "null"] }
-        status:
-          type: string
-          enum: [importable, already_has_polygon, not_matched, duplicate_in_file, duplicate_database, missing_code, invalid_geometry, inactive_parcel]
-        detail: { type: string }
-        superficieHa: { type: ["number", "null"] }
-
-    GeoJsonImportResult:
-      type: object
-      required: [imported, skippedExisting, summary, eudrVerificationRequired, message]
-      properties:
-        imported: { type: integer }
-        skippedExisting: { type: integer }
-        summary:
-          $ref: "#/components/schemas/GeoJsonImportSummary"
-        eudrVerificationRequired: { type: boolean }
-        message: { type: string }
+        raison: { type: string }
 
     MembreHistorique:
       type: object

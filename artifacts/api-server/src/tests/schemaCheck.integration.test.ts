@@ -33,6 +33,13 @@ describe.skipIf(!enabled)("contrôles du schéma PostgreSQL", () => {
        CREATE TABLE ${qualifiedIdentifier(schemaName, "lots")} (
          id integer NOT NULL
        );
+       CREATE TABLE ${qualifiedIdentifier(schemaName, "parcelles")} (
+         id integer NOT NULL,
+         geometrie jsonb,
+         surface_polygone_ha numeric(10, 4),
+         distance_gps_m numeric(12, 2),
+         statut_polygone varchar(40)
+       );
        CREATE TABLE ${qualifiedIdentifier(schemaName, "membres")} (
          id integer NOT NULL,
          cooperative_id integer NOT NULL,

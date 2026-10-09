@@ -169,8 +169,6 @@ import type {
   GenererBulletinsInput,
   GenererDotationsBody,
   GenererRapportInput,
-  GeoJsonImportPreview,
-  GeoJsonImportResult,
   GetAnomaliesParams,
   GetAuditExportPdfParams,
   GetAuditJournalParams,
@@ -240,7 +238,8 @@ import type {
   HypothesesInput,
   ImportBalanceSageBody,
   ImportMembresBody,
-  ImportParcellesGeoJsonBody,
+  ImportParcellesPolygonesBody,
+  ImportParcellesPolygonesParams,
   ImputationAvanceExportateur,
   ImputerAvanceExportateurInput,
   Intrant,
@@ -292,6 +291,7 @@ import type {
   PayerBulletinInput,
   Personnel,
   PersonnelHistorique,
+  PolygonesImportResult,
   PostBudgetIdSync200,
   PostSubventionsIdTranche200,
   PreferencesNotifications,
@@ -302,7 +302,6 @@ import type {
   PreteurInput,
   PreviewBalanceSageBody,
   PreviewMembresImportBody,
-  PreviewParcellesGeoJsonImportBody,
   ProjectionCampagne,
   ProjectionTresorerie,
   RapportAgentPesee,
@@ -940,101 +939,30 @@ export const useImportMembres = <TError = ErrorType<ErrorResponse>,
       return useMutation(getImportMembresMutationOptions(options));
     }
 
-export const getPreviewParcellesGeoJsonImportUrl = () => {
+export const getImportParcellesPolygonesUrl = (params?: ImportParcellesPolygonesParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
-
-
-  return `/api/parcelles/import-geojson/preview`
-}
-
-/**
- * @summary Prévisualiser l'import de contours GeoJSON
- */
-export const previewParcellesGeoJsonImport = async (previewParcellesGeoJsonImportBody: PreviewParcellesGeoJsonImportBody, options?: RequestInit): Promise<GeoJsonImportPreview> => {
-    const formData = new FormData();
-formData.append(`fichier`, previewParcellesGeoJsonImportBody.fichier);
-if(previewParcellesGeoJsonImportBody.champCode !== undefined) {
- formData.append(`champCode`, previewParcellesGeoJsonImportBody.champCode);
- }
-
-  return customFetch<GeoJsonImportPreview>(getPreviewParcellesGeoJsonImportUrl(),
-  {
-    ...options,
-    method: 'POST'
-    ,
-    body:
-      formData,
-  }
-);}
-
-
-
-
-export const getPreviewParcellesGeoJsonImportMutationOptions = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewParcellesGeoJsonImport>>, TError,{data: BodyType<PreviewParcellesGeoJsonImportBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof previewParcellesGeoJsonImport>>, TError,{data: BodyType<PreviewParcellesGeoJsonImportBody>}, TContext> => {
-
-const mutationKey = ['previewParcellesGeoJsonImport'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewParcellesGeoJsonImport>>, {data: BodyType<PreviewParcellesGeoJsonImportBody>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  previewParcellesGeoJsonImport(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type PreviewParcellesGeoJsonImportMutationResult = NonNullable<Awaited<ReturnType<typeof previewParcellesGeoJsonImport>>>
-    export type PreviewParcellesGeoJsonImportMutationBody = BodyType<PreviewParcellesGeoJsonImportBody>
-    export type PreviewParcellesGeoJsonImportMutationError = ErrorType<ErrorResponse>
-
-    /**
- * @summary Prévisualiser l'import de contours GeoJSON
- */
-export const usePreviewParcellesGeoJsonImport = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewParcellesGeoJsonImport>>, TError,{data: BodyType<PreviewParcellesGeoJsonImportBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof previewParcellesGeoJsonImport>>,
-        TError,
-        {data: BodyType<PreviewParcellesGeoJsonImportBody>},
-        TContext
-      > => {
-      return useMutation(getPreviewParcellesGeoJsonImportMutationOptions(options));
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
     }
+  });
 
-export const getImportParcellesGeoJsonUrl = () => {
+  const stringifiedParams = normalizedParams.toString();
 
-
-
-
-  return `/api/parcelles/import-geojson`
+  return stringifiedParams.length > 0 ? `/api/parcelles/import-polygones?${stringifiedParams}` : `/api/parcelles/import-polygones`
 }
 
 /**
- * @summary Importer des contours GeoJSON dans les parcelles existantes
+ * @summary Importer les polygones GeoJSON des parcelles existantes
  */
-export const importParcellesGeoJson = async (importParcellesGeoJsonBody: ImportParcellesGeoJsonBody, options?: RequestInit): Promise<GeoJsonImportResult> => {
+export const importParcellesPolygones = async (importParcellesPolygonesBody: ImportParcellesPolygonesBody,
+    params?: ImportParcellesPolygonesParams, options?: RequestInit): Promise<PolygonesImportResult> => {
     const formData = new FormData();
-formData.append(`fichier`, importParcellesGeoJsonBody.fichier);
-if(importParcellesGeoJsonBody.champCode !== undefined) {
- formData.append(`champCode`, importParcellesGeoJsonBody.champCode);
- }
+formData.append(`fichier`, importParcellesPolygonesBody.fichier);
 
-  return customFetch<GeoJsonImportResult>(getImportParcellesGeoJsonUrl(),
+  return customFetch<PolygonesImportResult>(getImportParcellesPolygonesUrl(params),
   {
     ...options,
     method: 'POST'
@@ -1047,11 +975,11 @@ if(importParcellesGeoJsonBody.champCode !== undefined) {
 
 
 
-export const getImportParcellesGeoJsonMutationOptions = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importParcellesGeoJson>>, TError,{data: BodyType<ImportParcellesGeoJsonBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof importParcellesGeoJson>>, TError,{data: BodyType<ImportParcellesGeoJsonBody>}, TContext> => {
+export const getImportParcellesPolygonesMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importParcellesPolygones>>, TError,{data: BodyType<ImportParcellesPolygonesBody>;params?: ImportParcellesPolygonesParams}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof importParcellesPolygones>>, TError,{data: BodyType<ImportParcellesPolygonesBody>;params?: ImportParcellesPolygonesParams}, TContext> => {
 
-const mutationKey = ['importParcellesGeoJson'];
+const mutationKey = ['importParcellesPolygones'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -1061,10 +989,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof importParcellesGeoJson>>, {data: BodyType<ImportParcellesGeoJsonBody>}> = (props) => {
-          const {data} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof importParcellesPolygones>>, {data: BodyType<ImportParcellesPolygonesBody>;params?: ImportParcellesPolygonesParams}> = (props) => {
+          const {data,params} = props ?? {};
 
-          return  importParcellesGeoJson(data,requestOptions)
+          return  importParcellesPolygones(data,params,requestOptions)
         }
 
 
@@ -1074,22 +1002,22 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type ImportParcellesGeoJsonMutationResult = NonNullable<Awaited<ReturnType<typeof importParcellesGeoJson>>>
-    export type ImportParcellesGeoJsonMutationBody = BodyType<ImportParcellesGeoJsonBody>
-    export type ImportParcellesGeoJsonMutationError = ErrorType<ErrorResponse>
+    export type ImportParcellesPolygonesMutationResult = NonNullable<Awaited<ReturnType<typeof importParcellesPolygones>>>
+    export type ImportParcellesPolygonesMutationBody = BodyType<ImportParcellesPolygonesBody>
+    export type ImportParcellesPolygonesMutationError = ErrorType<ErrorResponse>
 
     /**
- * @summary Importer des contours GeoJSON dans les parcelles existantes
+ * @summary Importer les polygones GeoJSON des parcelles existantes
  */
-export const useImportParcellesGeoJson = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importParcellesGeoJson>>, TError,{data: BodyType<ImportParcellesGeoJsonBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+export const useImportParcellesPolygones = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importParcellesPolygones>>, TError,{data: BodyType<ImportParcellesPolygonesBody>;params?: ImportParcellesPolygonesParams}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
-        Awaited<ReturnType<typeof importParcellesGeoJson>>,
+        Awaited<ReturnType<typeof importParcellesPolygones>>,
         TError,
-        {data: BodyType<ImportParcellesGeoJsonBody>},
+        {data: BodyType<ImportParcellesPolygonesBody>;params?: ImportParcellesPolygonesParams},
         TContext
       > => {
-      return useMutation(getImportParcellesGeoJsonMutationOptions(options));
+      return useMutation(getImportParcellesPolygonesMutationOptions(options));
     }
 
 export const getGetMembreByQrUrl = (token: string,) => {

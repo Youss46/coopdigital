@@ -158,68 +158,28 @@ export const ImportMembresBody = zod.object({
 
 
 /**
- * @summary Prévisualiser l'import de contours GeoJSON
+ * @summary Importer les polygones GeoJSON des parcelles existantes
  */
-export const PreviewParcellesGeoJsonImportBody = zod.object({
-  "fichier": zod.instanceof(File),
-  "champCode": zod.string().optional()
+export const importParcellesPolygonesQueryDryRunDefault = false;
+
+export const ImportParcellesPolygonesQueryParams = zod.object({
+  "dry_run": zod.coerce.boolean().default(importParcellesPolygonesQueryDryRunDefault)
 })
 
-export const PreviewParcellesGeoJsonImportResponse = zod.object({
-  "fileName": zod.string(),
-  "codeFields": zod.array(zod.string()),
-  "selectedField": zod.string(),
-  "summary": zod.object({
-  "totalFeatures": zod.number(),
-  "codesFound": zod.number(),
-  "importable": zod.number(),
-  "alreadyHasPolygon": zod.number(),
-  "notMatched": zod.number(),
-  "duplicateInFile": zod.number(),
-  "duplicateInDatabase": zod.number(),
-  "missingCode": zod.number(),
-  "invalidGeometry": zod.number(),
-  "inactiveParcel": zod.number(),
-  "identicalDuplicates": zod.number()
-}),
-  "rows": zod.array(zod.object({
-  "featureIndex": zod.number(),
-  "featureCount": zod.number(),
+export const ImportParcellesPolygonesBody = zod.object({
+  "fichier": zod.instanceof(File)
+})
+
+export const ImportParcellesPolygonesResponse = zod.object({
+  "total": zod.number(),
+  "mis_a_jour": zod.number(),
+  "non_rattaches": zod.array(zod.string()),
+  "rejetes": zod.array(zod.object({
+  "feature": zod.number(),
   "code": zod.string().nullable(),
-  "memberName": zod.string().nullable(),
-  "status": zod.enum(['importable', 'already_has_polygon', 'not_matched', 'duplicate_in_file', 'duplicate_database', 'missing_code', 'invalid_geometry', 'inactive_parcel']),
-  "detail": zod.string(),
-  "superficieHa": zod.number().nullable()
-}))
-})
-
-
-/**
- * @summary Importer des contours GeoJSON dans les parcelles existantes
- */
-export const ImportParcellesGeoJsonBody = zod.object({
-  "fichier": zod.instanceof(File),
-  "champCode": zod.string().optional()
-})
-
-export const ImportParcellesGeoJsonResponse = zod.object({
-  "imported": zod.number(),
-  "skippedExisting": zod.number(),
-  "summary": zod.object({
-  "totalFeatures": zod.number(),
-  "codesFound": zod.number(),
-  "importable": zod.number(),
-  "alreadyHasPolygon": zod.number(),
-  "notMatched": zod.number(),
-  "duplicateInFile": zod.number(),
-  "duplicateInDatabase": zod.number(),
-  "missingCode": zod.number(),
-  "invalidGeometry": zod.number(),
-  "inactiveParcel": zod.number(),
-  "identicalDuplicates": zod.number()
-}),
-  "eudrVerificationRequired": zod.boolean(),
-  "message": zod.string()
+  "raison": zod.string()
+})),
+  "a_verifier": zod.number()
 })
 
 
