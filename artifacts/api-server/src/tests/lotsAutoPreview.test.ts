@@ -69,7 +69,7 @@ vi.mock("../services/expeditionsService.js", () => ({
   getLotExpeditionSummary: vi.fn(),
 }));
 
-import { previewAutoLot } from "../controllers/lotsController.js";
+import { createLot, previewAutoLot } from "../controllers/lotsController.js";
 
 function buildRequest(body: Record<string, unknown>): Request {
   return Object.assign(Object.create(null), {
@@ -202,5 +202,41 @@ describe("previewAutoLot", () => {
       poidsTotalKg: 3000,
       deficitKg: 2000,
     }));
+  });
+
+  it("renvoie le message d'erreur précis si le calcul automatique échoue", async () => {
+    state.select.mockImplementationOnce(() => {
+      throw new Error("Colonne requise absente");
+    });
+    const response = buildResponse();
+
+    await previewAutoLot(
+      buildRequest({ quantiteCibleKg: 5000, toutesOrigines: true }),
+      response,
+    );
+
+    expect(response.status).toHaveBeenCalledWith(500);
+    expect(response.json).toHaveBeenCalledWith({ erreur: "Colonne requise absente" });
+  });
+
+  it("renvoie le message d'erreur précis si la création du lot échoue", async () => {
+    const erreurBaseDeDonnees = Object.assign(
+      new Error("Failed query: SELECT ..."),
+      { cause: { message: 'la colonne "cooperative_id" est introuvable' } },
+    );
+    state.select.mockImplementationOnce(() => {
+      throw erreurBaseDeDonnees;
+    });
+    const response = buildResponse();
+
+    await createLot(
+      buildRequest({ cooperativeId: 42, livraisonIds: [1] }),
+      response,
+    );
+
+    expect(response.status).toHaveBeenCalledWith(500);
+    expect(response.json).toHaveBeenCalledWith({
+      erreur: 'la colonne "cooperative_id" est introuvable',
+    });
   });
 });

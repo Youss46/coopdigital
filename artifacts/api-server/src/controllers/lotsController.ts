@@ -18,6 +18,7 @@ import {
 } from "@workspace/db";
 import { eq, inArray, sql, desc, and, or, isNull, isNotNull } from "drizzle-orm";
 import { CreateLotBody, UpdateLotStatutBody } from "@workspace/api-zod";
+import { apiError } from "../lib/apiError.js";
 import { generateLotEudrPdf } from "../services/pdfService";
 import {
   corrigerStatutLotAvecHistoriqueExpedition,
@@ -357,7 +358,7 @@ export async function previewAutoLot(req: Request, res: Response): Promise<void>
     });
   } catch (err) {
     req.log.error({ err }, "Erreur previewAutoLot");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
@@ -606,7 +607,7 @@ export async function createLot(req: Request, res: Response): Promise<void> {
     res.status(201).json(detail);
   } catch (err) {
     req.log.error({ err }, "Erreur createLot");
-    res.status(500).json({ erreur: "Erreur interne du serveur" });
+    res.status(500).json({ erreur: apiError(err) });
   }
 }
 
