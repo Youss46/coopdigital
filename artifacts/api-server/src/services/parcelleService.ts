@@ -50,6 +50,26 @@ function polygonsIntersect(parcelle: [number, number][], zone: [number, number][
   return pointInPolygon(centerLat, centerLng, zone);
 }
 
+export function polygoneLatLngPourVerification(
+  polygone: [number, number][] | null | undefined,
+  geometrie: { type: "Polygon"; coordinates: [number, number][][] } | null | undefined,
+): [number, number][] | null {
+  if (geometrie?.type === "Polygon") {
+    const anneauExterieur = geometrie.coordinates[0];
+    if (Array.isArray(anneauExterieur)) {
+      const points = anneauExterieur.map(([longitude, latitude]) => [latitude, longitude] as [number, number]);
+      const premier = points[0];
+      const dernier = points.at(-1);
+      if (premier && dernier && premier[0] === dernier[0] && premier[1] === dernier[1]) {
+        points.pop();
+      }
+      if (points.length >= 3) return points;
+    }
+  }
+
+  return Array.isArray(polygone) && polygone.length >= 3 ? polygone : null;
+}
+
 // ── Code parcelle ─────────────────────────────────────────────────────────────
 
 export async function genererCodeParcelle(membreId: number): Promise<string> {
@@ -77,10 +97,10 @@ export async function verifierEUDR(parcelleId: number): Promise<void> {
     .from(zonesRisqueEudrTable)
     .where(eq(zonesRisqueEudrTable.cooperativeId, parcelle.cooperativeId));
 
-  const poly = parcelle.polygone;
+  const poly = polygoneLatLngPourVerification(parcelle.polygone, parcelle.geometrie);
   const today = new Date().toISOString().slice(0, 10);
 
-  if (!poly || poly.length < 3) {
+  if (!poly) {
     await db
       .update(parcellesTable)
       .set({

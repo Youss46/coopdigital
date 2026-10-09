@@ -7,6 +7,7 @@ import {
   verifierEUDR,
   exportGeoJSON,
   calculerConformiteGlobale,
+  polygoneLatLngPourVerification,
 } from "../services/parcelleService";
 import { getConfig } from "../services/configService";
 import { computeCodeMembre } from "../services/portailService";
@@ -716,7 +717,11 @@ export async function verifierTout(req: Request, res: Response): Promise<void> {
   try {
     const coopId = COOP_ID(req);
     const nonVerifiees = await db
-      .select({ id: parcellesTable.id, polygone: parcellesTable.polygone })
+      .select({
+        id: parcellesTable.id,
+        polygone: parcellesTable.polygone,
+        geometrie: parcellesTable.geometrie,
+      })
       .from(parcellesTable)
       .where(and(
         eq(parcellesTable.cooperativeId, coopId),
@@ -728,7 +733,7 @@ export async function verifierTout(req: Request, res: Response): Promise<void> {
     let sansPolygone = 0;
     let erreurs = 0;
     for (const parcelle of nonVerifiees) {
-      const hasPolygone = Array.isArray(parcelle.polygone) && parcelle.polygone.length >= 3;
+      const hasPolygone = polygoneLatLngPourVerification(parcelle.polygone, parcelle.geometrie) !== null;
       if (!hasPolygone) sansPolygone++;
       try {
         await verifierEUDR(parcelle.id);
