@@ -4093,6 +4093,36 @@ export const ListPaiementsResponse = zod.object({
 
 
 /**
+ * @summary Règlements de livraisons restant à effectuer sur une période
+ */
+export const GetPaiementsRapportEnAttenteQueryParams = zod.object({
+  "date_debut": zod.date().describe('Date minimale de livraison incluse'),
+  "date_fin": zod.date().describe('Date maximale de livraison incluse')
+})
+
+export const GetPaiementsRapportEnAttenteResponse = zod.object({
+  "cooperativeNom": zod.string(),
+  "dateDebut": zod.string().describe('Date de début de la période au format AAAA-MM-JJ'),
+  "dateFin": zod.string().describe('Date de fin de la période au format AAAA-MM-JJ'),
+  "genereLe": zod.coerce.date(),
+  "nombreLivraisons": zod.number(),
+  "totalMontantNetFcfa": zod.number(),
+  "totalMontantRegleFcfa": zod.number(),
+  "totalMontantRestantFcfa": zod.number(),
+  "items": zod.array(zod.object({
+  "livraisonId": zod.number(),
+  "numeroLivraison": zod.string(),
+  "dateLivraison": zod.string().describe('Date de livraison au format AAAA-MM-JJ'),
+  "producteur": zod.string(),
+  "village": zod.string().nullish(),
+  "montantNetFcfa": zod.number(),
+  "montantRegleFcfa": zod.number(),
+  "montantRestantFcfa": zod.number()
+}))
+})
+
+
+/**
  * @summary Valider plusieurs paiements de bons carburant en une seule opération
  */
 export const validerLotPaiementsCarburantBodyPaiementIdsMax = 200;

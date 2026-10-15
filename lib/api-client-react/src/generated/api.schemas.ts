@@ -1194,6 +1194,33 @@ export interface ValiderLotCarburantResponse {
   statut: ValiderLotCarburantResponseStatut;
 }
 
+export interface PaiementRapportEnAttenteItem {
+  livraisonId: number;
+  numeroLivraison: string;
+  /** Date de livraison au format AAAA-MM-JJ */
+  dateLivraison: string;
+  producteur: string;
+  /** @nullable */
+  village?: string | null;
+  montantNetFcfa: number;
+  montantRegleFcfa: number;
+  montantRestantFcfa: number;
+}
+
+export interface PaiementsRapportEnAttente {
+  cooperativeNom: string;
+  /** Date de début de la période au format AAAA-MM-JJ */
+  dateDebut: string;
+  /** Date de fin de la période au format AAAA-MM-JJ */
+  dateFin: string;
+  genereLe: string;
+  nombreLivraisons: number;
+  totalMontantNetFcfa: number;
+  totalMontantRegleFcfa: number;
+  totalMontantRestantFcfa: number;
+  items: PaiementRapportEnAttenteItem[];
+}
+
 /**
  * @nullable
  */
@@ -6040,6 +6067,17 @@ export const ListPaiementsType = {
   carburant: 'carburant',
   tous: 'tous',
 } as const;
+
+export type GetPaiementsRapportEnAttenteParams = {
+/**
+ * Date minimale de livraison incluse
+ */
+date_debut: string;
+/**
+ * Date maximale de livraison incluse
+ */
+date_fin: string;
+};
 
 export type GetEncoursIntrantsMembre200 = {
   membreId: number;

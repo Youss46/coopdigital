@@ -25,6 +25,7 @@ import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
 import { usePermission } from "@/hooks/usePermission";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import ReglementsImpayesModal from "@/components/ReglementsImpayesModal";
 
 function nomProducteur(p: PaiementListItem) {
   if (p.bonCarburantNumero) return `Carburant — ${p.bonCarburantNumero}`;
@@ -1466,6 +1467,7 @@ export default function ReglementsPage() {
   const [recherche, setRecherche] = useState("");
   const [onglet, setOnglet] = useState<ReglementOnglet>("livraisons");
   const [page, setPage] = useState(1);
+  const [rapportEnAttenteOuvert, setRapportEnAttenteOuvert] = useState(false);
   const [modal, setModal] = useState<ModalState>(null);
   const [transportModal, setTransportModal] = useState<FraisTransportARegler | null>(null);
   const [lotCarburantOuvert, setLotCarburantOuvert] = useState(false);
@@ -1860,9 +1862,22 @@ export default function ReglementsPage() {
   return (
     <div className="space-y-5">
       {/* ── En-tête ── */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Règlements</h1>
-        <p className="text-gray-500 text-sm mt-0.5">Validation des paiements producteurs</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Règlements</h1>
+          <p className="text-gray-500 text-sm mt-0.5">Validation des paiements producteurs</p>
+        </div>
+        {peutLire && (
+          <button
+            type="button"
+            data-testid="button-open-reglements-impayes"
+            onClick={() => setRapportEnAttenteOuvert(true)}
+            className="inline-flex items-center gap-2 rounded-lg border border-green-200 bg-white px-3 py-2 text-sm font-semibold text-green-800 hover:bg-green-50"
+          >
+            <Printer size={15} />
+            Imprimer les règlements en attente
+          </button>
+        )}
       </div>
 
       {/* ── Carte solde caisse (délégué uniquement) ── */}
@@ -2395,6 +2410,9 @@ export default function ReglementsPage() {
           })}
           loading={reglementTransportMut.isPending}
         />
+      )}
+      {rapportEnAttenteOuvert && (
+        <ReglementsImpayesModal onClose={() => setRapportEnAttenteOuvert(false)} />
       )}
     </div>
   );

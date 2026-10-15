@@ -213,6 +213,7 @@ import type {
   GetMissionsParams,
   GetMouvementsStockParams,
   GetNotificationsParams,
+  GetPaiementsRapportEnAttenteParams,
   GetPaiementsStatsParams,
   GetPrixAlertesParams,
   GetPrixAnalyseMargeParams,
@@ -286,6 +287,7 @@ import type {
   NotificationsResponse,
   PaiementListItem,
   PaiementsListResponse,
+  PaiementsRapportEnAttente,
   PaiementsStats,
   PartsMembre,
   PayerBulletinInput,
@@ -11870,6 +11872,90 @@ export function useListPaiements<TData = Awaited<ReturnType<typeof listPaiements
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListPaiementsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetPaiementsRapportEnAttenteUrl = (params: GetPaiementsRapportEnAttenteParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/paiements/rapport-en-attente?${stringifiedParams}` : `/api/paiements/rapport-en-attente`
+}
+
+/**
+ * @summary Règlements de livraisons restant à effectuer sur une période
+ */
+export const getPaiementsRapportEnAttente = async (params: GetPaiementsRapportEnAttenteParams, options?: RequestInit): Promise<PaiementsRapportEnAttente> => {
+
+  return customFetch<PaiementsRapportEnAttente>(getGetPaiementsRapportEnAttenteUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPaiementsRapportEnAttenteQueryKey = (params?: GetPaiementsRapportEnAttenteParams,) => {
+    return [
+    `/api/paiements/rapport-en-attente`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetPaiementsRapportEnAttenteQueryOptions = <TData = Awaited<ReturnType<typeof getPaiementsRapportEnAttente>>, TError = ErrorType<unknown>>(params: GetPaiementsRapportEnAttenteParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaiementsRapportEnAttente>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPaiementsRapportEnAttenteQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPaiementsRapportEnAttente>>> = ({ signal }) => getPaiementsRapportEnAttente(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPaiementsRapportEnAttente>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPaiementsRapportEnAttenteQueryResult = NonNullable<Awaited<ReturnType<typeof getPaiementsRapportEnAttente>>>
+export type GetPaiementsRapportEnAttenteQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Règlements de livraisons restant à effectuer sur une période
+ */
+
+export function useGetPaiementsRapportEnAttente<TData = Awaited<ReturnType<typeof getPaiementsRapportEnAttente>>, TError = ErrorType<unknown>>(
+ params: GetPaiementsRapportEnAttenteParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaiementsRapportEnAttente>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPaiementsRapportEnAttenteQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
