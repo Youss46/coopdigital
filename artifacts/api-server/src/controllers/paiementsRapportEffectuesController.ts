@@ -244,7 +244,7 @@ export async function getPaiementsRapportEffectues(req: Request, res: Response):
       WHERE c.id = ${cooperativeId}
         AND (reglement_event."montantFcfa" IS NULL OR reglement_event."montantFcfa" > 0)
       ORDER BY reglement_event."dateReglement" ASC NULLS LAST,
-        reglement_event."numeroLivraison" ASC NULLS LAST,
+        reglement_event."referenceOperation" ASC NULLS LAST,
         reglement_event."itemId" ASC NULLS LAST
     `);
 

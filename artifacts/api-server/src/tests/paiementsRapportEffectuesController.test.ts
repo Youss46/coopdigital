@@ -208,6 +208,8 @@ describe("rapport des règlements effectivement réalisés", () => {
     expect(sqlText).toContain("d.reference_piece");
     expect(sqlText).toContain("ch.date_encaissement");
     expect(sqlText).toContain("COALESCE(l.cooperative_id, b.cooperative_id, d.cooperative_id) = ");
+    expect(sqlText).toContain('reglement_event."referenceOperation" ASC NULLS LAST');
+    expect(sqlText).not.toContain('reglement_event."numeroLivraison"');
     expect(sqlText).toContain("m.delegue_id");
     expect(query.values).toContain(42);
     expect(query.values).not.toContain(999);
