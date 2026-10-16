@@ -1,10 +1,17 @@
 import { useState } from "react";
 import { CalendarDays, Loader2, Printer, X } from "lucide-react";
 import {
+  getGetPaiementsRapportEffectuesQueryKey,
   getGetPaiementsRapportEnAttenteQueryKey,
+  useGetPaiementsRapportEffectues,
   useGetPaiementsRapportEnAttente,
 } from "@workspace/api-client-react";
-import { construireFicheReglementsEnAttenteHtml } from "@/lib/reglementsPrint";
+import {
+  construireFicheReglementsEffectuesHtml,
+  construireFicheReglementsEnAttenteHtml,
+} from "@/lib/reglementsPrint";
+
+type TypeRapportReglements = "attente" | "effectues";
 
 function dateLocale(date: Date): string {
   const annee = date.getFullYear();
@@ -21,9 +28,11 @@ function fmtFcfa(value: number): string {
   return `${new Intl.NumberFormat("fr-FR").format(value)} FCFA`;
 }
 
-export default function ReglementsImpayesModal({
+export default function ReglementsRapportModal({
+  type,
   onClose,
 }: {
+  type: TypeRapportReglements;
   onClose: () => void;
 }) {
   const [dateFin, setDateFin] = useState(() => dateLocale(new Date()));
@@ -31,16 +40,43 @@ export default function ReglementsImpayesModal({
   const [erreurImpression, setErreurImpression] = useState<string | null>(null);
   const periodeValide = !!dateDebut && !!dateFin && dateDebut <= dateFin;
   const params = { date_debut: dateDebut, date_fin: dateFin };
-  const { data, error, isError, isLoading } = useGetPaiementsRapportEnAttente(params, {
+  const rapportAttente = useGetPaiementsRapportEnAttente(params, {
     query: {
       queryKey: getGetPaiementsRapportEnAttenteQueryKey(params),
-      enabled: periodeValide,
+      enabled: periodeValide && type === "attente",
+      retry: false,
+    },
+  });
+  const rapportEffectues = useGetPaiementsRapportEffectues(params, {
+    query: {
+      queryKey: getGetPaiementsRapportEffectuesQueryKey(params),
+      enabled: periodeValide && type === "effectues",
       retry: false,
     },
   });
 
+  const data = type === "attente" ? rapportAttente.data : rapportEffectues.data;
+  const isLoading = type === "attente" ? rapportAttente.isLoading : rapportEffectues.isLoading;
+  const isError = type === "attente" ? rapportAttente.isError : rapportEffectues.isError;
+  const error = type === "attente" ? rapportAttente.error : rapportEffectues.error;
+  const titre = type === "attente"
+    ? "Imprimer les règlements en attente"
+    : "Imprimer les règlements effectués";
+  const explicationPeriode = type === "attente"
+    ? "La période porte sur la date de livraison."
+    : "La période porte sur la date du paiement effectif. Un chèque compte à sa date d’encaissement.";
+  const nombreLignes = type === "attente"
+    ? rapportAttente.data?.nombreLivraisons
+    : rapportEffectues.data?.nombreReglements;
+
   function imprimer() {
-    if (!data) return;
+    const html = type === "attente" && rapportAttente.data
+      ? construireFicheReglementsEnAttenteHtml(rapportAttente.data)
+      : type === "effectues" && rapportEffectues.data
+        ? construireFicheReglementsEffectuesHtml(rapportEffectues.data)
+        : null;
+    if (!html) return;
+
     setErreurImpression(null);
     const fenetre = window.open("", "_blank");
     if (!fenetre) {
@@ -57,7 +93,7 @@ export default function ReglementsImpayesModal({
     };
     fenetre.addEventListener("load", lancerImpression, { once: true });
     fenetre.document.open();
-    fenetre.document.write(construireFicheReglementsEnAttenteHtml(data));
+    fenetre.document.write(html);
     fenetre.document.close();
     window.setTimeout(lancerImpression, 700);
   }
@@ -73,7 +109,7 @@ export default function ReglementsImpayesModal({
       <section
         role="dialog"
         aria-modal="true"
-        aria-labelledby="reglements-impayes-title"
+        aria-labelledby="reglements-rapport-title"
         className="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl"
       >
         <header className="flex items-start justify-between border-b border-gray-100 px-5 py-4">
@@ -82,17 +118,17 @@ export default function ReglementsImpayesModal({
               <CalendarDays size={18} />
             </span>
             <div>
-              <h2 id="reglements-impayes-title" className="font-bold text-gray-900">
-                Imprimer les règlements en attente
+              <h2 id="reglements-rapport-title" className="font-bold text-gray-900">
+                {titre}
               </h2>
               <p className="mt-1 text-xs text-gray-500">
-                La période porte sur la date de livraison. Vous pourrez imprimer ou enregistrer la fiche en PDF.
+                {explicationPeriode} Imprimez ou enregistrez la fiche en PDF.
               </p>
             </div>
           </div>
           <button
             type="button"
-            data-testid="button-close-reglements-impayes"
+            data-testid="button-close-reglements-rapport"
             onClick={onClose}
             aria-label="Fermer"
             className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
@@ -140,35 +176,55 @@ export default function ReglementsImpayesModal({
           )}
           {isError && (
             <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              {error instanceof Error ? error.message : "Impossible de charger les règlements en attente."}
+              {error instanceof Error
+                ? error.message
+                : "Impossible de charger les règlements pour cette période."}
             </p>
           )}
-          {data && (
+
+          {type === "attente" && rapportAttente.data && (
             <section
               data-testid="summary-rapport-reglements-impayes"
               className="grid grid-cols-2 gap-2 sm:grid-cols-4"
             >
               <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
                 <p className="text-[11px] text-gray-500">Livraisons</p>
-                <p className="mt-1 text-sm font-bold text-gray-900">{data.nombreLivraisons}</p>
+                <p className="mt-1 text-sm font-bold text-gray-900">{rapportAttente.data.nombreLivraisons}</p>
               </div>
               <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
                 <p className="text-[11px] text-gray-500">Montant net</p>
-                <p className="mt-1 text-xs font-bold text-gray-900">{fmtFcfa(data.totalMontantNetFcfa)}</p>
+                <p className="mt-1 text-xs font-bold text-gray-900">{fmtFcfa(rapportAttente.data.totalMontantNetFcfa)}</p>
               </div>
               <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
                 <p className="text-[11px] text-gray-500">Déjà réglé</p>
-                <p className="mt-1 text-xs font-bold text-gray-900">{fmtFcfa(data.totalMontantRegleFcfa)}</p>
+                <p className="mt-1 text-xs font-bold text-gray-900">{fmtFcfa(rapportAttente.data.totalMontantRegleFcfa)}</p>
               </div>
               <div className="rounded-lg border border-green-200 bg-green-50 p-3">
                 <p className="text-[11px] text-green-800">Total restant</p>
-                <p className="mt-1 text-xs font-bold text-green-900">{fmtFcfa(data.totalMontantRestantFcfa)}</p>
+                <p className="mt-1 text-xs font-bold text-green-900">{fmtFcfa(rapportAttente.data.totalMontantRestantFcfa)}</p>
               </div>
             </section>
           )}
-          {data?.nombreLivraisons === 0 && (
+          {type === "effectues" && rapportEffectues.data && (
+            <section
+              data-testid="summary-rapport-reglements-effectues"
+              className="grid grid-cols-2 gap-2"
+            >
+              <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                <p className="text-[11px] text-gray-500">Règlements effectués</p>
+                <p className="mt-1 text-sm font-bold text-gray-900">{rapportEffectues.data.nombreReglements}</p>
+              </div>
+              <div className="rounded-lg border border-green-200 bg-green-50 p-3">
+                <p className="text-[11px] text-green-800">Total réglé</p>
+                <p className="mt-1 text-sm font-bold text-green-900">{fmtFcfa(rapportEffectues.data.totalMontantRegleFcfa)}</p>
+              </div>
+            </section>
+          )}
+          {nombreLignes === 0 && (
             <p className="text-center text-sm text-gray-500">
-              Aucun règlement en attente pour cette période.
+              {type === "attente"
+                ? "Aucun règlement en attente pour cette période."
+                : "Aucun règlement effectué pour cette période."}
             </p>
           )}
           {erreurImpression && (
@@ -179,7 +235,7 @@ export default function ReglementsImpayesModal({
         <footer className="flex justify-end gap-2 border-t border-gray-100 px-5 py-4">
           <button
             type="button"
-            data-testid="button-cancel-reglements-impayes"
+            data-testid="button-cancel-reglements-rapport"
             onClick={onClose}
             className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
@@ -187,7 +243,7 @@ export default function ReglementsImpayesModal({
           </button>
           <button
             type="button"
-            data-testid="button-print-reglements-impayes"
+            data-testid={`button-print-reglements-${type}`}
             onClick={imprimer}
             disabled={!data || isLoading}
             className="inline-flex items-center gap-2 rounded-lg bg-[#1a4731] px-4 py-2 text-sm font-semibold text-white hover:bg-[#143a28] disabled:cursor-not-allowed disabled:opacity-50"

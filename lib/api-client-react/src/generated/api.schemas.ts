@@ -1221,6 +1221,33 @@ export interface PaiementsRapportEnAttente {
   items: PaiementRapportEnAttenteItem[];
 }
 
+export interface PaiementRapportEffectueItem {
+  id: string;
+  /** Date effective du paiement ou date d'encaissement du chèque */
+  dateReglement: string;
+  /** Date de livraison au format AAAA-MM-JJ */
+  dateLivraison: string;
+  numeroLivraison: string;
+  producteur: string;
+  /** @nullable */
+  village?: string | null;
+  modePaiement: string;
+  referencePaiement: string;
+  montantFcfa: number;
+}
+
+export interface PaiementsRapportEffectues {
+  cooperativeNom: string;
+  /** Date de début de la période au format AAAA-MM-JJ */
+  dateDebut: string;
+  /** Date de fin de la période au format AAAA-MM-JJ */
+  dateFin: string;
+  genereLe: string;
+  nombreReglements: number;
+  totalMontantRegleFcfa: number;
+  items: PaiementRapportEffectueItem[];
+}
+
 /**
  * @nullable
  */
@@ -6075,6 +6102,17 @@ export type GetPaiementsRapportEnAttenteParams = {
 date_debut: string;
 /**
  * Date maximale de livraison incluse
+ */
+date_fin: string;
+};
+
+export type GetPaiementsRapportEffectuesParams = {
+/**
+ * Date minimale de règlement effectif incluse
+ */
+date_debut: string;
+/**
+ * Date maximale de règlement effectif incluse
  */
 date_fin: string;
 };

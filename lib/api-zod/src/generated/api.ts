@@ -4123,6 +4123,35 @@ export const GetPaiementsRapportEnAttenteResponse = zod.object({
 
 
 /**
+ * @summary Règlements de livraisons effectivement réglés sur une période
+ */
+export const GetPaiementsRapportEffectuesQueryParams = zod.object({
+  "date_debut": zod.date().describe('Date minimale de règlement effectif incluse'),
+  "date_fin": zod.date().describe('Date maximale de règlement effectif incluse')
+})
+
+export const GetPaiementsRapportEffectuesResponse = zod.object({
+  "cooperativeNom": zod.string(),
+  "dateDebut": zod.string().describe('Date de début de la période au format AAAA-MM-JJ'),
+  "dateFin": zod.string().describe('Date de fin de la période au format AAAA-MM-JJ'),
+  "genereLe": zod.coerce.date(),
+  "nombreReglements": zod.number(),
+  "totalMontantRegleFcfa": zod.number(),
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "dateReglement": zod.string().describe('Date effective du paiement ou date d\'encaissement du chèque'),
+  "dateLivraison": zod.string().describe('Date de livraison au format AAAA-MM-JJ'),
+  "numeroLivraison": zod.string(),
+  "producteur": zod.string(),
+  "village": zod.string().nullish(),
+  "modePaiement": zod.string(),
+  "referencePaiement": zod.string(),
+  "montantFcfa": zod.number()
+}))
+})
+
+
+/**
  * @summary Valider plusieurs paiements de bons carburant en une seule opération
  */
 export const validerLotPaiementsCarburantBodyPaiementIdsMax = 200;

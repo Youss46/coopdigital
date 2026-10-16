@@ -3606,6 +3606,35 @@ paths:
               schema:
                 $ref: "#/components/schemas/PaiementsRapportEnAttente"
 
+  /paiements/rapport-effectues:
+    get:
+      operationId: getPaiementsRapportEffectues
+      tags: [paiements]
+      summary: Règlements de livraisons effectivement réglés sur une période
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: date_debut
+          in: query
+          required: true
+          description: Date minimale de règlement effectif incluse
+          schema:
+            type: string
+            format: date
+        - name: date_fin
+          in: query
+          required: true
+          description: Date maximale de règlement effectif incluse
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Fiche des règlements effectués, avec le total réglé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaiementsRapportEffectues"
+
   /paiements/carburant/valider-lot:
     post:
       operationId: validerLotPaiementsCarburant
@@ -8602,6 +8631,70 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PaiementRapportEnAttenteItem"
+
+    PaiementRapportEffectueItem:
+      type: object
+      required:
+        - id
+        - dateReglement
+        - dateLivraison
+        - numeroLivraison
+        - producteur
+        - modePaiement
+        - referencePaiement
+        - montantFcfa
+      properties:
+        id:
+          type: string
+        dateReglement:
+          type: string
+          description: Date effective du paiement ou date d'encaissement du chèque
+        dateLivraison:
+          type: string
+          description: Date de livraison au format AAAA-MM-JJ
+        numeroLivraison:
+          type: string
+        producteur:
+          type: string
+        village:
+          type: ["string", "null"]
+        modePaiement:
+          type: string
+        referencePaiement:
+          type: string
+        montantFcfa:
+          type: integer
+
+    PaiementsRapportEffectues:
+      type: object
+      required:
+        - cooperativeNom
+        - dateDebut
+        - dateFin
+        - genereLe
+        - nombreReglements
+        - totalMontantRegleFcfa
+        - items
+      properties:
+        cooperativeNom:
+          type: string
+        dateDebut:
+          type: string
+          description: Date de début de la période au format AAAA-MM-JJ
+        dateFin:
+          type: string
+          description: Date de fin de la période au format AAAA-MM-JJ
+        genereLe:
+          type: string
+          format: date-time
+        nombreReglements:
+          type: integer
+        totalMontantRegleFcfa:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaiementRapportEffectueItem"
 
     PaiementListItem:
       type: object

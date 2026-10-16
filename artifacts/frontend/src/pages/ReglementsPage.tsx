@@ -25,7 +25,7 @@ import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
 import { usePermission } from "@/hooks/usePermission";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import ReglementsImpayesModal from "@/components/ReglementsImpayesModal";
+import ReglementsRapportModal from "@/components/ReglementsRapportModal";
 
 function nomProducteur(p: PaiementListItem) {
   if (p.bonCarburantNumero) return `Carburant — ${p.bonCarburantNumero}`;
@@ -1467,7 +1467,7 @@ export default function ReglementsPage() {
   const [recherche, setRecherche] = useState("");
   const [onglet, setOnglet] = useState<ReglementOnglet>("livraisons");
   const [page, setPage] = useState(1);
-  const [rapportEnAttenteOuvert, setRapportEnAttenteOuvert] = useState(false);
+  const [typeRapportOuvert, setTypeRapportOuvert] = useState<"attente" | "effectues" | null>(null);
   const [modal, setModal] = useState<ModalState>(null);
   const [transportModal, setTransportModal] = useState<FraisTransportARegler | null>(null);
   const [lotCarburantOuvert, setLotCarburantOuvert] = useState(false);
@@ -1868,15 +1868,26 @@ export default function ReglementsPage() {
           <p className="text-gray-500 text-sm mt-0.5">Validation des paiements producteurs</p>
         </div>
         {peutLire && (
-          <button
-            type="button"
-            data-testid="button-open-reglements-impayes"
-            onClick={() => setRapportEnAttenteOuvert(true)}
-            className="inline-flex items-center gap-2 rounded-lg border border-green-200 bg-white px-3 py-2 text-sm font-semibold text-green-800 hover:bg-green-50"
-          >
-            <Printer size={15} />
-            Imprimer les règlements en attente
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              data-testid="button-open-reglements-impayes"
+              onClick={() => setTypeRapportOuvert("attente")}
+              className="inline-flex items-center gap-2 rounded-lg border border-green-200 bg-white px-3 py-2 text-sm font-semibold text-green-800 hover:bg-green-50"
+            >
+              <Printer size={15} />
+              Imprimer les règlements en attente
+            </button>
+            <button
+              type="button"
+              data-testid="button-open-reglements-effectues"
+              onClick={() => setTypeRapportOuvert("effectues")}
+              className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-50"
+            >
+              <Printer size={15} />
+              Imprimer les règlements effectués
+            </button>
+          </div>
         )}
       </div>
 
@@ -2411,8 +2422,11 @@ export default function ReglementsPage() {
           loading={reglementTransportMut.isPending}
         />
       )}
-      {rapportEnAttenteOuvert && (
-        <ReglementsImpayesModal onClose={() => setRapportEnAttenteOuvert(false)} />
+      {typeRapportOuvert && (
+        <ReglementsRapportModal
+          type={typeRapportOuvert}
+          onClose={() => setTypeRapportOuvert(null)}
+        />
       )}
     </div>
   );

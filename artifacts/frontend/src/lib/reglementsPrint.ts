@@ -1,4 +1,5 @@
 import type { PaiementsRapportEnAttente } from "@workspace/api-client-react";
+import type { PaiementsRapportEffectues } from "@workspace/api-client-react";
 
 function echapperHtml(value: string): string {
   return value
@@ -28,6 +29,20 @@ function fmtDateHeure(value: string): string {
         dateStyle: "short",
         timeStyle: "short",
       }).format(date);
+}
+
+export function libelleModePaiement(value: string): string {
+  const labels: Record<string, string> = {
+    orange_money: "Orange Money",
+    mtn_momo: "MTN Mobile Money",
+    especes: "Espèces",
+    wave: "Wave",
+    cheque: "Chèque encaissé",
+    virement: "Virement bancaire",
+    carte_producteur: "Carte producteur",
+    paiement: "Paiement",
+  };
+  return value.split(" / ").map((mode) => labels[mode] ?? mode).join(" / ");
 }
 
 export function construireFicheReglementsEnAttenteHtml(
@@ -125,6 +140,105 @@ export function construireFicheReglementsEnAttenteHtml(
     </tfoot>
   </table>
   <footer>CoopDigital · Règlements en attente · ${fmtDateHeure(rapport.genereLe)}</footer>
+</body>
+</html>`;
+}
+
+export function construireFicheReglementsEffectuesHtml(
+  rapport: PaiementsRapportEffectues,
+): string {
+  const lignes = rapport.items.length > 0
+    ? rapport.items.map((item) => `
+      <tr>
+        <td>${fmtDate(item.dateReglement)}</td>
+        <td>${echapperHtml(item.numeroLivraison)}</td>
+        <td>${fmtDate(item.dateLivraison)}</td>
+        <td>${echapperHtml(item.producteur)}</td>
+        <td>${echapperHtml(item.village ?? "—")}</td>
+        <td>${echapperHtml(libelleModePaiement(item.modePaiement))}</td>
+        <td class="ref">${echapperHtml(item.referencePaiement)}</td>
+        <td class="amount">${fmtFcfa(item.montantFcfa)}</td>
+      </tr>
+    `).join("")
+    : `<tr><td colspan="8" class="empty">Aucun règlement effectué pour cette période.</td></tr>`;
+
+  return `<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Règlements effectués — ${echapperHtml(rapport.cooperativeNom)}</title>
+  <style>
+    @page { size: A4 landscape; margin: 12mm; }
+    * { box-sizing: border-box; }
+    body { color: #17211b; font-family: Arial, Helvetica, sans-serif; font-size: 10pt; margin: 0; }
+    header { border-bottom: 2px solid #1a4731; margin-bottom: 16px; padding-bottom: 12px; }
+    h1 { color: #1a4731; font-size: 20pt; margin: 0 0 5px; }
+    .cooperative { font-size: 12pt; font-weight: 700; }
+    .period, .generated { color: #56645b; font-size: 9pt; margin-top: 5px; }
+    .summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 14px 0 18px; }
+    .card { border: 1px solid #d6e2da; border-radius: 5px; padding: 9px 11px; }
+    .card span { color: #64736a; display: block; font-size: 8pt; margin-bottom: 5px; }
+    .card strong { font-size: 12pt; }
+    .card.total { background: #eff8f1; border-color: #9dc8a9; color: #14532d; }
+    table { border-collapse: collapse; table-layout: fixed; width: 100%; }
+    th, td { border: 1px solid #d8dfda; padding: 6px 7px; overflow-wrap: anywhere; text-align: left; vertical-align: top; }
+    th { background: #edf3ef; color: #24382b; font-size: 8pt; }
+    td { font-size: 8.5pt; }
+    th:nth-child(1) { width: 10%; }
+    th:nth-child(2) { width: 12%; }
+    th:nth-child(3) { width: 9%; }
+    th:nth-child(4) { width: 17%; }
+    th:nth-child(5) { width: 12%; }
+    th:nth-child(6) { width: 13%; }
+    th:nth-child(7) { width: 13%; }
+    th:nth-child(8) { width: 14%; }
+    td.amount, th.amount { text-align: right; white-space: nowrap; }
+    td.ref { font-family: monospace; }
+    tfoot td { background: #eff8f1; font-weight: 700; }
+    .empty { color: #64736a; padding: 20px; text-align: center; }
+    footer { color: #64736a; font-size: 8pt; margin-top: 12px; text-align: right; }
+    thead { display: table-header-group; }
+    tfoot { display: table-row-group; }
+    tr { break-inside: avoid; }
+    @media screen {
+      body { margin: 24px auto; max-width: 1100px; padding: 0 20px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="cooperative">${echapperHtml(rapport.cooperativeNom)}</div>
+    <h1>Liste des règlements effectués</h1>
+    <div class="period">Période des règlements : du ${fmtDate(rapport.dateDebut)} au ${fmtDate(rapport.dateFin)}</div>
+    <div class="generated">Fiche générée le ${fmtDateHeure(rapport.genereLe)}</div>
+  </header>
+  <section class="summary" aria-label="Totaux de la période">
+    <div class="card"><span>Règlements effectués</span><strong>${rapport.nombreReglements}</strong></div>
+    <div class="card total"><span>Total réglé sur la période</span><strong>${fmtFcfa(rapport.totalMontantRegleFcfa)}</strong></div>
+  </section>
+  <table>
+    <thead>
+      <tr>
+        <th>Date de règlement</th>
+        <th>Référence livraison</th>
+        <th>Date livraison</th>
+        <th>Producteur</th>
+        <th>Village</th>
+        <th>Mode</th>
+        <th>Référence paiement</th>
+        <th class="amount">Montant réglé</th>
+      </tr>
+    </thead>
+    <tbody>${lignes}</tbody>
+    <tfoot>
+      <tr>
+        <td colspan="7">TOTAL — ${rapport.nombreReglements} règlement${rapport.nombreReglements === 1 ? "" : "s"}</td>
+        <td class="amount">${fmtFcfa(rapport.totalMontantRegleFcfa)}</td>
+      </tr>
+    </tfoot>
+  </table>
+  <footer>CoopDigital · Liste des règlements effectués · ${fmtDateHeure(rapport.genereLe)}</footer>
 </body>
 </html>`;
 }

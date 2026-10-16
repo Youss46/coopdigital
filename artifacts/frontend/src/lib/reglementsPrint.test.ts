@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { construireFicheReglementsEnAttenteHtml } from "./reglementsPrint";
+import {
+  construireFicheReglementsEffectuesHtml,
+  construireFicheReglementsEnAttenteHtml,
+} from "./reglementsPrint";
 
 describe("fiche imprimable des règlements en attente", () => {
   it("affiche le total restant dans le résumé et dans le pied du tableau", () => {
@@ -54,5 +57,33 @@ describe("fiche imprimable des règlements en attente", () => {
     expect(html).toContain("&lt;img src=x onerror=&quot;alert(1)&quot;&gt;");
     expect(html).toContain("&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;");
     expect(html).not.toContain("<script>alert");
+  });
+
+  it("imprime les paiements effectués, y compris le total et les chèques encaissés", () => {
+    const html = construireFicheReglementsEffectuesHtml({
+      cooperativeNom: "COOBEPA",
+      dateDebut: "2026-01-01",
+      dateFin: "2026-01-31",
+      genereLe: "2026-02-01T10:00:00.000Z",
+      nombreReglements: 1,
+      totalMontantRegleFcfa: 12500,
+      items: [{
+        id: "cheque-11",
+        dateReglement: "2026-01-20",
+        dateLivraison: "2025-12-20",
+        numeroLivraison: "LIV-2025-10",
+        producteur: "Awa Kouassi",
+        village: "Abbé",
+        modePaiement: "cheque",
+        referencePaiement: "CHQ-11",
+        montantFcfa: 12500,
+      }],
+    });
+
+    expect(html).toContain("Liste des règlements effectués");
+    expect(html).toContain("CHQ-11");
+    expect(html).toContain("Chèque encaissé");
+    expect(html).toContain("Total réglé sur la période");
+    expect(html.match(/12\s*500 FCFA/g)).toHaveLength(3);
   });
 });

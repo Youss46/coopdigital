@@ -213,6 +213,7 @@ import type {
   GetMissionsParams,
   GetMouvementsStockParams,
   GetNotificationsParams,
+  GetPaiementsRapportEffectuesParams,
   GetPaiementsRapportEnAttenteParams,
   GetPaiementsStatsParams,
   GetPrixAlertesParams,
@@ -287,6 +288,7 @@ import type {
   NotificationsResponse,
   PaiementListItem,
   PaiementsListResponse,
+  PaiementsRapportEffectues,
   PaiementsRapportEnAttente,
   PaiementsStats,
   PartsMembre,
@@ -11956,6 +11958,90 @@ export function useGetPaiementsRapportEnAttente<TData = Awaited<ReturnType<typeo
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetPaiementsRapportEnAttenteQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetPaiementsRapportEffectuesUrl = (params: GetPaiementsRapportEffectuesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/paiements/rapport-effectues?${stringifiedParams}` : `/api/paiements/rapport-effectues`
+}
+
+/**
+ * @summary Règlements de livraisons effectivement réglés sur une période
+ */
+export const getPaiementsRapportEffectues = async (params: GetPaiementsRapportEffectuesParams, options?: RequestInit): Promise<PaiementsRapportEffectues> => {
+
+  return customFetch<PaiementsRapportEffectues>(getGetPaiementsRapportEffectuesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPaiementsRapportEffectuesQueryKey = (params?: GetPaiementsRapportEffectuesParams,) => {
+    return [
+    `/api/paiements/rapport-effectues`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetPaiementsRapportEffectuesQueryOptions = <TData = Awaited<ReturnType<typeof getPaiementsRapportEffectues>>, TError = ErrorType<unknown>>(params: GetPaiementsRapportEffectuesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaiementsRapportEffectues>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPaiementsRapportEffectuesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPaiementsRapportEffectues>>> = ({ signal }) => getPaiementsRapportEffectues(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPaiementsRapportEffectues>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPaiementsRapportEffectuesQueryResult = NonNullable<Awaited<ReturnType<typeof getPaiementsRapportEffectues>>>
+export type GetPaiementsRapportEffectuesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Règlements de livraisons effectivement réglés sur une période
+ */
+
+export function useGetPaiementsRapportEffectues<TData = Awaited<ReturnType<typeof getPaiementsRapportEffectues>>, TError = ErrorType<unknown>>(
+ params: GetPaiementsRapportEffectuesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaiementsRapportEffectues>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPaiementsRapportEffectuesQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
