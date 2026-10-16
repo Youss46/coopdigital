@@ -7,9 +7,11 @@ type PaiementRapportEffectueRow = {
   cooperativeNom: string;
   itemId: string | null;
   dateReglement: string | null;
-  dateLivraison: string | null;
-  numeroLivraison: string | null;
-  producteur: string | null;
+  typeOperation: string | null;
+  dateOperation: string | null;
+  referenceOperation: string | null;
+  beneficiaire: string | null;
+  description: string | null;
   village: string | null;
   modePaiement: string | null;
   referencePaiement: string | null;
@@ -61,43 +63,72 @@ export async function getPaiementsRapportEffectues(req: Request, res: Response):
           ON ligne_cheque.id = ch.paiement_ligne_id
         GROUP BY COALESCE(ch.paiement_id, ligne_cheque.paiement_id)
       ),
-      evenements_regles AS (
+      paiements_context AS (
         SELECT
-          'paiement-ligne-' || pl.id::text AS "itemId",
-          COALESCE(p.date_validation, p.created_at)::date::text AS "dateReglement",
-          l.date_livraison::text AS "dateLivraison",
-          COALESCE(
-            NULLIF(l.numero_livraison, ''),
-            p.numero_recu,
-            'LIV-' || l.id::text
-          ) AS "numeroLivraison",
-          COALESCE(
-            NULLIF(BTRIM(CONCAT_WS(' ', m.nom, m.prenoms)), ''),
-            NULLIF(BTRIM(CONCAT_WS(' ', f.nom, f.prenoms)), ''),
-            'Producteur non renseigné'
-          ) AS producteur,
+          p.id,
+          p.numero_recu,
+          p.reference_transaction,
+          p.mode_paiement::text AS mode_paiement,
+          p.montant_fcfa,
+          COALESCE(p.date_validation, p.created_at)::date AS date_paiement,
+          COALESCE(l.cooperative_id, b.cooperative_id, d.cooperative_id) AS cooperative_id,
+          CASE
+            WHEN l.id IS NOT NULL THEN 'livraison'
+            WHEN b.id IS NOT NULL THEN 'carburant'
+            ELSE 'depense_vehicule'
+          END AS type_operation,
+          CASE
+            WHEN l.id IS NOT NULL THEN l.date_livraison::text
+            WHEN b.id IS NOT NULL THEN COALESCE(b.date_utilisation, b.date_emission)::text
+            ELSE d.date_depense::text
+          END AS date_operation,
+          CASE
+            WHEN l.id IS NOT NULL THEN COALESCE(
+              NULLIF(l.numero_livraison, ''),
+              p.numero_recu,
+              'LIV-' || l.id::text
+            )
+            WHEN b.id IS NOT NULL THEN COALESCE(NULLIF(b.numero, ''), 'BON-CARB-' || b.id::text)
+            ELSE COALESCE(NULLIF(d.reference_piece, ''), 'DEP-' || d.id::text)
+          END AS reference_operation,
+          CASE
+            WHEN l.id IS NOT NULL THEN COALESCE(
+              NULLIF(BTRIM(CONCAT_WS(' ', m.nom, m.prenoms)), ''),
+              NULLIF(BTRIM(CONCAT_WS(' ', f.nom, f.prenoms)), ''),
+              'Producteur non renseigné'
+            )
+            WHEN b.id IS NOT NULL THEN COALESCE(NULLIF(BTRIM(b.station_service), ''), 'Bon carburant')
+            ELSE COALESCE(
+              NULLIF(BTRIM(d.fournisseur), ''),
+              NULLIF(BTRIM(d.demandeur), ''),
+              'Dépense véhicule'
+            )
+          END AS beneficiaire,
+          CASE
+            WHEN b.id IS NOT NULL THEN NULLIF(
+              BTRIM(CONCAT_WS(' · ', b.type_carburant, b.motif)),
+              ''
+            )
+            WHEN d.id IS NOT NULL THEN NULLIF(BTRIM(d.libelle), '')
+            ELSE NULL
+          END AS description,
           m.village AS village,
-          pl.mode_paiement::text AS "modePaiement",
-          COALESCE(
-            NULLIF(pl.reference_transaction, ''),
-            p.numero_recu,
-            p.reference_transaction,
-            'REG-' || p.id::text
-          ) AS "referencePaiement",
-          pl.montant_fcfa::integer AS "montantFcfa",
-          l.id AS livraison_id,
-          p.id AS paiement_id
+          l.agent_id,
+          agent_user.role AS agent_role
         FROM paiements p
-        INNER JOIN livraisons l ON l.id = p.livraison_id
-        INNER JOIN paiement_lignes pl ON pl.paiement_id = p.id
+        LEFT JOIN livraisons l ON l.id = p.livraison_id
         LEFT JOIN membres m ON m.id = l.membre_id
         LEFT JOIN fournisseurs f ON f.id = l.fournisseur_id
+        LEFT JOIN bons_carburant b ON b.id = p.bon_carburant_id
+        LEFT JOIN depenses_vehicule d ON d.id = p.depense_vehicule_id
         LEFT JOIN users agent_user ON agent_user.id = l.agent_id
         WHERE p.statut IN ('confirme', 'effectue', 'en_cours')
-          AND pl.mode_paiement <> 'cheque'
-          AND l.cooperative_id = ${cooperativeId}
-          AND COALESCE(p.date_validation, p.created_at)::date >= ${dateDebut}::date
-          AND COALESCE(p.date_validation, p.created_at)::date <= ${dateFin}::date
+          AND (
+            p.livraison_id IS NOT NULL
+            OR p.bon_carburant_id IS NOT NULL
+            OR p.depense_vehicule_id IS NOT NULL
+          )
+          AND COALESCE(l.cooperative_id, b.cooperative_id, d.cooperative_id) = ${cooperativeId}
           AND (
             (
               ${estDelegue}::boolean
@@ -114,128 +145,96 @@ export async function getPaiementsRapportEffectues(req: Request, res: Response):
               )
             )
           )
+      ),
+      evenements_regles AS (
+        SELECT
+          'paiement-ligne-' || pl.id::text AS "itemId",
+          ctx.date_paiement::text AS "dateReglement",
+          ctx.type_operation AS "typeOperation",
+          ctx.date_operation AS "dateOperation",
+          ctx.reference_operation AS "referenceOperation",
+          ctx.beneficiaire AS beneficiaire,
+          ctx.description AS description,
+          ctx.village AS village,
+          pl.mode_paiement::text AS "modePaiement",
+          COALESCE(
+            NULLIF(pl.reference_transaction, ''),
+            ctx.numero_recu,
+            ctx.reference_transaction,
+            'REG-' || ctx.id::text
+          ) AS "referencePaiement",
+          pl.montant_fcfa::integer AS "montantFcfa"
+        FROM paiements_context ctx
+        INNER JOIN paiement_lignes pl ON pl.paiement_id = ctx.id
+        WHERE pl.mode_paiement <> 'cheque'
+          AND ctx.date_paiement >= ${dateDebut}::date
+          AND ctx.date_paiement <= ${dateFin}::date
 
         UNION ALL
 
         SELECT
-          'paiement-' || p.id::text AS "itemId",
-          COALESCE(p.date_validation, p.created_at)::date::text AS "dateReglement",
-          l.date_livraison::text AS "dateLivraison",
+          'paiement-' || ctx.id::text AS "itemId",
+          ctx.date_paiement::text AS "dateReglement",
+          ctx.type_operation AS "typeOperation",
+          ctx.date_operation AS "dateOperation",
+          ctx.reference_operation AS "referenceOperation",
+          ctx.beneficiaire AS beneficiaire,
+          ctx.description AS description,
+          ctx.village AS village,
+          COALESCE(ctx.mode_paiement, 'paiement') AS "modePaiement",
           COALESCE(
-            NULLIF(l.numero_livraison, ''),
-            p.numero_recu,
-            'LIV-' || l.id::text
-          ) AS "numeroLivraison",
-          COALESCE(
-            NULLIF(BTRIM(CONCAT_WS(' ', m.nom, m.prenoms)), ''),
-            NULLIF(BTRIM(CONCAT_WS(' ', f.nom, f.prenoms)), ''),
-            'Producteur non renseigné'
-          ) AS producteur,
-          m.village AS village,
-          COALESCE(p.mode_paiement::text, 'paiement') AS "modePaiement",
-          COALESCE(
-            p.numero_recu,
-            p.reference_transaction,
-            'REG-' || p.id::text
+            ctx.numero_recu,
+            ctx.reference_transaction,
+            'REG-' || ctx.id::text
           ) AS "referencePaiement",
-          GREATEST(0, p.montant_fcfa - COALESCE(ct.montant_fcfa, 0))::integer AS "montantFcfa",
-          l.id AS livraison_id,
-          p.id AS paiement_id
-        FROM paiements p
-        INNER JOIN livraisons l ON l.id = p.livraison_id
-        LEFT JOIN membres m ON m.id = l.membre_id
-        LEFT JOIN fournisseurs f ON f.id = l.fournisseur_id
-        LEFT JOIN users agent_user ON agent_user.id = l.agent_id
-        LEFT JOIN cheques_total ct ON ct.paiement_id = p.id
-        WHERE p.statut IN ('confirme', 'effectue', 'en_cours')
-          AND (p.mode_paiement IS NULL OR p.mode_paiement <> 'cheque')
+          GREATEST(0, ctx.montant_fcfa - COALESCE(ct.montant_fcfa, 0))::integer AS "montantFcfa"
+        FROM paiements_context ctx
+        LEFT JOIN cheques_total ct ON ct.paiement_id = ctx.id
+        WHERE (ctx.mode_paiement IS NULL OR ctx.mode_paiement <> 'cheque')
           AND NOT EXISTS (
-            SELECT 1 FROM paiement_lignes pl_absentes WHERE pl_absentes.paiement_id = p.id
+            SELECT 1 FROM paiement_lignes pl_absentes WHERE pl_absentes.paiement_id = ctx.id
           )
-          AND l.cooperative_id = ${cooperativeId}
-          AND COALESCE(p.date_validation, p.created_at)::date >= ${dateDebut}::date
-          AND COALESCE(p.date_validation, p.created_at)::date <= ${dateFin}::date
-          AND (
-            (
-              ${estDelegue}::boolean
-              AND ${utilisateurId} IS NOT NULL
-              AND (m.delegue_id = ${utilisateurId} OR f.cree_par_delegue_id = ${utilisateurId})
-            )
-            OR (
-              NOT ${estDelegue}::boolean
-              AND (
-                p.mode_paiement IS NULL
-                OR p.mode_paiement <> 'especes'
-                OR l.agent_id IS NULL
-                OR agent_user.role <> 'delegue'
-              )
-            )
-          )
+          AND ctx.date_paiement >= ${dateDebut}::date
+          AND ctx.date_paiement <= ${dateFin}::date
 
         UNION ALL
 
         SELECT
           'cheque-' || ch.id::text AS "itemId",
           ch.date_encaissement::text AS "dateReglement",
-          l.date_livraison::text AS "dateLivraison",
-          COALESCE(
-            NULLIF(l.numero_livraison, ''),
-            p.numero_recu,
-            'LIV-' || l.id::text
-          ) AS "numeroLivraison",
-          COALESCE(
-            NULLIF(BTRIM(CONCAT_WS(' ', m.nom, m.prenoms)), ''),
-            NULLIF(BTRIM(CONCAT_WS(' ', f.nom, f.prenoms)), ''),
-            'Producteur non renseigné'
-          ) AS producteur,
-          m.village AS village,
+          ctx.type_operation AS "typeOperation",
+          ctx.date_operation AS "dateOperation",
+          ctx.reference_operation AS "referenceOperation",
+          ctx.beneficiaire AS beneficiaire,
+          ctx.description AS description,
+          ctx.village AS village,
           'cheque'::text AS "modePaiement",
           COALESCE(
             NULLIF(ch.numero_cheque, ''),
-            p.numero_recu,
-            p.reference_transaction,
+            ctx.numero_recu,
+            ctx.reference_transaction,
             'CHEQUE-' || ch.id::text
           ) AS "referencePaiement",
-          ch.montant_fcfa::integer AS "montantFcfa",
-          l.id AS livraison_id,
-          p.id AS paiement_id
+          ch.montant_fcfa::integer AS "montantFcfa"
         FROM cheques_emis ch
         LEFT JOIN paiement_lignes ligne_cheque ON ligne_cheque.id = ch.paiement_ligne_id
-        INNER JOIN paiements p ON p.id = COALESCE(ch.paiement_id, ligne_cheque.paiement_id)
-        INNER JOIN livraisons l ON l.id = COALESCE(p.livraison_id, ch.livraison_id)
-        LEFT JOIN membres m ON m.id = l.membre_id
-        LEFT JOIN fournisseurs f ON f.id = l.fournisseur_id
-        LEFT JOIN users agent_user ON agent_user.id = l.agent_id
+        INNER JOIN paiements_context ctx
+          ON ctx.id = COALESCE(ch.paiement_id, ligne_cheque.paiement_id)
         WHERE ch.statut = 'encaisse'
           AND ch.date_encaissement >= ${dateDebut}::date
           AND ch.date_encaissement <= ${dateFin}::date
           AND ch.cooperative_id = ${cooperativeId}
-          AND p.statut IN ('confirme', 'effectue', 'en_cours')
-          AND l.cooperative_id = ${cooperativeId}
-          AND (
-            (
-              ${estDelegue}::boolean
-              AND ${utilisateurId} IS NOT NULL
-              AND (m.delegue_id = ${utilisateurId} OR f.cree_par_delegue_id = ${utilisateurId})
-            )
-            OR (
-              NOT ${estDelegue}::boolean
-              AND (
-                p.mode_paiement IS NULL
-                OR p.mode_paiement <> 'especes'
-                OR l.agent_id IS NULL
-                OR agent_user.role <> 'delegue'
-              )
-            )
-          )
+          AND ctx.cooperative_id = ${cooperativeId}
       )
       SELECT
         c.nom AS "cooperativeNom",
         reglement_event."itemId",
         reglement_event."dateReglement",
-        reglement_event."dateLivraison",
-        reglement_event."numeroLivraison",
-        reglement_event.producteur,
+        reglement_event."typeOperation",
+        reglement_event."dateOperation",
+        reglement_event."referenceOperation",
+        reglement_event.beneficiaire,
+        reglement_event.description,
         reglement_event.village,
         reglement_event."modePaiement",
         reglement_event."referencePaiement",
@@ -260,9 +259,11 @@ export async function getPaiementsRapportEffectues(req: Request, res: Response):
       .map((row) => ({
         id: row.itemId!,
         dateReglement: row.dateReglement ?? "",
-        dateLivraison: row.dateLivraison ?? "",
-        numeroLivraison: row.numeroLivraison ?? "",
-        producteur: row.producteur ?? "Producteur non renseigné",
+        typeOperation: row.typeOperation ?? "livraison",
+        dateOperation: row.dateOperation ?? "",
+        referenceOperation: row.referenceOperation ?? "",
+        beneficiaire: row.beneficiaire ?? "Bénéficiaire non renseigné",
+        description: row.description,
         village: row.village,
         modePaiement: row.modePaiement ?? "paiement",
         referencePaiement: row.referencePaiement ?? "",

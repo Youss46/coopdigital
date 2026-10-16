@@ -4123,7 +4123,7 @@ export const GetPaiementsRapportEnAttenteResponse = zod.object({
 
 
 /**
- * @summary Règlements de livraisons effectivement réglés sur une période
+ * @summary Règlements effectués sur une période, tous types d'opérations
  */
 export const GetPaiementsRapportEffectuesQueryParams = zod.object({
   "date_debut": zod.date().describe('Date minimale de règlement effectif incluse'),
@@ -4140,9 +4140,11 @@ export const GetPaiementsRapportEffectuesResponse = zod.object({
   "items": zod.array(zod.object({
   "id": zod.string(),
   "dateReglement": zod.string().describe('Date effective du paiement ou date d\'encaissement du chèque'),
-  "dateLivraison": zod.string().describe('Date de livraison au format AAAA-MM-JJ'),
-  "numeroLivraison": zod.string(),
-  "producteur": zod.string(),
+  "typeOperation": zod.enum(['livraison', 'carburant', 'depense_vehicule']),
+  "dateOperation": zod.string().describe('Date de livraison, du bon carburant ou de la dépense au format AAAA-MM-JJ'),
+  "referenceOperation": zod.string(),
+  "beneficiaire": zod.string(),
+  "description": zod.string().nullish(),
   "village": zod.string().nullish(),
   "modePaiement": zod.string(),
   "referencePaiement": zod.string(),

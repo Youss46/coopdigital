@@ -11986,7 +11986,7 @@ export const getGetPaiementsRapportEffectuesUrl = (params: GetPaiementsRapportEf
 }
 
 /**
- * @summary Règlements de livraisons effectivement réglés sur une période
+ * @summary Règlements effectués sur une période, tous types d'opérations
  */
 export const getPaiementsRapportEffectues = async (params: GetPaiementsRapportEffectuesParams, options?: RequestInit): Promise<PaiementsRapportEffectues> => {
 
@@ -12033,7 +12033,7 @@ export type GetPaiementsRapportEffectuesQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Règlements de livraisons effectivement réglés sur une période
+ * @summary Règlements effectués sur une période, tous types d'opérations
  */
 
 export function useGetPaiementsRapportEffectues<TData = Awaited<ReturnType<typeof getPaiementsRapportEffectues>>, TError = ErrorType<unknown>>(

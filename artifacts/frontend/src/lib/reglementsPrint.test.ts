@@ -65,25 +65,58 @@ describe("fiche imprimable des règlements en attente", () => {
       dateDebut: "2026-01-01",
       dateFin: "2026-01-31",
       genereLe: "2026-02-01T10:00:00.000Z",
-      nombreReglements: 1,
-      totalMontantRegleFcfa: 12500,
-      items: [{
-        id: "cheque-11",
-        dateReglement: "2026-01-20",
-        dateLivraison: "2025-12-20",
-        numeroLivraison: "LIV-2025-10",
-        producteur: "Awa Kouassi",
-        village: "Abbé",
-        modePaiement: "cheque",
-        referencePaiement: "CHQ-11",
-        montantFcfa: 12500,
-      }],
+      nombreReglements: 3,
+      totalMontantRegleFcfa: 15000,
+      items: [
+        {
+          id: "paiement-ligne-11",
+          dateReglement: "2026-01-05",
+          typeOperation: "livraison",
+          dateOperation: "2025-12-20",
+          referenceOperation: "LIV-2025-10",
+          beneficiaire: "Awa Kouassi",
+          description: null,
+          village: "Abbé",
+          modePaiement: "especes",
+          referencePaiement: "REC-10",
+          montantFcfa: 6000,
+        },
+        {
+          id: "paiement-ligne-12",
+          dateReglement: "2026-01-08",
+          typeOperation: "carburant",
+          dateOperation: "2026-01-06",
+          referenceOperation: "BON-12",
+          beneficiaire: "Station Abidjan",
+          description: "gasoil · mission",
+          village: null,
+          modePaiement: "orange_money",
+          referencePaiement: "REC-12",
+          montantFcfa: 4000,
+        },
+        {
+          id: "cheque-13",
+          dateReglement: "2026-01-20",
+          typeOperation: "depense_vehicule",
+          dateOperation: "2026-01-09",
+          referenceOperation: "PIECE-13",
+          beneficiaire: "Garage K",
+          description: "Réparation",
+          village: null,
+          modePaiement: "cheque",
+          referencePaiement: "CHQ-13",
+          montantFcfa: 5000,
+        },
+      ],
     });
 
     expect(html).toContain("Liste des règlements effectués");
-    expect(html).toContain("CHQ-11");
+    expect(html).toContain("CHQ-13");
     expect(html).toContain("Chèque encaissé");
+    expect(html).toContain("Bon carburant");
+    expect(html).toContain("Dépense véhicule");
+    expect(html).toContain("Garage K");
     expect(html).toContain("Total réglé sur la période");
-    expect(html.match(/12\s*500 FCFA/g)).toHaveLength(3);
+    expect(html.match(/15\s*000 FCFA/g)).toHaveLength(2);
   });
 });

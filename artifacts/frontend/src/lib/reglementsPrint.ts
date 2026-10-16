@@ -45,6 +45,15 @@ export function libelleModePaiement(value: string): string {
   return value.split(" / ").map((mode) => labels[mode] ?? mode).join(" / ");
 }
 
+function libelleTypeOperation(value: string): string {
+  const labels: Record<string, string> = {
+    livraison: "Livraison",
+    carburant: "Bon carburant",
+    depense_vehicule: "Dépense véhicule",
+  };
+  return labels[value] ?? value;
+}
+
 export function construireFicheReglementsEnAttenteHtml(
   rapport: PaiementsRapportEnAttente,
 ): string {
@@ -151,16 +160,17 @@ export function construireFicheReglementsEffectuesHtml(
     ? rapport.items.map((item) => `
       <tr>
         <td>${fmtDate(item.dateReglement)}</td>
-        <td>${echapperHtml(item.numeroLivraison)}</td>
-        <td>${fmtDate(item.dateLivraison)}</td>
-        <td>${echapperHtml(item.producteur)}</td>
-        <td>${echapperHtml(item.village ?? "—")}</td>
+        <td>${echapperHtml(libelleTypeOperation(item.typeOperation))}</td>
+        <td>${fmtDate(item.dateOperation)}</td>
+        <td class="ref">${echapperHtml(item.referenceOperation)}</td>
+        <td>${echapperHtml(item.beneficiaire)}</td>
+        <td>${echapperHtml(item.description ?? item.village ?? "—")}</td>
         <td>${echapperHtml(libelleModePaiement(item.modePaiement))}</td>
         <td class="ref">${echapperHtml(item.referencePaiement)}</td>
         <td class="amount">${fmtFcfa(item.montantFcfa)}</td>
       </tr>
     `).join("")
-    : `<tr><td colspan="8" class="empty">Aucun règlement effectué pour cette période.</td></tr>`;
+    : `<tr><td colspan="9" class="empty">Aucun règlement effectué pour cette période.</td></tr>`;
 
   return `<!doctype html>
 <html lang="fr">
@@ -185,14 +195,15 @@ export function construireFicheReglementsEffectuesHtml(
     th, td { border: 1px solid #d8dfda; padding: 6px 7px; overflow-wrap: anywhere; text-align: left; vertical-align: top; }
     th { background: #edf3ef; color: #24382b; font-size: 8pt; }
     td { font-size: 8.5pt; }
-    th:nth-child(1) { width: 10%; }
-    th:nth-child(2) { width: 12%; }
+    th:nth-child(1) { width: 9%; }
+    th:nth-child(2) { width: 11%; }
     th:nth-child(3) { width: 9%; }
-    th:nth-child(4) { width: 17%; }
-    th:nth-child(5) { width: 12%; }
-    th:nth-child(6) { width: 13%; }
-    th:nth-child(7) { width: 13%; }
-    th:nth-child(8) { width: 14%; }
+    th:nth-child(4) { width: 11%; }
+    th:nth-child(5) { width: 15%; }
+    th:nth-child(6) { width: 15%; }
+    th:nth-child(7) { width: 10%; }
+    th:nth-child(8) { width: 10%; }
+    th:nth-child(9) { width: 10%; }
     td.amount, th.amount { text-align: right; white-space: nowrap; }
     td.ref { font-family: monospace; }
     tfoot td { background: #eff8f1; font-weight: 700; }
@@ -221,10 +232,11 @@ export function construireFicheReglementsEffectuesHtml(
     <thead>
       <tr>
         <th>Date de règlement</th>
-        <th>Référence livraison</th>
-        <th>Date livraison</th>
-        <th>Producteur</th>
-        <th>Village</th>
+        <th>Type</th>
+        <th>Date opération</th>
+        <th>Référence</th>
+        <th>Bénéficiaire</th>
+        <th>Détail / village</th>
         <th>Mode</th>
         <th>Référence paiement</th>
         <th class="amount">Montant réglé</th>
@@ -233,7 +245,7 @@ export function construireFicheReglementsEffectuesHtml(
     <tbody>${lignes}</tbody>
     <tfoot>
       <tr>
-        <td colspan="7">TOTAL — ${rapport.nombreReglements} règlement${rapport.nombreReglements === 1 ? "" : "s"}</td>
+        <td colspan="8">TOTAL — ${rapport.nombreReglements} règlement${rapport.nombreReglements === 1 ? "" : "s"}</td>
         <td class="amount">${fmtFcfa(rapport.totalMontantRegleFcfa)}</td>
       </tr>
     </tfoot>

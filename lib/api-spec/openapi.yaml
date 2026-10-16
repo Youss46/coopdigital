@@ -3610,7 +3610,7 @@ paths:
     get:
       operationId: getPaiementsRapportEffectues
       tags: [paiements]
-      summary: Règlements de livraisons effectivement réglés sur une période
+      summary: Règlements effectués sur une période, tous types d'opérations
       security: [{ bearerAuth: [] }]
       parameters:
         - name: date_debut
@@ -8637,9 +8637,10 @@ components:
       required:
         - id
         - dateReglement
-        - dateLivraison
-        - numeroLivraison
-        - producteur
+        - typeOperation
+        - dateOperation
+        - referenceOperation
+        - beneficiaire
         - modePaiement
         - referencePaiement
         - montantFcfa
@@ -8649,13 +8650,18 @@ components:
         dateReglement:
           type: string
           description: Date effective du paiement ou date d'encaissement du chèque
-        dateLivraison:
+        typeOperation:
           type: string
-          description: Date de livraison au format AAAA-MM-JJ
-        numeroLivraison:
+          enum: [livraison, carburant, depense_vehicule]
+        dateOperation:
           type: string
-        producteur:
+          description: Date de livraison, du bon carburant ou de la dépense au format AAAA-MM-JJ
+        referenceOperation:
           type: string
+        beneficiaire:
+          type: string
+        description:
+          type: ["string", "null"]
         village:
           type: ["string", "null"]
         modePaiement:

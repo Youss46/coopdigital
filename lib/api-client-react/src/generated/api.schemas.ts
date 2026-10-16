@@ -1221,14 +1221,26 @@ export interface PaiementsRapportEnAttente {
   items: PaiementRapportEnAttenteItem[];
 }
 
+export type PaiementRapportEffectueItemTypeOperation = typeof PaiementRapportEffectueItemTypeOperation[keyof typeof PaiementRapportEffectueItemTypeOperation];
+
+
+export const PaiementRapportEffectueItemTypeOperation = {
+  livraison: 'livraison',
+  carburant: 'carburant',
+  depense_vehicule: 'depense_vehicule',
+} as const;
+
 export interface PaiementRapportEffectueItem {
   id: string;
   /** Date effective du paiement ou date d'encaissement du chèque */
   dateReglement: string;
-  /** Date de livraison au format AAAA-MM-JJ */
-  dateLivraison: string;
-  numeroLivraison: string;
-  producteur: string;
+  typeOperation: PaiementRapportEffectueItemTypeOperation;
+  /** Date de livraison, du bon carburant ou de la dépense au format AAAA-MM-JJ */
+  dateOperation: string;
+  referenceOperation: string;
+  beneficiaire: string;
+  /** @nullable */
+  description?: string | null;
   /** @nullable */
   village?: string | null;
   modePaiement: string;
