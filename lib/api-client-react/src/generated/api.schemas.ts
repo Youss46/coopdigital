@@ -1588,6 +1588,14 @@ export interface LotInput {
   fractionPoidsKg?: number;
 }
 
+export interface CreateLotAutoVenteInput {
+  /** @minItems 1 */
+  livraisonIds: number[];
+  entrepot?: string;
+  /** @minimum 1 */
+  nombreSacs?: number;
+}
+
 export type LotStatutInputStatut = typeof LotStatutInputStatut[keyof typeof LotStatutInputStatut];
 
 

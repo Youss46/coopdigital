@@ -69,7 +69,7 @@ vi.mock("../services/expeditionsService.js", () => ({
   getLotExpeditionSummary: vi.fn(),
 }));
 
-import { createLot, previewAutoLot } from "../controllers/lotsController.js";
+import { createLot, createLotForVente, previewAutoLot } from "../controllers/lotsController.js";
 
 function buildRequest(body: Record<string, unknown>): Request {
   return Object.assign(Object.create(null), {
@@ -240,6 +240,17 @@ describe("previewAutoLot", () => {
     expect(response.status).toHaveBeenCalledWith(500);
     expect(response.json).toHaveBeenCalledWith({
       erreur: 'la colonne "cooperative_id" est introuvable',
+    });
+  });
+
+  it("refuse la création du lot de vente sans livraisons", async () => {
+    const response = buildResponse();
+
+    await createLotForVente(buildRequest({ livraisonIds: [] }), response);
+
+    expect(response.status).toHaveBeenCalledWith(400);
+    expect(response.json).toHaveBeenCalledWith({
+      erreur: "Sélectionnez au moins une livraison pour constituer le lot de vente",
     });
   });
 });

@@ -91,6 +91,15 @@ describe("périmètre du comptable", () => {
     expect(hasPermission("comptable", "ventes", "creer")).toBe(true);
     expect(hasPermission("comptable", "ventes", "encaisser")).toBe(true);
     expect(hasPermission("comptable", "exportateurs", "creer")).toBe(false);
+
+    const venteLot = runAccessCheck("/ventes/lots-auto", "comptable", "POST");
+    expect(venteLot.res.status).not.toHaveBeenCalled();
+    expect(venteLot.next).toHaveBeenCalledOnce();
+
+    const lotGenerique = runAccessCheck("/lots", "comptable", "POST");
+    expect(lotGenerique.res.status).toHaveBeenCalledWith(403);
+    expect(lotGenerique.next).not.toHaveBeenCalled();
+    expect(hasPermission("comptable", "tracabilite", "creer_lot")).toBe(false);
   });
 
   it("autorise les opérations de trésorerie sans autoriser la création des comptes", () => {

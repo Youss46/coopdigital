@@ -12,7 +12,7 @@ import {
   getCreances,
   signalerRefus,
 } from "../controllers/exportateursController";
-import { listLots, previewAutoLot } from "../controllers/lotsController";
+import { listLots, previewAutoLot, createLotForVente } from "../controllers/lotsController";
 import { listEntrepotsHandler } from "../controllers/entrepotDelegueController";
 import * as avancesExportateursCtrl from "../controllers/avancesExportateursController.js";
 
@@ -27,6 +27,7 @@ router.get("/exportateurs/:id", checkPermission("exportateurs", "lire"), getExpo
 router.get("/ventes/creances", checkPermission("creances", "lire"), getCreances);
 router.get("/ventes/lots-disponibles", checkPermission("ventes", "lire"), listLots);
 router.post("/ventes/preview-auto", checkPermission("ventes", "creer"), previewAutoLot);
+router.post("/ventes/lots-auto", checkPermission("ventes", "creer"), createLotForVente);
 router.get("/ventes/entrepots", checkPermission("ventes", "lire"), listEntrepotsHandler);
 router.get("/ventes/stocks-receptionnes", checkPermission("ventes", "lire"), listStocksReceptionnes);
 router.get("/ventes", checkPermission("ventes", "lire"), listVentes);

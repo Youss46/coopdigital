@@ -379,8 +379,8 @@ describe("branchement UI du suivi des ventes", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
-      "/api/lots/preview-auto",
-      "/api/lots",
+      "/api/ventes/preview-auto",
+      "/api/ventes/lots-auto",
       "/api/ventes",
     ]);
     expect((fetchMock.mock.calls[1]![1] as RequestInit).method).toBe("POST");
@@ -410,7 +410,7 @@ describe("branchement UI du suivi des ventes", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock.mock.calls[1]![0]).toBe("/api/lots");
+    expect(fetchMock.mock.calls[1]![0]).toBe("/api/ventes/lots-auto");
     expectNotTracked();
     expect(mocks.toast).toHaveBeenCalledWith({
       title: "Erreur",

@@ -1151,6 +1151,21 @@ export const CreateVenteBody = zod.object({
 
 
 /**
+ * @summary Constituer un lot de vente à partir des livraisons de la coopérative
+ */
+
+
+
+
+
+export const CreateLotAutoForVenteBody = zod.object({
+  "livraisonIds": zod.array(zod.number().min(1)).min(1),
+  "entrepot": zod.string().optional(),
+  "nombreSacs": zod.number().min(1).optional()
+})
+
+
+/**
  * @summary Quantités acceptées disponibles après réception au port
  */
 export const GetStocksReceptionnesResponseItem = zod.object({

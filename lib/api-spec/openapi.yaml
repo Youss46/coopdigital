@@ -981,6 +981,39 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /ventes/lots-auto:
+    post:
+      operationId: createLotAutoForVente
+      tags: [exportateurs]
+      summary: Constituer un lot de vente à partir des livraisons de la coopérative
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLotAutoVenteInput"
+      responses:
+        "201":
+          description: Lot créé pour le parcours de vente cacao
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LotDetail"
+        "400":
+          description: Sélection invalide
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Livraisons hors du périmètre autorisé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /ventes/stocks-receptionnes:
     get:
       operationId: getStocksReceptionnes
@@ -9107,6 +9140,23 @@ components:
         fractionPoidsKg:
           type: number
           description: Poids extrait de la livraison fractionnée
+
+    CreateLotAutoVenteInput:
+      type: object
+      additionalProperties: false
+      required: [livraisonIds]
+      properties:
+        livraisonIds:
+          type: array
+          minItems: 1
+          items:
+            type: integer
+            minimum: 1
+        entrepot:
+          type: string
+        nombreSacs:
+          type: integer
+          minimum: 1
 
     LotStatutInput:
       type: object

@@ -114,6 +114,7 @@ import type {
   CreateEquipementBody,
   CreateLitige201,
   CreateLitigeBody,
+  CreateLotAutoVenteInput,
   CreateMaintenanceBody,
   CreateMissionTransportBody,
   CreatePersonnelInput,
@@ -3455,6 +3456,77 @@ export const useCreateVente = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getCreateVenteMutationOptions(options));
+    }
+
+export const getCreateLotAutoForVenteUrl = () => {
+
+
+
+
+  return `/api/ventes/lots-auto`
+}
+
+/**
+ * @summary Constituer un lot de vente à partir des livraisons de la coopérative
+ */
+export const createLotAutoForVente = async (createLotAutoVenteInput: CreateLotAutoVenteInput, options?: RequestInit): Promise<LotDetail> => {
+
+  return customFetch<LotDetail>(getCreateLotAutoForVenteUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createLotAutoVenteInput,)
+  }
+);}
+
+
+
+
+export const getCreateLotAutoForVenteMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createLotAutoForVente>>, TError,{data: BodyType<CreateLotAutoVenteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createLotAutoForVente>>, TError,{data: BodyType<CreateLotAutoVenteInput>}, TContext> => {
+
+const mutationKey = ['createLotAutoForVente'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createLotAutoForVente>>, {data: BodyType<CreateLotAutoVenteInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createLotAutoForVente(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateLotAutoForVenteMutationResult = NonNullable<Awaited<ReturnType<typeof createLotAutoForVente>>>
+    export type CreateLotAutoForVenteMutationBody = BodyType<CreateLotAutoVenteInput>
+    export type CreateLotAutoForVenteMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Constituer un lot de vente à partir des livraisons de la coopérative
+ */
+export const useCreateLotAutoForVente = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createLotAutoForVente>>, TError,{data: BodyType<CreateLotAutoVenteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createLotAutoForVente>>,
+        TError,
+        {data: BodyType<CreateLotAutoVenteInput>},
+        TContext
+      > => {
+      return useMutation(getCreateLotAutoForVenteMutationOptions(options));
     }
 
 export const getGetStocksReceptionnesUrl = () => {

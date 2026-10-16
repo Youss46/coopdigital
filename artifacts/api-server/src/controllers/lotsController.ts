@@ -363,6 +363,37 @@ export async function previewAutoLot(req: Request, res: Response): Promise<void>
 }
 
 export async function createLot(req: Request, res: Response): Promise<void> {
+  return createLotInternal(req, res, false);
+}
+
+export async function createLotForVente(req: Request, res: Response): Promise<void> {
+  const body = req.body as {
+    livraisonIds?: unknown;
+    nombreSacs?: unknown;
+    entrepot?: unknown;
+  } | null;
+
+  if (!body || !Array.isArray(body.livraisonIds) || body.livraisonIds.length === 0) {
+    res.status(400).json({ erreur: "Sélectionnez au moins une livraison pour constituer le lot de vente" });
+    return;
+  }
+
+  // Cette route ne doit exposer que la constitution de lot utilisée par les ventes.
+  // Les paramètres génériques (fractionnement, quantité cible, etc.) restent réservés
+  // au parcours de gestion des lots.
+  req.body = {
+    livraisonIds: body.livraisonIds,
+    nombreSacs: body.nombreSacs,
+    entrepot: body.entrepot,
+  };
+  return createLotInternal(req, res, true);
+}
+
+async function createLotInternal(
+  req: Request,
+  res: Response,
+  membresUniquement: boolean,
+): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
   if (!cooperativeId) {
     res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
@@ -494,6 +525,12 @@ export async function createLot(req: Request, res: Response): Promise<void> {
     // Vérifier que toutes les livraisons appartiennent à cette coopérative
     // (membres OU fournisseurs externes) — on utilise Drizzle type-safe au lieu
     // de sql`ANY()` qui ne sérialise pas les tableaux JS correctement avec pg.
+    const perimetreLivraisons = membresUniquement
+      ? eq(membresTable.cooperativeId, cooperativeId)
+      : or(
+          eq(membresTable.cooperativeId, cooperativeId),
+          eq(fournisseursTable.cooperativeId, cooperativeId),
+        );
     const livraisonsVerif = await db
       .select({ id: livraisonsTable.id })
       .from(livraisonsTable)
@@ -502,10 +539,7 @@ export async function createLot(req: Request, res: Response): Promise<void> {
       .where(
         and(
           inArray(livraisonsTable.id, livraisonIds),
-          or(
-            eq(membresTable.cooperativeId, cooperativeId),
-            eq(fournisseursTable.cooperativeId, cooperativeId),
-          ),
+          perimetreLivraisons,
         ),
       );
 
