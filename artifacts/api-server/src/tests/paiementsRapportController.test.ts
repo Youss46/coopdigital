@@ -155,6 +155,7 @@ describe("rapport des règlements de livraisons en attente", () => {
     const query = mocks.execute.mock.calls[0]?.[0] as { strings: string[]; values: unknown[] };
     expect(query.strings.join("")).toContain("m.delegue_id");
     expect(query.strings.join("")).toContain("f.cree_par_delegue_id");
+    expect(query.strings.join("")).toContain("::integer IS NOT NULL");
     expect(query.values).toContain(true);
     expect(query.values).toContain(19);
   });

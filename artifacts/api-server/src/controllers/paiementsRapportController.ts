@@ -99,7 +99,7 @@ export async function getPaiementsRapportEnAttente(req: Request, res: Response):
           AND (
             (
               ${estDelegue}::boolean
-              AND ${utilisateurId} IS NOT NULL
+              AND ${utilisateurId}::integer IS NOT NULL
               AND (
                 m.delegue_id = ${utilisateurId}
                 OR f.cree_par_delegue_id = ${utilisateurId}

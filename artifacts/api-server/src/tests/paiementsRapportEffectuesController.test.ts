@@ -245,6 +245,7 @@ describe("rapport des règlements effectivement réalisés", () => {
     }));
     const query = mocks.execute.mock.calls[0]?.[0] as { strings: string[]; values: unknown[] };
     expect(query.strings.join("")).toContain("m.delegue_id");
+    expect(query.strings.join("")).toContain("::integer IS NOT NULL");
     expect(query.values).toContain(true);
     expect(query.values).toContain(19);
   });
