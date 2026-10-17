@@ -254,6 +254,82 @@ export async function listAvances(req: Request, res: Response): Promise<void> {
   }
 }
 
+export async function getRapportAvancesDeleguesLocalites(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  const cooperativeId = req.user?.cooperativeId;
+  if (!cooperativeId) {
+    res.status(403).json({ erreur: "Coopérative non associée à ce compte" });
+    return;
+  }
+
+  const membreIdParam = req.query["membre_id"];
+  const membreId = membreDelegueLocaliteCible(res)
+    ?? (membreIdParam === undefined ? undefined : Number(membreIdParam));
+  if (membreId !== undefined && (!Number.isInteger(membreId) || membreId <= 0)) {
+    res.status(400).json({ erreur: "Identifiant de délégué invalide" });
+    return;
+  }
+
+  try {
+    const today = new Date().toISOString().split("T")[0]!;
+    const conditions = construireConditionsAvances(req, res, cooperativeId, membreId);
+    const avances = await db
+      .select({
+        id: avancesTable.id,
+        membreId: avancesTable.membreId,
+        membreNom: membresTable.nom,
+        membrePrenoms: membresTable.prenoms,
+        section: membresTable.section,
+        village: membresTable.village,
+        montantOctroyeFcfa: avancesTable.montantOctroyeFcfa,
+        montantRembourseFcfa: avancesTable.montantRembourse_fcfa,
+        soldeRestantFcfa: avancesTable.soldeRestantFcfa,
+        dateOctroi: avancesTable.dateOctroi,
+        dateEcheance: avancesTable.dateEcheance,
+        reportDate: avancesTable.reportDate,
+        motif: avancesTable.motif,
+        statut: avancesTable.statut,
+      })
+      .from(avancesTable)
+      .leftJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
+      .where(and(
+        ...conditions,
+        sql`(${statutAvanceEffectifSql(today)})::text IN ('en_cours', 'en_retard')`,
+      ))
+      .orderBy(desc(avancesTable.createdAt), desc(avancesTable.id));
+
+    const items = avances.map((avance) => ({
+      ...avance,
+      montantOctroyeFcfa: Number(avance.montantOctroyeFcfa ?? 0),
+      montantRembourseFcfa: Number(avance.montantRembourseFcfa ?? 0),
+      soldeRestantFcfa: Number(avance.soldeRestantFcfa ?? 0),
+      dateEcheance: getEcheanceAvanceEffective(avance.dateEcheance, avance.reportDate),
+      statut: getStatutAvanceEffectif(
+        avance.statut,
+        avance.dateEcheance,
+        avance.reportDate,
+        today,
+      ),
+    }));
+
+    res.json({
+      items,
+      nombreAvances: items.length,
+      nombreEnCours: items.filter((avance) => avance.statut === "en_cours").length,
+      nombreEnRetard: items.filter((avance) => avance.statut === "en_retard").length,
+      totalMontantOctroyeFcfa: items.reduce((total, avance) => total + avance.montantOctroyeFcfa, 0),
+      totalMontantRembourseFcfa: items.reduce((total, avance) => total + avance.montantRembourseFcfa, 0),
+      totalSoldeRestantFcfa: items.reduce((total, avance) => total + avance.soldeRestantFcfa, 0),
+      genereLe: new Date().toISOString(),
+    });
+  } catch (err) {
+    req.log.error({ err }, "Erreur getRapportAvancesDeleguesLocalites");
+    res.status(500).json({ erreur: apiError(err) });
+  }
+}
+
 export async function getAvancesDeleguesLocalitesResume(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
   if (!cooperativeId) {

@@ -6,12 +6,14 @@ import {
   ChevronRight, ChevronDown, AlertCircle, CalendarDays, TrendingUp, Settings,
   CheckCircle2, Clock, Banknote, Trash2, ArrowDownCircle, Package,
   Download, ShoppingCart, Truck, Pencil, History,
+  Printer,
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { MoneyInput } from "@/components/ui/money-input";
 import { usePermission } from "@/hooks/usePermission";
 import { useAuth } from "@/contexts/AuthContext";
+import AvancesDeleguesRapportModal from "@/components/AvancesDeleguesRapportModal";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok = () => localStorage.getItem("coop_token") ?? "";
@@ -403,6 +405,7 @@ export default function DeleguesLocalitesPage() {
   ));
   const [filtreAvances, setFiltreAvances] = useState<FiltreAvances>("toutes");
   const [pageAvances, setPageAvances] = useState(1);
+  const [rapportAvancesOuvert, setRapportAvancesOuvert] = useState(false);
   const [search, setSearch] = useState("");
   const [filtreLivraisons, setFiltreLivraisons] = useState<FiltreStatutLivraison>("tous");
   const [searchLivraisons, setSearchLivraisons] = useState("");
@@ -1014,6 +1017,17 @@ export default function DeleguesLocalitesPage() {
                 className="flex items-center justify-center gap-1.5 rounded-lg bg-[#1a4731] px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#123525]"
               >
                 <PlusCircle size={15} /> Octroyer une avance
+              </button>
+            )}
+            {peutLireAvances && (
+              <button
+                type="button"
+                data-testid="button-open-rapport-avances"
+                onClick={() => setRapportAvancesOuvert(true)}
+                className="flex items-center justify-center gap-1.5 rounded-lg border border-green-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-green-800 hover:bg-green-50"
+              >
+                <Printer size={15} />
+                Imprimer les avances dues
               </button>
             )}
           </div>
@@ -2518,6 +2532,15 @@ export default function DeleguesLocalitesPage() {
             </div>
           </div>
         </div>
+      )}
+      {rapportAvancesOuvert && (
+        <AvancesDeleguesRapportModal
+          membreId={membreAvancesId}
+          membreNom={membreAvancesSelectionne
+            ? [membreAvancesSelectionne.prenoms, membreAvancesSelectionne.nom].filter(Boolean).join(" ")
+            : null}
+          onClose={() => setRapportAvancesOuvert(false)}
+        />
       )}
     </div>
   );
