@@ -115,6 +115,7 @@ describe("rapport des règlements de livraisons en attente", () => {
     const sqlText = query.strings.join("");
     expect(sqlText).toContain("DISTINCT ON (l.id)");
     expect(sqlText).toContain("p.statut = 'en_attente'");
+    expect(sqlText).toContain("p.bon_carburant_id IS NULL");
     expect(sqlText).toContain("l.date_livraison >= ");
     expect(sqlText).toContain("l.cooperative_id = ");
     expect(query.values).toContain(42);

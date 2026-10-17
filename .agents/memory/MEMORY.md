@@ -149,3 +149,4 @@
 - [Réparations techniques hors parcours métier](maintenance-repair-hidden-ui.md) — conserver les réparations idempotentes côté serveur, mais ne pas exposer un bouton de maintenance dans le parcours utilisateur courant.
 - [Codes d’erreur métier offline](offline-business-error-codes.md) — classifier les rejets API via le code sérialisé, pas via `instanceof`, puis conserver le brouillon avec son identifiant.
 - [Installation pnpm derrière le firewall](pnpm-firewall-install.md) — si un paquet annexe bloque l’installation globale, réparer la version bloquée puis installer le graphe ciblé avec les filtres pnpm.
+- [Séparation des fiches règlement et carburant](reglements-fuel-report-separation.md) — les fiches générales en attente/effectuées excluent le carburant; ses bons ont des impressions dédiées.

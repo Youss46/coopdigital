@@ -65,8 +65,8 @@ describe("fiche imprimable des règlements en attente", () => {
       dateDebut: "2026-01-01",
       dateFin: "2026-01-31",
       genereLe: "2026-02-01T10:00:00.000Z",
-      nombreReglements: 3,
-      totalMontantRegleFcfa: 15000,
+      nombreReglements: 2,
+      totalMontantRegleFcfa: 11000,
       items: [
         {
           id: "paiement-ligne-11",
@@ -80,19 +80,6 @@ describe("fiche imprimable des règlements en attente", () => {
           modePaiement: "especes",
           referencePaiement: "REC-10",
           montantFcfa: 6000,
-        },
-        {
-          id: "paiement-ligne-12",
-          dateReglement: "2026-01-08",
-          typeOperation: "carburant",
-          dateOperation: "2026-01-06",
-          referenceOperation: "BON-12",
-          beneficiaire: "Station Abidjan",
-          description: "gasoil · mission",
-          village: null,
-          modePaiement: "orange_money",
-          referencePaiement: "REC-12",
-          montantFcfa: 4000,
         },
         {
           id: "cheque-13",
@@ -113,10 +100,10 @@ describe("fiche imprimable des règlements en attente", () => {
     expect(html).toContain("Liste des règlements effectués");
     expect(html).toContain("CHQ-13");
     expect(html).toContain("Chèque encaissé");
-    expect(html).toContain("Bon carburant");
+    expect(html).not.toContain("Bon carburant");
     expect(html).toContain("Dépense véhicule");
     expect(html).toContain("Garage K");
     expect(html).toContain("Total réglé sur la période");
-    expect(html.match(/15\s*000 FCFA/g)).toHaveLength(2);
+    expect(html.match(/11\s*000 FCFA/g)).toHaveLength(2);
   });
 });

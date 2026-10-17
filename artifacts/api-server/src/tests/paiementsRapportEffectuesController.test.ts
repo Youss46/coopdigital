@@ -59,7 +59,7 @@ describe("rapport des règlements effectivement réalisés", () => {
     expect(mocks.execute).not.toHaveBeenCalled();
   });
 
-  it("retourne les règlements des livraisons, du carburant et des véhicules avec leur total", async () => {
+  it("retourne les règlements des livraisons et des véhicules, sans inclure le carburant", async () => {
     mocks.execute.mockResolvedValue({
       rows: [
         {
@@ -75,20 +75,6 @@ describe("rapport des règlements effectivement réalisés", () => {
           modePaiement: "especes",
           referencePaiement: "REC-10",
           montantFcfa: "6000",
-        },
-        {
-          cooperativeNom: "COOBEPA",
-          itemId: "paiement-ligne-12",
-          dateReglement: "2026-01-08",
-          typeOperation: "carburant",
-          dateOperation: "2026-01-06",
-          referenceOperation: "BON-12",
-          beneficiaire: "Station Abidjan",
-          description: "gasoil · mission",
-          village: null,
-          modePaiement: "orange_money",
-          referencePaiement: "REC-12",
-          montantFcfa: "4000",
         },
         {
           cooperativeNom: "COOBEPA",
@@ -135,8 +121,8 @@ describe("rapport des règlements effectivement réalisés", () => {
       cooperativeNom: "COOBEPA",
       dateDebut: "2026-01-01",
       dateFin: "2026-01-31",
-      nombreReglements: 4,
-      totalMontantRegleFcfa: 17500,
+      nombreReglements: 3,
+      totalMontantRegleFcfa: 13500,
       items: [
         {
           id: "paiement-ligne-10",
@@ -150,19 +136,6 @@ describe("rapport des règlements effectivement réalisés", () => {
           modePaiement: "especes",
           referencePaiement: "REC-10",
           montantFcfa: 6000,
-        },
-        {
-          id: "paiement-ligne-12",
-          dateReglement: "2026-01-08",
-          typeOperation: "carburant",
-          dateOperation: "2026-01-06",
-          referenceOperation: "BON-12",
-          beneficiaire: "Station Abidjan",
-          description: "gasoil · mission",
-          village: null,
-          modePaiement: "orange_money",
-          referencePaiement: "REC-12",
-          montantFcfa: 4000,
         },
         {
           id: "paiement-ligne-13",
@@ -199,6 +172,7 @@ describe("rapport des règlements effectivement réalisés", () => {
     };
     const sqlText = query.strings.join("");
     expect(sqlText).toContain("p.statut IN ('confirme', 'effectue', 'en_cours')");
+    expect(sqlText).toContain("p.bon_carburant_id IS NULL");
     expect(sqlText).toContain("pl.mode_paiement <> 'cheque'");
     expect(sqlText).toContain("ch.statut = 'encaisse'");
     expect(sqlText).toContain("COALESCE(p.date_validation, p.created_at)::date");

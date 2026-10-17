@@ -5,6 +5,10 @@ import { checkPermission } from "../middlewares/permissions";
 import { listPaiements, validerPaiement, validerLotPaiementsCarburant, rejeterPaiement, annulerRejetPaiement, statsPaiements } from "../controllers/paiementsController";
 import { getPaiementsRapportEnAttente } from "../controllers/paiementsRapportController.js";
 import { getPaiementsRapportEffectues } from "../controllers/paiementsRapportEffectuesController.js";
+import {
+  handleGetBonsCarburantReglementPdf,
+  handleGetBonsCarburantRecuReglementPdf,
+} from "../controllers/transportController";
 import * as cartesProducteurs from "../controllers/reglementsCartesProducteursController";
 
 const router = Router();
@@ -12,6 +16,8 @@ const router = Router();
 router.get("/paiements/stats", authMiddleware, checkPermission("paiements", "lire"), statsPaiements);
 router.get("/paiements/rapport-en-attente", authMiddleware, checkPermission("paiements", "lire"), getPaiementsRapportEnAttente);
 router.get("/paiements/rapport-effectues", authMiddleware, checkPermission("paiements", "lire"), getPaiementsRapportEffectues);
+router.get("/paiements/rapport-carburant-en-attente-pdf", authMiddleware, checkPermission("paiements", "lire"), handleGetBonsCarburantReglementPdf);
+router.get("/paiements/rapport-carburant-effectues-pdf", authMiddleware, checkPermission("paiements", "lire"), handleGetBonsCarburantRecuReglementPdf);
 router.get("/paiements/cartes-producteur", authMiddleware, checkPermission("paiements", "lire"), cartesProducteurs.list);
 router.post("/paiements/cartes-producteur/:id/payer", authMiddleware, checkPermission("paiements", "valider"), auditMiddleware("paiements", "VALIDATE", { entiteIdParam: "id", entiteType: "reglement_carte_producteur" }), cartesProducteurs.payer);
 router.post("/paiements/cartes-producteur/:id/rejeter", authMiddleware, checkPermission("paiements", "rejeter"), auditMiddleware("paiements", "REJECT", { entiteIdParam: "id", entiteType: "reglement_carte_producteur" }), cartesProducteurs.rejeter);

@@ -89,6 +89,7 @@ export async function getPaiementsRapportEnAttente(req: Request, res: Response):
         LEFT JOIN users agent_user ON agent_user.id = l.agent_id
         WHERE p.statut = 'en_attente'
           AND p.livraison_id IS NOT NULL
+          AND p.bon_carburant_id IS NULL
           AND l.cooperative_id = ${cooperativeId}
           AND l.date_livraison >= ${dateDebut}::date
           AND l.date_livraison <= ${dateFin}::date

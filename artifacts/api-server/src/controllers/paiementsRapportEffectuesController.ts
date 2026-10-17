@@ -128,6 +128,7 @@ export async function getPaiementsRapportEffectues(req: Request, res: Response):
             OR p.bon_carburant_id IS NOT NULL
             OR p.depense_vehicule_id IS NOT NULL
           )
+          AND p.bon_carburant_id IS NULL
           AND COALESCE(l.cooperative_id, b.cooperative_id, d.cooperative_id) = ${cooperativeId}
           AND (
             (
