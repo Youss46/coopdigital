@@ -61,6 +61,27 @@ function toDateStr(d: Date | null | undefined): string | null | undefined {
   return d instanceof Date ? d.toISOString().split("T")[0] : String(d);
 }
 
+function estDateRapportValide(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+function lirePeriodeRapportCarburant(req: Request):
+  | { periode?: { dateDebut: string; dateFin: string }; erreur?: never }
+  | { periode?: never; erreur: string } {
+  const hasStart = req.query["date_debut"] !== undefined;
+  const hasEnd = req.query["date_fin"] !== undefined;
+  if (!hasStart && !hasEnd) return {};
+
+  const dateDebut = typeof req.query["date_debut"] === "string" ? req.query["date_debut"] : "";
+  const dateFin = typeof req.query["date_fin"] === "string" ? req.query["date_fin"] : "";
+  if (!estDateRapportValide(dateDebut) || !estDateRapportValide(dateFin) || dateDebut > dateFin) {
+    return { erreur: "Sélectionnez une période valide avec les dates au format AAAA-MM-JJ." };
+  }
+  return { periode: { dateDebut, dateFin } };
+}
+
 // ─── Mappers Drizzle (camelCase) → API snake_case ────────────────────────────
 
 type DrizzleVehicule = Awaited<ReturnType<typeof getVehicules>>[number];
@@ -1139,13 +1160,15 @@ export async function handleGetBonsCarburantReglementPdf(req: Request, res: Resp
   try {
     const cooperativeId = req.user?.cooperativeId;
     if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
+    const { periode, erreur } = lirePeriodeRapportCarburant(req);
+    if (erreur) { res.status(400).json({ erreur }); return; }
     const rawIds = typeof req.query["ids"] === "string" ? req.query["ids"] : "";
     const bonIds = rawIds
       .split(",")
       .map(value => Number(value.trim()))
       .filter(Number.isInteger)
       .filter(value => value > 0);
-    const rows = await getBonsCarburantPourReglement(cooperativeId, bonIds.length ? bonIds : undefined);
+    const rows = await getBonsCarburantPourReglement(cooperativeId, bonIds.length ? bonIds : undefined, periode);
     if (rows.length === 0) {
       res.status(404).json({ erreur: "Aucun bon utilisé en attente de règlement pour ces critères." });
       return;
@@ -1174,7 +1197,9 @@ export async function handleGetBonsCarburantRecuReglementPdf(req: Request, res: 
   try {
     const cooperativeId = req.user?.cooperativeId;
     if (!cooperativeId) { res.status(400).json({ erreur: "Coopérative introuvable" }); return; }
-    const rows = await getBonsCarburantPourRecuReglement(cooperativeId);
+    const { periode, erreur } = lirePeriodeRapportCarburant(req);
+    if (erreur) { res.status(400).json({ erreur }); return; }
+    const rows = await getBonsCarburantPourRecuReglement(cooperativeId, periode);
     if (rows.length === 0) {
       res.status(404).json({ erreur: "Aucun bon carburant réglé pour cette coopérative." });
       return;

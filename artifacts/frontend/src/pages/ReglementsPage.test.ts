@@ -8,6 +8,7 @@ import {
   currentPendingFuelIds,
   filterReglementsByTab,
 } from "./ReglementsPage";
+import CarburantReglementsRapportModal from "@/components/CarburantReglementsRapportModal";
 
 function normaliserEspaces(value: string) {
   return value.replace(/[\u00a0\u202f]/g, " ");
@@ -371,5 +372,50 @@ describe("modale de validation d'un règlement", () => {
       undefined,
       true,
     );
+  });
+});
+
+describe("modale d'impression des règlements carburant", () => {
+  let container: HTMLDivElement;
+  let root: Root;
+
+  afterEach(() => {
+    act(() => root?.unmount());
+    container?.remove();
+  });
+
+  it("transmet la période sélectionnée au rapport carburant", async () => {
+    const onGenerate = vi.fn().mockResolvedValue(true);
+    const onClose = vi.fn();
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root.render(createElement(CarburantReglementsRapportModal, {
+        type: "effectues",
+        loading: false,
+        onClose,
+        onGenerate,
+      }));
+    });
+
+    const start = container.querySelector<HTMLInputElement>('[data-testid="input-rapport-carburant-date-debut"]')!;
+    const end = container.querySelector<HTMLInputElement>('[data-testid="input-rapport-carburant-date-fin"]')!;
+    await act(async () => {
+      const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setValue?.call(start, "2026-03-01");
+      start.dispatchEvent(new Event("input", { bubbles: true }));
+      start.dispatchEvent(new Event("change", { bubbles: true }));
+      setValue?.call(end, "2026-03-31");
+      end.dispatchEvent(new Event("input", { bubbles: true }));
+      end.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    const print = container.querySelector<HTMLButtonElement>('[data-testid="button-print-rapport-carburant-effectues"]')!;
+    await act(async () => print.click());
+
+    expect(onGenerate).toHaveBeenCalledWith("2026-03-01", "2026-03-31");
+    expect(onClose).toHaveBeenCalledOnce();
   });
 });

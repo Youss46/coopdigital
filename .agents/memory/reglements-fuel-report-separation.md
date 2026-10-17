@@ -7,4 +7,4 @@ Les fiches générales « règlements en attente » et « règlements effectués
 
 **Why:** les règlements carburant ont leurs propres bons, stations et états de règlement; l’utilisateur a explicitement demandé des documents distincts.
 
-**How to apply:** exclure les paiements liés à un bon carburant des rapports généraux et réutiliser les impressions dédiées aux bons pour les listes carburant en attente et réglés.
+**How to apply:** exclure les paiements liés à un bon carburant des rapports généraux et réutiliser les impressions dédiées aux bons pour les listes carburant en attente et réglés. Pour les périodes carburant, filtrer les bons en attente par date d’utilisation; filtrer les règlements effectués par date_validation, sinon created_at.

@@ -658,12 +658,15 @@ export async function getBonsCarburant(cooperativeId: number, filters: BonCarbur
 export async function getBonsCarburantPourReglement(
   cooperativeId: number,
   bonIds?: number[],
+  periode?: { dateDebut?: string; dateFin?: string },
 ) {
   const conds = [
     eq(bonsCarburantTable.cooperativeId, cooperativeId),
     eq(bonsCarburantTable.statut, "utilise"),
     eq(paiementsTable.statut, "en_attente"),
   ];
+  if (periode?.dateDebut) conds.push(gte(bonsCarburantTable.dateUtilisation, periode.dateDebut));
+  if (periode?.dateFin) conds.push(lte(bonsCarburantTable.dateUtilisation, periode.dateFin));
   if (bonIds?.length) {
     conds.push(inArray(bonsCarburantTable.id, bonIds));
   }
@@ -684,7 +687,22 @@ export async function getBonsCarburantPourReglement(
     .orderBy(bonsCarburantTable.stationService, bonsCarburantTable.dateUtilisation, bonsCarburantTable.numero);
 }
 
-export async function getBonsCarburantPourRecuReglement(cooperativeId: number) {
+export async function getBonsCarburantPourRecuReglement(
+  cooperativeId: number,
+  periode?: { dateDebut?: string; dateFin?: string },
+) {
+  const conds = [
+    eq(bonsCarburantTable.cooperativeId, cooperativeId),
+    eq(bonsCarburantTable.statut, "utilise"),
+    inArray(paiementsTable.statut, ["confirme", "effectue"]),
+  ];
+  if (periode?.dateDebut) {
+    conds.push(sql`DATE(COALESCE(${paiementsTable.dateValidation}, ${paiementsTable.createdAt})) >= ${periode.dateDebut}::date`);
+  }
+  if (periode?.dateFin) {
+    conds.push(sql`DATE(COALESCE(${paiementsTable.dateValidation}, ${paiementsTable.createdAt})) <= ${periode.dateFin}::date`);
+  }
+
   return db
     .select({
       numero: bonsCarburantTable.numero,
@@ -701,11 +719,7 @@ export async function getBonsCarburantPourRecuReglement(cooperativeId: number) {
     .innerJoin(bonsCarburantTable, eq(paiementsTable.bonCarburantId, bonsCarburantTable.id))
     .leftJoin(vehiculesTable, eq(vehiculesTable.id, bonsCarburantTable.vehiculeId))
     .leftJoin(chauffeursTable, eq(chauffeursTable.id, bonsCarburantTable.chauffeurId))
-    .where(and(
-      eq(bonsCarburantTable.cooperativeId, cooperativeId),
-      eq(bonsCarburantTable.statut, "utilise"),
-      inArray(paiementsTable.statut, ["confirme", "effectue"]),
-    ))
+    .where(and(...conds))
     .groupBy(bonsCarburantTable.id, vehiculesTable.id, chauffeursTable.id)
     .orderBy(bonsCarburantTable.stationService, bonsCarburantTable.dateUtilisation, bonsCarburantTable.numero);
 }

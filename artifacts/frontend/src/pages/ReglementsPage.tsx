@@ -26,6 +26,7 @@ import { usePermission } from "@/hooks/usePermission";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import ReglementsRapportModal from "@/components/ReglementsRapportModal";
+import CarburantReglementsRapportModal from "@/components/CarburantReglementsRapportModal";
 import { openPdfViewer } from "@/lib/pdfViewer";
 
 function nomProducteur(p: PaiementListItem) {
@@ -1469,6 +1470,7 @@ export default function ReglementsPage() {
   const [onglet, setOnglet] = useState<ReglementOnglet>("livraisons");
   const [page, setPage] = useState(1);
   const [typeRapportOuvert, setTypeRapportOuvert] = useState<"attente" | "effectues" | null>(null);
+  const [typeRapportCarburantOuvert, setTypeRapportCarburantOuvert] = useState<"attente" | "effectues" | null>(null);
   const [rapportCarburantEnCours, setRapportCarburantEnCours] = useState<"attente" | "effectues" | null>(null);
   const [modal, setModal] = useState<ModalState>(null);
   const [transportModal, setTransportModal] = useState<FraisTransportARegler | null>(null);
@@ -1484,29 +1486,33 @@ export default function ReglementsPage() {
   const qc = useQueryClient();
   const { toast } = useToast();
 
-  async function ouvrirRapportCarburant(type: "attente" | "effectues") {
+  async function ouvrirRapportCarburant(type: "attente" | "effectues", dateDebut: string, dateFin: string): Promise<boolean> {
     setRapportCarburantEnCours(type);
     try {
       const endpoint = type === "attente"
         ? "/api/paiements/rapport-carburant-en-attente-pdf"
         : "/api/paiements/rapport-carburant-effectues-pdf";
-      const response = await fetch(`${BASE}${endpoint}`, {
+      const query = new URLSearchParams({ date_debut: dateDebut, date_fin: dateFin });
+      const response = await fetch(`${BASE}${endpoint}?${query.toString()}`, {
         headers: { Authorization: `Bearer ${tok()}` },
       });
       if (!response.ok) {
         const payload = await response.json().catch(() => null) as { erreur?: string } | null;
         throw new Error(payload?.erreur ?? "Impossible de générer la fiche carburant.");
       }
+      const suffixePeriode = `${dateDebut}-${dateFin}`;
       const filename = type === "attente"
-        ? "fiche-reglements-carburant-en-attente.pdf"
-        : "fiche-reglements-carburant-effectues.pdf";
+        ? `fiche-reglements-carburant-en-attente-${suffixePeriode}.pdf`
+        : `fiche-reglements-carburant-effectues-${suffixePeriode}.pdf`;
       openPdfViewer(URL.createObjectURL(await response.blob()), filename);
+      return true;
     } catch (error) {
       toast({
         title: "Fiche carburant impossible",
         description: error instanceof Error ? error.message : "Une erreur est survenue.",
         variant: "destructive",
       });
+      return false;
     } finally {
       setRapportCarburantEnCours(null);
     }
@@ -1920,8 +1926,8 @@ export default function ReglementsPage() {
             <button
               type="button"
               data-testid="button-open-carburant-en-attente"
-              title="Imprime séparément les bons carburant actuellement en attente de règlement."
-              onClick={() => void ouvrirRapportCarburant("attente")}
+              title="Imprime séparément les bons carburant en attente, avec choix de période."
+              onClick={() => setTypeRapportCarburantOuvert("attente")}
               disabled={rapportCarburantEnCours !== null}
               className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-50 disabled:cursor-wait disabled:opacity-60"
             >
@@ -1931,8 +1937,8 @@ export default function ReglementsPage() {
             <button
               type="button"
               data-testid="button-open-carburant-effectues"
-              title="Imprime séparément les règlements carburant déjà effectués."
-              onClick={() => void ouvrirRapportCarburant("effectues")}
+              title="Imprime séparément les règlements carburant effectués, avec choix de période."
+              onClick={() => setTypeRapportCarburantOuvert("effectues")}
               disabled={rapportCarburantEnCours !== null}
               className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-50 disabled:cursor-wait disabled:opacity-60"
             >
@@ -2478,6 +2484,14 @@ export default function ReglementsPage() {
         <ReglementsRapportModal
           type={typeRapportOuvert}
           onClose={() => setTypeRapportOuvert(null)}
+        />
+      )}
+      {typeRapportCarburantOuvert && (
+        <CarburantReglementsRapportModal
+          type={typeRapportCarburantOuvert}
+          loading={rapportCarburantEnCours === typeRapportCarburantOuvert}
+          onClose={() => setTypeRapportCarburantOuvert(null)}
+          onGenerate={(dateDebut, dateFin) => ouvrirRapportCarburant(typeRapportCarburantOuvert, dateDebut, dateFin)}
         />
       )}
     </div>
