@@ -118,8 +118,13 @@ vi.mock("../lib/campagneGuard.js", () => ({
   assertCampagneActiveExiste: vi.fn(),
 }));
 
-const { listAvances, getAvancesDeleguesLocalitesResume, getAvancesEncours, getAvancesReportees } =
-  await import("../controllers/avancesController.js");
+const {
+  listAvances,
+  getAvancesDeleguesLocalitesResume,
+  getAvancesEncours,
+  getAvancesReportees,
+  getRapportAvancesDeleguesLocalites,
+} = await import("../controllers/avancesController.js");
 
 function effectiveStatus(row: Row): string {
   const status = String(row["statut"] ?? "");
@@ -290,6 +295,45 @@ describe("listes des avances ordinaires", () => {
     expect(res.status).not.toHaveBeenCalledWith(500);
     const payload = vi.mocked(res.json).mock.calls[0]![0] as { avances: Array<{ membreId: number }> };
     expect(payload.avances.map((avance) => avance.membreId)).toEqual([13]);
+  });
+
+  it("isole le rapport d’avances par coopérative, y compris avec un membre_id fourni", async () => {
+    fixtures.rows.push({
+      ...fixtures.rows[2]!,
+      id: 4,
+      membreId: 99,
+      cooperativeId: 99,
+      membreNom: "Délégué d’une autre coopérative",
+      soldeRestantFcfa: 80_000,
+      montantOctroyeFcfa: 100_000,
+    });
+
+    const resGlobal = response();
+    resGlobal.locals.membreDelegueLocalite = true;
+    await getRapportAvancesDeleguesLocalites(request(), resGlobal);
+
+    const rapportGlobal = vi.mocked(resGlobal.json).mock.calls[0]![0] as {
+      items: Array<{ membreId: number }>;
+      totalSoldeRestantFcfa: number;
+    };
+    expect(rapportGlobal.items.map((avance) => avance.membreId)).toEqual([13]);
+    expect(rapportGlobal.totalSoldeRestantFcfa).toBe(30_000);
+
+    const resMembreAutreCooperative = response();
+    resMembreAutreCooperative.locals.membreDelegueLocalite = true;
+    await getRapportAvancesDeleguesLocalites(
+      request({ membre_id: "99" }),
+      resMembreAutreCooperative,
+    );
+
+    const rapportMembreAutreCooperative = vi.mocked(resMembreAutreCooperative.json).mock.calls[0]![0] as {
+      items: Array<{ membreId: number }>;
+      nombreAvances: number;
+      totalSoldeRestantFcfa: number;
+    };
+    expect(rapportMembreAutreCooperative.items).toEqual([]);
+    expect(rapportMembreAutreCooperative.nombreAvances).toBe(0);
+    expect(rapportMembreAutreCooperative.totalSoldeRestantFcfa).toBe(0);
   });
 
   it("retourne une seule page de la liste globale avec les totaux globaux", async () => {
