@@ -4695,8 +4695,8 @@ function OngletAnomaliesIA() {
               </span>
             )}
           </h2>
-          <p className="text-xs text-gray-400 mt-0.5">
-            Claude Sonnet analyse chaque nuit les écritures de la veille et signale les anomalies au comptable.
+          <p className="text-xs text-amber-700 mt-0.5">
+            Les analyses automatiques par IA sont suspendues. Les anomalies déjà détectées restent consultables.
           </p>
         </div>
         <div className="flex items-center gap-2">
