@@ -1070,6 +1070,60 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
     });
   });
 
+  it("retrouve une ligne de chèque si son identifiant historique est périmé", async () => {
+    const { paymentId, deliveryId } = await createDeferredPayment(1_200_000);
+    const versement = await validate(paymentId, {
+      montantReglementFcfa: 1_000_000,
+      ventilations: [
+        { modePaiement: "especes", montantFcfa: 400_000 },
+        {
+          modePaiement: "cheque",
+          montantFcfa: 600_000,
+          numeroCheque: "CHQ-LIGNE-HISTORIQUE",
+        },
+      ],
+    });
+    expect(versement.statusCode, JSON.stringify(versement.body)).toBe(200);
+
+    const reliquatAvantAnnulation = await client.query(
+      `SELECT id FROM paiements
+       WHERE livraison_id = $1 AND statut = 'en_attente'`,
+      [deliveryId],
+    );
+    expect(reliquatAvantAnnulation.rows).toHaveLength(1);
+    paymentIds.push(reliquatAvantAnnulation.rows[0].id as number);
+
+    const cheque = await client.query(
+      `SELECT id FROM cheques_emis
+       WHERE paiement_id = $1 AND montant_fcfa = 600000`,
+      [paymentId],
+    );
+    expect(cheque.rows).toHaveLength(1);
+    await client.query(
+      `UPDATE cheques_emis SET paiement_ligne_id = 2147483647 WHERE id = $1`,
+      [cheque.rows[0].id],
+    );
+
+    await expect(
+      annulerCheque(cheque.rows[0].id, cooperativeId, {
+        motifAnnulation: "Ligne de chèque historique",
+      }),
+    ).resolves.toMatchObject({ statut: "annule" });
+
+    expect(await client.query(
+      `SELECT mode_paiement, montant_fcfa FROM paiement_lignes
+       WHERE paiement_id = $1 ORDER BY id`,
+      [paymentId],
+    )).toMatchObject({
+      rows: [{ mode_paiement: "especes", montant_fcfa: 400_000 }],
+    });
+    expect(await client.query(
+      `SELECT montant_fcfa FROM paiements
+       WHERE livraison_id = $1 AND statut = 'en_attente'`,
+      [deliveryId],
+    )).toMatchObject({ rows: [{ montant_fcfa: 800_000 }] });
+  });
+
   it("refuse une ventilation si la part réglée par chèque n'a pas de numéro", async () => {
     const { paymentId } = await createDeferredPayment(100_000);
     const result = await validate(paymentId, {

@@ -68,19 +68,29 @@ async function traiterPaiementApresRetourCheque(
     .where(eq(paiementLignesTable.paiementId, paiement.id))
     .orderBy(paiementLignesTable.id);
 
-  const ligneChequeIndex = lignes.findIndex((ligne) =>
-    cheque.paiementLigneId != null
-      ? ligne.id === cheque.paiementLigneId
-      : ligne.modePaiement === "cheque"
-        && ligne.montantFcfa === cheque.montantFcfa
-        && (!cheque.numeroCheque || ligne.numeroCheque === cheque.numeroCheque),
+  const ligneChequeParId = cheque.paiementLigneId == null
+    ? -1
+    : lignes.findIndex((ligne) => ligne.id === cheque.paiementLigneId);
+  const lignesChequeCorrespondantes = lignes.flatMap((ligne, index) =>
+    ligne.modePaiement === "cheque"
+      && ligne.montantFcfa === cheque.montantFcfa
+      && (!cheque.numeroCheque || ligne.numeroCheque === cheque.numeroCheque)
+      ? [index]
+      : [],
   );
+  const ligneChequeIndex = ligneChequeParId >= 0
+    ? ligneChequeParId
+    : lignesChequeCorrespondantes.length === 1
+      ? lignesChequeCorrespondantes[0]!
+      : -1;
   const paiementVentile = lignes.length > 1 || (paiement.modePaiement == null && lignes.length > 0);
 
   if (paiementVentile) {
     const ligneCheque = ligneChequeIndex >= 0 ? lignes[ligneChequeIndex] : null;
     if (!ligneCheque || ligneCheque.modePaiement !== "cheque") {
-      throw new Error("Ligne de chèque introuvable dans le règlement ventilé");
+      throw new Error(
+        "Ligne de chèque introuvable ou ambiguë dans le règlement; aucune autre ligne n'a été modifiée",
+      );
     }
 
     const lignesConservees = lignes.filter((ligne) => ligne.id !== ligneCheque.id);

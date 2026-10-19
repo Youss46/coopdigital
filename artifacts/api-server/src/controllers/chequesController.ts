@@ -134,6 +134,7 @@ export async function postRejeter(req: Request, res: Response): Promise<void> {
     const msg = (err as Error).message;
     if (msg === "Chèque introuvable") { res.status(404).json({ erreur: msg }); return; }
     if (msg.startsWith("Seul un chèque")) { res.status(409).json({ erreur: msg }); return; }
+    if (msg.startsWith("Ligne de chèque introuvable ou ambiguë")) { res.status(409).json({ erreur: msg }); return; }
     req.log.error({ err }, "Erreur postRejeter");
     res.status(500).json({ erreur: "Erreur interne" });
   }
@@ -158,6 +159,7 @@ export async function postAnnuler(req: Request, res: Response): Promise<void> {
     const msg = (err as Error).message;
     if (msg === "Chèque introuvable") { res.status(404).json({ erreur: msg }); return; }
     if (msg.startsWith("Seul un chèque")) { res.status(409).json({ erreur: msg }); return; }
+    if (msg.startsWith("Ligne de chèque introuvable ou ambiguë")) { res.status(409).json({ erreur: msg }); return; }
     req.log.error({ err }, "Erreur postAnnuler");
     res.status(500).json({ erreur: "Erreur interne" });
   }
