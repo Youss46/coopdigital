@@ -1,6 +1,7 @@
 import { type Request, type Response } from "express";
 import * as svc from "../services/chequesService.js";
 import * as recusSvc from "../services/chequesRecusService.js";
+import { apiError } from "../lib/apiError.js";
 
 function getCoop(req: Request) { return req.user?.cooperativeId ?? null; }
 function getUser(req: Request) { return req.user?.id ?? null; }
@@ -161,7 +162,7 @@ export async function postAnnuler(req: Request, res: Response): Promise<void> {
     if (msg.startsWith("Seul un chèque")) { res.status(409).json({ erreur: msg }); return; }
     if (msg.startsWith("Ligne de chèque introuvable ou ambiguë")) { res.status(409).json({ erreur: msg }); return; }
     req.log.error({ err }, "Erreur postAnnuler");
-    const detail = err instanceof Error ? err.message : String(err);
+    const detail = apiError(err);
     res.status(500).json({
       erreur: "Erreur interne",
       ...(detail ? { detail } : {}),

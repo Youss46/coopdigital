@@ -397,4 +397,36 @@ describe("POST /cheques/:id/annuler", () => {
       vi.unstubAllEnvs();
     }
   });
+
+  it("renvoie la cause PostgreSQL plutôt que l'enveloppe Drizzle en production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    const detail = 'Key (numero_recu)=(REC-2026-0042) already exists.';
+    const postgresError = Object.assign(
+      new Error('duplicate key value violates unique constraint "paiements_numero_recu_unique"'),
+      { detail },
+    );
+    const drizzleError = Object.assign(
+      new Error("Failed query: commit\nparams: "),
+      { cause: postgresError },
+    );
+    annulerCheque.mockRejectedValueOnce(drizzleError);
+
+    try {
+      const response = await fetch(`${baseUrl}/cheques/17/annuler`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ motifAnnulation: "Test cause PostgreSQL" }),
+      });
+
+      expect(response.status).toBe(500);
+      const payload = await response.json();
+      expect(payload).toEqual({
+        erreur: "Erreur interne",
+        detail,
+      });
+      expect(JSON.stringify(payload)).not.toContain("Failed query");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
 });
