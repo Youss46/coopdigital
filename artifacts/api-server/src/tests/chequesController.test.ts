@@ -376,9 +376,10 @@ describe("POST /cheques/:id/annuler", () => {
     }
   });
 
-  it("ne révèle pas le détail technique en production", async () => {
+  it("renvoie le détail mais pas la pile d'appel en production", async () => {
     vi.stubEnv("NODE_ENV", "production");
-    annulerCheque.mockRejectedValueOnce(new Error("détail interne"));
+    const detail = 'duplicate key value violates unique constraint "paiements_numero_recu_unique"';
+    annulerCheque.mockRejectedValueOnce(new Error(detail));
 
     try {
       const response = await fetch(`${baseUrl}/cheques/17/annuler`, {
@@ -388,7 +389,10 @@ describe("POST /cheques/:id/annuler", () => {
       });
 
       expect(response.status).toBe(500);
-      expect(await response.json()).toEqual({ erreur: "Erreur interne" });
+      expect(await response.json()).toEqual({
+        erreur: "Erreur interne",
+        detail,
+      });
     } finally {
       vi.unstubAllEnvs();
     }

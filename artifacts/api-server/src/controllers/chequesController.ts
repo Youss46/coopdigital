@@ -164,7 +164,7 @@ export async function postAnnuler(req: Request, res: Response): Promise<void> {
     const detail = err instanceof Error ? err.message : String(err);
     res.status(500).json({
       erreur: "Erreur interne",
-      ...(process.env.NODE_ENV === "development" && detail ? { detail } : {}),
+      ...(detail ? { detail } : {}),
     });
   }
 }
