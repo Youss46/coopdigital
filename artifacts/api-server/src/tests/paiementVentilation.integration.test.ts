@@ -2,6 +2,7 @@ import { pool } from "@workspace/db";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { listPaiements, validerPaiement } from "../controllers/paiementsController.js";
 import { getJournal } from "../services/caisseService.js";
+import { annulerCheque } from "../services/chequesService.js";
 import {
   annulerChequeRecu,
   deposerChequeRecu,
@@ -937,6 +938,47 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
       modePaiement: null,
       lignes: [],
     });
+  });
+
+  it("annule un chèque sans numéro et conserve les lignes jusqu'au prochain règlement", async () => {
+    const { paymentId, deliveryId } = await createDeferredPayment(700_000);
+    const validation = await validate(paymentId, { modePaiement: "cheque" });
+    expect(validation.statusCode, JSON.stringify(validation.body)).toBe(200);
+
+    const cheque = await client.query(
+      `SELECT id, numero_cheque FROM cheques_emis WHERE paiement_id = $1`,
+      [paymentId],
+    );
+    expect(cheque.rows).toEqual([expect.objectContaining({ numero_cheque: null })]);
+
+    await expect(
+      annulerCheque(cheque.rows[0].id, cooperativeId, { motifAnnulation: "Chèque non présenté" }),
+    ).resolves.toMatchObject({ statut: "annule" });
+
+    expect(await client.query(
+      `SELECT statut, mode_paiement, montant_fcfa FROM paiements WHERE id = $1`,
+      [paymentId],
+    )).toMatchObject({
+      rows: [{ statut: "en_attente", mode_paiement: null, montant_fcfa: 700_000 }],
+    });
+    expect(await client.query(
+      `SELECT count(*)::int AS count, coalesce(sum(montant_fcfa), 0)::int AS total
+       FROM paiement_lignes WHERE paiement_id = $1`,
+      [paymentId],
+    )).toMatchObject({ rows: [{ count: 1, total: 700_000 }] });
+    expect(await client.query(
+      `SELECT statut_paiement, montant_restant FROM livraisons WHERE id = $1`,
+      [deliveryId],
+    )).toMatchObject({
+      rows: [{ statut_paiement: "EN_ATTENTE", montant_restant: "700000.00" }],
+    });
+
+    const replacement = await validate(paymentId, { modePaiement: "especes" });
+    expect(replacement.statusCode, JSON.stringify(replacement.body)).toBe(200);
+    expect(await client.query(
+      `SELECT mode_paiement FROM paiement_lignes WHERE paiement_id = $1`,
+      [paymentId],
+    )).toMatchObject({ rows: [{ mode_paiement: "especes" }] });
   });
 
   it("valide le versement du reliquat et clôture la livraison sans doublon", async () => {

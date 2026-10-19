@@ -255,7 +255,7 @@ describe("retour en attente du règlement", () => {
       modePaiement: null,
       referenceTransaction: null,
     }));
-    expect(tx.delete).toHaveBeenCalledOnce();
+    expect(tx.delete).not.toHaveBeenCalled();
     expect(livraisonUpdate.set).toHaveBeenCalledWith({
       statutPaiement: "EN_ATTENTE",
       montantRestant: "125000",
@@ -293,7 +293,7 @@ describe("retour en attente du règlement", () => {
       modePaiement: null,
       referenceTransaction: null,
     }));
-    expect(tx.delete).toHaveBeenCalledOnce();
+    expect(tx.delete).not.toHaveBeenCalled();
     expect(livraisonUpdate.set).toHaveBeenCalledWith({
       statutPaiement: "PARTIEL",
       montantRestant: "175000",

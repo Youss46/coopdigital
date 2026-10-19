@@ -114,9 +114,6 @@ async function traiterPaiementApresRetourCheque(
       numeroRecu,
     });
   } else {
-    if (ligneChequeIndex >= 0) {
-      await tx.delete(paiementLignesTable).where(eq(paiementLignesTable.id, lignes[ligneChequeIndex]!.id));
-    }
     await tx
       .update(paiementsTable)
       .set({
