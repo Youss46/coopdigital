@@ -63,6 +63,7 @@ vi.mock("drizzle-orm", () => ({
   desc: vi.fn(() => ({})),
   eq: vi.fn(() => ({})),
   inArray: vi.fn(() => ({})),
+  sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values })),
 }));
 
 const {
@@ -281,8 +282,8 @@ describe("retour en attente du règlement", () => {
         .mockReturnValueOnce(selectChain([{ compteDetteProducteur: "401" }]))
         .mockReturnValueOnce(selectChain([{ montantNetFcfa: "2704000", montantRestant: "2004000" }]))
         .mockReturnValueOnce(selectChain([
-          { id: 64, numeroRecu: "REC-RELIQUAT" },
-          { id: 65, numeroRecu: "REC-CHEQUE-ANNULE" },
+          { id: 64, numeroRecu: "REC-RELIQUAT", montantLignes: 700000 },
+          { id: 65, numeroRecu: "REC-CHEQUE-ANNULE", montantLignes: 0 },
         ])),
       update: vi.fn()
         .mockReturnValueOnce(chequeUpdate)
@@ -317,7 +318,7 @@ describe("retour en attente du règlement", () => {
     });
     expect(paiementDoublonUpdate.set).toHaveBeenCalledWith({
       statut: "rejete",
-      motifRejet: "Solde regroupé dans le règlement REC-RELIQUAT après le retour d'un chèque.",
+      motifRejet: "Solde regroupé dans le règlement REC-CHEQUE-ANNULE après le retour d'un chèque.",
     });
   });
 

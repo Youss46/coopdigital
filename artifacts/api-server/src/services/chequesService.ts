@@ -216,6 +216,11 @@ async function restaurerSoldeLivraisonApresRetourCheque(
       .select({
         id: paiementsTable.id,
         numeroRecu: paiementsTable.numeroRecu,
+        montantLignes: sql<number>`coalesce((
+          select sum(${paiementLignesTable.montantFcfa})::integer
+          from ${paiementLignesTable}
+          where ${paiementLignesTable.paiementId} = ${paiementsTable.id}
+        ), 0)`,
       })
       .from(paiementsTable)
       .where(and(
@@ -226,11 +231,27 @@ async function restaurerSoldeLivraisonApresRetourCheque(
       .orderBy(paiementsTable.id);
 
     if (paiementsEnAttente.length > 0) {
-      // Préserver le reliquat en attente préexistant plutôt que de faire
-      // apparaître le paiement du chèque retourné comme une nouvelle ligne.
-      const paiementPrincipal = paiementsEnAttente.find(
-        (paiement) => paiement.id !== cheque.paiementId,
-      ) ?? paiementsEnAttente[0]!;
+      // Ne jamais augmenter un paiement qui porte déjà des lignes d'un
+      // montant différent : le trigger différé vérifiera leur cohérence au
+      // commit. Préférer le reliquat sans ventilation; sinon une ligne déjà
+      // égale au montant restauré peut rester le paiement principal.
+      const paiementPrincipal =
+        paiementsEnAttente.find(
+          (paiement) => paiement.id !== cheque.paiementId && Number(paiement.montantLignes) === 0,
+        )
+        ?? paiementsEnAttente.find((paiement) => Number(paiement.montantLignes) === 0)
+        ?? paiementsEnAttente.find(
+          (paiement) => paiement.id !== cheque.paiementId
+            && Number(paiement.montantLignes) === montantRestantRestaure,
+        )
+        ?? paiementsEnAttente.find(
+          (paiement) => Number(paiement.montantLignes) === montantRestantRestaure,
+        );
+      if (!paiementPrincipal) {
+        throw new Error(
+          "Impossible de regrouper le solde : les règlements en attente ont des lignes de paiement incompatibles.",
+        );
+      }
       const paiementsDoublons = paiementsEnAttente.filter(
         (paiement) => paiement.id !== paiementPrincipal.id,
       );
