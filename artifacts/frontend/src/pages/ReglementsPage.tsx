@@ -73,6 +73,7 @@ function livraisonAvecSolde(p: PaiementListItem) {
   return !!p.livraisonId && ["EN_ATTENTE", "PARTIEL", "DIFFERE"].includes(statut);
 }
 function montantRestantLivraison(p: PaiementListItem) {
+  if (p.statut === "en_attente") return Math.max(0, p.montantFcfa);
   return livraisonAvecSolde(p)
     ? Math.max(0, p.livraisonMontantRestant ?? p.montantFcfa)
     : p.montantFcfa;
@@ -460,7 +461,9 @@ export function ModalValidation({
   const montantNet = paiement.montantNetFcfa ?? paiement.montantFcfa;
   const estLivraisonAvecSolde = livraisonAvecSolde(paiement);
   const montantRestant = montantRestantLivraison(paiement);
-  const montantDejaPaye = Math.max(0, montantNet - montantRestant);
+  const montantDejaPaye = paiement.statut === "en_attente"
+    ? 0
+    : Math.max(0, montantNet - montantRestant);
   const commissionCollecteMontant = paiement.commissionCollecteStatut === "en_attente"
     ? Math.max(0, paiement.commissionCollecteFcfa ?? 0)
     : 0;
@@ -2560,7 +2563,9 @@ function PaiementRow({
   const poids = p.poidsNetKg ?? p.poidsKg;
   const montantNet = p.montantNetFcfa ?? p.montantFcfa;
   const montantRestant = montantRestantLivraison(p);
-  const montantDejaPaye = Math.max(0, montantNet - montantRestant);
+  const montantDejaPaye = p.statut === "en_attente"
+    ? 0
+    : Math.max(0, montantNet - montantRestant);
   const showActions = p.statut === "en_attente";
   const showRecu = p.statut === "confirme" || p.statut === "effectue" || p.statut === "en_cours";
   const showRejet = p.statut === "rejete";

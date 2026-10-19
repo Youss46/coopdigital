@@ -584,6 +584,8 @@ export async function listPaiements(req: Request, res: Response): Promise<void> 
         livraisonsMontant: sql<number>`coalesce(sum(
           case when ${paiementsTable.livraisonId} is not null
             then case
+              when ${paiementsTable.statut} = 'en_attente'
+                then greatest(0, coalesce(${paiementsTable.montantFcfa}, 0))
               when upper(coalesce(${livraisonsTable.statutPaiement}::text, '')) in ('EN_ATTENTE', 'PARTIEL', 'DIFFERE', 'IMPAYE', 'EN_RETARD')
                 then greatest(0, coalesce(${livraisonsTable.montantRestant}, ${paiementsTable.montantFcfa}, 0))
               else coalesce(${paiementsTable.montantFcfa}, 0)
@@ -597,6 +599,9 @@ export async function listPaiements(req: Request, res: Response): Promise<void> 
         tousCount: sql<number>`count(*)::integer`,
         tousMontant: sql<number>`coalesce(sum(
           case when ${paiementsTable.livraisonId} is not null
+            and ${paiementsTable.statut} = 'en_attente'
+              then greatest(0, coalesce(${paiementsTable.montantFcfa}, 0))
+            when ${paiementsTable.livraisonId} is not null
             and upper(coalesce(${livraisonsTable.statutPaiement}::text, '')) in ('EN_ATTENTE', 'PARTIEL', 'DIFFERE', 'IMPAYE', 'EN_RETARD')
               then greatest(0, coalesce(${livraisonsTable.montantRestant}, ${paiementsTable.montantFcfa}, 0))
             else coalesce(${paiementsTable.montantFcfa}, 0)
@@ -1301,16 +1306,29 @@ async function debiterMobileDansTransaction(
           }
 
           if (livraisonAvecSolde && row.paiement.livraisonId && (soldeApresLivraison ?? 0) > 0) {
-            await tx.insert(paiementsTable).values({
-              cooperativeId,
-              livraisonId: row.paiement.livraisonId,
-              membreId: row.paiement.membreId,
-              campagneId: row.paiement.campagneId,
-              montantFcfa: soldeApresLivraison!,
-              modePaiement: null,
-              statut: "en_attente",
-              numeroRecu: numeroRecuReste,
-            });
+            const [paiementsEnAttente] = await tx
+              .select({
+                montantTotal: sql<number>`coalesce(sum(${paiementsTable.montantFcfa}), 0)::integer`,
+              })
+              .from(paiementsTable)
+              .where(and(
+                eq(paiementsTable.livraisonId, row.paiement.livraisonId),
+                eq(paiementsTable.statut, "en_attente"),
+              ));
+            const montantDejaEnAttente = Math.max(0, Math.round(Number(paiementsEnAttente?.montantTotal ?? 0)));
+            const montantACompleter = Math.max(0, soldeApresLivraison! - montantDejaEnAttente);
+            if (montantACompleter > 0) {
+              await tx.insert(paiementsTable).values({
+                cooperativeId,
+                livraisonId: row.paiement.livraisonId,
+                membreId: row.paiement.membreId,
+                campagneId: row.paiement.campagneId,
+                montantFcfa: montantACompleter,
+                modePaiement: null,
+                statut: "en_attente",
+                numeroRecu: numeroRecuReste,
+              });
+            }
           }
 
           const lignesInserees = await tx.insert(paiementLignesTable).values(

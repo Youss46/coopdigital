@@ -12,6 +12,42 @@ import { enregistrerMouvement } from "./banqueService.js";
 
 function today(): string { return new Date().toISOString().slice(0, 10); }
 
+type ChequeTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function restaurerSoldeLivraisonApresRetourCheque(
+  tx: ChequeTransaction,
+  cheque: { livraisonId: number | null; montantFcfa: number },
+) {
+  if (cheque.livraisonId == null) return;
+
+  const [livraison] = await tx
+    .select({
+      montantNetFcfa: livraisonsTable.montantNetFcfa,
+      montantRestant: livraisonsTable.montantRestant,
+    })
+    .from(livraisonsTable)
+    .where(eq(livraisonsTable.id, cheque.livraisonId))
+    .for("update")
+    .limit(1);
+
+  if (!livraison) throw new Error("Livraison liée au chèque introuvable");
+
+  const montantNet = Math.max(0, Math.round(Number(livraison.montantNetFcfa ?? cheque.montantFcfa)));
+  const montantRestant = Math.max(0, Math.round(Number(livraison.montantRestant ?? montantNet)));
+  const montantRestantRestaure = Math.min(
+    montantNet,
+    montantRestant + Math.max(0, Math.round(Number(cheque.montantFcfa))),
+  );
+
+  await tx
+    .update(livraisonsTable)
+    .set({
+      statutPaiement: montantRestantRestaure >= montantNet ? "EN_ATTENTE" : "PARTIEL",
+      montantRestant: String(montantRestantRestaure),
+    })
+    .where(eq(livraisonsTable.id, cheque.livraisonId));
+}
+
 export function resolveBeneficiaireCheque(row: {
   beneficiaire: string;
   nomMembre: string | null;
@@ -291,12 +327,7 @@ export async function rejeterCheque(
         .where(eq(paiementsTable.id, cheque.paiementId));
     }
 
-    if (cheque.livraisonId) {
-      await tx
-        .update(livraisonsTable)
-        .set({ statutPaiement: "EN_ATTENTE" })
-        .where(eq(livraisonsTable.id, cheque.livraisonId));
-    }
+    await restaurerSoldeLivraisonApresRetourCheque(tx, cheque);
 
     return updated ?? { ...cheque, statut: "rejete" as const, dateRejet: dateRej, motifRejet: data.motifRejet };
   });
@@ -341,12 +372,7 @@ export async function annulerCheque(
         .where(eq(paiementsTable.id, cheque.paiementId));
     }
 
-    if (cheque.livraisonId) {
-      await tx
-        .update(livraisonsTable)
-        .set({ statutPaiement: "EN_ATTENTE" })
-        .where(eq(livraisonsTable.id, cheque.livraisonId));
-    }
+    await restaurerSoldeLivraisonApresRetourCheque(tx, cheque);
 
     return updated ?? { ...cheque, statut: "annule" as const, motifAnnulation: data.motifAnnulation };
   });

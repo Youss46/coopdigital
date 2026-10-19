@@ -2,6 +2,10 @@ import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MoneyInput } from "@/components/ui/money-input";
 import {
+  getGetPaiementsStatsQueryKey,
+  getListPaiementsQueryKey,
+} from "@workspace/api-client-react";
+import {
   CheckSquare, Plus, Loader2, X, CheckCircle2, XCircle, Clock,
   AlertTriangle, Ban, Building2, Calendar, Hash, User,
 } from "lucide-react";
@@ -138,6 +142,8 @@ export default function ChequesPage() {
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: ["cheques"] });
     void qc.invalidateQueries({ queryKey: ["banque-comptes"] });
+    void qc.invalidateQueries({ queryKey: getListPaiementsQueryKey() });
+    void qc.invalidateQueries({ queryKey: getGetPaiementsStatsQueryKey() });
     setChequeSelectionne(null);
   };
 

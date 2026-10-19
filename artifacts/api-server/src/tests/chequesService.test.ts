@@ -163,7 +163,9 @@ describe("retour en attente du règlement", () => {
     const paiementUpdate = updateChain();
     const livraisonUpdate = updateChain();
     const tx = {
-      select: vi.fn().mockReturnValue(selectChain([chequeLie])),
+      select: vi.fn()
+        .mockReturnValueOnce(selectChain([chequeLie]))
+        .mockReturnValueOnce(selectChain([{ montantNetFcfa: "125000", montantRestant: "0" }])),
       update: vi.fn()
         .mockReturnValueOnce(chequeUpdate)
         .mockReturnValueOnce(paiementUpdate)
@@ -183,7 +185,10 @@ describe("retour en attente du règlement", () => {
       validePar: null,
       motifRejet: "Chèque rejeté : Provision insuffisante",
     }));
-    expect(livraisonUpdate.set).toHaveBeenCalledWith({ statutPaiement: "EN_ATTENTE" });
+    expect(livraisonUpdate.set).toHaveBeenCalledWith({
+      statutPaiement: "EN_ATTENTE",
+      montantRestant: "125000",
+    });
   });
 
   it("remet le règlement et la livraison en attente quand le chèque est annulé", async () => {
@@ -192,7 +197,9 @@ describe("retour en attente du règlement", () => {
     const paiementUpdate = updateChain();
     const livraisonUpdate = updateChain();
     const tx = {
-      select: vi.fn().mockReturnValue(selectChain([chequeLie])),
+      select: vi.fn()
+        .mockReturnValueOnce(selectChain([chequeLie]))
+        .mockReturnValueOnce(selectChain([{ montantNetFcfa: "200000", montantRestant: "50000" }])),
       update: vi.fn()
         .mockReturnValueOnce(chequeUpdate)
         .mockReturnValueOnce(paiementUpdate)
@@ -209,7 +216,10 @@ describe("retour en attente du règlement", () => {
       validePar: null,
       motifRejet: "Chèque annulé : Chèque remplacé",
     }));
-    expect(livraisonUpdate.set).toHaveBeenCalledWith({ statutPaiement: "EN_ATTENTE" });
+    expect(livraisonUpdate.set).toHaveBeenCalledWith({
+      statutPaiement: "PARTIEL",
+      montantRestant: "175000",
+    });
   });
 
   it("annule toute la transaction si le règlement ne peut pas être remis en attente", async () => {
