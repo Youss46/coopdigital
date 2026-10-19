@@ -510,6 +510,7 @@ export function ModalValidation({
     ? MODES_CARBURANT.filter((m) => m.value === "especes")
     : MODES_CARBURANT;
   const modeManquant = !selectedMode;
+  const numeroChequeManquant = selectedMode === "cheque" && !numeroCheque.trim();
   const isMobile = selectedMode === "orange_money" || selectedMode === "mtn_momo" || selectedMode === "wave";
   const isEspeces = selectedMode === "especes";
   const isCarteProducteur = selectedMode === "carte_producteur";
@@ -518,6 +519,11 @@ export function ModalValidation({
   const refManquante = isMobile && !ref.trim();
   const totalVentile = ventilations.reduce((total, ligne) => total + parseMontantSaisi(ligne.montantFcfa), 0);
   const ventilationIncorrecte = multiMoyens && totalVentile !== montantTotalAttendu;
+  const numeroChequeVentilationManquant = multiMoyens && ventilations.some((ligne) =>
+    ligne.modePaiement === "cheque"
+    && parseMontantSaisi(ligne.montantFcfa) > 0
+    && !ligne.numeroCheque.trim(),
+  );
   const ventilationEspecesBloquee = multiMoyens
     && ventilations.some((ligne) => ligne.modePaiement === "especes")
     && sessionCaisseOuverte === false;
@@ -586,7 +592,7 @@ export function ModalValidation({
       return;
     }
     if (multiMoyens) {
-      if (ventilationIncorrecte || ventilations.some((ligne) => {
+      if (ventilationIncorrecte || numeroChequeVentilationManquant || ventilations.some((ligne) => {
         const montant = parseMontantSaisi(ligne.montantFcfa);
         return !Number.isInteger(montant) || montant <= 0;
       })) {
@@ -605,6 +611,7 @@ export function ModalValidation({
       return;
     }
     if (modeManquant) { setTouched(true); return; }
+    if (numeroChequeManquant) { setTouched(true); return; }
     if (sessionBloquee) return;
     if (refManquante) { setTouched(true); return; }
     if (compteBancaireManquant) { setTouched(true); return; }
@@ -840,7 +847,24 @@ export function ModalValidation({
                     </div>
                     {ligne.modePaiement === "cheque" && (
                       <div className="grid grid-cols-2 gap-2">
-                        <input value={ligne.numeroCheque} onChange={(e) => setVentilations((old) => old.map((item, i) => i === index ? { ...item, numeroCheque: e.target.value } : item))} placeholder="N° du chèque" className="border border-gray-200 rounded-lg px-2 py-2 text-xs" />
+                        <div>
+                          <input
+                            required
+                            maxLength={50}
+                            aria-label="Numéro du chèque (obligatoire)"
+                            value={ligne.numeroCheque}
+                            onChange={(e) => setVentilations((old) => old.map((item, i) => i === index ? { ...item, numeroCheque: e.target.value } : item))}
+                            placeholder="N° du chèque *"
+                            className={`w-full border rounded-lg px-2 py-2 text-xs ${
+                              touched && ligne.modePaiement === "cheque" && parseMontantSaisi(ligne.montantFcfa) > 0 && !ligne.numeroCheque.trim()
+                                ? "border-red-400 bg-red-50"
+                                : "border-gray-200"
+                            }`}
+                          />
+                          {touched && ligne.modePaiement === "cheque" && parseMontantSaisi(ligne.montantFcfa) > 0 && !ligne.numeroCheque.trim() && (
+                            <p className="text-xs text-red-500 mt-1">Le numéro du chèque est obligatoire.</p>
+                          )}
+                        </div>
                         <input value={ligne.banque} onChange={(e) => setVentilations((old) => old.map((item, i) => i === index ? { ...item, banque: e.target.value } : item))} placeholder="Banque (optionnel)" className="border border-gray-200 rounded-lg px-2 py-2 text-xs" />
                       </div>
                     )}
@@ -854,6 +878,7 @@ export function ModalValidation({
                   <span>{fmt(totalVentile)} / {fmt(montantVersement)}</span>
                 </div>
                 {touched && ventilationIncorrecte && <p className="text-xs text-red-500">Le total des moyens doit correspondre au montant de ce versement.</p>}
+                {touched && numeroChequeVentilationManquant && <p className="text-xs text-red-500">Renseignez le numéro de chaque chèque utilisé.</p>}
               </div>
             ) : modePreset ? (
               /* Mode pré-sélectionné — lecture seule */
@@ -950,12 +975,25 @@ export function ModalValidation({
 
           {!multiMoyens && selectedMode === "cheque" && (
             <div className="grid grid-cols-2 gap-2">
-              <input
-                value={numeroCheque}
-                onChange={(e) => setNumeroCheque(e.target.value)}
-                placeholder="N° du chèque"
-                className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-400"
-              />
+              <label className="block text-xs font-medium text-gray-600">
+                N° du chèque <span className="text-red-500">*</span>
+                <input
+                  required
+                  maxLength={50}
+                  aria-label="Numéro du chèque (obligatoire)"
+                  value={numeroCheque}
+                  onChange={(e) => setNumeroCheque(e.target.value)}
+                  placeholder="Saisir le numéro"
+                  className={`mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
+                    touched && numeroChequeManquant
+                      ? "border-red-400 bg-red-50 focus:ring-red-400"
+                      : "border-gray-200 focus:ring-green-400"
+                  }`}
+                />
+                {touched && numeroChequeManquant && (
+                  <span className="block text-xs text-red-500 mt-1">Le numéro du chèque est obligatoire.</span>
+                )}
+              </label>
               <input
                 value={banque}
                 onChange={(e) => setBanque(e.target.value)}

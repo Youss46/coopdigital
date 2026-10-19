@@ -139,6 +139,146 @@ describe("modale de validation d'un règlement", () => {
     );
   });
 
+  it("bloque un règlement par chèque tant que son numéro n'est pas renseigné", async () => {
+    const onConfirm = vi.fn();
+    const paiement = {
+      id: 46,
+      membreNom: "Kouassi",
+      membrePrenoms: "Awa",
+      montantFcfa: 1_000,
+      montantNetFcfa: 1_000,
+      statut: "en_attente",
+      modePaiement: null,
+      livraisonId: 102,
+      livraisonStatutPaiement: "EN_ATTENTE",
+      livraisonMontantRestant: 1_000,
+    } as PaiementListItem;
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root.render(createElement(ModalValidation, {
+        paiement,
+        onClose: vi.fn(),
+        onConfirm,
+        loading: false,
+        sessionCaisseOuverte: true,
+      }));
+    });
+
+    const mode = container.querySelector<HTMLSelectElement>("select")!;
+    await act(async () => {
+      const setValue = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+      setValue?.call(mode, "cheque");
+      mode.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    const confirmButton = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Confirmer et payer"),
+    )!;
+    await act(async () => confirmButton.click());
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(container.textContent).toContain("Le numéro du chèque est obligatoire.");
+
+    const numeroCheque = container.querySelector<HTMLInputElement>(
+      '[aria-label="Numéro du chèque (obligatoire)"]',
+    )!;
+    await act(async () => {
+      const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setValue?.call(numeroCheque, "CHQ-0001");
+      numeroCheque.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => confirmButton.click());
+
+    expect(onConfirm).toHaveBeenCalledWith(
+      "",
+      "",
+      1_000,
+      "cheque",
+      undefined,
+      { numero: "CHQ-0001", banque: "" },
+      false,
+    );
+  });
+
+  it("bloque la part chèque d'un règlement mixte tant que son numéro manque", async () => {
+    const onConfirm = vi.fn();
+    const paiement = {
+      id: 47,
+      membreNom: "Kouassi",
+      membrePrenoms: "Awa",
+      montantFcfa: 1_000,
+      montantNetFcfa: 1_000,
+      statut: "en_attente",
+      modePaiement: null,
+      livraisonId: 103,
+      livraisonStatutPaiement: "EN_ATTENTE",
+      livraisonMontantRestant: 1_000,
+    } as PaiementListItem;
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root.render(createElement(ModalValidation, {
+        paiement,
+        onClose: vi.fn(),
+        onConfirm,
+        loading: false,
+        sessionCaisseOuverte: true,
+      }));
+    });
+
+    const multiMoyens = container.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+    await act(async () => multiMoyens.click());
+
+    const montants = Array.from(container.querySelectorAll<HTMLInputElement>('input[inputmode="numeric"]')).slice(-2);
+    await act(async () => {
+      const setInputValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setInputValue?.call(montants[0], "500");
+      montants[0]!.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    const confirmButton = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Confirmer et payer"),
+    )!;
+    await act(async () => confirmButton.click());
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(container.textContent).toContain("Le numéro du chèque est obligatoire.");
+
+    const numeroCheque = container.querySelector<HTMLInputElement>(
+      '[aria-label="Numéro du chèque (obligatoire)"]',
+    )!;
+    await act(async () => {
+      const setInputValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setInputValue?.call(numeroCheque, "CHQ-MIXTE-001");
+      numeroCheque.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => confirmButton.click());
+
+    expect(onConfirm).toHaveBeenCalledWith(
+      "",
+      "",
+      1_000,
+      undefined,
+      [
+        { modePaiement: "especes", montantFcfa: 500 },
+        {
+          modePaiement: "cheque",
+          montantFcfa: 500,
+          numeroCheque: "CHQ-MIXTE-001",
+          banque: null,
+          dateEcheance: null,
+        },
+      ],
+      undefined,
+      false,
+    );
+  });
+
   it("transmet le compte bancaire choisi pour une carte producteur", async () => {
     const onConfirm = vi.fn();
     const paiement = {
@@ -353,6 +493,20 @@ describe("modale de validation d'un règlement", () => {
     await act(async () => {
       confirmButton!.click();
     });
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(container.textContent).toContain("Le numéro du chèque est obligatoire.");
+
+    const numeroCheque = container.querySelector<HTMLInputElement>(
+      '[aria-label="Numéro du chèque (obligatoire)"]',
+    )!;
+    await act(async () => {
+      const setInputValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setInputValue?.call(numeroCheque, "CHQ-MIXTE-0042");
+      numeroCheque.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      confirmButton!.click();
+    });
 
     expect(onConfirm).toHaveBeenCalledWith(
       "",
@@ -364,7 +518,7 @@ describe("modale de validation d'un règlement", () => {
         {
           modePaiement: "cheque",
           montantFcfa: 207_500,
-          numeroCheque: null,
+          numeroCheque: "CHQ-MIXTE-0042",
           banque: null,
           dateEcheance: null,
         },

@@ -1216,12 +1216,21 @@ async function debiterMobileDansTransaction(
           res.status(400).json({ erreur: "La référence de transaction est obligatoire pour chaque paiement mobile money." });
           return;
         }
+        const numeroCheque = ligne.numeroCheque?.trim() ?? "";
+        if (modeLigne === "cheque" && !numeroCheque) {
+          res.status(400).json({ erreur: "Le numéro du chèque est obligatoire pour chaque ligne réglée par chèque." });
+          return;
+        }
+        if (modeLigne === "cheque" && numeroCheque.length > 50) {
+          res.status(400).json({ erreur: "Le numéro du chèque ne peut pas dépasser 50 caractères." });
+          return;
+        }
         lignes.push({
           modePaiement: modeLigne as typeof MODES_VALIDES[number],
           montantFcfa: montant,
           referenceTransaction: ligne.referenceTransaction ?? null,
           telephone: ligne.telephone ?? null,
-          numeroCheque: ligne.numeroCheque ?? null,
+          numeroCheque: modeLigne === "cheque" ? numeroCheque : null,
           banque: ligne.banque ?? null,
           dateEcheance: ligne.dateEcheance ?? null,
         });
@@ -1575,6 +1584,15 @@ async function debiterMobileDansTransaction(
     const mode = (modeOverride ?? row.paiement.modePaiement) as string;
     const isMobileMarchand = mode === "orange_money" || mode === "mtn_momo" || mode === "wave";
     const isCarteProducteur = mode === "carte_producteur";
+    const numeroChequeNormalise = mode === "cheque" ? body.numeroCheque?.trim() ?? "" : null;
+    if (mode === "cheque" && !numeroChequeNormalise) {
+      res.status(400).json({ erreur: "Le numéro du chèque est obligatoire." });
+      return;
+    }
+    if (numeroChequeNormalise && numeroChequeNormalise.length > 50) {
+      res.status(400).json({ erreur: "Le numéro du chèque ne peut pas dépasser 50 caractères." });
+      return;
+    }
 
     if (isCarteProducteur && (!body.compteBancaireId || !Number.isInteger(Number(body.compteBancaireId)))) {
       res.status(400).json({ erreur: "Sélectionnez le compte bancaire à débiter pour un paiement par carte producteur." });
@@ -1876,7 +1894,7 @@ async function debiterMobileDansTransaction(
         modePaiement: mode as "especes" | "cheque" | "virement" | "orange_money" | "mtn_momo" | "wave" | "carte_producteur",
         montantFcfa: montantTotalPaiement,
         referenceTransaction: body.referenceTransaction ?? null,
-        numeroCheque: mode === "cheque" ? body.numeroCheque ?? null : null,
+        numeroCheque: numeroChequeNormalise,
         banque: mode === "cheque" ? body.banque ?? null : null,
         dateEcheance: mode === "cheque" ? body.dateEcheance ?? null : null,
       }).returning({ id: paiementLignesTable.id });
@@ -1884,7 +1902,7 @@ async function debiterMobileDansTransaction(
       if (mode === "cheque") {
         await tx.insert(chequesEmisTable).values({
           cooperativeId,
-          numeroCheque: body.numeroCheque ?? null,
+          numeroCheque: numeroChequeNormalise,
           beneficiaire: beneficiairePaiement,
           montantFcfa: montantTotalPaiement,
           paiementId: id,

@@ -777,7 +777,7 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
     });
   });
 
-  it("rollbacke les espèces si l'enregistrement du chèque échoue", async () => {
+  it("refuse un numéro de chèque trop long avant tout effet financier", async () => {
     const paymentId = await createPayment(2_000);
 
     const result = await validate(paymentId, {
@@ -792,7 +792,7 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
       ],
     });
 
-    expect(result.statusCode).toBe(500);
+    expect(result.statusCode).toBe(400);
     expect(await paymentEffects(paymentId)).toEqual({
       statut: "en_attente",
       lines: 0,
@@ -940,16 +940,30 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
     });
   });
 
-  it("annule un chèque sans numéro et conserve les lignes jusqu'au prochain règlement", async () => {
+  it("exige un numéro pour le chèque, puis permet son annulation et un règlement en espèces", async () => {
     const { paymentId, deliveryId } = await createDeferredPayment(700_000);
-    const validation = await validate(paymentId, { modePaiement: "cheque" });
+    const validationSansNumero = await validate(paymentId, { modePaiement: "cheque" });
+    expect(validationSansNumero.statusCode).toBe(400);
+    expect(validationSansNumero.body).toMatchObject({
+      erreur: "Le numéro du chèque est obligatoire.",
+    });
+    expect(await paymentEffects(paymentId)).toMatchObject({
+      statut: "en_attente",
+      lines: 0,
+      cheques: 0,
+    });
+
+    const validation = await validate(paymentId, {
+      modePaiement: "cheque",
+      numeroCheque: "CHQ-ANNULATION-700000",
+    });
     expect(validation.statusCode, JSON.stringify(validation.body)).toBe(200);
 
     const cheque = await client.query(
       `SELECT id, numero_cheque FROM cheques_emis WHERE paiement_id = $1`,
       [paymentId],
     );
-    expect(cheque.rows).toEqual([expect.objectContaining({ numero_cheque: null })]);
+    expect(cheque.rows).toEqual([expect.objectContaining({ numero_cheque: "CHQ-ANNULATION-700000" })]);
 
     await expect(
       annulerCheque(cheque.rows[0].id, cooperativeId, { motifAnnulation: "Chèque non présenté" }),
@@ -979,6 +993,29 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
       `SELECT mode_paiement FROM paiement_lignes WHERE paiement_id = $1`,
       [paymentId],
     )).toMatchObject({ rows: [{ mode_paiement: "especes" }] });
+  });
+
+  it("refuse une ventilation si la part réglée par chèque n'a pas de numéro", async () => {
+    const { paymentId } = await createDeferredPayment(100_000);
+    const result = await validate(paymentId, {
+      montantReglementFcfa: 100_000,
+      ventilations: [
+        { modePaiement: "especes", montantFcfa: 50_000 },
+        { modePaiement: "cheque", montantFcfa: 50_000 },
+      ],
+    });
+
+    expect(result.statusCode).toBe(400);
+    expect(result.body).toMatchObject({
+      erreur: "Le numéro du chèque est obligatoire pour chaque ligne réglée par chèque.",
+    });
+    expect(await paymentEffects(paymentId)).toMatchObject({
+      statut: "en_attente",
+      lines: 0,
+      movements: 0,
+      cheques: 0,
+      accounting: 0,
+    });
   });
 
   it("valide le versement du reliquat et clôture la livraison sans doublon", async () => {
@@ -1157,7 +1194,7 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
     );
   });
 
-  it("rollbacke le reliquat et la caisse si le chèque du versement échoue", async () => {
+  it("refuse un numéro de chèque trop long pour un versement partiel", async () => {
     const { paymentId, deliveryId } = await createDeferredPayment(590_000);
 
     const result = await validate(paymentId, {
@@ -1173,7 +1210,7 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
       ],
     });
 
-    expect(result.statusCode).toBe(500);
+    expect(result.statusCode).toBe(400);
     expect(await paymentEffects(paymentId)).toEqual({
       statut: "en_attente",
       lines: 0,

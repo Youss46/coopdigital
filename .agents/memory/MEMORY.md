@@ -99,6 +99,7 @@
 - [Concurrence des chèques reçus](cheques-recus-terminal-concurrency.md) — encaissement, rejet et annulation doivent verrouiller le chèque et échouer avant tout effet financier concurrent.
 - [Chèque émis rejeté ou annulé](cheque-emis-reglement-attente.md) — une transition terminale invalide le règlement lié et remet paiement et livraison en attente atomiquement.
 - [Atomicité des règlements ventilés](paiement-ventilation-atomicity.md) — paiement, lignes, trésorerie, chèques et comptabilité doivent rester dans une transaction et totaliser le montant parent.
+- [Numéro obligatoire pour un règlement par chèque](cheque-number-required.md) — tout paiement par chèque, seul ou dans une ventilation, exige un numéro non vide.
 - [Versements partiels livraison](paiement-versements-partiels.md) — le solde livraison est verrouillé; chaque versement est un paiement distinct et le reliquat redevient actionnable.
 - [Fixtures PostgreSQL typées](postgres-fixture-parameter-types.md) — dans un INSERT de test, caster séparément les paramètres réutilisés entre colonnes integer et numeric.
 - [Références PDF des pesées](pdf-local-numbering.md) — les reçus et bordereaux affichent PES-S-<rang> avant tout identifiant legacy.
