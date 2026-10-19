@@ -8,12 +8,18 @@ const {
   encaisserChequeRecu,
   rejeterChequeRecu,
   annulerChequeRecu,
+  annulerCheque,
 } = vi.hoisted(() => ({
   creerChequeRecu: vi.fn(),
   deposerChequeRecu: vi.fn(),
   encaisserChequeRecu: vi.fn(),
   rejeterChequeRecu: vi.fn(),
   annulerChequeRecu: vi.fn(),
+  annulerCheque: vi.fn(),
+}));
+
+vi.mock("../services/chequesService.js", () => ({
+  annulerCheque,
 }));
 
 vi.mock("../services/chequesRecusService.js", () => ({
@@ -41,6 +47,7 @@ beforeAll(async () => {
   app.use(express.json());
   app.use((req, _res, next) => {
     req.user = { id: 55, role: "comptable", cooperativeId: 7 };
+    req.log = { error: vi.fn() } as any;
     next();
   });
   app.use(chequesRouter);
@@ -343,5 +350,47 @@ describe("POST /cheques-recus/:id/annuler", () => {
     });
     expect(annulerChequeRecu).toHaveBeenCalledTimes(2);
     expect(annulerChequeRecu).toHaveBeenCalledWith(43, 7, "Erreur de saisie");
+  });
+});
+
+describe("POST /cheques/:id/annuler", () => {
+  it("renvoie le vrai détail d'une erreur serveur en développement", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    const detail = 'duplicate key value violates unique constraint "paiements_numero_recu_unique"';
+    annulerCheque.mockRejectedValueOnce(new Error(detail));
+
+    try {
+      const response = await fetch(`${baseUrl}/cheques/17/annuler`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ motifAnnulation: "Test diagnostic" }),
+      });
+
+      expect(response.status).toBe(500);
+      expect(await response.json()).toEqual({
+        erreur: "Erreur interne",
+        detail,
+      });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("ne révèle pas le détail technique en production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    annulerCheque.mockRejectedValueOnce(new Error("détail interne"));
+
+    try {
+      const response = await fetch(`${baseUrl}/cheques/17/annuler`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ motifAnnulation: "Test production" }),
+      });
+
+      expect(response.status).toBe(500);
+      expect(await response.json()).toEqual({ erreur: "Erreur interne" });
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

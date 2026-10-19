@@ -161,7 +161,11 @@ export async function postAnnuler(req: Request, res: Response): Promise<void> {
     if (msg.startsWith("Seul un chèque")) { res.status(409).json({ erreur: msg }); return; }
     if (msg.startsWith("Ligne de chèque introuvable ou ambiguë")) { res.status(409).json({ erreur: msg }); return; }
     req.log.error({ err }, "Erreur postAnnuler");
-    res.status(500).json({ erreur: "Erreur interne" });
+    const detail = err instanceof Error ? err.message : String(err);
+    res.status(500).json({
+      erreur: "Erreur interne",
+      ...(process.env.NODE_ENV === "development" && detail ? { detail } : {}),
+    });
   }
 }
 

@@ -18,19 +18,29 @@ const BASE = import.meta.env.VITE_API_URL ?? "";
 const tok = () => localStorage.getItem("coop_token") ?? "";
 const headers = () => ({ Authorization: `Bearer ${tok()}`, "Content-Type": "application/json" });
 
+async function throwApiError(response: Response): Promise<never> {
+  const payload = await response.json().catch(() => null) as {
+    erreur?: unknown;
+    detail?: unknown;
+  } | null;
+  const detail = typeof payload?.detail === "string" ? payload.detail.trim() : "";
+  const erreur = typeof payload?.erreur === "string" ? payload.erreur.trim() : "";
+  throw new Error(detail || erreur || response.statusText || `HTTP ${response.status}`);
+}
+
 async function apiFetch<T>(path: string): Promise<T> {
   const r = await fetch(`${BASE}${path}`, { headers: headers() });
-  if (!r.ok) throw new Error((await r.json().catch(() => ({ erreur: r.statusText }))).erreur ?? r.statusText);
+  if (!r.ok) await throwApiError(r);
   return r.json() as Promise<T>;
 }
 async function apiPost<T>(path: string, body: unknown): Promise<T> {
   const r = await fetch(`${BASE}${path}`, { method: "POST", headers: headers(), body: JSON.stringify(body) });
-  if (!r.ok) throw new Error((await r.json().catch(() => ({ erreur: r.statusText }))).erreur ?? r.statusText);
+  if (!r.ok) await throwApiError(r);
   return r.json() as Promise<T>;
 }
 async function apiPut<T>(path: string, body?: unknown): Promise<T> {
   const r = await fetch(`${BASE}${path}`, { method: "PUT", headers: headers(), body: body ? JSON.stringify(body) : undefined });
-  if (!r.ok) throw new Error((await r.json().catch(() => ({ erreur: r.statusText }))).erreur ?? r.statusText);
+  if (!r.ok) await throwApiError(r);
   return r.json() as Promise<T>;
 }
 
