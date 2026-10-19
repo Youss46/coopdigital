@@ -13,23 +13,15 @@ function fmtFcfa(value: number): string {
 }
 
 export default function AvancesDeleguesRapportModal({
-  membreId,
-  membreNom,
   onClose,
 }: {
-  membreId: number | null;
-  membreNom: string | null;
   onClose: () => void;
 }) {
   const query = useQuery<RapportAvancesDelegues>({
-    queryKey: ["rapport-avances-delegues-localites", membreId],
+    queryKey: ["rapport-avances-delegues-localites"],
     queryFn: async () => {
-      const params = new URLSearchParams();
-      if (membreId !== null) params.set("membre_id", String(membreId));
-      const queryString = params.toString();
-      const suffix = queryString ? `?${queryString}` : "";
       const response = await fetch(
-        `${BASE}/api/delegues-localites/avances/rapport${suffix}`,
+        `${BASE}/api/delegues-localites/avances/rapport`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("coop_token") ?? ""}`,
@@ -45,10 +37,6 @@ export default function AvancesDeleguesRapportModal({
     retry: false,
   });
 
-  const titrePerimetre = membreNom ?? "Tous les délégués de localités";
-  const titre = membreNom
-    ? `Imprimer les avances restant dues — ${membreNom}`
-    : "Imprimer les avances restant dues";
   const [erreurImpression, setErreurImpression] = useState<string | null>(null);
 
   function imprimer() {
@@ -70,7 +58,7 @@ export default function AvancesDeleguesRapportModal({
     fenetre.addEventListener("load", lancerImpression, { once: true });
     fenetre.document.open();
     fenetre.document.write(
-      construireFicheAvancesDeleguesHtml(query.data, titrePerimetre),
+      construireFicheAvancesDeleguesHtml(query.data),
     );
     fenetre.document.close();
     window.setTimeout(lancerImpression, 700);
@@ -98,7 +86,7 @@ export default function AvancesDeleguesRapportModal({
               className="font-bold text-gray-900"
               data-testid="text-titre-rapport-avances"
             >
-              {titre}
+              Imprimer toutes les avances restant dues
             </h2>
             <p className="mt-1 text-xs text-gray-500">
               Les avances en cours et en retard seront imprimées. Vous pouvez aussi enregistrer la fiche en PDF.

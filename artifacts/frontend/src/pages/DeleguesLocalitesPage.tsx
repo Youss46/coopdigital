@@ -1027,7 +1027,7 @@ export default function DeleguesLocalitesPage() {
                 className="flex items-center justify-center gap-1.5 rounded-lg border border-green-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-green-800 hover:bg-green-50"
               >
                 <Printer size={15} />
-                Imprimer les avances dues
+                Imprimer toutes les avances dues
               </button>
             )}
           </div>
@@ -2535,10 +2535,6 @@ export default function DeleguesLocalitesPage() {
       )}
       {rapportAvancesOuvert && (
         <AvancesDeleguesRapportModal
-          membreId={membreAvancesId}
-          membreNom={membreAvancesSelectionne
-            ? [membreAvancesSelectionne.prenoms, membreAvancesSelectionne.nom].filter(Boolean).join(" ")
-            : null}
           onClose={() => setRapportAvancesOuvert(false)}
         />
       )}
