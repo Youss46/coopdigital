@@ -83,9 +83,16 @@ async function traiterPaiementApresRetourCheque(
     : lignesChequeCorrespondantes.length === 1
       ? lignesChequeCorrespondantes[0]!
       : -1;
-  const paiementVentile = lignes.length > 1 || (paiement.modePaiement == null && lignes.length > 0);
+  const montantTotalLignes = lignes.reduce((total, ligne) => total + ligne.montantFcfa, 0);
+  // Preserve the legacy single-method path when its parent amount matches its
+  // line, but repair historical rows whose amount was already consolidated
+  // while the old cheque line remained attached.
+  const paiementAvecLignes =
+    lignes.length > 1
+    || (paiement.modePaiement == null && lignes.length > 0)
+    || (lignes.length > 0 && montantTotalLignes !== paiement.montantFcfa);
 
-  if (paiementVentile) {
+  if (paiementAvecLignes) {
     const ligneCheque = ligneChequeIndex >= 0 ? lignes[ligneChequeIndex] : null;
     if (!ligneCheque || ligneCheque.modePaiement !== "cheque") {
       throw new Error(

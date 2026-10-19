@@ -264,22 +264,25 @@ describe("retour en attente du règlement", () => {
   });
 
   it("regroupe le solde restauré dans le reliquat existant après annulation", async () => {
-    const chequeLie = { ...cheque, livraisonId: 91 };
+    const chequeLie = { ...cheque, montantFcfa: 1000000, livraisonId: 91 };
+    const paiementAvecMontantHistorique = { ...paiement, montantFcfa: 2704000 };
+    const ligneChequeHistorique = { ...ligneCheque, montantFcfa: 700000 };
     const chequeUpdate = updateChain([{ ...chequeLie, statut: "annule" }]);
     const paiementUpdate = updateChain();
     const livraisonUpdate = updateChain();
     const paiementPrincipalUpdate = updateChain();
     const paiementDoublonUpdate = updateChain();
+    const paiementEnAttenteInsere = insertChain();
     const tx = {
       select: vi.fn()
         .mockReturnValueOnce(selectChain([chequeLie]))
-        .mockReturnValueOnce(selectChain([paiement]))
-        .mockReturnValueOnce(selectChain([ligneCheque]))
+        .mockReturnValueOnce(selectChain([paiementAvecMontantHistorique]))
+        .mockReturnValueOnce(selectChain([ligneChequeHistorique]))
         .mockReturnValueOnce(selectChain([{ compteDetteProducteur: "401" }]))
-        .mockReturnValueOnce(selectChain([{ montantNetFcfa: "200000", montantRestant: "50000" }]))
+        .mockReturnValueOnce(selectChain([{ montantNetFcfa: "2704000", montantRestant: "2004000" }]))
         .mockReturnValueOnce(selectChain([
-          { id: 63, numeroRecu: "REC-PRINCIPAL" },
-          { id: 64, numeroRecu: "REC-DOUBLON" },
+          { id: 64, numeroRecu: "REC-RELIQUAT" },
+          { id: 65, numeroRecu: "REC-CHEQUE-ANNULE" },
         ])),
       update: vi.fn()
         .mockReturnValueOnce(chequeUpdate)
@@ -288,31 +291,33 @@ describe("retour en attente du règlement", () => {
         .mockReturnValueOnce(paiementPrincipalUpdate)
         .mockReturnValueOnce(paiementDoublonUpdate),
       delete: vi.fn().mockReturnValue(deleteChain()),
+      insert: vi.fn().mockReturnValue(paiementEnAttenteInsere),
     };
     mockDb.transaction.mockImplementationOnce(async (callback: (tx: unknown) => unknown) => callback(tx));
 
     await annulerCheque(41, 7, { motifAnnulation: "Chèque remplacé" });
 
     expect(tx.select.mock.results[0].value.for).toHaveBeenCalledWith("update");
-    expect(paiementUpdate.set).toHaveBeenCalledWith(expect.objectContaining({
-      statut: "en_attente",
-      dateValidation: null,
-      validePar: null,
+    expect(tx.delete).toHaveBeenCalledOnce();
+    expect(paiementUpdate.set).toHaveBeenCalledWith({
+      montantFcfa: 0,
+      statut: "rejete",
       motifRejet: "Chèque annulé : Chèque remplacé",
-      modePaiement: null,
-      referenceTransaction: null,
+    });
+    expect(paiementEnAttenteInsere.values).toHaveBeenCalledWith(expect.objectContaining({
+      montantFcfa: 1000000,
+      statut: "en_attente",
     }));
-    expect(tx.delete).not.toHaveBeenCalled();
     expect(livraisonUpdate.set).toHaveBeenCalledWith({
-      statutPaiement: "PARTIEL",
-      montantRestant: "175000",
+      statutPaiement: "EN_ATTENTE",
+      montantRestant: "2704000",
     });
     expect(paiementPrincipalUpdate.set).toHaveBeenCalledWith({
-      montantFcfa: 175000,
+      montantFcfa: 2704000,
     });
     expect(paiementDoublonUpdate.set).toHaveBeenCalledWith({
       statut: "rejete",
-      motifRejet: "Solde regroupé dans le règlement REC-DOUBLON après le retour d'un chèque.",
+      motifRejet: "Solde regroupé dans le règlement REC-RELIQUAT après le retour d'un chèque.",
     });
   });
 
