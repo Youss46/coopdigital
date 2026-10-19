@@ -3,16 +3,159 @@ import {
   chequesEmisTable,
   comptesBancairesTable,
   paiementsTable,
+  paiementLignesTable,
   livraisonsTable,
   membresTable,
   fournisseursTable,
 } from "@workspace/db";
 import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { enregistrerMouvement } from "./banqueService.js";
+import { proposerEcrituresDansTransaction } from "./comptabiliteService.js";
+import { genererNumeroRecuDansTransaction } from "./recuService.js";
 
 function today(): string { return new Date().toISOString().slice(0, 10); }
 
 type ChequeTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function traiterPaiementApresRetourCheque(
+  tx: ChequeTransaction,
+  cheque: {
+    id: number;
+    paiementId: number | null;
+    paiementLigneId: number | null;
+    numeroCheque: string | null;
+    montantFcfa: number;
+    livraisonId: number | null;
+    membreId: number | null;
+    beneficiaire: string;
+  },
+  cooperativeId: number,
+  motif: string,
+) {
+  if (cheque.paiementId == null) return;
+
+  const [paiement] = await tx
+    .select({
+      id: paiementsTable.id,
+      cooperativeId: paiementsTable.cooperativeId,
+      livraisonId: paiementsTable.livraisonId,
+      bonCarburantId: paiementsTable.bonCarburantId,
+      depenseVehiculeId: paiementsTable.depenseVehiculeId,
+      membreId: paiementsTable.membreId,
+      campagneId: paiementsTable.campagneId,
+      libelle: paiementsTable.libelle,
+      montantFcfa: paiementsTable.montantFcfa,
+      modePaiement: paiementsTable.modePaiement,
+      referenceTransaction: paiementsTable.referenceTransaction,
+      statut: paiementsTable.statut,
+    })
+    .from(paiementsTable)
+    .where(eq(paiementsTable.id, cheque.paiementId))
+    .for("update")
+    .limit(1);
+
+  if (!paiement) return;
+
+  const lignes = await tx
+    .select({
+      id: paiementLignesTable.id,
+      modePaiement: paiementLignesTable.modePaiement,
+      montantFcfa: paiementLignesTable.montantFcfa,
+      numeroCheque: paiementLignesTable.numeroCheque,
+      referenceTransaction: paiementLignesTable.referenceTransaction,
+    })
+    .from(paiementLignesTable)
+    .where(eq(paiementLignesTable.paiementId, paiement.id))
+    .orderBy(paiementLignesTable.id);
+
+  const ligneChequeIndex = lignes.findIndex((ligne) =>
+    cheque.paiementLigneId != null
+      ? ligne.id === cheque.paiementLigneId
+      : ligne.modePaiement === "cheque"
+        && ligne.montantFcfa === cheque.montantFcfa
+        && (!cheque.numeroCheque || ligne.numeroCheque === cheque.numeroCheque),
+  );
+  const paiementVentile = lignes.length > 1 || (paiement.modePaiement == null && lignes.length > 0);
+
+  if (paiementVentile) {
+    const ligneCheque = ligneChequeIndex >= 0 ? lignes[ligneChequeIndex] : null;
+    if (!ligneCheque || ligneCheque.modePaiement !== "cheque") {
+      throw new Error("Ligne de chèque introuvable dans le règlement ventilé");
+    }
+
+    const lignesConservees = lignes.filter((ligne) => ligne.id !== ligneCheque.id);
+    const montantConserve = lignesConservees.reduce((total, ligne) => total + ligne.montantFcfa, 0);
+    await tx.delete(paiementLignesTable).where(eq(paiementLignesTable.id, ligneCheque.id));
+    await tx
+      .update(paiementsTable)
+      .set({
+        montantFcfa: montantConserve,
+        ...(montantConserve === 0
+          ? { statut: "rejete", motifRejet: motif }
+          : {}),
+      })
+      .where(eq(paiementsTable.id, paiement.id));
+
+    const numeroRecu = await genererNumeroRecuDansTransaction(cooperativeId, tx);
+    await tx.insert(paiementsTable).values({
+      cooperativeId: paiement.cooperativeId ?? cooperativeId,
+      livraisonId: paiement.livraisonId ?? cheque.livraisonId,
+      bonCarburantId: paiement.bonCarburantId,
+      // Une dépense véhicule ne peut être liée qu'à un règlement (contrainte unique).
+      depenseVehiculeId: null,
+      membreId: paiement.membreId ?? cheque.membreId,
+      campagneId: paiement.campagneId,
+      libelle: paiement.depenseVehiculeId != null
+        ? paiement.libelle ?? cheque.beneficiaire
+        : paiement.libelle,
+      montantFcfa: cheque.montantFcfa,
+      modePaiement: null,
+      statut: "en_attente",
+      numeroRecu,
+    });
+
+  } else {
+    await tx
+      .update(paiementsTable)
+      .set({
+        statut: "en_attente",
+        motifRejet: motif,
+        validePar: null,
+        dateValidation: null,
+      })
+      .where(eq(paiementsTable.id, cheque.paiementId));
+  }
+
+  let compteDette = paiement.bonCarburantId
+    ? "6042"
+    : paiement.depenseVehiculeId
+      ? "624"
+      : "401";
+  const livraisonId = paiement.livraisonId ?? cheque.livraisonId;
+  if (!paiement.bonCarburantId && !paiement.depenseVehiculeId && livraisonId != null) {
+    const [livraison] = await tx
+      .select({ compteDetteProducteur: livraisonsTable.compteDetteProducteur })
+      .from(livraisonsTable)
+      .where(eq(livraisonsTable.id, livraisonId))
+      .for("update")
+      .limit(1);
+    compteDette = livraison?.compteDetteProducteur?.trim() || "401";
+  }
+  await proposerEcrituresDansTransaction(tx, cooperativeId, [{
+    source: "paiement",
+    sourceId: paiement.id,
+    libelle: `Extourne du chèque ${cheque.numeroCheque ?? cheque.paiementLigneId ?? cheque.paiementId}`,
+    compteDebit: "521",
+    compteCredit: compteDette,
+    montantFcfa: cheque.montantFcfa,
+    date: today(),
+    numeroPiece: `PAI-${paiement.id}-CHQ-${cheque.id}`,
+    tiersId: paiement.bonCarburantId || paiement.depenseVehiculeId
+      ? undefined
+      : (paiement.membreId ?? cheque.membreId ?? undefined),
+    tiersType: paiement.bonCarburantId || paiement.depenseVehiculeId ? undefined : "membre",
+  }]);
+}
 
 async function restaurerSoldeLivraisonApresRetourCheque(
   tx: ChequeTransaction,
@@ -315,17 +458,12 @@ export async function rejeterCheque(
       .where(and(eq(chequesEmisTable.id, id), eq(chequesEmisTable.cooperativeId, cooperativeId)))
       .returning();
 
-    if (cheque.paiementId) {
-      await tx
-        .update(paiementsTable)
-        .set({
-          statut: "en_attente",
-          motifRejet: `Chèque rejeté : ${data.motifRejet}`,
-          validePar: null,
-          dateValidation: null,
-        })
-        .where(eq(paiementsTable.id, cheque.paiementId));
-    }
+    await traiterPaiementApresRetourCheque(
+      tx,
+      cheque,
+      cooperativeId,
+      `Chèque rejeté : ${data.motifRejet}`,
+    );
 
     await restaurerSoldeLivraisonApresRetourCheque(tx, cheque);
 
@@ -360,17 +498,12 @@ export async function annulerCheque(
       .where(and(eq(chequesEmisTable.id, id), eq(chequesEmisTable.cooperativeId, cooperativeId)))
       .returning();
 
-    if (cheque.paiementId) {
-      await tx
-        .update(paiementsTable)
-        .set({
-          statut: "en_attente",
-          motifRejet: `Chèque annulé : ${data.motifAnnulation}`,
-          validePar: null,
-          dateValidation: null,
-        })
-        .where(eq(paiementsTable.id, cheque.paiementId));
-    }
+    await traiterPaiementApresRetourCheque(
+      tx,
+      cheque,
+      cooperativeId,
+      `Chèque annulé : ${data.motifAnnulation}`,
+    );
 
     await restaurerSoldeLivraisonApresRetourCheque(tx, cheque);
 

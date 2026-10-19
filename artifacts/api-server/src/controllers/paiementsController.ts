@@ -358,7 +358,7 @@ const SELECT_FIELDS = {
   bonCarburantId: paiementsTable.bonCarburantId,
   bonCarburantNumero: bonsCarburantTable.numero,
   depenseVehiculeId: paiementsTable.depenseVehiculeId,
-  depenseVehiculeLibelle: depensesVehiculeTable.libelle,
+  depenseVehiculeLibelle: sql<string | null>`coalesce(${depensesVehiculeTable.libelle}, ${paiementsTable.libelle})`,
   depenseVehiculeFournisseur: depensesVehiculeTable.fournisseur,
   membreId: paiementsTable.membreId,
   montantFcfa: paiementsTable.montantFcfa,
@@ -1331,6 +1331,11 @@ async function debiterMobileDansTransaction(
             }
           }
 
+          // Un paiement repassé en attente après le retour d'un chèque peut
+          // encore porter les lignes de sa précédente tentative. Les remplacer
+          // dans la même transaction évite de doubler la ventilation.
+          await tx.delete(paiementLignesTable)
+            .where(eq(paiementLignesTable.paiementId, id));
           const lignesInserees = await tx.insert(paiementLignesTable).values(
             lignes.map((ligne) => ({
               paiementId: id,
@@ -1789,6 +1794,8 @@ async function debiterMobileDansTransaction(
         );
       }
 
+      await tx.delete(paiementLignesTable)
+        .where(eq(paiementLignesTable.paiementId, id));
       const [ligneInseree] = await tx.insert(paiementLignesTable).values({
         paiementId: id,
         modePaiement: mode as "especes" | "cheque" | "virement" | "orange_money" | "mtn_momo" | "wave" | "carte_producteur",

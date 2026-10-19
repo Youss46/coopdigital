@@ -1,6 +1,31 @@
 import { db, entrepotsDeleguesTable, sequencesPeseeTable, sequencesRecusTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 
+type RecuTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function genererNumeroRecuAvecExecutor(
+  cooperativeId: number,
+  executor: typeof db | RecuTransaction,
+): Promise<string> {
+  if (!Number.isInteger(cooperativeId) || cooperativeId < 1) {
+    throw new Error("Coopérative invalide pour la génération du numéro de reçu");
+  }
+  const annee = new Date().getFullYear();
+  const [row] = await executor
+    .insert(sequencesRecusTable)
+    .values({ cooperativeId, annee, compteur: 1 })
+    .onConflictDoUpdate({
+      target: [sequencesRecusTable.cooperativeId, sequencesRecusTable.annee],
+      set: { compteur: sql`${sequencesRecusTable.compteur} + 1` },
+    })
+    .returning({ numero: sequencesRecusTable.compteur });
+  const n = row?.numero;
+  if (!Number.isInteger(n) || n < 1) {
+    throw new Error("Impossible de générer un numéro de reçu");
+  }
+  return `REC-${annee}-${String(n).padStart(5, "0")}`;
+}
+
 /**
  * Réserve atomiquement le prochain rang de pesée pour une coopérative et une
  * année civile. Les gaps sont acceptables si la création parente est annulée.
@@ -45,24 +70,15 @@ export function formatNumeroPesee(
  *
  * Les gaps sont acceptables (rollback d'une transaction parente, etc.).
  */
+export async function genererNumeroRecuDansTransaction(
+  cooperativeId: number,
+  tx: RecuTransaction,
+): Promise<string> {
+  return genererNumeroRecuAvecExecutor(cooperativeId, tx);
+}
+
 export async function genererNumeroRecu(cooperativeId: number): Promise<string> {
-  if (!Number.isInteger(cooperativeId) || cooperativeId < 1) {
-    throw new Error("Coopérative invalide pour la génération du numéro de reçu");
-  }
-  const annee = new Date().getFullYear();
-  const [row] = await db
-    .insert(sequencesRecusTable)
-    .values({ cooperativeId, annee, compteur: 1 })
-    .onConflictDoUpdate({
-      target: [sequencesRecusTable.cooperativeId, sequencesRecusTable.annee],
-      set: { compteur: sql`${sequencesRecusTable.compteur} + 1` },
-    })
-    .returning({ numero: sequencesRecusTable.compteur });
-  const n = row?.numero;
-  if (!Number.isInteger(n) || n < 1) {
-    throw new Error("Impossible de générer un numéro de reçu");
-  }
-  return `REC-${annee}-${String(n).padStart(5, "0")}`;
+  return genererNumeroRecuAvecExecutor(cooperativeId, db);
 }
 
 /**

@@ -32,6 +32,7 @@ import { openPdfViewer } from "@/lib/pdfViewer";
 function nomProducteur(p: PaiementListItem) {
   if (p.bonCarburantNumero) return `Carburant — ${p.bonCarburantNumero}`;
   if (p.depenseVehiculeId) return `Pièce de rechange — ${p.depenseVehiculeLibelle ?? `Bon BAP-${String(p.depenseVehiculeId).padStart(5, "0")}`}`;
+  if (p.depenseVehiculeLibelle) return `Pièce de rechange — ${p.depenseVehiculeLibelle}`;
   const nom = p.membreNom ?? p.fournisseurNom ?? "";
   const prenoms = p.membrePrenoms ?? p.fournisseurPrenoms ?? "";
   return `${nom} ${prenoms}`.trim() || "—";
