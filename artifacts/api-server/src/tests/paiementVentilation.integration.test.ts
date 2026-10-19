@@ -995,6 +995,81 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
     )).toMatchObject({ rows: [{ mode_paiement: "especes" }] });
   });
 
+  it("regroupe le chèque annulé avec le reliquat déjà en attente", async () => {
+    const { paymentId, deliveryId } = await createDeferredPayment(2_704_000);
+    const versement = await validate(paymentId, {
+      montantReglementFcfa: 700_000,
+      modePaiement: "cheque",
+      numeroCheque: "CHQ-RELIQUAT-700000",
+    });
+    expect(versement.statusCode, JSON.stringify(versement.body)).toBe(200);
+
+    const reliquatAvantAnnulation = await client.query(
+      `SELECT id, montant_fcfa, numero_recu FROM paiements
+       WHERE livraison_id = $1 AND id <> $2 AND statut = 'en_attente'`,
+      [deliveryId, paymentId],
+    );
+    expect(reliquatAvantAnnulation.rows).toHaveLength(1);
+    expect(reliquatAvantAnnulation.rows[0].montant_fcfa).toBe(2_004_000);
+    const reliquatPaymentId = reliquatAvantAnnulation.rows[0].id as number;
+    const numeroRecuReliquat = reliquatAvantAnnulation.rows[0].numero_recu as string;
+    paymentIds.push(reliquatPaymentId);
+
+    const cheque = await client.query(
+      `SELECT id FROM cheques_emis WHERE paiement_id = $1`,
+      [paymentId],
+    );
+    await annulerCheque(
+      cheque.rows[0].id,
+      cooperativeId,
+      { motifAnnulation: "Chèque non présenté" },
+    );
+
+    const paiementsEnAttente = await client.query(
+      `SELECT id, montant_fcfa FROM paiements
+       WHERE livraison_id = $1 AND statut = 'en_attente'`,
+      [deliveryId],
+    );
+    expect(paiementsEnAttente.rows).toEqual([
+      { id: reliquatPaymentId, montant_fcfa: 2_704_000 },
+    ]);
+
+    const listeEnAttente = response();
+    await listPaiements({
+      query: { statut: "en_attente", type: "livraison" },
+      user: { cooperativeId, role: "comptable" },
+      log: { error: () => undefined },
+    } as any, listeEnAttente as any);
+    const lignesVisibles = (
+      listeEnAttente.body as {
+        items: Array<{ id: number; livraisonId: number | null; montantFcfa: number }>;
+      }
+    ).items.filter((item) => item.livraisonId === deliveryId);
+    expect(lignesVisibles).toEqual([
+      expect.objectContaining({
+        id: reliquatPaymentId,
+        montantFcfa: 2_704_000,
+      }),
+    ]);
+
+    const reliquatConsolide = await client.query(
+      `SELECT statut, motif_rejet FROM paiements WHERE id = $1`,
+      [paymentId],
+    );
+    expect(reliquatConsolide.rows[0]).toMatchObject({
+      statut: "rejete",
+      motif_rejet: expect.stringContaining(numeroRecuReliquat),
+    });
+    const livraison = await client.query(
+      `SELECT statut_paiement, montant_restant FROM livraisons WHERE id = $1`,
+      [deliveryId],
+    );
+    expect(livraison.rows[0]).toMatchObject({
+      statut_paiement: "EN_ATTENTE",
+      montant_restant: "2704000.00",
+    });
+  });
+
   it("refuse une ventilation si la part réglée par chèque n'a pas de numéro", async () => {
     const { paymentId } = await createDeferredPayment(100_000);
     const result = await validate(paymentId, {

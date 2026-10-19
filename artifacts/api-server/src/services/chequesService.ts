@@ -161,7 +161,7 @@ async function traiterPaiementApresRetourCheque(
 
 async function restaurerSoldeLivraisonApresRetourCheque(
   tx: ChequeTransaction,
-  cheque: { livraisonId: number | null; montantFcfa: number },
+  cheque: { livraisonId: number | null; montantFcfa: number; paiementId: number | null },
 ) {
   if (cheque.livraisonId == null) return;
 
@@ -191,6 +191,52 @@ async function restaurerSoldeLivraisonApresRetourCheque(
       montantRestant: String(montantRestantRestaure),
     })
     .where(eq(livraisonsTable.id, cheque.livraisonId));
+
+  // Si la livraison avait déjà un reliquat en attente, regrouper le montant
+  // restauré dans une seule ligne pour éviter deux cartes de règlement.
+  if (montantRestant > 0) {
+    const paiementsEnAttente = await tx
+      .select({
+        id: paiementsTable.id,
+        numeroRecu: paiementsTable.numeroRecu,
+      })
+      .from(paiementsTable)
+      .where(and(
+        eq(paiementsTable.livraisonId, cheque.livraisonId),
+        eq(paiementsTable.statut, "en_attente"),
+      ))
+      .for("update")
+      .orderBy(paiementsTable.id);
+
+    if (paiementsEnAttente.length > 0) {
+      // Préserver le reliquat en attente préexistant plutôt que de faire
+      // apparaître le paiement du chèque retourné comme une nouvelle ligne.
+      const paiementPrincipal = paiementsEnAttente.find(
+        (paiement) => paiement.id !== cheque.paiementId,
+      ) ?? paiementsEnAttente[0]!;
+      const paiementsDoublons = paiementsEnAttente.filter(
+        (paiement) => paiement.id !== paiementPrincipal.id,
+      );
+      await tx
+        .update(paiementsTable)
+        .set({ montantFcfa: montantRestantRestaure })
+        .where(eq(paiementsTable.id, paiementPrincipal!.id));
+
+      for (const doublon of paiementsDoublons) {
+        const referencePrincipale = paiementPrincipal!.numeroRecu || `PAI-${paiementPrincipal!.id}`;
+        await tx
+          .update(paiementsTable)
+          .set({
+            statut: "rejete",
+            motifRejet: `Solde regroupé dans le règlement ${referencePrincipale} après le retour d'un chèque.`,
+          })
+          .where(and(
+            eq(paiementsTable.id, doublon.id),
+            eq(paiementsTable.statut, "en_attente"),
+          ));
+      }
+    }
+  }
 }
 
 export function resolveBeneficiaireCheque(row: {

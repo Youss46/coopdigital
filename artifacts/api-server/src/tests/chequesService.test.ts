@@ -29,6 +29,7 @@ vi.mock("@workspace/db", () => {
     montantRestant: {},
     modePaiement: {},
     referenceTransaction: {},
+      numeroRecu: {},
     paiementId: {},
     paiementLigneId: {},
     numeroCheque: {},
@@ -262,22 +263,30 @@ describe("retour en attente du règlement", () => {
     });
   });
 
-  it("remet le règlement et la livraison en attente quand le chèque est annulé", async () => {
+  it("regroupe le solde restauré dans le reliquat existant après annulation", async () => {
     const chequeLie = { ...cheque, livraisonId: 91 };
     const chequeUpdate = updateChain([{ ...chequeLie, statut: "annule" }]);
     const paiementUpdate = updateChain();
     const livraisonUpdate = updateChain();
+    const paiementPrincipalUpdate = updateChain();
+    const paiementDoublonUpdate = updateChain();
     const tx = {
       select: vi.fn()
         .mockReturnValueOnce(selectChain([chequeLie]))
         .mockReturnValueOnce(selectChain([paiement]))
         .mockReturnValueOnce(selectChain([ligneCheque]))
         .mockReturnValueOnce(selectChain([{ compteDetteProducteur: "401" }]))
-        .mockReturnValueOnce(selectChain([{ montantNetFcfa: "200000", montantRestant: "50000" }])),
+        .mockReturnValueOnce(selectChain([{ montantNetFcfa: "200000", montantRestant: "50000" }]))
+        .mockReturnValueOnce(selectChain([
+          { id: 63, numeroRecu: "REC-PRINCIPAL" },
+          { id: 64, numeroRecu: "REC-DOUBLON" },
+        ])),
       update: vi.fn()
         .mockReturnValueOnce(chequeUpdate)
         .mockReturnValueOnce(paiementUpdate)
-        .mockReturnValueOnce(livraisonUpdate),
+        .mockReturnValueOnce(livraisonUpdate)
+        .mockReturnValueOnce(paiementPrincipalUpdate)
+        .mockReturnValueOnce(paiementDoublonUpdate),
       delete: vi.fn().mockReturnValue(deleteChain()),
     };
     mockDb.transaction.mockImplementationOnce(async (callback: (tx: unknown) => unknown) => callback(tx));
@@ -297,6 +306,13 @@ describe("retour en attente du règlement", () => {
     expect(livraisonUpdate.set).toHaveBeenCalledWith({
       statutPaiement: "PARTIEL",
       montantRestant: "175000",
+    });
+    expect(paiementPrincipalUpdate.set).toHaveBeenCalledWith({
+      montantFcfa: 175000,
+    });
+    expect(paiementDoublonUpdate.set).toHaveBeenCalledWith({
+      statut: "rejete",
+      motifRejet: "Solde regroupé dans le règlement REC-DOUBLON après le retour d'un chèque.",
     });
   });
 
