@@ -31,8 +31,8 @@ async function traiterPaiementApresRetourCheque(
   },
   cooperativeId: number,
   motif: string,
-) {
-  if (cheque.paiementId == null) return;
+): Promise<{ livraisonId: number | null } | null> {
+  if (cheque.paiementId == null) return null;
 
   const [paiement] = await tx
     .select({
@@ -54,7 +54,7 @@ async function traiterPaiementApresRetourCheque(
     .for("update")
     .limit(1);
 
-  if (!paiement) return;
+  if (!paiement) return null;
 
   const lignes = await tx
     .select({
@@ -113,8 +113,10 @@ async function traiterPaiementApresRetourCheque(
       statut: "en_attente",
       numeroRecu,
     });
-
   } else {
+    if (ligneChequeIndex >= 0) {
+      await tx.delete(paiementLignesTable).where(eq(paiementLignesTable.id, lignes[ligneChequeIndex]!.id));
+    }
     await tx
       .update(paiementsTable)
       .set({
@@ -122,6 +124,8 @@ async function traiterPaiementApresRetourCheque(
         motifRejet: motif,
         validePar: null,
         dateValidation: null,
+        modePaiement: null,
+        referenceTransaction: null,
       })
       .where(eq(paiementsTable.id, cheque.paiementId));
   }
@@ -155,6 +159,7 @@ async function traiterPaiementApresRetourCheque(
       : (paiement.membreId ?? cheque.membreId ?? undefined),
     tiersType: paiement.bonCarburantId || paiement.depenseVehiculeId ? undefined : "membre",
   }]);
+  return { livraisonId: paiement.livraisonId ?? cheque.livraisonId };
 }
 
 async function restaurerSoldeLivraisonApresRetourCheque(
@@ -458,14 +463,17 @@ export async function rejeterCheque(
       .where(and(eq(chequesEmisTable.id, id), eq(chequesEmisTable.cooperativeId, cooperativeId)))
       .returning();
 
-    await traiterPaiementApresRetourCheque(
+    const paiementRetour = await traiterPaiementApresRetourCheque(
       tx,
       cheque,
       cooperativeId,
       `Chèque rejeté : ${data.motifRejet}`,
     );
 
-    await restaurerSoldeLivraisonApresRetourCheque(tx, cheque);
+    await restaurerSoldeLivraisonApresRetourCheque(tx, {
+      ...cheque,
+      livraisonId: cheque.livraisonId ?? paiementRetour?.livraisonId ?? null,
+    });
 
     return updated ?? { ...cheque, statut: "rejete" as const, dateRejet: dateRej, motifRejet: data.motifRejet };
   });
@@ -498,14 +506,17 @@ export async function annulerCheque(
       .where(and(eq(chequesEmisTable.id, id), eq(chequesEmisTable.cooperativeId, cooperativeId)))
       .returning();
 
-    await traiterPaiementApresRetourCheque(
+    const paiementRetour = await traiterPaiementApresRetourCheque(
       tx,
       cheque,
       cooperativeId,
       `Chèque annulé : ${data.motifAnnulation}`,
     );
 
-    await restaurerSoldeLivraisonApresRetourCheque(tx, cheque);
+    await restaurerSoldeLivraisonApresRetourCheque(tx, {
+      ...cheque,
+      livraisonId: cheque.livraisonId ?? paiementRetour?.livraisonId ?? null,
+    });
 
     return updated ?? { ...cheque, statut: "annule" as const, motifAnnulation: data.motifAnnulation };
   });

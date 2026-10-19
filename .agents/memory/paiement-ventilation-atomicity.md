@@ -5,7 +5,7 @@ description: Garanties à conserver lorsqu'un paiement utilise plusieurs moyens 
 
 Un règlement ventilé doit valider le paiement, ses lignes, les chèques, les mouvements de trésorerie et toutes les écritures comptables dans une transaction commune. La somme des lignes est aussi contrôlée par une contrainte différée PostgreSQL.
 
-Lors du rejet ou de l’annulation d’un chèque d’un règlement ventilé, ne pas remettre tout le paiement parent en attente : retirer seulement la ligne du chèque, conserver le montant et le statut des autres moyens, créer un règlement en attente pour la part retournée et extourner son écriture. La livraison retrouve uniquement cette part dans son solde restant. Lors d’une nouvelle validation d’un paiement mono-moyen revenu en attente, remplacer ses anciennes lignes dans la même transaction.
+Lors du rejet ou de l’annulation d’un chèque d’un règlement ventilé, ne pas remettre tout le paiement parent en attente : retirer seulement la ligne du chèque, conserver le montant et le statut des autres moyens, créer un règlement en attente pour la part retournée et extourner son écriture. La livraison retrouve uniquement cette part dans son solde restant. Pour un chèque seul, retirer aussi sa ligne et son mode du paiement revenu en attente afin que le nouveau moyen soit choisi explicitement. Si le solde stocké de la livraison est nul, le règlement peut reconstituer le disponible depuis le net moins les paiements confirmés, plafonné à l’échéance en attente; préférer le livraisonId du paiement si le chèque historique n’en a pas.
 
 **Why:** Une ventilation espèces + chèque peut créer plusieurs effets financiers; une erreur ou une double validation ne doit laisser aucun sous-ensemble enregistré.
 

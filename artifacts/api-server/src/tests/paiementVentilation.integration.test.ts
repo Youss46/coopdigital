@@ -1,6 +1,6 @@
 import { pool } from "@workspace/db";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { validerPaiement } from "../controllers/paiementsController.js";
+import { listPaiements, validerPaiement } from "../controllers/paiementsController.js";
 import { getJournal } from "../services/caisseService.js";
 import {
   annulerChequeRecu,
@@ -875,6 +875,67 @@ describe.skipIf(!enabled)("règlement ventilé atomique sur PostgreSQL", () => {
       mobileMovements: 0,
       cheques: 0,
       accounting: 1,
+    });
+  });
+
+  it("recalcule un solde nul depuis les paiements déjà réglés avant d'accepter le versement en attente", async () => {
+    const { paymentId, deliveryId } = await createDeferredPayment(302_400);
+    await client.query(
+      `UPDATE livraisons SET montant_restant = 0 WHERE id = $1`,
+      [deliveryId],
+    );
+
+    const result = await validate(paymentId, {
+      montantReglementFcfa: 302_400,
+      modePaiement: "especes",
+    });
+
+    expect(result.statusCode, JSON.stringify(result.body)).toBe(200);
+    expect(await client.query(
+      `SELECT statut_paiement, montant_restant FROM livraisons WHERE id = $1`,
+      [deliveryId],
+    )).toMatchObject({
+      rows: [{ statut_paiement: "PAYÉ", montant_restant: "0.00" }],
+    });
+    expect(await paymentEffects(paymentId)).toMatchObject({
+      statut: "effectue",
+      movements: 1,
+    });
+  });
+
+  it("n'affiche pas le moyen chèque rejeté sur un ancien règlement resté en attente", async () => {
+    const { paymentId } = await createDeferredPayment(75_000);
+    await client.query(
+      `UPDATE paiements SET mode_paiement = 'cheque' WHERE id = $1`,
+      [paymentId],
+    );
+    const line = await client.query(
+      `INSERT INTO paiement_lignes (paiement_id, mode_paiement, montant_fcfa, numero_cheque)
+       VALUES ($1, 'cheque', 75000, 'CHQ-HISTORIQUE')
+       RETURNING id`,
+      [paymentId],
+    );
+    await client.query(
+      `INSERT INTO cheques_emis
+        (cooperative_id, beneficiaire, montant_fcfa, paiement_id, paiement_ligne_id,
+         date_emission, statut, date_rejet, motif_rejet)
+       VALUES ($1, 'Membre test', 75000, $2, $3, CURRENT_DATE, 'rejete', CURRENT_DATE, 'Rejet test')`,
+      [cooperativeId, paymentId, line.rows[0].id],
+    );
+
+    const result = response();
+    await listPaiements({
+      query: { statut: "en_attente", type: "livraison" },
+      user: { cooperativeId, role: "comptable" },
+      log: { error: () => undefined },
+    } as any, result as any);
+
+    const items = (result.body as { items: Array<{ id: number; modePaiement: string | null; lignes: unknown[] }> }).items;
+    const pendingPayment = items.find((item) => item.id === paymentId);
+    expect(pendingPayment).toMatchObject({
+      id: paymentId,
+      modePaiement: null,
+      lignes: [],
     });
   });
 

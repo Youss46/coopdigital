@@ -362,7 +362,17 @@ const SELECT_FIELDS = {
   depenseVehiculeFournisseur: depensesVehiculeTable.fournisseur,
   membreId: paiementsTable.membreId,
   montantFcfa: paiementsTable.montantFcfa,
-  modePaiement: paiementsTable.modePaiement,
+  modePaiement: sql<string | null>`CASE
+    WHEN ${paiementsTable.statut} = 'en_attente'
+      AND EXISTS (
+        SELECT 1
+        FROM cheques_emis ce
+        WHERE ce.paiement_id = ${paiementsTable.id}
+          AND ce.statut IN ('rejete', 'annule')
+      )
+    THEN NULL
+    ELSE ${paiementsTable.modePaiement}
+  END`,
   referenceTransaction: paiementsTable.referenceTransaction,
   statut: paiementsTable.statut,
   createdAt: paiementsTable.createdAt,
@@ -429,7 +439,24 @@ async function attachPaiementLignes<T extends { id: number }>(rows: T[]) {
   const lignes = await db
     .select()
     .from(paiementLignesTable)
-    .where(inArray(paiementLignesTable.paiementId, rows.map((row) => row.id)));
+    .where(and(
+      inArray(paiementLignesTable.paiementId, rows.map((row) => row.id)),
+      sql`NOT EXISTS (
+        SELECT 1
+        FROM paiements p
+        JOIN cheques_emis ce ON ce.paiement_id = p.id
+        WHERE p.id = ${paiementLignesTable.paiementId}
+          AND p.statut = 'en_attente'
+          AND ce.statut IN ('rejete', 'annule')
+          AND (
+            ce.paiement_ligne_id = ${paiementLignesTable.id}
+            OR (
+              ce.paiement_ligne_id IS NULL
+              AND ${paiementLignesTable.modePaiement} = 'cheque'
+            )
+          )
+      )`,
+    ));
   return rows.map((row) => ({
     ...row,
     lignes: lignes.filter((ligne) => ligne.paiementId === row.id),
@@ -1072,9 +1099,25 @@ async function debiterMobileDansTransaction(
     );
 
     const livraisonAvecSolde = !!row.paiement.livraisonId && estLivraisonAvecSolde(row.livraisonStatutPaiement);
-    const montantRestantActuel = livraisonAvecSolde
+    let montantRestantActuel = livraisonAvecSolde
       ? Math.max(0, Math.round(Number(row.livraisonMontantRestant ?? row.livraisonMontantNetFcfa ?? row.paiement.montantFcfa)))
       : row.paiement.montantFcfa;
+    if (livraisonAvecSolde && row.paiement.livraisonId && montantRestantActuel === 0) {
+      const montantNet = Math.max(0, Math.round(Number(row.livraisonMontantNetFcfa ?? row.paiement.montantFcfa)));
+      const [paiementsDejaRegles] = await db
+        .select({
+          montant: sql<number>`coalesce(sum(${paiementsTable.montantFcfa}), 0)::integer`,
+        })
+        .from(paiementsTable)
+        .where(and(
+          eq(paiementsTable.livraisonId, row.paiement.livraisonId),
+          inArray(paiementsTable.statut, ["confirme", "effectue", "en_cours"]),
+        ));
+      const soldeCalcule = Math.max(0, montantNet - Number(paiementsDejaRegles?.montant ?? 0));
+      // Une livraison peut conserver un solde nul après le retour d'un ancien chèque.
+      // Le paiement en attente ne peut toutefois pas ouvrir un montant supérieur à sa propre part.
+      montantRestantActuel = Math.min(soldeCalcule, Math.max(0, row.paiement.montantFcfa));
+    }
     const montantDemande = body.montantReglementFcfa == null
       ? row.paiement.montantFcfa
       : Number(body.montantReglementFcfa);
@@ -1249,11 +1292,27 @@ async function debiterMobileDansTransaction(
               .where(eq(livraisonsTable.id, row.paiement.livraisonId))
               .for("update")
               .limit(1);
-            const reste = Math.max(0, Math.round(Number(
+            let reste = Math.max(0, Math.round(Number(
               livraisonVerrouillee?.montantRestant
               ?? livraisonVerrouillee?.montantNetFcfa
               ?? 0,
             )));
+            if (reste === 0 && livraisonVerrouillee) {
+              const montantNet = Math.max(0, Math.round(Number(
+                livraisonVerrouillee.montantNetFcfa ?? row.livraisonMontantNetFcfa ?? row.paiement.montantFcfa,
+              )));
+              const [paiementsDejaRegles] = await tx
+                .select({
+                  montant: sql<number>`coalesce(sum(${paiementsTable.montantFcfa}), 0)::integer`,
+                })
+                .from(paiementsTable)
+                .where(and(
+                  eq(paiementsTable.livraisonId, row.paiement.livraisonId),
+                  inArray(paiementsTable.statut, ["confirme", "effectue", "en_cours"]),
+                ));
+              const soldeCalcule = Math.max(0, montantNet - Number(paiementsDejaRegles?.montant ?? 0));
+              reste = Math.min(soldeCalcule, Math.max(0, row.paiement.montantFcfa));
+            }
             if (!livraisonVerrouillee || montantDemande > reste) {
               throw new PaiementMontantInvalideError(
                 `Le solde de cette livraison a changé. Le montant restant est de ${reste.toLocaleString("fr-FR")} FCFA.`,
@@ -1664,11 +1723,27 @@ async function debiterMobileDansTransaction(
           .where(eq(livraisonsTable.id, row.paiement.livraisonId))
           .for("update")
           .limit(1);
-        const reste = Math.max(0, Math.round(Number(
+        let reste = Math.max(0, Math.round(Number(
           livraisonVerrouillee?.montantRestant
           ?? livraisonVerrouillee?.montantNetFcfa
           ?? 0,
         )));
+        if (reste === 0 && livraisonVerrouillee) {
+          const montantNet = Math.max(0, Math.round(Number(
+            livraisonVerrouillee.montantNetFcfa ?? row.livraisonMontantNetFcfa ?? row.paiement.montantFcfa,
+          )));
+          const [paiementsDejaRegles] = await tx
+            .select({
+              montant: sql<number>`coalesce(sum(${paiementsTable.montantFcfa}), 0)::integer`,
+            })
+            .from(paiementsTable)
+            .where(and(
+              eq(paiementsTable.livraisonId, row.paiement.livraisonId),
+              inArray(paiementsTable.statut, ["confirme", "effectue", "en_cours"]),
+            ));
+          const soldeCalcule = Math.max(0, montantNet - Number(paiementsDejaRegles?.montant ?? 0));
+          reste = Math.min(soldeCalcule, Math.max(0, row.paiement.montantFcfa));
+        }
         if (!livraisonVerrouillee || montantDemande > reste) {
           throw new PaiementMontantInvalideError(
             `Le solde de cette livraison a changé. Le montant restant est de ${reste.toLocaleString("fr-FR")} FCFA.`,

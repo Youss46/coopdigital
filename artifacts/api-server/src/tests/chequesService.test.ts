@@ -223,13 +223,12 @@ describe("retour en attente du règlement", () => {
   });
 
   it("remet le règlement et la livraison en attente quand le chèque est rejeté", async () => {
-    const chequeLie = { ...cheque, livraisonId: 91 };
-    const chequeUpdate = updateChain([{ ...chequeLie, statut: "rejete" }]);
+    const chequeUpdate = updateChain([{ ...cheque, statut: "rejete" }]);
     const paiementUpdate = updateChain();
     const livraisonUpdate = updateChain();
     const tx = {
       select: vi.fn()
-        .mockReturnValueOnce(selectChain([chequeLie]))
+        .mockReturnValueOnce(selectChain([cheque]))
         .mockReturnValueOnce(selectChain([paiement]))
         .mockReturnValueOnce(selectChain([ligneCheque]))
         .mockReturnValueOnce(selectChain([{ compteDetteProducteur: "401" }]))
@@ -238,6 +237,7 @@ describe("retour en attente du règlement", () => {
         .mockReturnValueOnce(chequeUpdate)
         .mockReturnValueOnce(paiementUpdate)
         .mockReturnValueOnce(livraisonUpdate),
+      delete: vi.fn().mockReturnValue(deleteChain()),
     };
     mockDb.transaction.mockImplementationOnce(async (callback: (tx: unknown) => unknown) => callback(tx));
 
@@ -252,7 +252,10 @@ describe("retour en attente du règlement", () => {
       dateValidation: null,
       validePar: null,
       motifRejet: "Chèque rejeté : Provision insuffisante",
+      modePaiement: null,
+      referenceTransaction: null,
     }));
+    expect(tx.delete).toHaveBeenCalledOnce();
     expect(livraisonUpdate.set).toHaveBeenCalledWith({
       statutPaiement: "EN_ATTENTE",
       montantRestant: "125000",
@@ -275,6 +278,7 @@ describe("retour en attente du règlement", () => {
         .mockReturnValueOnce(chequeUpdate)
         .mockReturnValueOnce(paiementUpdate)
         .mockReturnValueOnce(livraisonUpdate),
+      delete: vi.fn().mockReturnValue(deleteChain()),
     };
     mockDb.transaction.mockImplementationOnce(async (callback: (tx: unknown) => unknown) => callback(tx));
 
@@ -286,7 +290,10 @@ describe("retour en attente du règlement", () => {
       dateValidation: null,
       validePar: null,
       motifRejet: "Chèque annulé : Chèque remplacé",
+      modePaiement: null,
+      referenceTransaction: null,
     }));
+    expect(tx.delete).toHaveBeenCalledOnce();
     expect(livraisonUpdate.set).toHaveBeenCalledWith({
       statutPaiement: "PARTIEL",
       montantRestant: "175000",
@@ -371,6 +378,7 @@ describe("retour en attente du règlement", () => {
       update: vi.fn()
         .mockReturnValueOnce(chequeUpdate)
         .mockReturnValueOnce(paiementUpdate),
+      delete: vi.fn().mockReturnValue(deleteChain()),
     };
     mockDb.transaction.mockImplementationOnce(async (callback: (tx: unknown) => unknown) => callback(tx));
 
