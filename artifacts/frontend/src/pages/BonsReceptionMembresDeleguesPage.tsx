@@ -122,6 +122,8 @@ export default function BonsReceptionMembresDeleguesPage() {
   const [filtreStatut, setFiltreStatut] = useState<string>("actifs");
   const [rechercheMembre, setRechercheMembre] = useState("");
   const [membreSelectOpen, setMembreSelectOpen] = useState(false);
+  const [rechercheChauffeur, setRechercheChauffeur] = useState("");
+  const [chauffeurSelectOpen, setChauffeurSelectOpen] = useState(false);
 
   // Pré-remplissage depuis ?membre_id=X (navigué depuis DeleguesLocalitesPage)
   useEffect(() => {
@@ -161,13 +163,20 @@ export default function BonsReceptionMembresDeleguesPage() {
   });
   const vehicules = vehiculesData?.vehicules ?? [];
 
-  const { data: chauffeursData } = useGetChauffeurs({
+  const { data: chauffeursData, isLoading: isLoadingChauffeurs } = useGetChauffeurs({
     query: {
       queryKey: getGetChauffeursQueryKey(),
       enabled: form.typeTransport === "cooperatif",
     },
   });
   const chauffeurs = chauffeursData?.chauffeurs ?? [];
+  const chauffeursFiltres = chauffeurs.filter(c => normalizeSearch(
+    `${c.prenoms ?? ""} ${c.nom} ${c.telephone ?? ""}`,
+  ).includes(normalizeSearch(rechercheChauffeur.trim())));
+  const chauffeurSelectionne = chauffeurs.find(c => String(c.id) === form.chauffeurId);
+  const chauffeurSelectionneLabel = chauffeurSelectionne
+    ? `${chauffeurSelectionne.prenoms ?? ""} ${chauffeurSelectionne.nom}`.trim()
+    : "";
 
   const statutsQuery = filtreStatut === "actifs"
     ? "en_attente_pesee,en_pesee"
@@ -613,7 +622,11 @@ export default function BonsReceptionMembresDeleguesPage() {
                     <button
                       key={t}
                       type="button"
-                      onClick={() => setForm(f => ({ ...f, typeTransport: t, vehiculeId: "", chauffeurId: "", typeVehicule: "", immatriculation: "", nomChauffeur: "", telephoneChauffeur: "" }))}
+                      onClick={() => {
+                        setForm(f => ({ ...f, typeTransport: t, vehiculeId: "", chauffeurId: "", typeVehicule: "", immatriculation: "", nomChauffeur: "", telephoneChauffeur: "" }));
+                        setRechercheChauffeur("");
+                        setChauffeurSelectOpen(false);
+                      }}
                       style={{
                         flex: 1, padding: "10px", borderRadius: 8, fontWeight: 700, fontSize: ".82rem",
                         cursor: "pointer", border: `2px solid ${form.typeTransport === t ? "#0891b2" : "#e5e7eb"}`,
@@ -643,14 +656,80 @@ export default function BonsReceptionMembresDeleguesPage() {
                   </div>
                   <div>
                     <label style={labelStyle}>Chauffeur (flotte coop)</label>
-                    <select value={form.chauffeurId} onChange={e => setForm(f => ({ ...f, chauffeurId: e.target.value }))} style={selectStyle}>
-                      <option value="">— Sélectionner un chauffeur —</option>
-                      {chauffeurs.map(c => (
-                        <option key={c.id} value={c.id}>
-                          {c.prenoms} {c.nom}{c.telephone ? ` · ${c.telephone}` : ""}
-                        </option>
-                      ))}
-                    </select>
+                    <Popover
+                      open={chauffeurSelectOpen}
+                      onOpenChange={open => {
+                        setChauffeurSelectOpen(open);
+                        if (open) setRechercheChauffeur("");
+                      }}
+                    >
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          role="combobox"
+                          aria-expanded={chauffeurSelectOpen}
+                          aria-label="Rechercher et sélectionner un chauffeur"
+                          disabled={isLoadingChauffeurs}
+                          data-testid="combobox-reception-driver"
+                          style={{
+                            ...selectStyle,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            textAlign: "left",
+                            color: chauffeurSelectionneLabel ? "#111827" : "#6b7280",
+                            opacity: isLoadingChauffeurs ? 0.65 : 1,
+                          }}
+                        >
+                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {isLoadingChauffeurs
+                              ? "Chargement des chauffeurs…"
+                              : chauffeurSelectionneLabel || "Rechercher ou sélectionner un chauffeur…"}
+                          </span>
+                          <ChevronsUpDown size={16} aria-hidden="true" style={{ marginLeft: 8, flexShrink: 0, opacity: 0.55 }} />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        align="start"
+                        className="z-[1100] w-[--radix-popover-trigger-width] p-0"
+                      >
+                        <Command shouldFilter={false}>
+                          <CommandInput
+                            value={rechercheChauffeur}
+                            onValueChange={setRechercheChauffeur}
+                            placeholder="Rechercher par nom ou téléphone…"
+                            aria-label="Rechercher un chauffeur"
+                            data-testid="input-search-reception-driver"
+                          />
+                          <CommandList>
+                            <CommandEmpty>
+                              {chauffeurs.length === 0
+                                ? "Aucun chauffeur disponible."
+                                : "Aucun chauffeur ne correspond à cette recherche."}
+                            </CommandEmpty>
+                            {chauffeursFiltres.map(c => (
+                              <CommandItem
+                                key={c.id}
+                                value={`${c.id} ${c.prenoms ?? ""} ${c.nom} ${c.telephone ?? ""}`}
+                                onSelect={() => {
+                                  setForm(f => ({ ...f, chauffeurId: String(c.id) }));
+                                  setRechercheChauffeur("");
+                                  setChauffeurSelectOpen(false);
+                                }}
+                                data-testid={`option-reception-driver-${c.id}`}
+                              >
+                                <Check
+                                  aria-hidden="true"
+                                  className={`mr-2 h-4 w-4 ${String(c.id) === form.chauffeurId ? "opacity-100" : "opacity-0"}`}
+                                />
+                                <span>{c.prenoms} {c.nom}</span>
+                                {c.telephone && <span className="ml-auto text-xs text-muted-foreground">{c.telephone}</span>}
+                              </CommandItem>
+                            ))}
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 </div>
               )}
