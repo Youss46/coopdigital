@@ -9,7 +9,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Package, Truck, Plus, X, CheckCircle2, Clock, Scale, RefreshCw, AlertCircle, ChevronRight } from "lucide-react";
+import { ArrowLeft, Package, Truck, Plus, X, CheckCircle2, Clock, Scale, RefreshCw, AlertCircle, ChevronRight, Search } from "lucide-react";
 import {
   getGetChauffeursQueryKey,
   getGetVehiculesQueryKey,
@@ -46,6 +46,9 @@ async function apiDelete(path: string) {
 }
 
 function fmt(n: number) { return n.toLocaleString("fr-FR"); }
+function normalizeSearch(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("fr");
+}
 function fmtDate(d: string) {
   return new Date(d).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
@@ -115,6 +118,7 @@ export default function BonsReceptionMembresDeleguesPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(FORM_INIT);
   const [filtreStatut, setFiltreStatut] = useState<string>("actifs");
+  const [rechercheMembre, setRechercheMembre] = useState("");
 
   // Pré-remplissage depuis ?membre_id=X (navigué depuis DeleguesLocalitesPage)
   useEffect(() => {
@@ -138,6 +142,10 @@ export default function BonsReceptionMembresDeleguesPage() {
     queryFn: () => apiFetch<Membre[]>(`/api/pesee/membres-delegues`),
   });
   const membres = membresData ?? [];
+  const membresFiltres = membres.filter(m => normalizeSearch(
+    `${m.prenoms ?? ""} ${m.nom} ${m.telephone ?? ""} ${m.section ?? ""}`,
+  ).includes(normalizeSearch(rechercheMembre.trim())));
+  const membreSelectionne = membres.find(m => String(m.id) === form.membreDelegueId);
 
   const { data: vehiculesData } = useGetVehicules({
     query: {
@@ -189,6 +197,7 @@ export default function BonsReceptionMembresDeleguesPage() {
       void qc.invalidateQueries({ queryKey: ["bons-reception"] });
       setShowForm(false);
       setForm(FORM_INIT);
+      setRechercheMembre("");
     },
   });
 
@@ -479,11 +488,27 @@ export default function BonsReceptionMembresDeleguesPage() {
               {/* Membre délégué */}
               <div>
                 <label style={labelStyle}>Membre délégué de localités *</label>
+                <div style={{ position: "relative", marginBottom: 8 }}>
+                  <Search size={16} aria-hidden="true" style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", color: "#6b7280", pointerEvents: "none" }} />
+                  <input
+                    type="search"
+                    value={rechercheMembre}
+                    onChange={e => setRechercheMembre(e.target.value)}
+                    placeholder="Rechercher par nom, téléphone ou section…"
+                    aria-label="Rechercher un membre délégué"
+                    data-testid="input-search-reception-member"
+                    style={{ ...inputStyle, paddingLeft: 36 }}
+                  />
+                </div>
                 <select
                   value={form.membreDelegueId}
-                  onChange={e => setForm(f => ({ ...f, membreDelegueId: e.target.value }))}
+                  onChange={e => {
+                    setForm(f => ({ ...f, membreDelegueId: e.target.value }));
+                    setRechercheMembre("");
+                  }}
                   style={selectStyle}
                   disabled={isLoadingMembres}
+                  data-testid="select-reception-member"
                 >
                   <option value="">
                     {isLoadingMembres
@@ -494,12 +519,22 @@ export default function BonsReceptionMembresDeleguesPage() {
                           ? "Aucun membre délégué disponible"
                           : "— Sélectionner —"}
                   </option>
-                  {membres.map(m => (
+                  {membreSelectionne && !membresFiltres.some(m => m.id === membreSelectionne.id) && (
+                    <option value={membreSelectionne.id}>
+                      {membreSelectionne.prenoms} {membreSelectionne.nom}{membreSelectionne.section ? ` (${membreSelectionne.section})` : ""} — sélectionné
+                    </option>
+                  )}
+                  {membresFiltres.map(m => (
                     <option key={m.id} value={m.id}>
                       {m.prenoms} {m.nom}{m.section ? ` (${m.section})` : ""}
                     </option>
                   ))}
                 </select>
+                {rechercheMembre.trim() && membresFiltres.length === 0 && (
+                  <div style={{ marginTop: 6, fontSize: ".75rem", color: "#6b7280" }} data-testid="text-no-member-search-results">
+                    Aucun membre ne correspond à cette recherche.
+                  </div>
+                )}
                 {isMembresError ? (
                   <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 6, fontSize: ".75rem", color: "#b91c1c" }}>
                     <AlertCircle size={13} />
