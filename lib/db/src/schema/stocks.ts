@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 import { cooperativesTable } from "./cooperatives";
 import { lotsTable } from "./lots";
 import { usersTable } from "./users";
+import { livraisonsTable } from "./livraisons";
 
 export const entrepotsTable = pgTable("entrepots", {
   id: serial("id").primaryKey(),
@@ -29,6 +30,7 @@ export const mouvementsStockTable = pgTable("mouvements_stock", {
   id: serial("id").primaryKey(),
   entrepotId: integer("entrepot_id").notNull().references(() => entrepotsTable.id),
   lotId: integer("lot_id").references(() => lotsTable.id),
+  livraisonId: integer("livraison_id").references(() => livraisonsTable.id, { onDelete: "set null" }),
   type: mouvementTypeEnum("type").notNull(),
   poidsKg: numeric("poids_kg", { precision: 10, scale: 2 }).notNull(),
   nombreSacs: integer("nombre_sacs"),

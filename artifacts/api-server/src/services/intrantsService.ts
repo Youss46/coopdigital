@@ -60,7 +60,8 @@ export async function enregistrerRemboursementParLivraison(
   cooperativeId: number,
   membreId: number,
   montantADeduire: number,
-  dateRemboursement: string
+  dateRemboursement: string,
+  livraisonId?: number,
 ): Promise<void> {
   if (montantADeduire <= 0) return;
 
@@ -103,6 +104,7 @@ export async function enregistrerRemboursementParLivraison(
 
     await tx.insert(remboursementsIntrantsTable).values({
       distributionId: dist.id,
+      livraisonId: livraisonId ?? null,
       membreId,
       dateRemboursement,
       montantFcfa: String(remb),

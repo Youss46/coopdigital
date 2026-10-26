@@ -384,6 +384,23 @@
           "name": "statut_polygone"
         }
       ]
+    },
+    {
+      "migration": "0178_tracabilite_annulation_livraison",
+      "objects": [
+        {
+          "kind": "column",
+          "schema": "public",
+          "table": "mouvements_stock",
+          "name": "livraison_id"
+        },
+        {
+          "kind": "column",
+          "schema": "public",
+          "table": "remboursements_intrants",
+          "name": "livraison_id"
+        }
+      ]
     }
   ]
 }

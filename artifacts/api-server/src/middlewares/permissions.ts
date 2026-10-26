@@ -94,6 +94,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     // Les livraisons sont créées uniquement par les parcours de pesée dédiés.
     creer:     [],
     modifier:  ["pca", "directeur"],
+    annuler:   ["pca", "directeur"],
     supprimer: ["pca", "directeur"],
   },
 

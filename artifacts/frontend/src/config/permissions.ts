@@ -69,6 +69,7 @@ export const PERMISSIONS: Record<string, Record<string, string[]>> = {
     // dédiés (terrain/session), jamais depuis la page Livraisons.
     creer:     [],
     modifier:  ["pca", "directeur"],
+    annuler:   ["pca", "directeur"],
     supprimer: ["pca", "directeur"],
   },
 

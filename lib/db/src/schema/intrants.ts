@@ -7,6 +7,7 @@ import { cooperativesTable } from "./cooperatives";
 import { membresTable } from "./membres";
 import { usersTable } from "./users";
 import { campagnesTable } from "./campagnes";
+import { livraisonsTable } from "./livraisons";
 
 export const categoriesIntrantsTable = pgTable("categories_intrants", {
   id: serial("id").primaryKey(),
@@ -76,6 +77,7 @@ export const remboursementIntrantModeEnum = pgEnum("remboursement_intrant_mode",
 export const remboursementsIntrantsTable = pgTable("remboursements_intrants", {
   id: serial("id").primaryKey(),
   distributionId: integer("distribution_id").notNull().references(() => distributionsIntrantsTable.id),
+  livraisonId: integer("livraison_id").references(() => livraisonsTable.id, { onDelete: "set null" }),
   membreId: integer("membre_id").notNull().references(() => membresTable.id),
   dateRemboursement: date("date_remboursement", { mode: "string" }).notNull(),
   montantFcfa: numeric("montant_fcfa", { precision: 14, scale: 2 }).notNull(),

@@ -1389,6 +1389,7 @@ export async function terminerSession(cooperativeId: number, sessionId: number) 
               if (entrepotCentral) {
                 await db.insert(mouvementsStockTable).values({
                   entrepotId: entrepotCentral.id,
+                  livraisonId,
                   type:       "entree",
                   poidsKg:    String(poidsKg),
                   nombreSacs: detail.nbSacsTotal ?? null,
@@ -1827,7 +1828,7 @@ export async function creerLivraisonDepuisSession(
 
     // ── Remboursement intrants (membres seulement) ────────────────────────
     if (!isFournisseur && intrantsDeduits > 0 && session.membreId) {
-      await enregistrerRemboursementParLivraison(tx, cooperativeId, session.membreId, intrantsDeduits, dateStr);
+      await enregistrerRemboursementParLivraison(tx, cooperativeId, session.membreId, intrantsDeduits, dateStr, livraisonId);
     }
 
     // Link livraison back to session (session is locked — no concurrent writer)
@@ -1928,6 +1929,7 @@ export async function creerLivraisonDepuisSession(
         if (entrepotCentral) {
           await db.insert(mouvementsStockTable).values({
             entrepotId: entrepotCentral.id,
+            livraisonId: result.livraison.id,
             type:       "entree",
             poidsKg:    String(poidsKgNum),
             nombreSacs: result.livraison.nombreSacs ?? null,
