@@ -1828,7 +1828,7 @@ export async function creerLivraisonDepuisSession(
 
     // ── Remboursement intrants (membres seulement) ────────────────────────
     if (!isFournisseur && intrantsDeduits > 0 && session.membreId) {
-      await enregistrerRemboursementParLivraison(tx, cooperativeId, session.membreId, intrantsDeduits, dateStr, livraisonId);
+      await enregistrerRemboursementParLivraison(tx, cooperativeId, session.membreId, intrantsDeduits, dateStr, livraison!.id);
     }
 
     // Link livraison back to session (session is locked — no concurrent writer)

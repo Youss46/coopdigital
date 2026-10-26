@@ -92,6 +92,14 @@ interface Livraison {
   nombreSacs?: number | null;
 }
 
+interface LivraisonAnnulee {
+  id: number;
+  annuleeLe: string;
+  annuleePar: string | null;
+  motif: string;
+  livraison: Partial<Livraison>;
+}
+
 const ROLE_SAISIE_LABEL: Record<string, { label: string; color: string; bg: string }> = {
   peseur:        { label: "Peseur",        color: "#0369a1", bg: "#e0f2fe" },
   delegue:       { label: "Délégué",       color: "#15803d", bg: "#dcfce7" },
@@ -361,6 +369,7 @@ export default function LivraisonsPage() {
   const [periode, setPeriode] = useState<PeriodeFilter>("all");
   const [dateDebut, setDateDebut] = useState("");
   const [dateFin, setDateFin] = useState("");
+  const [vueLivraison, setVueLivraison] = useState<"actives" | "annulees">("actives");
 
   const periodeDates = getPeriodeDates(periode, dateDebut, dateFin);
   const livraisonParams = new URLSearchParams({ limit: "100" });
@@ -372,6 +381,13 @@ export default function LivraisonsPage() {
     queryFn: () => apiFetch(`/api/livraisons?${livraisonParams.toString()}`),
     staleTime: 30_000,
     refetchInterval: 60_000,
+  });
+
+  const { data: livraisonsAnnulees = [], isLoading: chargementAnnulees } = useQuery<LivraisonAnnulee[]>({
+    queryKey: ["livraisons-annulees"],
+    queryFn: () => apiFetch("/api/livraisons/annulees"),
+    enabled: vueLivraison === "annulees",
+    staleTime: 30_000,
   });
 
   const { data: entrepotsDelegues = [] } = useQuery<EntrepotDelegue[]>({
@@ -393,6 +409,16 @@ export default function LivraisonsPage() {
       (l.fournisseurPrenoms ?? "").toLowerCase().includes(r)
     );
   });
+  const annuleesFiltrees = livraisonsAnnulees.filter(({ livraison: l }) => {
+    if (!recherche) return true;
+    const r = recherche.toLowerCase();
+    return [
+      l.membreNom,
+      l.membrePrenoms,
+      l.fournisseurNom,
+      l.fournisseurPrenoms,
+    ].some((nom) => String(nom ?? "").toLowerCase().includes(r));
+  });
 
   const totalPoids = livraisons.reduce((s, l) => s + parseFloat(l.poidsKg ?? "0"), 0);
   const totalNet = livraisons.reduce((s, l) => s + (l.montantNetFcfa ?? 0), 0);
@@ -409,7 +435,35 @@ export default function LivraisonsPage() {
         </div>
       </div>
 
+      <div className="flex gap-2" role="tablist" aria-label="Historique des livraisons">
+        <button
+          role="tab"
+          aria-selected={vueLivraison === "actives"}
+          onClick={() => setVueLivraison("actives")}
+          className={`px-3 py-2 rounded-lg text-sm font-medium border ${
+            vueLivraison === "actives"
+              ? "bg-[#1a4731] text-white border-[#1a4731]"
+              : "bg-white text-gray-600 border-gray-200"
+          }`}
+        >
+          Livraisons actives
+        </button>
+        <button
+          role="tab"
+          aria-selected={vueLivraison === "annulees"}
+          onClick={() => setVueLivraison("annulees")}
+          className={`px-3 py-2 rounded-lg text-sm font-medium border ${
+            vueLivraison === "annulees"
+              ? "bg-[#1a4731] text-white border-[#1a4731]"
+              : "bg-white text-gray-600 border-gray-200"
+          }`}
+        >
+          Annulées
+        </button>
+      </div>
+
       {/* KPIs résumé */}
+      {vueLivraison === "actives" && (
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         <div className="bg-white border border-gray-100 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-1.5">
@@ -444,6 +498,7 @@ export default function LivraisonsPage() {
           <p className="text-xs text-gray-400 mt-0.5">Déjà versé : {fmt(totalPaye)}</p>
         </div>
       </div>
+      )}
 
       {/* Recherche */}
       <div className="relative">
@@ -458,6 +513,7 @@ export default function LivraisonsPage() {
       </div>
 
       {/* Filtre période */}
+      {vueLivraison === "actives" && (
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
           {(["all", "today", "week", "month"] as const).map((p) => {
@@ -521,8 +577,10 @@ export default function LivraisonsPage() {
           )}
         </div>
       </div>
+      )}
 
       {/* Filtre agent saisie */}
+      {vueLivraison === "actives" && (
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-xs text-gray-400 font-medium flex items-center gap-1"><User size={11} /> Saisi par :</span>
         {([
@@ -555,9 +613,10 @@ export default function LivraisonsPage() {
           </span>
         )}
       </div>
+      )}
 
       {/* Liste */}
-      {isLoading ? (
+      {vueLivraison === "actives" && (isLoading ? (
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
           <table className="w-full"><tbody><TableSkeleton colonnes={4} lignes={6} /></tbody></table>
         </div>
@@ -575,13 +634,35 @@ export default function LivraisonsPage() {
             <LivraisonRow key={l.id} livraison={l} />
           ))}
         </div>
+      ))}
+      {vueLivraison === "annulees" && (
+        chargementAnnulees ? (
+          <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+            <table className="w-full"><tbody><TableSkeleton colonnes={4} lignes={4} /></tbody></table>
+          </div>
+        ) : annuleesFiltrees.length === 0 ? (
+          <div className="bg-white rounded-xl border border-gray-100">
+            <EmptyState
+              icone={Package}
+              titre={recherche ? "Aucune livraison annulée pour cette recherche" : "Aucune livraison annulée"}
+              description="Les pesées annulées restent consultables ici."
+            />
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-xs text-gray-500">{annuleesFiltrees.length} livraison{annuleesFiltrees.length !== 1 ? "s" : ""} annulée{annuleesFiltrees.length !== 1 ? "s" : ""}</p>
+            {annuleesFiltrees.map((annulation) => (
+              <LivraisonAnnuleeCard key={`${annulation.id}-${annulation.annuleeLe}`} annulation={annulation} />
+            ))}
+          </div>
+        )
       )}
 
       {/* ─── Sessions de pesée ───────────────────────────────────────────── */}
-      {voitSessions && <SessionsPeseeSection />}
+      {vueLivraison === "actives" && voitSessions && <SessionsPeseeSection />}
 
       {/* ─── Entrepôts délégués ─────────────────────────────────────────── */}
-      {voitDelegues && entrepotsDelegues.length > 0 && (
+      {vueLivraison === "actives" && voitDelegues && entrepotsDelegues.length > 0 && (
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
           <button
             onClick={() => setDeleguesOuvert((v) => !v)}
@@ -686,13 +767,68 @@ async function printRecuLivraison(id: number) {
   setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
 
+function LivraisonAnnuleeCard({ annulation }: { annulation: LivraisonAnnulee }) {
+  const l = annulation.livraison;
+  const nom = `${l.membreNom ?? l.fournisseurNom ?? "Producteur"} ${l.membrePrenoms ?? l.fournisseurPrenoms ?? ""}`.trim();
+  return (
+    <article className="bg-white border border-red-100 rounded-xl p-4 space-y-2">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="font-semibold text-gray-900">{nom}</h3>
+          <p className="text-xs text-gray-500 mt-1">
+            Pesée du {fmtDate(l.dateLivraison)} · {fmtPoids(l.poidsKg)}
+          </p>
+        </div>
+        <span className="shrink-0 rounded-full bg-red-50 text-red-700 border border-red-100 px-2.5 py-1 text-xs font-semibold">
+          Annulée
+        </span>
+      </div>
+      <div className="border-t border-gray-100 pt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-600">
+        <span>Montant net : <strong>{fmt(l.montantNetFcfa)}</strong></span>
+        <span>Annulée le {fmtDate(annulation.annuleeLe)}</span>
+        {annulation.annuleePar && <span>par {annulation.annuleePar}</span>}
+      </div>
+      <p className="rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
+        <strong>Motif :</strong> {annulation.motif || "Non renseigné"}
+      </p>
+    </article>
+  );
+}
+
 function LivraisonRow({ livraison: l }: { livraison: Livraison }) {
+  const { utilisateur } = useAuth();
+  const queryClient = useQueryClient();
   const [ouvert, setOuvert] = useState(false);
   const [downloadingRecu, setDownloadingRecu] = useState(false);
   const [printingRecu, setPrintingRecu] = useState(false);
+  const [annulationOuverte, setAnnulationOuverte] = useState(false);
+  const [motifAnnulation, setMotifAnnulation] = useState("");
+  const [erreurAnnulation, setErreurAnnulation] = useState("");
+  const [annulationEnCours, setAnnulationEnCours] = useState(false);
+  const peutAnnuler = ["pca", "directeur"].includes(utilisateur?.role ?? "");
   const poids = parseFloat(l.poidsKg ?? "0");
   const statut = statutPaiementLabel(l.statutPaiement);
   const montantRestant = Number(l.montantRestant ?? 0);
+
+  const confirmerAnnulation = async () => {
+    setErreurAnnulation("");
+    setAnnulationEnCours(true);
+    try {
+      const response = await apiPut(`/api/livraisons/${l.id}/annuler`, { motif: motifAnnulation });
+      const body = await response.json().catch(() => ({})) as { erreur?: string };
+      if (!response.ok) throw new Error(body.erreur || `Échec de l’annulation (HTTP ${response.status})`);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["livraisons-liste"] }),
+        queryClient.invalidateQueries({ queryKey: ["livraisons-annulees"] }),
+      ]);
+      setAnnulationOuverte(false);
+      setMotifAnnulation("");
+    } catch (error) {
+      setErreurAnnulation(error instanceof Error ? error.message : "Impossible d’annuler cette livraison");
+    } finally {
+      setAnnulationEnCours(false);
+    }
+  };
 
   return (
     <div>
@@ -878,6 +1014,74 @@ function LivraisonRow({ livraison: l }: { livraison: Livraison }) {
               {printingRecu ? <Loader2 size={12} className="animate-spin" /> : <><Printer size={12} /> Imprimer</>}
             </button>
           </div>
+          {peutAnnuler && (
+            <button
+              onClick={() => { setAnnulationOuverte(true); setErreurAnnulation(""); }}
+              className="w-full mt-2 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold border border-red-200 text-red-700 hover:bg-red-50"
+            >
+              Annuler cette pesée
+            </button>
+          )}
+        </div>
+      )}
+      {annulationOuverte && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !annulationEnCours) setAnnulationOuverte(false);
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={`annulation-livraison-title-${l.id}`}
+            className="w-full max-w-md bg-white rounded-2xl shadow-xl p-5 space-y-4"
+          >
+            <div>
+              <h2 id={`annulation-livraison-title-${l.id}`} className="text-lg font-bold text-gray-900">
+                Annuler cette pesée ?
+              </h2>
+              <p className="text-sm text-gray-600 mt-1">
+                La livraison sortira des listes actives. Son historique restera consultable dans l’onglet « Annulées ».
+              </p>
+            </div>
+            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-900">
+              Cette opération rétablit les retenues d’avance et d’intrants, et inverse le stock disponible. Une livraison déjà réglée ou intégrée à un lot ne peut pas être annulée.
+            </div>
+            <label className="block text-sm font-medium text-gray-700">
+              Motif de l’annulation *
+              <textarea
+                autoFocus
+                value={motifAnnulation}
+                onChange={(event) => setMotifAnnulation(event.target.value)}
+                maxLength={500}
+                rows={3}
+                placeholder="Expliquez pourquoi cette pesée doit être annulée"
+                className="mt-1.5 w-full resize-y rounded-lg border border-gray-300 p-3 text-sm font-normal focus:outline-none focus:ring-2 focus:ring-red-200"
+              />
+            </label>
+            {erreurAnnulation && (
+              <p role="alert" className="text-sm text-red-700">{erreurAnnulation}</p>
+            )}
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setAnnulationOuverte(false)}
+                disabled={annulationEnCours}
+                className="px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-700 disabled:opacity-50"
+              >
+                Retour
+              </button>
+              <button
+                onClick={confirmerAnnulation}
+                disabled={annulationEnCours || motifAnnulation.trim().length < 5}
+                className="px-4 py-2 rounded-lg bg-red-700 text-white text-sm font-semibold disabled:opacity-50 flex items-center gap-2"
+              >
+                {annulationEnCours && <Loader2 size={14} className="animate-spin" />}
+                Confirmer l’annulation
+              </button>
+            </div>
+          </section>
         </div>
       )}
     </div>

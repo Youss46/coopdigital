@@ -545,17 +545,25 @@ export async function listLivraisonsAnnulees(req: Request, res: Response): Promi
         eq(auditTrailTable.entiteType, "livraison_annulee"),
       ))
       .orderBy(desc(auditTrailTable.createdAt))
-      .limit(200);
 
     res.json(rows.map((row) => {
       const avant = asJsonRecord(row.valeursAvant);
       const apres = asJsonRecord(row.valeursApres);
+      const livraison = asJsonRecord(avant["livraison"]);
+      const membre = asJsonRecord(avant["membre"]);
+      const fournisseur = asJsonRecord(avant["fournisseur"]);
       return {
         id: row.id,
         annuleeLe: row.annuleeLe,
         annuleePar: row.userNom,
         motif: typeof apres["motif"] === "string" ? apres["motif"] : "",
-        livraison: asJsonRecord(avant["livraison"]),
+        livraison: {
+          ...livraison,
+          membreNom: membre["nom"] ?? null,
+          membrePrenoms: membre["prenoms"] ?? null,
+          fournisseurNom: fournisseur["nom"] ?? null,
+          fournisseurPrenoms: fournisseur["prenoms"] ?? null,
+        },
       };
     }));
   } catch (err) {
@@ -593,6 +601,28 @@ export async function annulerLivraison(req: Request, res: Response): Promise<voi
 
       if (!livraison) throw new AnnulationLivraisonError("Livraison introuvable", 404);
 
+      const [membre] = livraison.membreId
+        ? await tx.select({ nom: membresTable.nom, prenoms: membresTable.prenoms })
+          .from(membresTable)
+          .where(and(
+            eq(membresTable.id, livraison.membreId),
+            eq(membresTable.cooperativeId, cooperativeId),
+          ))
+          .limit(1)
+        : [];
+      const [fournisseur] = livraison.fournisseurId
+        ? await tx.select({ nom: fournisseursTable.nom, prenoms: fournisseursTable.prenoms })
+          .from(fournisseursTable)
+          .where(and(
+            eq(fournisseursTable.id, livraison.fournisseurId),
+            eq(fournisseursTable.cooperativeId, cooperativeId),
+          ))
+          .limit(1)
+        : [];
+      if ((livraison.membreId && !membre) || (livraison.fournisseurId && !fournisseur)) {
+        throw new AnnulationLivraisonError("Annulation impossible : le producteur lié n'appartient pas à cette coopérative");
+      }
+
       const [session] = await tx
         .select()
         .from(sessionsPeseeTable)
@@ -602,7 +632,7 @@ export async function annulerLivraison(req: Request, res: Response): Promise<voi
         ))
         .for("update")
         .limit(1);
-      if (!session || session.statut !== "terminee") {
+      if (session && session.statut !== "terminee") {
         throw new AnnulationLivraisonError("Seule une livraison issue d'une pesée terminée peut être annulée");
       }
 
@@ -666,7 +696,7 @@ export async function annulerLivraison(req: Request, res: Response): Promise<voi
         .from(commissionsDeleguesTable)
         .where(eq(commissionsDeleguesTable.livraisonId, livraisonId))
         .for("update");
-      if (commissions.some((c) => c.statut !== "en_attente" && c.statut !== "annulé")) {
+      if (commissions.some((c) => (c.statut !== "en_attente" && c.statut !== "annulé") || c.mouvementId != null)) {
         throw new AnnulationLivraisonError("Annulation impossible : la commission liée à cette livraison a déjà été réglée");
       }
 
@@ -696,6 +726,16 @@ export async function annulerLivraison(req: Request, res: Response): Promise<voi
         );
       }
 
+      const conditionsMouvementsStock = [
+        eq(mouvementsStockTable.livraisonId, livraisonId),
+        eq(mouvementsStockTable.motif, `Livraison #${livraisonId}`),
+      ];
+      if (session) {
+        conditionsMouvementsStock.push(
+          eq(mouvementsStockTable.motif, `Session pesée #${session.id}`),
+          eq(mouvementsStockTable.motif, `Livraison membre-délégué — session #${session.id}`),
+        );
+      }
       const mouvementsStock = await tx
         .select({
           id: mouvementsStockTable.id,
@@ -709,12 +749,7 @@ export async function annulerLivraison(req: Request, res: Response): Promise<voi
         .innerJoin(entrepotsTable, eq(mouvementsStockTable.entrepotId, entrepotsTable.id))
         .where(and(
           eq(entrepotsTable.cooperativeId, cooperativeId),
-          or(
-            eq(mouvementsStockTable.livraisonId, livraisonId),
-            eq(mouvementsStockTable.motif, `Livraison #${livraisonId}`),
-            eq(mouvementsStockTable.motif, `Session pesée #${session.id}`),
-            eq(mouvementsStockTable.motif, `Livraison membre-délégué — session #${session.id}`),
-          ),
+          or(...conditionsMouvementsStock),
         ));
 
       const entrepotMouvements = await tx
@@ -735,6 +770,25 @@ export async function annulerLivraison(req: Request, res: Response): Promise<voi
           eq(ecrituresComptablesTable.sourceId, livraisonId),
         ))
         .for("update");
+      const anneeCorrection = new Date().getFullYear();
+      let exerciceCorrection = anneeCorrection;
+      if (ecritures.length > 0) {
+        const [exerciceOuvert] = await tx
+          .select({ annee: exercicesTable.annee })
+          .from(exercicesTable)
+          .where(and(
+            eq(exercicesTable.cooperativeId, cooperativeId),
+            eq(exercicesTable.annee, anneeCorrection),
+            eq(exercicesTable.statut, "ouvert"),
+          ))
+          .limit(1);
+        if (!exerciceOuvert) {
+          throw new AnnulationLivraisonError(
+            "Annulation impossible : aucun exercice comptable ouvert n'est disponible pour enregistrer la contre-écriture",
+          );
+        }
+        exerciceCorrection = exerciceOuvert.annee;
+      }
       const ecrituresEnAttente = await tx
         .select()
         .from(ecrituresEnAttenteTable)
@@ -805,21 +859,34 @@ export async function annulerLivraison(req: Request, res: Response): Promise<voi
           poidsKg: String(poids),
           stockAvantKg: String(stockAvant),
           stockApresKg: String(stockApres),
-          livraisonId,
+          livraisonId: null,
           enregistrePar: userId,
           notes: `Annulation livraison #${livraisonId} : ${motif}`,
         });
       }
 
+      const distributionsAvant: Array<typeof distributionsIntrantsTable.$inferSelect> = [];
+      const intrantsParDistribution = new Map<number, number>();
       for (const remboursement of remboursementsIntrants) {
+        if (remboursement.mode !== "deduction_livraison") continue;
+        intrantsParDistribution.set(
+          remboursement.distributionId,
+          (intrantsParDistribution.get(remboursement.distributionId) ?? 0) + Number(remboursement.montantFcfa),
+        );
+      }
+      for (const [distributionId, montantARestaurer] of intrantsParDistribution) {
         const [distribution] = await tx
           .select()
           .from(distributionsIntrantsTable)
-          .where(eq(distributionsIntrantsTable.id, remboursement.distributionId))
+          .where(eq(distributionsIntrantsTable.id, distributionId))
           .for("update")
           .limit(1);
         if (!distribution) throw new AnnulationLivraisonError("Une distribution d'intrants liée est introuvable");
-        const rembourse = Number(distribution.montantRembourse_fcfa) - Number(remboursement.montantFcfa);
+        if (!livraison.membreId || distribution.membreId !== livraison.membreId) {
+          throw new AnnulationLivraisonError("Annulation impossible : la retenue d'intrants ne correspond pas au producteur de cette livraison");
+        }
+        distributionsAvant.push(distribution);
+        const rembourse = Number(distribution.montantRembourse_fcfa) - montantARestaurer;
         if (rembourse < -0.01) throw new AnnulationLivraisonError("Le remboursement d'intrants ne peut pas être rétabli sans incohérence");
         const montantRembourse = Math.max(0, rembourse);
         const montantDu = Number(distribution.montantMembreFcfa);
@@ -831,6 +898,10 @@ export async function annulerLivraison(req: Request, res: Response): Promise<voi
         }).where(eq(distributionsIntrantsTable.id, distribution.id));
       }
 
+      const avancesAvant: Array<Pick<
+        typeof avancesTable.$inferSelect,
+        "id" | "membreId" | "montantRembourse_fcfa" | "soldeRestantFcfa" | "statut" | "dateEcheance"
+      >> = [];
       const avanceTotals = new Map<number, number>();
       for (const remboursement of avances) {
         avanceTotals.set(
@@ -840,12 +911,28 @@ export async function annulerLivraison(req: Request, res: Response): Promise<voi
       }
       for (const [avanceId, montant] of avanceTotals) {
         const [avance] = await tx
-          .select()
+          .select({
+            id: avancesTable.id,
+            membreId: avancesTable.membreId,
+            montantRembourse_fcfa: avancesTable.montantRembourse_fcfa,
+            soldeRestantFcfa: avancesTable.soldeRestantFcfa,
+            statut: avancesTable.statut,
+            dateEcheance: avancesTable.dateEcheance,
+          })
           .from(avancesTable)
-          .where(eq(avancesTable.id, avanceId))
+          .innerJoin(membresTable, eq(avancesTable.membreId, membresTable.id))
+          .where(and(
+            eq(avancesTable.id, avanceId),
+            eq(membresTable.cooperativeId, cooperativeId),
+            livraison.membreId ? eq(avancesTable.membreId, livraison.membreId) : sql`false`,
+          ))
           .for("update")
           .limit(1);
         if (!avance) throw new AnnulationLivraisonError("Une avance liée à cette livraison est introuvable");
+        if (avance.statut === "annulee" || avance.statut === "cloturee") {
+          throw new AnnulationLivraisonError("Annulation impossible : une avance liée a été annulée ou clôturée depuis cette livraison");
+        }
+        avancesAvant.push(avance);
         const nouveauRembourse = avance.montantRembourse_fcfa - montant;
         const nouveauSolde = avance.soldeRestantFcfa + montant;
         const statut = nouveauSolde <= 0
@@ -883,7 +970,7 @@ export async function annulerLivraison(req: Request, res: Response): Promise<voi
           montantFcfa: ecriture.montantFcfa,
           source: "livraison",
           sourceId: livraisonId,
-          exercice: new Date().getFullYear(),
+          exercice: exerciceCorrection,
           typeEcriture: "annulation",
           ecritureSourceId: ecriture.id,
           tiersId: ecriture.tiersId,
@@ -917,7 +1004,7 @@ export async function annulerLivraison(req: Request, res: Response): Promise<voi
       }
       if (cheques.length > 0) {
         await tx.update(chequesEmisTable)
-          .set({ livraisonId: null })
+          .set({ livraisonId: null, paiementId: null, paiementLigneId: null })
           .where(inArray(chequesEmisTable.id, cheques.map((c) => c.id)));
       }
       if (avances.length > 0) {
@@ -929,20 +1016,16 @@ export async function annulerLivraison(req: Request, res: Response): Promise<voi
           .where(inArray(remboursementsIntrantsTable.id, remboursementsIntrants.map((r) => r.id)));
       }
 
-      await tx.update(sessionsPeseeTable)
-        .set({
-          statut: "annulee",
-          livraisonId: null,
-          notes: sql`concat_ws(E'\n', ${sessionsPeseeTable.notes}, ${`Livraison #${livraisonId} annulée par décision de gestion. Motif : ${motif}`})`,
-        })
-        .where(eq(sessionsPeseeTable.id, session.id));
+      if (session) {
+        await tx.update(sessionsPeseeTable)
+          .set({
+            statut: "annulee",
+            livraisonId: null,
+            notes: sql`concat_ws(E'\n', ${sessionsPeseeTable.notes}, ${`Livraison #${livraisonId} annulée par décision de gestion. Motif : ${motif}`})`,
+          })
+          .where(eq(sessionsPeseeTable.id, session.id));
+      }
 
-      const [membre] = livraison.membreId
-        ? await tx.select({ nom: membresTable.nom, prenoms: membresTable.prenoms })
-          .from(membresTable)
-          .where(eq(membresTable.id, livraison.membreId))
-          .limit(1)
-        : [];
       await tx.insert(auditTrailTable).values({
         cooperativeId,
         userId,
@@ -958,10 +1041,13 @@ export async function annulerLivraison(req: Request, res: Response): Promise<voi
           livraison,
           session,
           membre: membre ?? null,
+          fournisseur: fournisseur ?? null,
           paiements,
           cheques,
           avances,
           remboursementsIntrants,
+          avancesAvant,
+          distributionsAvant,
           mouvementsStock,
           entrepotMouvements,
           commissions,
