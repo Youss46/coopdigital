@@ -5,7 +5,7 @@ import {
   entrepotsTable, mouvementsStockTable, usersTable, sessionsPeseeTable,
   remboursementsIntrantsTable, distributionsIntrantsTable, entrepotsDeleguesTable,
   entrepotsMouvementsTable, mouvementsCaisseDelegueTable, commissionsDeleguesTable,
-  chequesEmisTable, expeditionLotsTable, auditTrailTable, ecrituresComptablesTable,
+  chequesEmisTable, paiementLignesTable, expeditionLotsTable, auditTrailTable, ecrituresComptablesTable,
   ecrituresEnAttenteTable, exercicesTable,
 } from "@workspace/db";
 import { alias } from "drizzle-orm/pg-core";
@@ -661,23 +661,40 @@ export async function annulerLivraison(req: Request, res: Response): Promise<voi
       const paiements = await tx
         .select()
         .from(paiementsTable)
-        .where(and(
-          eq(paiementsTable.livraisonId, livraisonId),
-          eq(paiementsTable.cooperativeId, cooperativeId),
-        ))
+        .where(eq(paiementsTable.livraisonId, livraisonId))
         .for("update");
+      if (paiements.some((p) => p.cooperativeId != null && p.cooperativeId !== cooperativeId)) {
+        throw new AnnulationLivraisonError("Annulation impossible : un règlement lié appartient à une autre coopérative");
+      }
       if (paiements.some((p) => p.statut === "confirme" || p.statut === "effectue")) {
         throw new AnnulationLivraisonError("Annulation impossible : un règlement de cette livraison est déjà confirmé");
       }
+      if (paiements.some((p) => p.statut === "en_cours")) {
+        throw new AnnulationLivraisonError("Annulation impossible : un règlement est encore en cours de traitement");
+      }
 
+      const lignesPaiement = paiements.length > 0
+        ? await tx
+          .select()
+          .from(paiementLignesTable)
+          .where(inArray(paiementLignesTable.paiementId, paiements.map((p) => p.id)))
+          .for("update")
+        : [];
+      const conditionsCheques = [eq(chequesEmisTable.livraisonId, livraisonId)];
+      if (paiements.length > 0) {
+        conditionsCheques.push(inArray(chequesEmisTable.paiementId, paiements.map((p) => p.id)));
+      }
+      if (lignesPaiement.length > 0) {
+        conditionsCheques.push(inArray(chequesEmisTable.paiementLigneId, lignesPaiement.map((l) => l.id)));
+      }
       const cheques = await tx
         .select()
         .from(chequesEmisTable)
-        .where(and(
-          eq(chequesEmisTable.cooperativeId, cooperativeId),
-          eq(chequesEmisTable.livraisonId, livraisonId),
-        ))
+        .where(or(...conditionsCheques))
         .for("update");
+      if (cheques.some((c) => c.cooperativeId !== cooperativeId)) {
+        throw new AnnulationLivraisonError("Annulation impossible : un chèque lié appartient à une autre coopérative");
+      }
       if (cheques.some((c) => c.statut !== "annule" && c.statut !== "rejete")) {
         throw new AnnulationLivraisonError("Annulez ou rejetez d'abord le chèque lié à cette livraison");
       }
@@ -746,16 +763,30 @@ export async function annulerLivraison(req: Request, res: Response): Promise<voi
           motif: mouvementsStockTable.motif,
         })
         .from(mouvementsStockTable)
-        .innerJoin(entrepotsTable, eq(mouvementsStockTable.entrepotId, entrepotsTable.id))
-        .where(and(
-          eq(entrepotsTable.cooperativeId, cooperativeId),
-          or(...conditionsMouvementsStock),
-        ));
+        .where(or(...conditionsMouvementsStock))
+        .for("update");
+
+      const entrepotIdsStock = [...new Set(mouvementsStock.map((m) => m.entrepotId))].sort((a, b) => a - b);
+      if (entrepotIdsStock.length > 0) {
+        const entrepotsStock = await tx
+          .select({ id: entrepotsTable.id, cooperativeId: entrepotsTable.cooperativeId })
+          .from(entrepotsTable)
+          .where(inArray(entrepotsTable.id, entrepotIdsStock))
+          .orderBy(entrepotsTable.id)
+          .for("update");
+        if (
+          entrepotsStock.length !== entrepotIdsStock.length ||
+          entrepotsStock.some((e) => e.cooperativeId !== cooperativeId)
+        ) {
+          throw new AnnulationLivraisonError("Annulation impossible : un mouvement de stock lié est invalide ou appartient à une autre coopérative");
+        }
+      }
 
       const entrepotMouvements = await tx
         .select()
         .from(entrepotsMouvementsTable)
         .where(eq(entrepotsMouvementsTable.livraisonId, livraisonId))
+        .orderBy(entrepotsMouvementsTable.entrepotId, entrepotsMouvementsTable.id)
         .for("update");
       if (entrepotMouvements.some((m) => m.typeMouvement === "sortie")) {
         throw new AnnulationLivraisonError("Annulation impossible : le stock de l'entrepôt délégué a déjà été transféré");
@@ -1043,6 +1074,7 @@ export async function annulerLivraison(req: Request, res: Response): Promise<voi
           membre: membre ?? null,
           fournisseur: fournisseur ?? null,
           paiements,
+          lignesPaiement,
           cheques,
           avances,
           remboursementsIntrants,
@@ -1056,7 +1088,7 @@ export async function annulerLivraison(req: Request, res: Response): Promise<voi
         },
         valeursApres: { statut: "annulee", motif },
         champsModifies: ["statut", "motif"],
-        description: `Livraison #${livraisonId} annulée — ${motif}`,
+        description: `Livraison #${livraisonId} annulée — ${motif}`.slice(0, 500),
         campagneId: livraison.campagneId ?? undefined,
       });
 
