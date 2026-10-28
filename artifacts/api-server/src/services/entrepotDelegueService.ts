@@ -305,39 +305,42 @@ async function enregistrerMouvement(
   par: number,
   extra: { livraisonId?: number; transfertId?: number; notes?: string } = {},
 ) {
-  const [entrepot] = await db
-    .select({ stockActuelKg: entrepotsDeleguesTable.stockActuelKg })
-    .from(entrepotsDeleguesTable)
-    .where(eq(entrepotsDeleguesTable.id, entrepotId))
-    .limit(1);
-  if (!entrepot) throw new Error("Entrepôt introuvable");
+  return db.transaction(async (tx) => {
+    const [entrepot] = await tx
+      .select({ stockActuelKg: entrepotsDeleguesTable.stockActuelKg })
+      .from(entrepotsDeleguesTable)
+      .where(eq(entrepotsDeleguesTable.id, entrepotId))
+      .for("update")
+      .limit(1);
+    if (!entrepot) throw new Error("Entrepôt introuvable");
 
-  const avant = toNum(entrepot.stockActuelKg);
-  const apres = type === "entree" ? avant + poidsKg : avant - poidsKg;
-  if (apres < 0) throw new Error("Stock insuffisant dans l'entrepôt");
+    const avant = toNum(entrepot.stockActuelKg);
+    const apres = type === "entree" ? avant + poidsKg : avant - poidsKg;
+    if (apres < 0) throw new Error("Stock insuffisant dans l'entrepôt");
 
-  await db
-    .update(entrepotsDeleguesTable)
-    .set({ stockActuelKg: String(apres), stockMisAJourLe: new Date(), updatedAt: new Date() })
-    .where(eq(entrepotsDeleguesTable.id, entrepotId));
+    await tx
+      .update(entrepotsDeleguesTable)
+      .set({ stockActuelKg: String(apres), stockMisAJourLe: new Date(), updatedAt: new Date() })
+      .where(eq(entrepotsDeleguesTable.id, entrepotId));
 
-  const [mouv] = await db
-    .insert(entrepotsMouvementsTable)
-    .values({
-      entrepotId,
-      typeMouvement: type,
-      motif,
-      poidsKg: String(poidsKg),
-      stockAvantKg: String(avant),
-      stockApresKg: String(apres),
-      enregistrePar: par,
-      livraisonId: extra.livraisonId ?? null,
-      transfertId: extra.transfertId ?? null,
-      notes: extra.notes,
-    })
-    .returning();
+    const [mouv] = await tx
+      .insert(entrepotsMouvementsTable)
+      .values({
+        entrepotId,
+        typeMouvement: type,
+        motif,
+        poidsKg: String(poidsKg),
+        stockAvantKg: String(avant),
+        stockApresKg: String(apres),
+        enregistrePar: par,
+        livraisonId: extra.livraisonId ?? null,
+        transfertId: extra.transfertId ?? null,
+        notes: extra.notes,
+      })
+      .returning();
 
-  return { mouvement: mouv!, stockApres: apres };
+    return { mouvement: mouv!, stockApres: apres };
+  });
 }
 
 // ─── Alertes stock ───────────────────────────────────────────────────────────

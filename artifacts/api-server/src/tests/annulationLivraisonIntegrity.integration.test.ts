@@ -1,6 +1,7 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { pool } from "@workspace/db";
 import { annulerLivraison } from "../controllers/livraisonsController.js";
+import { sortieStock } from "../controllers/stocksController.js";
 
 const enabled =
   process.env.RUN_POSTGRES_INTEGRATION === "1" &&
@@ -65,6 +66,36 @@ describe.skipIf(!enabled)("annulation de livraison : cohérence stock et règlem
       [cooperativeId],
     );
     entrepotId = entrepot.rows[0].id;
+  });
+
+  afterEach(async () => {
+    if (!client || !cooperativeId) return;
+    await client.query("BEGIN");
+    try {
+      await client.query(`DELETE FROM audit_trail WHERE cooperative_id = $1`, [cooperativeId]);
+      await client.query(`DELETE FROM cheques_emis WHERE cooperative_id = $1`, [cooperativeId]);
+      await client.query(
+        `DELETE FROM entrepot_mouvements
+         WHERE entrepot_id IN (
+           SELECT id FROM entrepots_delegues WHERE cooperative_id = $1
+         )`,
+        [cooperativeId],
+      );
+      await client.query(`DELETE FROM mouvements_stock WHERE entrepot_id = $1`, [entrepotId]);
+      await client.query(
+        `DELETE FROM paiements
+         WHERE livraison_id IN (
+           SELECT id FROM livraisons WHERE cooperative_id = $1
+         )`,
+        [cooperativeId],
+      );
+      await client.query(`DELETE FROM livraisons WHERE cooperative_id = $1`, [cooperativeId]);
+      await client.query(`DELETE FROM entrepots_delegues WHERE cooperative_id = $1`, [cooperativeId]);
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    }
   });
 
   afterAll(async () => {
@@ -133,10 +164,15 @@ describe.skipIf(!enabled)("annulation de livraison : cohérence stock et règlem
     const result = await client.query(
       `INSERT INTO paiements
          (cooperative_id, livraison_id, numero_recu, montant_fcfa, statut, date_validation)
-       VALUES ($1, $2, $3, 50000, $4,
-               CASE WHEN $4 = 'confirme' THEN NOW() ELSE NULL END)
+       VALUES ($1, $2, $3, 50000, $4, $5)
        RETURNING id`,
-      [cooperativeId, livraisonId, `TEST-${process.pid}-${sequence++}`, statut],
+      [
+        cooperativeId,
+        livraisonId,
+        `TEST-${process.pid}-${sequence++}`,
+        statut,
+        statut === "confirme" ? new Date() : null,
+      ],
     );
     return result.rows[0].id as number;
   }
@@ -150,6 +186,19 @@ describe.skipIf(!enabled)("annulation de livraison : cohérence stock et règlem
         body: { motif },
         socket: { remoteAddress: "127.0.0.1" },
         headers: { "user-agent": "integration-test" },
+        log: { error: () => undefined },
+      } as never,
+      response as never,
+    );
+    return response;
+  }
+
+  async function callSortieStock(poidsKg: number) {
+    const response = makeResponse();
+    await sortieStock(
+      {
+        user: { id: userId, cooperativeId, role: "pca" },
+        body: { entrepotId, poidsKg, motif: "Sortie concurrente de test" },
         log: { error: () => undefined },
       } as never,
       response as never,
@@ -183,14 +232,16 @@ describe.skipIf(!enabled)("annulation de livraison : cohérence stock et règlem
       [entrepotId, livraisonId, `Livraison #${livraisonId}`],
     );
 
-    const response = await callAnnuler(livraisonId);
+    const motif = "M".repeat(500);
+    const response = await callAnnuler(livraisonId, motif);
     expect(response.statusCode).toBe(200);
     expect(response.body).toMatchObject({ ok: true, id: livraisonId, statut: "annulee" });
 
     const livraison = await client.query(`SELECT id FROM livraisons WHERE id = $1`, [livraisonId]);
     const paiements = await client.query(`SELECT id FROM paiements WHERE id = $1`, [paiementId]);
     const audit = await client.query(
-      `SELECT valeurs_avant -> 'paiements' AS paiements
+      `SELECT valeurs_avant -> 'paiements' AS paiements,
+              valeurs_apres ->> 'motif' AS motif
          FROM audit_trail
         WHERE cooperative_id = $1 AND entite_type = 'livraison_annulee' AND entite_id = $2`,
       [cooperativeId, livraisonId],
@@ -214,6 +265,7 @@ describe.skipIf(!enabled)("annulation de livraison : cohérence stock et règlem
     expect(paiements.rowCount).toBe(0);
     expect(audit.rows[0].paiements).toHaveLength(1);
     expect(Number(audit.rows[0].paiements[0].id)).toBe(paiementId);
+    expect(audit.rows[0].motif).toBe(motif);
     expect(mouvements.rows).toHaveLength(2);
     expect(soldeStock).toBe(0);
   });
@@ -251,6 +303,49 @@ describe.skipIf(!enabled)("annulation de livraison : cohérence stock et règlem
     expect(auditCount.rows[0].count).toBe(0);
   });
 
+  it("refuse un règlement encore en cours sans le supprimer", async () => {
+    const livraisonId = await createLivraison();
+    const paiementId = await createPayment(livraisonId, "en_cours");
+
+    const response = await callAnnuler(livraisonId);
+    expect(response.statusCode).toBe(409);
+
+    const livraison = await client.query(`SELECT id FROM livraisons WHERE id = $1`, [livraisonId]);
+    const paiement = await client.query(`SELECT statut FROM paiements WHERE id = $1`, [paiementId]);
+    expect(livraison.rowCount).toBe(1);
+    expect(paiement.rows[0].statut).toBe("en_cours");
+  });
+
+  it("refuse un chèque actif lié au règlement même si livraison_id est absent", async () => {
+    const livraisonId = await createLivraison();
+    const paiementId = await createPayment(livraisonId, "en_attente");
+    const cheque = await client.query(
+      `INSERT INTO cheques_emis
+         (cooperative_id, numero_cheque, beneficiaire, montant_fcfa, paiement_id,
+          date_emission, statut)
+       VALUES ($1, $2, 'Producteur test', 50000, $3, CURRENT_DATE, 'emis')
+       RETURNING id`,
+      [cooperativeId, `CHQ-${process.pid}-${sequence++}`, paiementId],
+    );
+
+    const response = await callAnnuler(livraisonId);
+    expect(response.statusCode).toBe(409);
+
+    const livraison = await client.query(`SELECT id FROM livraisons WHERE id = $1`, [livraisonId]);
+    const paiement = await client.query(`SELECT id FROM paiements WHERE id = $1`, [paiementId]);
+    const persistedCheque = await client.query(
+      `SELECT statut, paiement_id, livraison_id FROM cheques_emis WHERE id = $1`,
+      [cheque.rows[0].id],
+    );
+    expect(livraison.rowCount).toBe(1);
+    expect(paiement.rowCount).toBe(1);
+    expect(persistedCheque.rows[0]).toEqual({
+      statut: "emis",
+      paiement_id: paiementId,
+      livraison_id: null,
+    });
+  });
+
   it("refuse si la quantité du stock ne permet plus d'inverser l'entrée", async () => {
     const livraisonId = await createLivraison();
     await client.query(
@@ -284,6 +379,42 @@ describe.skipIf(!enabled)("annulation de livraison : cohérence stock et règlem
     expect(livraison.rowCount).toBe(1);
     expect(mouvements.rows[0].count).toBe(2);
     expect(auditCount.rows[0].count).toBe(0);
+  });
+
+  it("sérialise une sortie de stock concurrente avec l'annulation", async () => {
+    const livraisonId = await createLivraison();
+    await client.query(
+      `INSERT INTO mouvements_stock (entrepot_id, livraison_id, type, poids_kg, motif)
+       VALUES ($1, $2, 'entree', 100, $3)`,
+      [entrepotId, livraisonId, `Livraison #${livraisonId}`],
+    );
+
+    const [annulation, sortie] = await Promise.all([
+      callAnnuler(livraisonId),
+      callSortieStock(10),
+    ]);
+    const mouvements = await client.query(
+      `SELECT type, poids_kg
+         FROM mouvements_stock
+        WHERE entrepot_id = $1`,
+      [entrepotId],
+    );
+    const soldeStock = mouvements.rows.reduce(
+      (total: number, row: { type: string; poids_kg: string }) =>
+        total + (row.type === "entree" || row.type === "retour_refus"
+          ? Number(row.poids_kg)
+          : -Number(row.poids_kg)),
+      0,
+    );
+
+    expect([200, 409]).toContain(annulation.statusCode);
+    expect([201, 400, 422]).toContain(sortie.statusCode);
+    expect(soldeStock).toBeGreaterThanOrEqual(0);
+    if (annulation.statusCode === 200) {
+      expect(sortie.statusCode).not.toBe(201);
+    } else {
+      expect(sortie.statusCode).toBe(201);
+    }
   });
 
   it("annule toute la transaction si un entrepôt délégué ne peut pas restituer le stock", async () => {

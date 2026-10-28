@@ -5,21 +5,6 @@ import { eq, and, sql, desc } from "drizzle-orm";
 import { EntreeStockBody, SortieStockBody } from "@workspace/api-zod";
 import { proposerEcriture } from "../services/comptabiliteService";
 
-async function calcStockActuel(entrepotId: number): Promise<number> {
-  const [row] = await db
-    .select({
-      stock: sql<number>`
-        coalesce(
-          sum(case when type in ('entree', 'retour_refus') then poids_kg else -poids_kg end),
-          0
-        )::float
-      `,
-    })
-    .from(mouvementsStockTable)
-    .where(eq(mouvementsStockTable.entrepotId, entrepotId));
-  return row?.stock ?? 0;
-}
-
 export async function getEntrepots(req: Request, res: Response): Promise<void> {
   const cooperativeId = req.user?.cooperativeId;
   if (!cooperativeId) {
@@ -357,72 +342,107 @@ export async function sortieStock(req: Request, res: Response): Promise<void> {
   }
 
   try {
-    const [entrepot] = await db.select({ id: entrepotsTable.id }).from(entrepotsTable)
-      .where(and(eq(entrepotsTable.id, parse.data.entrepotId), eq(entrepotsTable.cooperativeId, cooperativeId))).limit(1);
-    if (!entrepot) { res.status(403).json({ erreur: "Entrepôt introuvable ou non autorisé" }); return; }
-
-    // Vérifier stock suffisant
-    const stockActuel = await calcStockActuel(parse.data.entrepotId);
-    if (stockActuel < parse.data.poidsKg) {
-      res.status(400).json({
-        erreur: `Stock insuffisant. Disponible : ${stockActuel.toFixed(2)} kg, demandé : ${parse.data.poidsKg} kg`,
-      });
-      return;
-    }
-
     const agentId = (req as Request & { user?: { id: number } }).user?.id ?? null;
+    const resultat = await db.transaction(async (tx) => {
+      const [entrepot] = await tx.select({ id: entrepotsTable.id }).from(entrepotsTable)
+        .where(and(
+          eq(entrepotsTable.id, parse.data.entrepotId),
+          eq(entrepotsTable.cooperativeId, cooperativeId),
+        ))
+        .for("update")
+        .limit(1);
+      if (!entrepot) return { type: "introuvable" as const };
 
-    // ── Détection anomalies ──────────────────────────────────────────────
-    const anomaliesDetectees = await checkStock(cooperativeId, {
-      entrepotId: parse.data.entrepotId,
-      poidsKg: parse.data.poidsKg,
-      stockActuel,
-      agentId,
+      const [row] = await tx
+        .select({
+          stock: sql<number>`
+            coalesce(
+              sum(case when type in ('entree', 'retour_refus') then poids_kg else -poids_kg end),
+              0
+            )::float
+          `,
+        })
+        .from(mouvementsStockTable)
+        .where(eq(mouvementsStockTable.entrepotId, parse.data.entrepotId));
+      const stockActuel = row?.stock ?? 0;
+      if (stockActuel < parse.data.poidsKg) {
+        return { type: "stock_insuffisant" as const, stockActuel };
+      }
+
+      const anomaliesDetectees = await checkStock(cooperativeId, {
+        entrepotId: parse.data.entrepotId,
+        poidsKg: parse.data.poidsKg,
+        stockActuel,
+        agentId,
+      });
+      const anomaliesCritiques = anomaliesDetectees.filter((a) => a.niveauGravite === "critique");
+      if (anomaliesCritiques.length > 0) {
+        return { type: "anomalies_critiques" as const, anomaliesCritiques };
+      }
+
+      const pu2 = parse.data.prixUnitaireFcfa ?? null;
+      const [mouvement] = await tx
+        .insert(mouvementsStockTable)
+        .values({
+          entrepotId: parse.data.entrepotId,
+          lotId: parse.data.lotId ?? null,
+          type: "sortie",
+          poidsKg: String(parse.data.poidsKg),
+          ...(parse.data.nombreSacs != null ? { nombreSacs: parse.data.nombreSacs } : {}),
+          prixUnitaireFcfa: pu2 != null ? String(pu2) : null,
+          motif: parse.data.motif ?? null,
+          agentId,
+        })
+        .returning();
+
+      const [withNom] = await tx
+        .select({
+          id: mouvementsStockTable.id,
+          entrepotId: mouvementsStockTable.entrepotId,
+          entrepotNom: entrepotsTable.nom,
+          lotId: mouvementsStockTable.lotId,
+          type: mouvementsStockTable.type,
+          poidsKg: mouvementsStockTable.poidsKg,
+          nombreSacs: mouvementsStockTable.nombreSacs,
+          prixUnitaireFcfa: mouvementsStockTable.prixUnitaireFcfa,
+          motif: mouvementsStockTable.motif,
+          agentId: mouvementsStockTable.agentId,
+          createdAt: mouvementsStockTable.createdAt,
+        })
+        .from(mouvementsStockTable)
+        .leftJoin(entrepotsTable, eq(entrepotsTable.id, mouvementsStockTable.entrepotId))
+        .where(eq(mouvementsStockTable.id, mouvement!.id));
+
+      return {
+        type: "cree" as const,
+        mouvement: mouvement!,
+        withNom,
+        anomaliesAttention: anomaliesDetectees.filter((a) => a.niveauGravite !== "critique"),
+      };
     });
-    const anomaliesCritiques = anomaliesDetectees.filter((a) => a.niveauGravite === "critique");
-    if (anomaliesCritiques.length > 0) {
-      void creerAnomalies(cooperativeId, anomaliesCritiques, "stocks");
-      res.status(422).json({
-        erreur: anomaliesCritiques[0]!.description,
-        anomalie: "bloquee",
-        anomalies: anomaliesCritiques,
+
+    if (resultat.type === "introuvable") {
+      res.status(403).json({ erreur: "Entrepôt introuvable ou non autorisé" });
+      return;
+    }
+    if (resultat.type === "stock_insuffisant") {
+      res.status(400).json({
+        erreur: `Stock insuffisant. Disponible : ${resultat.stockActuel.toFixed(2)} kg, demandé : ${parse.data.poidsKg} kg`,
       });
       return;
     }
-    const anomaliesAttention = anomaliesDetectees.filter((a) => a.niveauGravite !== "critique");
+    if (resultat.type === "anomalies_critiques") {
+      void creerAnomalies(cooperativeId, resultat.anomaliesCritiques, "stocks");
+      res.status(422).json({
+        erreur: resultat.anomaliesCritiques[0]!.description,
+        anomalie: "bloquee",
+        anomalies: resultat.anomaliesCritiques,
+      });
+      return;
+    }
 
     const pu2 = parse.data.prixUnitaireFcfa ?? null;
-    const [mouvement] = await db
-      .insert(mouvementsStockTable)
-      .values({
-        entrepotId: parse.data.entrepotId,
-        lotId: parse.data.lotId ?? null,
-        type: "sortie",
-        poidsKg: String(parse.data.poidsKg),
-        ...(parse.data.nombreSacs != null ? { nombreSacs: parse.data.nombreSacs } : {}),
-        prixUnitaireFcfa: pu2 != null ? String(pu2) : null,
-        motif: parse.data.motif ?? null,
-        agentId,
-      })
-      .returning();
-
-    const [withNom] = await db
-      .select({
-        id: mouvementsStockTable.id,
-        entrepotId: mouvementsStockTable.entrepotId,
-        entrepotNom: entrepotsTable.nom,
-        lotId: mouvementsStockTable.lotId,
-        type: mouvementsStockTable.type,
-        poidsKg: mouvementsStockTable.poidsKg,
-        nombreSacs: mouvementsStockTable.nombreSacs,
-        prixUnitaireFcfa: mouvementsStockTable.prixUnitaireFcfa,
-        motif: mouvementsStockTable.motif,
-        agentId: mouvementsStockTable.agentId,
-        createdAt: mouvementsStockTable.createdAt,
-      })
-      .from(mouvementsStockTable)
-      .leftJoin(entrepotsTable, eq(entrepotsTable.id, mouvementsStockTable.entrepotId))
-      .where(eq(mouvementsStockTable.id, mouvement!.id));
+    const mouvement = resultat.mouvement;
 
     // Écriture comptable sortie stock (perte/ajustement, si prix fourni)
     if (pu2 != null) {
@@ -441,10 +461,10 @@ export async function sortieStock(req: Request, res: Response): Promise<void> {
       }
     }
 
-    if (anomaliesAttention.length > 0) {
-      void creerAnomalies(cooperativeId, anomaliesAttention, "stocks", { entiteId: mouvement!.id, entiteType: "mouvement_stock" });
+    if (resultat.anomaliesAttention.length > 0) {
+      void creerAnomalies(cooperativeId, resultat.anomaliesAttention, "stocks", { entiteId: mouvement.id, entiteType: "mouvement_stock" });
     }
-    res.status(201).json(withNom);
+    res.status(201).json(resultat.withNom);
   } catch (err) {
     req.log.error({ err }, "Erreur sortieStock");
     res.status(500).json({ erreur: "Erreur interne du serveur" });
