@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  Package, Search, Loader2, ChevronRight, Calendar,
+  Package, Search, Loader2, ChevronLeft, ChevronRight, Calendar,
   Scale, Banknote, TrendingDown, ArrowDownCircle, FileDown,
   Warehouse, ChevronDown, MapPin, User, Printer, ClipboardList,
   ArrowRight, CheckCircle2, AlertCircle, CalendarDays, X,
@@ -92,6 +92,16 @@ interface Livraison {
   nombreSacs?: number | null;
 }
 
+interface LivraisonsPaginated {
+  items: Livraison[];
+  total: number;
+  totals: {
+    poidsKg: number;
+    montantNetFcfa: number;
+    montantRestantFcfa: number;
+  };
+}
+
 interface LivraisonAnnulee {
   id: number;
   annuleeLe: string;
@@ -134,6 +144,7 @@ function statutPaiementLabel(statut: string | null | undefined) {
 }
 
 type PeriodeFilter = "all" | "today" | "week" | "month" | "custom";
+const LIVRAISONS_PAGE_SIZE = 25;
 
 function getPeriodeDates(
   periode: PeriodeFilter,
@@ -369,19 +380,31 @@ export default function LivraisonsPage() {
   const [periode, setPeriode] = useState<PeriodeFilter>("today");
   const [dateDebut, setDateDebut] = useState("");
   const [dateFin, setDateFin] = useState("");
+  const [offset, setOffset] = useState(0);
   const [vueLivraison, setVueLivraison] = useState<"actives" | "annulees">("actives");
 
+  const paginationActive = periode === "all" && vueLivraison === "actives";
   const periodeDates = getPeriodeDates(periode, dateDebut, dateFin);
-  const livraisonParams = new URLSearchParams({ limit: "100" });
+  const livraisonParams = new URLSearchParams({
+    limit: String(paginationActive ? LIVRAISONS_PAGE_SIZE : 100),
+  });
+  if (paginationActive) {
+    livraisonParams.set("pagination", "true");
+    livraisonParams.set("offset", String(offset));
+    if (recherche.trim()) livraisonParams.set("search", recherche.trim());
+    if (filtreRole) livraisonParams.set("agent_role", filtreRole);
+  }
   if (periodeDates.date_debut) livraisonParams.set("date_debut", periodeDates.date_debut);
   if (periodeDates.date_fin) livraisonParams.set("date_fin", periodeDates.date_fin);
 
-  const { data: livraisons = [], isLoading } = useQuery<Livraison[]>({
-    queryKey: ["livraisons-liste", periode, dateDebut, dateFin],
+  const { data: livraisonsData, isLoading } = useQuery<Livraison[] | LivraisonsPaginated>({
+    queryKey: ["livraisons-liste", periode, dateDebut, dateFin, paginationActive, offset, recherche, filtreRole],
     queryFn: () => apiFetch(`/api/livraisons?${livraisonParams.toString()}`),
     staleTime: 30_000,
     refetchInterval: 60_000,
   });
+  const pageData = livraisonsData && !Array.isArray(livraisonsData) ? livraisonsData : null;
+  const livraisons = Array.isArray(livraisonsData) ? livraisonsData : livraisonsData?.items ?? [];
 
   const { data: livraisonsAnnulees = [], isLoading: chargementAnnulees } = useQuery<LivraisonAnnulee[]>({
     queryKey: ["livraisons-annulees"],
@@ -399,8 +422,8 @@ export default function LivraisonsPage() {
   });
 
   const filtres = livraisons.filter((l) => {
-    if (filtreRole && l.agentRole !== filtreRole) return false;
-    if (!recherche) return true;
+    if (!paginationActive && filtreRole && l.agentRole !== filtreRole) return false;
+    if (paginationActive || !recherche) return true;
     const r = recherche.toLowerCase();
     return (
       (l.membreNom ?? "").toLowerCase().includes(r) ||
@@ -420,10 +443,17 @@ export default function LivraisonsPage() {
     ].some((nom) => String(nom ?? "").toLowerCase().includes(r));
   });
 
-  const totalPoids = livraisons.reduce((s, l) => s + parseFloat(l.poidsKg ?? "0"), 0);
-  const totalNet = livraisons.reduce((s, l) => s + (l.montantNetFcfa ?? 0), 0);
-  const totalRestant = livraisons.reduce((s, l) => s + Number(l.montantRestant ?? 0), 0);
+  const totalPoids = paginationActive
+    ? pageData?.totals.poidsKg ?? 0
+    : livraisons.reduce((s, l) => s + parseFloat(l.poidsKg ?? "0"), 0);
+  const totalNet = paginationActive
+    ? pageData?.totals.montantNetFcfa ?? 0
+    : livraisons.reduce((s, l) => s + (l.montantNetFcfa ?? 0), 0);
+  const totalRestant = paginationActive
+    ? pageData?.totals.montantRestantFcfa ?? 0
+    : livraisons.reduce((s, l) => s + Number(l.montantRestant ?? 0), 0);
   const totalPaye = Math.max(0, totalNet - totalRestant);
+  const totalLivraisons = paginationActive ? pageData?.total ?? 0 : livraisons.length;
 
   return (
     <div className="space-y-5">
@@ -472,7 +502,7 @@ export default function LivraisonsPage() {
             </div>
             <span className="text-xs text-gray-500 font-medium">Livraisons</span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">{livraisons.length}</p>
+          <p className="text-2xl font-bold text-gray-900">{totalLivraisons}</p>
           <p className="text-xs text-gray-400 mt-0.5">{fmtPoids(String(totalPoids))} total</p>
         </div>
         <div className="bg-white border border-gray-100 rounded-xl p-4">
@@ -507,7 +537,7 @@ export default function LivraisonsPage() {
           type="search"
           placeholder="Rechercher par nom de producteur…"
           value={recherche}
-          onChange={(e) => setRecherche(e.target.value)}
+          onChange={(e) => { setRecherche(e.target.value); setOffset(0); }}
           className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-green-400"
         />
       </div>
@@ -524,7 +554,7 @@ export default function LivraisonsPage() {
             return (
               <button
                 key={p}
-                onClick={() => { setPeriode(p); setDateDebut(""); setDateFin(""); }}
+                onClick={() => { setPeriode(p); setDateDebut(""); setDateFin(""); setOffset(0); }}
                 className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
                   active ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
                 }`}
@@ -545,7 +575,7 @@ export default function LivraisonsPage() {
               type="date"
               value={dateDebut}
               max={dateFin || undefined}
-              onChange={(e) => { setDateDebut(e.target.value); setPeriode("custom"); }}
+              onChange={(e) => { setDateDebut(e.target.value); setPeriode("custom"); setOffset(0); }}
               aria-label="Date de début"
               className={`text-xs border rounded-md px-2 py-1.5 h-7 transition-colors outline-none focus:ring-1 focus:ring-[#1a4731] focus:border-[#1a4731] ${
                 periode === "custom" && dateDebut ? "border-[#1a4731] bg-green-50" : "border-gray-200 bg-white"
@@ -558,7 +588,7 @@ export default function LivraisonsPage() {
               type="date"
               value={dateFin}
               min={dateDebut || undefined}
-              onChange={(e) => { setDateFin(e.target.value); setPeriode("custom"); }}
+              onChange={(e) => { setDateFin(e.target.value); setPeriode("custom"); setOffset(0); }}
               aria-label="Date de fin"
               className={`text-xs border rounded-md px-2 py-1.5 h-7 transition-colors outline-none focus:ring-1 focus:ring-[#1a4731] focus:border-[#1a4731] ${
                 periode === "custom" && dateFin ? "border-[#1a4731] bg-green-50" : "border-gray-200 bg-white"
@@ -567,7 +597,7 @@ export default function LivraisonsPage() {
           </div>
           {periode === "custom" && (dateDebut || dateFin) && (
             <button
-              onClick={() => { setDateDebut(""); setDateFin(""); setPeriode("all"); }}
+              onClick={() => { setDateDebut(""); setDateFin(""); setPeriode("all"); setOffset(0); }}
               className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
               title="Réinitialiser la période"
               aria-label="Réinitialiser la période"
@@ -594,7 +624,7 @@ export default function LivraisonsPage() {
           return (
             <button
               key={opt.value}
-              onClick={() => setFiltreRole(opt.value)}
+              onClick={() => { setFiltreRole(opt.value); setOffset(0); }}
               className="text-xs px-2.5 py-1 rounded-full font-medium border transition-all"
               style={actif && style
                 ? { background: style.bg, color: style.color, borderColor: style.color }
@@ -635,6 +665,39 @@ export default function LivraisonsPage() {
           ))}
         </div>
       ))}
+      {paginationActive && (pageData?.total ?? 0) > LIVRAISONS_PAGE_SIZE && (
+        <nav
+          aria-label="Pagination des livraisons"
+          className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3"
+        >
+          <p className="text-xs text-gray-500">
+            Affichage de {offset + 1} à {Math.min(offset + LIVRAISONS_PAGE_SIZE, pageData?.total ?? 0)} sur {pageData?.total ?? 0}
+          </p>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500">
+              Page {Math.floor(offset / LIVRAISONS_PAGE_SIZE) + 1} / {Math.ceil((pageData?.total ?? 0) / LIVRAISONS_PAGE_SIZE)}
+            </span>
+            <button
+              type="button"
+              aria-label="Page précédente"
+              onClick={() => setOffset(Math.max(0, offset - LIVRAISONS_PAGE_SIZE))}
+              disabled={offset === 0 || isLoading}
+              className="rounded-lg border border-gray-200 p-1.5 text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+            >
+              <ChevronLeft size={15} />
+            </button>
+            <button
+              type="button"
+              aria-label="Page suivante"
+              onClick={() => setOffset(offset + LIVRAISONS_PAGE_SIZE)}
+              disabled={offset + LIVRAISONS_PAGE_SIZE >= (pageData?.total ?? 0) || isLoading}
+              className="rounded-lg border border-gray-200 p-1.5 text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+            >
+              <ChevronRight size={15} />
+            </button>
+          </div>
+        </nav>
+      )}
       {vueLivraison === "annulees" && (
         chargementAnnulees ? (
           <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">

@@ -15,7 +15,7 @@ const agentUserAlias = alias(usersTable, "agent_user");
 // Alias pour la jointure peseur saisie physique (proxy délégué central)
 const peseurUserAlias = alias(usersTable, "peseur_user");
 import { creerChequeDepuisLivraison } from "../services/chequesService.js";
-import { eq, and, desc, notInArray, or, sql, gte, lte, isNull, inArray, like } from "drizzle-orm";
+import { eq, and, desc, notInArray, or, sql, gte, lte, isNull, inArray, ilike } from "drizzle-orm";
 import { CampagneFermeeError, assertCampagneOuverte } from "../lib/campagneGuard";
 import { checkLivraison, creerAnomalies } from "../services/anomalieService";
 import { CreateLivraisonBody } from "@workspace/api-zod";
@@ -37,12 +37,21 @@ export async function listLivraisons(req: Request, res: Response): Promise<void>
   try {
     const membreId = req.query["membre_id"] ? parseInt(String(req.query["membre_id"])) : undefined;
     const categorieMembreDelegue = req.query["categorie_membre_delegue"] === "true";
+    const paginationActive = req.query["pagination"] === "true";
     // When fetching all delegue livraisons for the aggregated view, we don't cap at 200.
     const defaultLimit = categorieMembreDelegue ? 10000 : 20;
-    const limit = Math.min(10000, parseInt(String(req.query["limit"] ?? String(defaultLimit))));
+    const limitParam = Number.parseInt(String(req.query["limit"] ?? String(defaultLimit)), 10);
+    const maxLimit = paginationActive ? 100 : 10000;
+    const limit = Number.isFinite(limitParam) && limitParam > 0
+      ? Math.min(maxLimit, limitParam)
+      : defaultLimit;
+    const offsetParam = Number.parseInt(String(req.query["offset"] ?? "0"), 10);
+    const offset = Number.isFinite(offsetParam) ? Math.max(0, offsetParam) : 0;
     const statutPaiementFilter = req.query["statut_paiement"] ? String(req.query["statut_paiement"]) : undefined;
     const dateDebut = req.query["date_debut"] ? String(req.query["date_debut"]) : undefined;
     const dateFin = req.query["date_fin"] ? String(req.query["date_fin"]) : undefined;
+    const recherche = paginationActive ? String(req.query["search"] ?? "").trim() : "";
+    const agentRoleFilter = paginationActive ? String(req.query["agent_role"] ?? "").trim() : "";
 
     const coopCondition = or(
       eq(membresTable.cooperativeId, cooperativeId),
@@ -62,6 +71,21 @@ export async function listLivraisons(req: Request, res: Response): Promise<void>
     if (dateFin) {
       extraConditions.push(lte(livraisonsTable.dateLivraison, dateFin));
     }
+    if (paginationActive && recherche) {
+      const pattern = `%${recherche}%`;
+      extraConditions.push(
+        or(
+          ilike(sql`concat_ws(' ', ${membresTable.nom}, ${membresTable.prenoms})`, pattern),
+          ilike(sql`concat_ws(' ', ${fournisseursTable.nom}, ${fournisseursTable.prenoms})`, pattern),
+        )!,
+      );
+    }
+    if (
+      paginationActive &&
+      (agentRoleFilter === "peseur" || agentRoleFilter === "delegue" || agentRoleFilter === "agent_terrain")
+    ) {
+      extraConditions.push(eq(agentUserAlias.role, agentRoleFilter));
+    }
     if (req.user?.role === "delegue" && req.user?.id) {
       // Membres rattachés AU délégué OU fournisseurs externes créés PAR ce délégué
       extraConditions.push(
@@ -75,7 +99,7 @@ export async function listLivraisons(req: Request, res: Response): Promise<void>
       ? and(coopCondition, ...extraConditions)
       : coopCondition;
 
-    const livraisons = await db
+    const livraisonsQuery = db
       .select({
         id: livraisonsTable.id,
         numeroPesee: livraisonsTable.numeroPesee,
@@ -87,6 +111,7 @@ export async function listLivraisons(req: Request, res: Response): Promise<void>
         avanceDeduiteFcfa: livraisonsTable.avanceDeduiteFcfa,
         intrantsDeduitsFcfa: livraisonsTable.intrantsDeduitsFcfa,
         montantNetFcfa: livraisonsTable.montantNetFcfa,
+        montantRestant: livraisonsTable.montantRestant,
         dateLivraison: livraisonsTable.dateLivraison,
         statutPaiement: livraisonsTable.statutPaiement,
         agentId: livraisonsTable.agentId,
@@ -115,7 +140,42 @@ export async function listLivraisons(req: Request, res: Response): Promise<void>
         desc(livraisonsTable.createdAt),
         desc(livraisonsTable.id),
       )
-      .limit(limit);
+      .limit(limit)
+      .offset(offset);
+
+    const livraisons = paginationActive ? null : await livraisonsQuery;
+
+    if (paginationActive) {
+      const [livraisons, [totaux]] = await Promise.all([
+        livraisonsQuery,
+        db
+          .select({
+            total: sql<number>`count(*)::int`,
+            poidsKg: sql<number>`coalesce(sum(${livraisonsTable.poidsKg}::numeric), 0)::float8`,
+            montantNetFcfa: sql<number>`coalesce(sum(${livraisonsTable.montantNetFcfa}), 0)::float8`,
+            montantRestantFcfa: sql<number>`coalesce(sum(${livraisonsTable.montantRestant}), 0)::float8`,
+          })
+          .from(livraisonsTable)
+          .leftJoin(membresTable, eq(livraisonsTable.membreId, membresTable.id))
+          .leftJoin(fournisseursTable, eq(livraisonsTable.fournisseurId, fournisseursTable.id))
+          .leftJoin(agentUserAlias, eq(livraisonsTable.agentId, agentUserAlias.id))
+          .leftJoin(peseurUserAlias, eq(livraisonsTable.peseurId, peseurUserAlias.id))
+          .where(whereClause),
+      ]);
+
+      res.json({
+        items: livraisons,
+        total: totaux.total,
+        totals: {
+          poidsKg: totaux.poidsKg,
+          montantNetFcfa: totaux.montantNetFcfa,
+          montantRestantFcfa: totaux.montantRestantFcfa,
+        },
+        limit,
+        offset,
+      });
+      return;
+    }
 
     res.json(livraisons);
   } catch (err) {
