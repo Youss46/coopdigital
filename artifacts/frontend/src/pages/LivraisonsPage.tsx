@@ -366,7 +366,7 @@ export default function LivraisonsPage() {
   const [recherche, setRecherche] = useState("");
   const [deleguesOuvert, setDeleguesOuvert] = useState(true);
   const [filtreRole, setFiltreRole] = useState<"" | "peseur" | "delegue" | "agent_terrain">("");
-  const [periode, setPeriode] = useState<PeriodeFilter>("all");
+  const [periode, setPeriode] = useState<PeriodeFilter>("today");
   const [dateDebut, setDateDebut] = useState("");
   const [dateFin, setDateFin] = useState("");
   const [vueLivraison, setVueLivraison] = useState<"actives" | "annulees">("actives");
