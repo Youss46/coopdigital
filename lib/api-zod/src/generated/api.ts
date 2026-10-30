@@ -4049,6 +4049,7 @@ export const ListPaiementsResponse = zod.object({
   "fournisseurPrenoms": zod.string().nullish(),
   "fournisseurTelephone": zod.string().nullish(),
   "dateLivraison": zod.string().nullish(),
+  "numeroRecuPesee": zod.string().nullish(),
   "poidsNetKg": zod.string().nullish(),
   "poidsKg": zod.string().nullish(),
   "montantBrutFcfa": zod.number().nullish(),

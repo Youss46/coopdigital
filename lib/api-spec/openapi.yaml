@@ -8785,6 +8785,9 @@ components:
           type: ["string", "null"]
         dateLivraison:
           type: ["string", "null"]
+        numeroRecuPesee:
+          type: ["string", "null"]
+          description: Numéro canonique du reçu de pesée associé à la livraison.
         poidsNetKg:
           type: ["string", "null"]
         poidsKg:

@@ -1369,6 +1369,8 @@ export interface PaiementListItem {
   /** @nullable */
   dateLivraison?: string | null;
   /** @nullable */
+  numeroRecuPesee?: string | null;
+  /** @nullable */
   poidsNetKg?: string | null;
   /** @nullable */
   poidsKg?: string | null;

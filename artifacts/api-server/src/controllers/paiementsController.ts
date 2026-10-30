@@ -389,6 +389,10 @@ const SELECT_FIELDS = {
   fournisseurTelephone: fournisseursTable.telephone,
   // Livraison
   dateLivraison: livraisonsTable.dateLivraison,
+  numeroRecuPesee: sql<string | null>`CASE
+    WHEN ${livraisonsTable.anneeNumeroPesee} IS NULL OR ${livraisonsTable.numeroPesee} IS NULL THEN NULL
+    ELSE 'PES-S-' || ${livraisonsTable.anneeNumeroPesee}::text || '-' || lpad(${livraisonsTable.numeroPesee}::text, 5, '0')
+  END`,
   poidsNetKg: livraisonsTable.poidsNetKg,
   poidsKg: livraisonsTable.poidsKg,
   montantBrutFcfa: livraisonsTable.montantBrutFcfa,

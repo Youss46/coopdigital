@@ -2648,6 +2648,7 @@ function PaiementRow({
           <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-500">
             {!isCarburant && telProducteur(p) && <span>{telProducteur(p)}</span>}
             {!isCarburant && p.dateLivraison && <span>Livr. {p.dateLivraison}</span>}
+            {!isCarburant && p.numeroRecuPesee && <span>Reçu de pesée : {p.numeroRecuPesee}</span>}
             {!isCarburant && poids && <span>{fmtPoids(poids)}</span>}
             {isCarburant && <span className="text-amber-600">Bon carburant — règlement station</span>}
           </div>
