@@ -865,6 +865,8 @@ export interface PolygonesImportResult {
 
 export interface LivraisonDetail {
   id: number;
+  /** @nullable */
+  numeroRecuPesee?: string | null;
   membreId: number;
   poidsKg: string;
   /** @nullable */

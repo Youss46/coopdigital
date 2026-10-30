@@ -8323,6 +8323,9 @@ components:
       properties:
         id:
           type: integer
+        numeroRecuPesee:
+          type: ["string", "null"]
+          description: Numéro du reçu de pesée, au format PES-S-AAAA-NNNNN.
         membreId:
           type: integer
         montantOctroyeFcfa:

@@ -537,6 +537,7 @@ export const GetLivraisonsQueryParams = zod.object({
 
 export const GetLivraisonsResponseItem = zod.object({
   "id": zod.number(),
+  "numeroRecuPesee": zod.string().nullish(),
   "membreId": zod.number(),
   "poidsKg": zod.string(),
   "produitBrutKg": zod.string().nullish(),

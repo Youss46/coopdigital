@@ -103,6 +103,10 @@ export async function listLivraisons(req: Request, res: Response): Promise<void>
       .select({
         id: livraisonsTable.id,
         numeroPesee: livraisonsTable.numeroPesee,
+        numeroRecuPesee: sql<string | null>`CASE
+          WHEN ${livraisonsTable.anneeNumeroPesee} IS NULL OR ${livraisonsTable.numeroPesee} IS NULL THEN NULL
+          ELSE 'PES-S-' || ${livraisonsTable.anneeNumeroPesee}::text || '-' || lpad(${livraisonsTable.numeroPesee}::text, 5, '0')
+        END`,
         membreId: livraisonsTable.membreId,
         fournisseurId: livraisonsTable.fournisseurId,
         poidsKg: livraisonsTable.poidsKg,

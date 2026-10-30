@@ -65,6 +65,7 @@ interface EntrepotDelegue {
 interface Livraison {
   id: number;
   numeroPesee?: number | null;
+  numeroRecuPesee?: string | null;
   membreId: number | null;
   fournisseurId: number | null;
   membreNom: string | null;
@@ -919,6 +920,12 @@ function LivraisonRow({ livraison: l }: { livraison: Livraison }) {
             <span className="text-xs text-gray-400 flex items-center gap-1">
               <Scale size={10} /> {poids.toFixed(1)} kg
             </span>
+            {l.numeroRecuPesee && (
+              <>
+                <span className="text-xs text-gray-300">·</span>
+                <span className="text-xs text-gray-500">Reçu : {l.numeroRecuPesee}</span>
+              </>
+            )}
             {l.agentRole && ROLE_SAISIE_LABEL[l.agentRole] && (
               <>
                 <span className="text-xs text-gray-300">·</span>
