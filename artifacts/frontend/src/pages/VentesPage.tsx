@@ -498,16 +498,6 @@ export default function VentesPage() {
         )}
       </div>
 
-      {/* Chaîne de valeur */}
-      <div className="flex items-center gap-1 text-xs text-gray-400 font-medium overflow-x-auto pb-1">
-        {["Producteur", "Livraison", "Stock/Lot", "Vente ◀", "Expédition port", "Exportateur"].map((step, i) => (
-          <span key={i} className={`flex items-center gap-1 whitespace-nowrap ${step.includes("◀") ? "text-green-700 font-semibold bg-green-50 px-2 py-0.5 rounded-full" : ""}`}>
-            {i > 0 && <span className="text-gray-300">›</span>}
-            {step.replace(" ◀", "")}
-          </span>
-        ))}
-      </div>
-
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl border border-gray-200 p-4">
