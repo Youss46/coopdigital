@@ -485,7 +485,7 @@ export default function VentesPage() {
             <ShoppingCart className="h-6 w-6 text-green-700" />
             Ventes cacao
           </h1>
-          <p className="text-sm text-gray-500 mt-1">Enregistrez la vente de lots à l'exportateur, avant expédition au port.</p>
+          <p className="text-sm text-gray-500 mt-1">Enregistrez la vente de lots à l'exportateur.</p>
         </div>
         {peutCreer && (
           <button
