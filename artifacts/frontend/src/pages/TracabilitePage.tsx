@@ -171,6 +171,7 @@ const RECEPTION_STATUT_COLORS: Record<string, string> = {
 };
 
 type LotStatut = "en_stock" | "transit" | "vendu" | "refoule" | "fusionne" | "annule";
+type LotStatutModifiable = Exclude<LotStatut, "vendu">;
 
 function StatutTimeline({ statut }: { statut: LotStatut }) {
   if (statut === "refoule") {
@@ -324,13 +325,13 @@ export function DetailModal({
 }: {
   lotId: number;
   onClose: () => void;
-  onStatutChange: (id: number, statut: LotStatut) => void;
+  onStatutChange: (id: number, statut: LotStatutModifiable) => void;
   peutModifier: boolean;
 }) {
   const { data, isLoading } = useGetLotTracabilite(lotId);
   const { token } = useAuth();
   const [copied, setCopied] = useState(false);
-  const [confirmStatut, setConfirmStatut] = useState<LotStatut | null>(null);
+  const [confirmStatut, setConfirmStatut] = useState<LotStatutModifiable | null>(null);
   const [showExpedier, setShowExpedier] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const queryClient = useQueryClient();
@@ -416,11 +417,6 @@ export function DetailModal({
 
   const statut = data?.lot.statut as LotStatut | undefined;
 
-  const prochainStatut = (s: LotStatut): LotStatut | null => {
-    const idx = STATUT_ORDER.indexOf(s);
-    return idx < STATUT_ORDER.length - 1 ? (STATUT_ORDER[idx + 1] as LotStatut) : null;
-  };
-
   type ProdEntry = { nom: string; prenoms: string; poids: number; montant: number; nb: number };
   const parProducteur = data?.livraisons.reduce<Record<number, ProdEntry>>(
     (acc, l) => {
@@ -445,10 +441,7 @@ export function DetailModal({
       events.push({ icon: "📦", label: `Stockage — ${data.lot.entrepot}`, date: data.lot.dateCreation });
     }
     if (data.vente) {
-      events.push({ icon: "🚚", label: `Expédition vers ${data.vente.exportateurNom ?? "exportateur"}`, date: data.vente.dateVente });
-    }
-    if (statut === "vendu" && data.vente) {
-      events.push({ icon: "✅", label: "Livraison confirmée", date: data.vente.dateVente });
+      events.push({ icon: "🧾", label: `Vente enregistrée auprès de ${data.vente.exportateurNom ?? "l'exportateur"}`, date: data.vente.dateVente });
     }
     if (statut === "refoule") {
       events.push({ icon: "⛔", label: "Refus signalé", date: data.lot.createdAt, detail: "Lot refoulé par l'exportateur" });
@@ -568,16 +561,6 @@ export function DetailModal({
                       </button>
                     )}
 
-                    {/* Confirmer livraison — visible si EN TRANSIT */}
-                    {statut === "transit" && !confirmStatut && (
-                      <button
-                        onClick={() => setConfirmStatut("vendu")}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700"
-                      >
-                        <CheckCircle2 size={13} /> Confirmer livraison
-                      </button>
-                    )}
-
                     {/* Signaler refus — visible si EN TRANSIT ou VENDU */}
                     {(statut === "transit" || statut === "vendu") && !confirmStatut && (
                       <button
@@ -599,7 +582,7 @@ export function DetailModal({
                     )}
 
                     {/* Passer EN TRANSIT (si pas de vente exportateur disponible) via statut classique */}
-                    {statut === "en_stock" && prochainStatut("en_stock") && !confirmStatut && (
+                    {statut === "en_stock" && !confirmStatut && (
                       <button
                         onClick={() => setConfirmStatut("transit")}
                         className="flex items-center gap-1.5 px-3 py-1.5 border border-amber-300 text-amber-700 text-xs font-medium rounded-lg hover:bg-amber-50"
@@ -1266,7 +1249,7 @@ export default function TracabilitePage() {
     });
   };
 
-  const handleStatutChange = (id: number, statut: LotStatut) => {
+  const handleStatutChange = (id: number, statut: LotStatutModifiable) => {
     mutStatut.mutate({ id, data: { statut } });
   };
 

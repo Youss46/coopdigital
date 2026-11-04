@@ -697,6 +697,13 @@ export async function updateLotStatut(req: Request, res: Response): Promise<void
     return;
   }
 
+  if (req.body?.statut === "vendu") {
+    res.status(409).json({
+      erreur: "Le statut « Vendu » est défini lors de l'enregistrement d'une vente dans Ventes cacao.",
+    });
+    return;
+  }
+
   const id = parseInt(String(req.params["id"] ?? "0"));
   const parse = UpdateLotStatutBody.safeParse(req.body);
   if (!parse.success) {

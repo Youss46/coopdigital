@@ -1605,7 +1605,6 @@ export type LotStatutInputStatut = typeof LotStatutInputStatut[keyof typeof LotS
 
 export const LotStatutInputStatut = {
   en_stock: 'en_stock',
-  vendu: 'vendu',
   transit: 'transit',
   refoule: 'refoule',
   fusionne: 'fusionne',

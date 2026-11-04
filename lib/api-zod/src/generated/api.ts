@@ -748,7 +748,7 @@ export const UpdateLotStatutParams = zod.object({
 })
 
 export const UpdateLotStatutBody = zod.object({
-  "statut": zod.enum(['en_stock', 'vendu', 'transit', 'refoule', 'fusionne', 'annule']),
+  "statut": zod.enum(['en_stock', 'transit', 'refoule', 'fusionne', 'annule']),
   "venteExportateurId": zod.number().nullish()
 })
 

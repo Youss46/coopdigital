@@ -687,6 +687,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Le statut Vendu doit provenir d'une vente enregistrée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /lots/fusionner:
     post:
@@ -9170,7 +9176,7 @@ components:
       properties:
         statut:
           type: string
-          enum: [en_stock, vendu, transit, refoule, fusionne, annule]
+          enum: [en_stock, transit, refoule, fusionne, annule]
         venteExportateurId:
           type: ["integer", "null"]
 
