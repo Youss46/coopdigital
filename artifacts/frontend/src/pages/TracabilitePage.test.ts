@@ -21,8 +21,6 @@ vi.mock("@workspace/api-client-react", () => ({
   useGetLotTracabilite: useGetLotTracabiliteMock,
   useGetEntrepots: vi.fn(),
   useFusionnerLots: vi.fn(),
-  useExpedierLot: vi.fn(),
-  useGetVentes: vi.fn(),
 }));
 
 vi.mock("@/contexts/AuthContext", () => ({
@@ -179,7 +177,7 @@ describe("timeline d'expédition sur mobile", () => {
       root.render(createElement(DetailModal, {
         lotId: 7,
         onClose: vi.fn(),
-        onStatutChange: vi.fn(),
+        onAnnulerLot: vi.fn(),
         peutModifier: false,
       }));
     });
@@ -220,7 +218,7 @@ describe("timeline d'expédition sur mobile", () => {
       root.render(createElement(DetailModal, {
         lotId: 7,
         onClose: vi.fn(),
-        onStatutChange: vi.fn(),
+        onAnnulerLot: vi.fn(),
         peutModifier: false,
       }));
     });
@@ -239,5 +237,43 @@ describe("timeline d'expédition sur mobile", () => {
     expect(author?.className).toContain("break-words");
     expect(note?.className).toContain("break-words");
     expect(transition?.parentElement?.className).toContain("min-w-0");
+  });
+
+  it("retire les actions logistiques mais conserve l'annulation du lot", async () => {
+    const lotEnStock = {
+      ...lotData,
+      lot: { ...lotData.lot, statut: "en_stock", expeditionStatut: null },
+    } as unknown as LotTracabilite;
+    const onAnnulerLot = vi.fn();
+    const onClose = vi.fn();
+    useGetLotTracabiliteMock.mockReturnValue({ data: lotEnStock, isLoading: false });
+
+    await act(async () => {
+      root.render(createElement(DetailModal, {
+        lotId: 7,
+        onClose,
+        onAnnulerLot,
+        peutModifier: true,
+      }));
+    });
+
+    expect(container.textContent).toContain("Annuler le lot");
+    expect(container.textContent).not.toContain("Expédier le lot");
+    expect(container.textContent).not.toContain("Passer en transit (sans vente)");
+    expect(container.textContent).not.toContain("Signaler refus");
+
+    const cancelButton = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Annuler le lot"),
+    );
+    await act(async () => cancelButton?.click());
+
+    expect(container.textContent).toContain("Annuler ce lot et libérer ses livraisons ?");
+    const confirmButton = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.trim() === "Confirmer",
+    );
+    await act(async () => confirmButton?.click());
+
+    expect(onAnnulerLot).toHaveBeenCalledWith(7);
+    expect(onClose).toHaveBeenCalledOnce();
   });
 });

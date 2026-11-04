@@ -7,8 +7,6 @@ import {
   useGetLotTracabilite,
   useGetEntrepots,
   useFusionnerLots,
-  useExpedierLot,
-  useGetVentes,
 } from "@workspace/api-client-react";
 import type { LotTracabilite } from "@workspace/api-client-react";
 import {
@@ -171,8 +169,6 @@ const RECEPTION_STATUT_COLORS: Record<string, string> = {
 };
 
 type LotStatut = "en_stock" | "transit" | "vendu" | "refoule" | "fusionne" | "annule";
-type LotStatutModifiable = Exclude<LotStatut, "vendu">;
-
 function StatutTimeline({ statut }: { statut: LotStatut }) {
   if (statut === "refoule") {
     return (
@@ -232,109 +228,23 @@ function StatutTimeline({ statut }: { statut: LotStatut }) {
   );
 }
 
-/* ── Modal Expédier ───────────────────────────────────────────── */
-function ModalExpedier({
-  lotId,
-  onClose,
-  onDone,
-}: {
-  lotId: number;
-  onClose: () => void;
-  onDone: () => void;
-}) {
-  const { data: ventes = [] } = useGetVentes();
-  const mutExpedier = useExpedierLot();
-  const [venteId, setVenteId] = useState<string>("");
-  const ventesDispos = ventes.filter((v) => !v.lotId);
-
-  const handleExpedier = () => {
-    if (!venteId) return;
-    mutExpedier.mutate(
-      { id: lotId, data: { venteExportateurId: parseInt(venteId) } },
-      { onSuccess: onDone }
-    );
-  };
-
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50">
-          <div className="flex items-center gap-2">
-            <Truck size={16} className="text-amber-600" />
-            <h3 className="font-bold text-gray-900 text-sm">Expédier le lot</h3>
-          </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg">
-            <X size={16} />
-          </button>
-        </div>
-        <div className="p-5 space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1.5">
-              Lier à une vente exportateur existante
-            </label>
-            <select
-              value={venteId}
-              onChange={(e) => setVenteId(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
-            >
-              <option value="">— Sélectionner une vente —</option>
-              {ventesDispos.map((v) => (
-                <option key={v.id} value={String(v.id)}>
-                  {v.exportateurNom ?? `Exp. #${v.exportateurId}`} —{" "}
-                  {formaterPoids(v.poidsKg)} — {formaterDate(v.dateVente)}
-                </option>
-              ))}
-            </select>
-            {ventesDispos.length === 0 && (
-              <p className="text-xs text-amber-600 mt-1">
-                Aucune vente sans lot disponible. Créez d'abord une vente depuis la page Exportateurs.
-              </p>
-            )}
-          </div>
-          <p className="text-xs text-gray-500 bg-amber-50 border border-amber-100 rounded-lg p-3">
-            Le lot passera en statut <strong>EN TRANSIT</strong> et sera lié à la vente sélectionnée.
-          </p>
-        </div>
-        <div className="flex gap-2 px-5 pb-5">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-2 border border-gray-200 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-50"
-          >
-            Annuler
-          </button>
-          <button
-            onClick={handleExpedier}
-            disabled={!venteId || mutExpedier.isPending}
-            className="flex-1 px-4 py-2 bg-amber-600 text-white text-sm font-bold rounded-lg hover:bg-amber-700 disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            <Truck size={14} />
-            {mutExpedier.isPending ? "Expédition…" : "Expédier"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /* ── Modal Détail Lot ─────────────────────────────────────────── */
 export function DetailModal({
   lotId,
   onClose,
-  onStatutChange,
+  onAnnulerLot,
   peutModifier,
 }: {
   lotId: number;
   onClose: () => void;
-  onStatutChange: (id: number, statut: LotStatutModifiable) => void;
+  onAnnulerLot: (id: number) => void;
   peutModifier: boolean;
 }) {
   const { data, isLoading } = useGetLotTracabilite(lotId);
   const { token } = useAuth();
   const [copied, setCopied] = useState(false);
-  const [confirmStatut, setConfirmStatut] = useState<LotStatutModifiable | null>(null);
-  const [showExpedier, setShowExpedier] = useState(false);
+  const [confirmAnnulation, setConfirmAnnulation] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
-  const queryClient = useQueryClient();
   const expeditions = data?.expeditions ?? [];
   const expeditionResume = data?.expeditionResume;
 
@@ -551,60 +461,25 @@ export function DetailModal({
                 <div className="px-6 py-4">
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">Actions</h3>
                   <div className="flex flex-wrap gap-2">
-                    {/* Expédier — visible si EN STOCK */}
-                    {statut === "en_stock" && (
-                      <button
-                        onClick={() => setShowExpedier(true)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 text-white text-xs font-medium rounded-lg hover:bg-amber-700"
-                      >
-                        <Truck size={13} /> Expédier
-                      </button>
-                    )}
-
-                    {/* Signaler refus — visible si EN TRANSIT ou VENDU */}
-                    {(statut === "transit" || statut === "vendu") && !confirmStatut && (
-                      <button
-                        onClick={() => setConfirmStatut("refoule")}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700"
-                      >
-                        <AlertOctagon size={13} /> Signaler refus
-                      </button>
-                    )}
-
                     {/* Annuler et libérer les livraisons — uniquement si EN STOCK */}
-                    {statut === "en_stock" && !confirmStatut && (
+                    {statut === "en_stock" && !confirmAnnulation && (
                       <button
-                        onClick={() => setConfirmStatut("annule")}
+                        onClick={() => setConfirmAnnulation(true)}
                         className="flex items-center gap-1.5 px-3 py-1.5 border border-red-300 text-red-700 text-xs font-medium rounded-lg hover:bg-red-50"
                       >
                         <X size={13} /> Annuler le lot
                       </button>
                     )}
 
-                    {/* Passer EN TRANSIT (si pas de vente exportateur disponible) via statut classique */}
-                    {statut === "en_stock" && !confirmStatut && (
-                      <button
-                        onClick={() => setConfirmStatut("transit")}
-                        className="flex items-center gap-1.5 px-3 py-1.5 border border-amber-300 text-amber-700 text-xs font-medium rounded-lg hover:bg-amber-50"
-                      >
-                        <Clock size={13} /> Passer en transit (sans vente)
-                      </button>
-                    )}
-
-                    {/* Confirmation inline */}
-                    {confirmStatut && (
+                    {confirmAnnulation && (
                       <div className="w-full flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                         <p className="text-sm text-amber-800 flex-1">
-                          {confirmStatut === "refoule"
-                            ? "Confirmer le signalement de refus ?"
-                            : confirmStatut === "annule"
-                            ? "Annuler ce lot et libérer ses livraisons ?"
-                            : `Passer ce lot en ${STATUT_LABELS[confirmStatut]} ?`}
+                          Annuler ce lot et libérer ses livraisons ?
                         </p>
                         <button
                           onClick={() => {
-                            onStatutChange(data.lot.id, confirmStatut);
-                            setConfirmStatut(null);
+                            onAnnulerLot(data.lot.id);
+                            setConfirmAnnulation(false);
                             onClose();
                           }}
                           className="px-3 py-1 bg-[#1a4731] text-white text-xs font-medium rounded-lg"
@@ -612,7 +487,7 @@ export function DetailModal({
                           Confirmer
                         </button>
                         <button
-                          onClick={() => setConfirmStatut(null)}
+                          onClick={() => setConfirmAnnulation(false)}
                           className="px-3 py-1 border border-gray-200 text-gray-600 text-xs font-medium rounded-lg"
                         >
                           Annuler
@@ -991,18 +866,6 @@ export function DetailModal({
         </div>
       </div>
 
-      {/* Sous-modal Expédier */}
-      {showExpedier && data && (
-        <ModalExpedier
-          lotId={data.lot.id}
-          onClose={() => setShowExpedier(false)}
-          onDone={() => {
-            setShowExpedier(false);
-            queryClient.invalidateQueries({ queryKey: getGetLotsQueryKey() });
-            onClose();
-          }}
-        />
-      )}
     </>
   );
 }
@@ -1186,7 +1049,7 @@ export default function TracabilitePage() {
     },
   });
 
-  const mutStatut = useUpdateLotStatut({
+  const mutAnnulation = useUpdateLotStatut({
     mutation: {
       onSuccess: (_data, variables) => {
         queryClient.invalidateQueries({ queryKey: getGetLotsQueryKey() });
@@ -1249,8 +1112,8 @@ export default function TracabilitePage() {
     });
   };
 
-  const handleStatutChange = (id: number, statut: LotStatutModifiable) => {
-    mutStatut.mutate({ id, data: { statut } });
+  const handleAnnulerLot = (id: number) => {
+    mutAnnulation.mutate({ id, data: { statut: "annule" } });
   };
 
   const handleAutoSelect = async () => {
@@ -1825,7 +1688,7 @@ export default function TracabilitePage() {
         <DetailModal
           lotId={lotDetail}
           onClose={() => setLotDetail(null)}
-          onStatutChange={handleStatutChange}
+          onAnnulerLot={handleAnnulerLot}
           peutModifier={peutModifier}
         />
       )}
