@@ -38,8 +38,9 @@ export function DelegatedDeliveryReceipt() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap');
         *{box-sizing:border-box}
-        .receipt-stage{--navy:#102e50;--navy2:#173d63;--leaf:#398b41;--leaf-dark:#17632c;--mint:#e7f2e8;--ink:#182b3d;--muted:#637485;--rule:#d5dee5;--paper:#fff;--soft:#f4f7f8;min-height:100dvh;background:#e9eff0;padding:30px 16px;color:var(--ink);font-family:'DM Sans',sans-serif}
-        .receipt{width:min(100%,820px);min-height:1120px;margin:0 auto;background:var(--paper);box-shadow:0 18px 54px rgba(16,46,80,.16);position:relative;overflow:hidden;padding:27px 30px 24px}
+        .receipt-stage{--navy:#102e50;--navy2:#173d63;--leaf:#398b41;--leaf-dark:#17632c;--mint:#e7f2e8;--ink:#182b3d;--muted:#637485;--rule:#d5dee5;--paper:#fff;--soft:#f4f7f8;min-height:100dvh;background:#e9eff0;padding:0;color:var(--ink);font-family:'DM Sans',sans-serif;display:flex;justify-content:center;align-items:flex-start}
+        .paper-preview{width:min(100%,620px);aspect-ratio:210/297;position:relative;overflow:hidden;flex:none}
+        .receipt{width:794px;height:1123px;min-height:1123px;margin:0;background:var(--paper);box-shadow:0 12px 36px rgba(16,46,80,.14);position:relative;overflow:hidden;padding:22px 26px 18px;display:flex;flex-direction:column;transform:scale(.781);transform-origin:top left}
         .receipt:before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 92% 24%,rgba(81,153,92,.075),transparent 23%),radial-gradient(ellipse at 5% 76%,rgba(16,46,80,.035),transparent 28%);pointer-events:none}
         .topline{height:5px;position:absolute;top:0;left:0;right:0;background:linear-gradient(90deg,var(--leaf) 0 32%,#a8ce55 32% 36%,var(--navy) 36%)}
         .receipt-header{display:flex;align-items:center;justify-content:space-between;gap:20px;border-bottom:1px solid var(--rule);padding:5px 0 17px;position:relative}
@@ -54,20 +55,20 @@ export function DelegatedDeliveryReceipt() {
         .doc-kicker{font-size:9px;color:var(--leaf-dark);font-weight:800;letter-spacing:.16em;text-transform:uppercase;margin-bottom:4px}
         .doc-title h1{margin:0;font:800 17px Manrope,sans-serif;color:var(--navy);letter-spacing:.01em}
         .receipt-ref{font:700 12px 'DM Sans',sans-serif;color:#fff;background:var(--navy);display:inline-block;margin-top:7px;padding:5px 10px;border-radius:4px;letter-spacing:.06em}
-        .meta-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0 10px}
+        .meta-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0 7px}
         .meta-chip{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:6px;background:#f0f4f6;font-size:11px;color:#53677a}
         .meta-chip svg{color:var(--leaf);flex:none}
         .meta-chip b{color:var(--ink);font-size:11px}
-        .product-line{display:flex;align-items:center;justify-content:flex-end;margin-bottom:15px}
+        .product-line{display:flex;align-items:center;justify-content:flex-end;margin-bottom:10px}
         .product-pill{display:inline-flex;align-items:center;gap:8px;padding:6px 13px;border:1px solid #b4d6b7;background:var(--mint);color:#245d2d;border-radius:99px;font-size:11px;font-weight:800}
         .product-dot{width:7px;height:7px;border-radius:50%;background:var(--leaf)}
-        .info-grid{display:grid;grid-template-columns:1.02fr .98fr;gap:13px}
+        .info-grid{display:grid;grid-template-columns:1.02fr .98fr;gap:10px}
         .panel{border:1px solid var(--rule);border-radius:7px;overflow:hidden;background:rgba(255,255,255,.94)}
         .panel-head{display:flex;align-items:center;gap:9px;background:var(--navy);color:#fff;padding:9px 12px;font:800 11px Manrope,sans-serif;letter-spacing:.055em;text-transform:uppercase}
         .panel-head svg{color:#dce9f3}
-        .panel-body{padding:11px 13px}
+        .panel-body{padding:13px}
         .fields{display:grid;grid-template-columns:1fr 1fr;column-gap:14px}
-        .receipt-field{display:grid;grid-template-columns:87px minmax(0,1fr);align-items:baseline;gap:5px;padding:3px 0;font-size:10px;line-height:1.25}
+        .receipt-field{display:grid;grid-template-columns:87px minmax(0,1fr);align-items:baseline;gap:5px;padding:4px 0;font-size:10px;line-height:1.25}
         .receipt-field span{color:#687b8c}
         .receipt-field strong{font-size:10.5px;color:#1c3042;font-weight:700;overflow-wrap:anywhere}
         .receipt-field.wide{grid-column:1/-1}
@@ -80,21 +81,21 @@ export function DelegatedDeliveryReceipt() {
         .pass-table td:first-child{color:var(--leaf-dark);font-weight:800}
         .pass-note{display:flex;justify-content:space-between;align-items:center;margin-top:6px;padding-top:8px;border-top:1px dashed var(--rule);font-size:9px;color:var(--muted)}
         .pass-note b{color:var(--navy);font-size:10px}
-        .settlement{margin-top:14px;border:1px solid #b9c9d5;border-radius:7px;overflow:hidden}
+        .settlement{margin-top:10px;border:1px solid #b9c9d5;border-radius:7px;overflow:hidden}
         .settlement-title{display:flex;align-items:center;justify-content:space-between;background:var(--navy);color:white;padding:9px 12px;font:800 11px Manrope,sans-serif;letter-spacing:.06em;text-transform:uppercase}
         .settlement-title span{display:flex;align-items:center;gap:8px}
         .settlement-title small{font:500 9px 'DM Sans',sans-serif;color:#d3e1ec;text-transform:none;letter-spacing:0}
         .settlement-grid{display:grid;grid-template-columns:repeat(5,1fr) 1.17fr}
-        .metric{min-height:88px;border-right:1px solid var(--rule);display:flex;flex-direction:column;justify-content:space-between;padding:10px 9px 12px;text-align:center;background:#fbfcfc}
+        .metric{min-height:220px;border-right:1px solid var(--rule);display:flex;flex-direction:column;justify-content:space-between;padding:12px 6px 14px;text-align:center;background:#fbfcfc}
         .metric:last-child{border:0}
         .metric-label{font-size:8px;font-weight:800;letter-spacing:.045em;text-transform:uppercase;color:#627589;line-height:1.35}
         .metric-value{font:800 14px Manrope,sans-serif;color:var(--navy);white-space:nowrap}
         .metric-value small{font:700 9px 'DM Sans',sans-serif;color:#52677a}
-        .charges{padding:9px 11px;background:#f5f8f6;border-left:1px solid var(--rule);display:flex;flex-direction:column;gap:5px}
+        .charges{padding:12px 9px;background:#f5f8f6;border-left:1px solid var(--rule);display:flex;flex-direction:column;justify-content:space-between;gap:5px}
         .charge{display:flex;justify-content:space-between;gap:6px;font-size:9px;color:#5b6f7f}
         .charge b{color:#30475a;font-weight:700;white-space:nowrap}
         .charge.total-deduct{border-top:1px solid #cfdad2;padding-top:5px;color:#42604a;font-weight:700}
-        .pay-row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;margin-top:11px}
+        .pay-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;margin-top:9px}
         .pay-copy{border:1px solid var(--rule);border-radius:7px;padding:10px 13px;display:flex;align-items:center;gap:11px;background:#f5f8f6}
         .pay-check{width:31px;height:31px;flex:none;border-radius:50%;background:var(--leaf);display:grid;place-items:center;color:#fff}
         .pay-copy strong{display:block;font:800 12px Manrope,sans-serif;color:var(--navy)}
@@ -102,14 +103,14 @@ export function DelegatedDeliveryReceipt() {
         .pay-total{background:var(--leaf-dark);color:#fff;border-radius:7px;padding:13px 17px;text-align:center;min-width:204px}
         .pay-total small{display:block;font-size:8px;text-transform:uppercase;letter-spacing:.12em;color:#cbe6cf;margin-bottom:3px;font-weight:700}
         .pay-total b{font:800 20px Manrope,sans-serif;white-space:nowrap}
-        .signatures{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
-        .sign-box{border:1px solid var(--rule);border-radius:6px;min-height:102px;overflow:hidden}
+        .signatures{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:13px}
+        .sign-box{border:1px solid var(--rule);border-radius:6px;min-height:112px;overflow:hidden}
         .sign-head{display:flex;align-items:center;gap:7px;background:#eff3f5;color:var(--navy);padding:7px 9px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.05em}
         .sign-head svg{color:var(--leaf-dark)}
         .sign-body{padding:8px 10px;font-size:9px;color:#647788}
         .sign-name{font-weight:700;color:#2b4153;margin-bottom:3px}
         .sign-line{margin-top:30px;border-top:1px dashed #bac8d1;text-align:center;padding-top:4px;font-size:8px;color:#8a9aa7}
-        .footer{display:flex;justify-content:space-between;align-items:flex-end;border-top:2px solid var(--leaf);margin-top:15px;padding-top:9px;gap:10px}
+        .footer{display:flex;justify-content:space-between;align-items:flex-end;border-top:2px solid var(--leaf);margin-top:auto;padding-top:8px;gap:10px}
         .footer-copy{font-size:9px;color:#637587;line-height:1.55}
         .footer-copy b{color:var(--navy);font-size:10px}
         .verify{display:flex;align-items:center;gap:8px}
@@ -118,9 +119,10 @@ export function DelegatedDeliveryReceipt() {
         .qr-grid{display:grid;grid-template-columns:repeat(21,3px);grid-template-rows:repeat(21,3px);padding:4px;background:white;border:1px solid #d5dee5;gap:0;flex:none}
         .qr-grid i.on{background:var(--navy)}
         .legal-note{position:absolute;bottom:5px;left:30px;font-size:7px;color:#94a1ab;letter-spacing:.025em}
-        @media(max-width:640px){
+        @media(max-width:560px){
           .receipt-stage{padding:0;background:#e9eff0}
-          .receipt{width:100%;min-height:100dvh;padding:18px 14px 26px;box-shadow:none}
+          .paper-preview{width:min(100%,620px)}
+          .receipt{transform:scale(.781);transform-origin:top left}
           .receipt-header{gap:9px;padding-bottom:13px}
           .brand-mark{width:42px;height:42px;border-radius:14px 14px 14px 4px}
           .brand-mark b{font-size:20px}
@@ -160,16 +162,18 @@ export function DelegatedDeliveryReceipt() {
           .legal-note{left:14px;bottom:4px}
         }
         @media print{
-          @page{size:A4 portrait;margin:8mm}
-          html,body{background:#fff!important;margin:0!important}
-          .receipt-stage{min-height:0!important;padding:0!important;background:#fff!important}
-          .receipt{width:100%!important;min-height:0!important;height:auto!important;margin:0!important;padding:7mm!important;box-shadow:none!important;overflow:visible!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+          @page{size:A4 portrait;margin:0}
+          html,body{width:210mm!important;height:297mm!important;background:#fff!important;margin:0!important}
+          .receipt-stage{width:210mm!important;height:297mm!important;min-height:297mm!important;padding:0!important;background:#fff!important}
+          .paper-preview{width:210mm!important;height:297mm!important;aspect-ratio:auto!important;overflow:visible!important}
+          .receipt{width:210mm!important;height:297mm!important;min-height:297mm!important;margin:0!important;padding:8mm!important;box-shadow:none!important;overflow:hidden!important;transform:none!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
           .topline{top:0}
           .panel,.settlement,.sign-box{break-inside:avoid}
           .receipt:before{display:none}
           .legal-note{bottom:1mm;left:7mm}
         }
       `}</style>
+      <div className="paper-preview">
       <article className="receipt">
         <div className="topline" />
         <header className="receipt-header">
@@ -255,6 +259,7 @@ export function DelegatedDeliveryReceipt() {
         </footer>
         <div className="legal-note">Données fictives à des fins de démonstration · Campagne 2026–2027</div>
       </article>
+      </div>
     </main>
   );
 }
