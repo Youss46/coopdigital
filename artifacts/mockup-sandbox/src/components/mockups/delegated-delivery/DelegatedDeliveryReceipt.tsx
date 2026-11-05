@@ -19,6 +19,12 @@ const Field = ({ label, value, wide = false }: { label: string; value: React.Rea
   </div>
 );
 
+const getPreviewWidth = () => {
+  if (typeof window === "undefined") return 620;
+  const viewportWidth = window.innerWidth;
+  return Math.min(620, Math.max(1, viewportWidth - (viewportWidth < 620 ? 24 : 0)));
+};
+
 function VerificationCode() {
   const cells = [
     "111111101001101111111", "100000101110001000001", "101110101010101011101",
@@ -33,6 +39,14 @@ function VerificationCode() {
 }
 
 export function DelegatedDeliveryReceipt() {
+  const [previewWidth, setPreviewWidth] = React.useState(getPreviewWidth);
+
+  React.useEffect(() => {
+    const resizePreview = () => setPreviewWidth(getPreviewWidth());
+    window.addEventListener("resize", resizePreview);
+    return () => window.removeEventListener("resize", resizePreview);
+  }, []);
+
   return (
     <main className="receipt-stage">
       <style>{`
@@ -40,7 +54,7 @@ export function DelegatedDeliveryReceipt() {
         *{box-sizing:border-box}
         .receipt-stage{--navy:#102e50;--navy2:#173d63;--leaf:#398b41;--leaf-dark:#17632c;--mint:#e7f2e8;--ink:#182b3d;--muted:#637485;--rule:#d5dee5;--paper:#fff;--soft:#f4f7f8;min-height:100dvh;background:#e9eff0;padding:0;color:var(--ink);font-family:'DM Sans',sans-serif;display:flex;justify-content:center;align-items:flex-start}
         .paper-preview{width:min(100%,620px);aspect-ratio:210/297;position:relative;overflow:hidden;flex:none}
-        .receipt{width:794px;height:1123px;min-height:1123px;margin:0;background:var(--paper);box-shadow:0 12px 36px rgba(16,46,80,.14);position:relative;overflow:hidden;padding:22px 26px 18px;display:flex;flex-direction:column;transform:scale(.781);transform-origin:top left}
+        .receipt{width:794px;height:1123px;min-height:1123px;margin:0;background:var(--paper);box-shadow:0 12px 36px rgba(16,46,80,.14);position:absolute;top:0;left:50%;overflow:hidden;padding:22px 26px 18px;display:flex;flex-direction:column;transform-origin:top center}
         .receipt:before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 92% 24%,rgba(81,153,92,.075),transparent 23%),radial-gradient(ellipse at 5% 76%,rgba(16,46,80,.035),transparent 28%);pointer-events:none}
         .topline{height:5px;position:absolute;top:0;left:0;right:0;background:linear-gradient(90deg,var(--leaf) 0 32%,#a8ce55 32% 36%,var(--navy) 36%)}
         .receipt-header{display:flex;align-items:center;justify-content:space-between;gap:20px;border-bottom:1px solid var(--rule);padding:5px 0 17px;position:relative}
@@ -119,62 +133,20 @@ export function DelegatedDeliveryReceipt() {
         .qr-grid{display:grid;grid-template-columns:repeat(21,3px);grid-template-rows:repeat(21,3px);padding:4px;background:white;border:1px solid #d5dee5;gap:0;flex:none}
         .qr-grid i.on{background:var(--navy)}
         .legal-note{position:absolute;bottom:5px;left:30px;font-size:7px;color:#94a1ab;letter-spacing:.025em}
-        @media(max-width:560px){
-          .receipt-stage{padding:0;background:#e9eff0}
-          .paper-preview{width:min(100%,620px)}
-          .receipt{transform:scale(.781);transform-origin:top left}
-          .receipt-header{gap:9px;padding-bottom:13px}
-          .brand-mark{width:42px;height:42px;border-radius:14px 14px 14px 4px}
-          .brand-mark b{font-size:20px}
-          .brand-name{font-size:21px}
-          .brand-sub{font-size:8px}
-          .doc-title{padding-left:10px}
-          .doc-title h1{font-size:13px}
-          .doc-kicker{font-size:7px}
-          .receipt-ref{font-size:9px;padding:4px 7px}
-          .meta-row{gap:6px;margin:11px 0 8px}
-          .meta-chip{padding:8px 7px;font-size:9px;gap:6px}
-          .meta-chip b{font-size:9px}
-          .product-line{margin-bottom:11px}
-          .info-grid{grid-template-columns:1fr;gap:9px}
-          .panel-head{padding:8px 10px}
-          .panel-body{padding:9px 10px}
-          .receipt-field{grid-template-columns:105px 1fr;font-size:10px}
-          .receipt-field strong{font-size:10px}
-          .pass-table th{padding:7px 5px;font-size:7px}
-          .pass-table td{padding:8px 5px;font-size:9px}
-          .settlement{margin-top:10px}
-          .settlement-title{padding:8px 9px;font-size:9px}
-          .settlement-title small{font-size:8px}
-          .settlement-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
-          .metric{min-height:67px;padding:8px 5px;border-bottom:1px solid var(--rule)}
-          .metric:nth-child(3){border-right:0}
-          .metric-value{font-size:12px}
-          .charges{grid-column:span 2;border-left:0}
-          .charges .charge{font-size:9px}
-          .pay-row{grid-template-columns:1fr;gap:7px}
-          .pay-total{min-width:0;padding:10px}
-          .pay-total b{font-size:19px}
-          .signatures{grid-template-columns:1fr;gap:7px;margin-top:10px}
-          .sign-box{min-height:76px}
-          .sign-line{margin-top:17px}
-          .footer{margin-top:11px}
-          .legal-note{left:14px;bottom:4px}
-        }
         @media print{
           @page{size:A4 portrait;margin:0}
           html,body{width:210mm!important;height:297mm!important;background:#fff!important;margin:0!important}
           .receipt-stage{width:210mm!important;height:297mm!important;min-height:297mm!important;padding:0!important;background:#fff!important}
           .paper-preview{width:210mm!important;height:297mm!important;aspect-ratio:auto!important;overflow:visible!important}
-          .receipt{width:210mm!important;height:297mm!important;min-height:297mm!important;margin:0!important;padding:8mm!important;box-shadow:none!important;overflow:hidden!important;transform:none!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+          .receipt{position:relative!important;top:auto!important;left:auto!important;width:210mm!important;height:297mm!important;min-height:297mm!important;margin:0!important;padding:8mm!important;box-shadow:none!important;overflow:hidden!important;transform:none!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
           .topline{top:0}
           .panel,.settlement,.sign-box{break-inside:avoid}
           .receipt:before{display:none}
           .legal-note{bottom:1mm;left:7mm}
         }
       `}</style>
-      <div className="paper-preview">
-      <article className="receipt">
+      <div className="paper-preview" style={{ width: previewWidth, height: previewWidth * 297 / 210 }}>
+      <article className="receipt" style={{ transform: `translateX(-50%) scale(${previewWidth / 794})` }}>
         <div className="topline" />
         <header className="receipt-header">
           <div className="brand">
