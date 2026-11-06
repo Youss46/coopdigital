@@ -76,6 +76,40 @@ function formaterFCFA(n: number): string {
 function formaterNombre(n: number): string {
   return new Intl.NumberFormat("fr-FR").format(n).replace(/[\u202F\u00A0]/g, " ");
 }
+function nombreEnLettres(n: number): string {
+  const units = ["zéro", "un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit", "neuf", "dix", "onze", "douze", "treize", "quatorze", "quinze", "seize", "dix-sept", "dix-huit", "dix-neuf"];
+  const underHundred = (value: number): string => {
+    if (value < 17) return units[value]!;
+    if (value < 20) return `dix-${units[value - 10]}`;
+    const tens = ["", "", "vingt", "trente", "quarante", "cinquante", "soixante"];
+    if (value < 70) {
+      const dizaine = Math.floor(value / 10);
+      const unite = value % 10;
+      return `${tens[dizaine]}${unite === 1 ? " et un" : unite ? `-${units[unite]}` : ""}`;
+    }
+    if (value < 80) return value === 71 ? "soixante et onze" : `soixante-${underHundred(value - 60)}`;
+    return value === 80 ? "quatre-vingts" : `quatre-vingt-${underHundred(value - 80)}`;
+  };
+  const underThousand = (value: number): string => {
+    if (value < 100) return underHundred(value);
+    const hundreds = Math.floor(value / 100);
+    const reste = value % 100;
+    const prefix = hundreds === 1 ? "cent" : `${units[hundreds]} cent`;
+    return `${prefix}${reste === 0 && hundreds > 1 ? "s" : ""}${reste ? ` ${underHundred(reste)}` : ""}`;
+  };
+  const convert = (value: number): string => {
+    if (value < 1000) return underThousand(value);
+    if (value < 1_000_000) {
+      const milliers = Math.floor(value / 1000);
+      const reste = value % 1000;
+      return `${milliers === 1 ? "mille" : `${underThousand(milliers)} mille`}${reste ? ` ${underThousand(reste)}` : ""}`;
+    }
+    const millions = Math.floor(value / 1_000_000);
+    const reste = value % 1_000_000;
+    return `${convert(millions)} million${millions > 1 ? "s" : ""}${reste ? ` ${convert(reste)}` : ""}`;
+  };
+  return convert(Math.max(0, Math.round(n)));
+}
 function formaterDate(d: string | Date): string {
   return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
@@ -4983,86 +5017,117 @@ export async function generateBordereauAchatSession(
 
   y += 6;
 
-  // ── IDENTIFICATION (gauche) + DÉTAILS PESÉE (droite) ───────────────────────
+  // Identification et détail des passages sont regroupés en deux cartes,
+  // comme le bordereau de référence.
   const LEFT_W  = 262;
   const RIGHT_X = M + LEFT_W + 10;
-  const RIGHT_W = PAGE_W - RIGHT_X - M;
+  const RIGHT_W = BW - LEFT_W - 10;
   const topY    = y;
-
-  doc.fontSize(8.5).fillColor(VERT).font("Helvetica-Bold").text("IDENTIFICATION", M, y);
-  y += 14;
-
-  const fieldRow = (label: string, value: string) => {
-    doc.fontSize(8).fillColor(GRIS).font("Helvetica")
-      .text(`${label} :`, M, y, { width: 96, lineBreak: false });
-    doc.font("Helvetica-Bold").fillColor("black")
-      .text(value, M + 98, y, { width: LEFT_W - 98, lineBreak: false });
-    y += 13;
-  };
-
-  fieldRow("Délégué",       `${deleguePrenoms} ${delegueNom}`.trim());
-  fieldRow("Téléphone",     delegueTel);
-  fieldRow("Section",       delegueZone);
-  // Les bons de réception des membres délégués portent également le camion
-  // et le chauffeur : les afficher comme sur le bordereau de référence.
+  const panelHeaderH = 24;
+  const identification: Array<[string, string]> = [
+    ["Délégué", `${deleguePrenoms} ${delegueNom}`.trim() || "—"],
+    ["Téléphone", delegueTel],
+    ["Section", delegueZone],
+  ];
+  // Les bons de réception des membres délégués portent aussi le camion et le
+  // chauffeur. Les deux restent visibles pour les anciens flux délégué terrain.
   if (!estDelegueMembre || session.bonReceptionId) {
-    fieldRow("N° Camion",     immatriculation);
-    fieldRow("Nom Chauffeur", nomChauffeur);
+    identification.push(["N° camion", immatriculation], ["Chauffeur", nomChauffeur]);
   }
-  fieldRow("Produit",       session.produit
-    ? session.produit.charAt(0).toUpperCase() + session.produit.slice(1)
-    : "Cacao");
-  fieldRow("Ouverture",     formaterDateHeure(session.createdAt));
-  fieldRow("Clôture",       session.dateFin ? formaterDateHeure(session.dateFin) : "—");
+  identification.push(
+    ["Produit", session.produit
+      ? session.produit.charAt(0).toUpperCase() + session.produit.slice(1)
+      : "Cacao"],
+    ["Ouverture", formaterDateHeure(session.createdAt)],
+    ["Clôture", session.dateFin ? formaterDateHeure(session.dateFin) : "—"],
+  );
   if (estDelegueMembre || session.fournisseurId != null) {
-    fieldRow("Nombre de passages", String(lignes.length));
+    identification.push(["Passages", `${lignes.length} pesée(s)`]);
   }
-  fieldRow("Statut paiement", libelleStatutPaiement(livraisonReglement?.statutPaiement));
+  identification.push(["Paiement", libelleStatutPaiement(livraisonReglement?.statutPaiement)]);
 
-  const leftBottom = y;
+  const dCols = [24, 60, 32, RIGHT_W - 116];
+  const passHeaderH = 15;
+  const passRowH = 14;
+  const rightContentH = panelHeaderH + passHeaderH + lignes.length * passRowH + 27;
+  const leftContentH = panelHeaderH + 9 + identification.length * 14 + 9;
+  const panelH = Math.max(leftContentH, rightContentH);
 
-  // Tableau DÉTAILS PESÉE
-  let ry = topY;
-  doc.fontSize(8.5).fillColor(VERT).font("Helvetica-Bold").text("DÉTAILS PESÉE", RIGHT_X, ry);
-  ry += 14;
+  doc.roundedRect(M, topY, LEFT_W, panelH, 6).fillAndStroke("#ffffff", "#d5dee5");
+  doc.roundedRect(RIGHT_X, topY, RIGHT_W, panelH, 6).fillAndStroke("#ffffff", "#d5dee5");
+  doc.roundedRect(M, topY, LEFT_W, panelHeaderH, 6).fill("#102e50");
+  doc.rect(M, topY + 10, LEFT_W, panelHeaderH - 10).fill("#102e50");
+  doc.roundedRect(RIGHT_X, topY, RIGHT_W, panelHeaderH, 6).fill("#102e50");
+  doc.rect(RIGHT_X, topY + 10, RIGHT_W, panelHeaderH - 10).fill("#102e50");
+  doc.fontSize(8.5).fillColor("#ffffff").font("Helvetica-Bold")
+    .text("IDENTIFICATION DU DÉLÉGUÉ", M + 10, topY + 8, { lineBreak: false });
+  doc.fontSize(8.5).fillColor("#ffffff").font("Helvetica-Bold")
+    .text("DÉTAIL DES PESÉES", RIGHT_X + 10, topY + 8, { lineBreak: false });
 
-  const dCols = [26, 64, 32, RIGHT_W - 122];
-  const dHdrs = ["N°", "POIDS BRUT", "SACS", "HORODATEUR"];
-  doc.rect(RIGHT_X, ry, RIGHT_W, 16).fill(VERT);
-  let cx = RIGHT_X;
-  dHdrs.forEach((h, i) => {
-    doc.fontSize(7).fillColor("white").font("Helvetica-Bold")
-      .text(h, cx + 2, ry + 5, { width: dCols[i]! - 4, lineBreak: false });
-    cx += dCols[i]!;
+  let fieldY = topY + panelHeaderH + 8;
+  for (const [label, value] of identification) {
+    doc.fontSize(7.5).fillColor(GRIS).font("Helvetica")
+      .text(`${label} :`, M + 9, fieldY, { width: 86, lineBreak: false });
+    doc.fontSize(8).fillColor("#1c3042").font("Helvetica-Bold")
+      .text(value, M + 97, fieldY, { width: LEFT_W - 106, lineBreak: false });
+    fieldY += 14;
+  }
+
+  let ry = topY + panelHeaderH;
+  const tableX = RIGHT_X + 7;
+  const tableW = RIGHT_W - 14;
+  const tableCols = [22, 58, 30, tableW - 110];
+  doc.rect(tableX, ry, tableW, passHeaderH).fill("#edf3f5");
+  let cx = tableX;
+  ["N°", "POIDS BRUT", "SACS", "HORODATEUR"].forEach((header, idx) => {
+    doc.fontSize(6.5).fillColor("#52677a").font("Helvetica-Bold")
+      .text(header, cx + 2, ry + 5, { width: tableCols[idx]! - 4, lineBreak: false });
+    cx += tableCols[idx]!;
   });
-  ry += 16;
+  ry += passHeaderH;
 
   for (let idx = 0; idx < lignes.length; idx++) {
-    const l = lignes[idx]!;
-    if (idx % 2 === 0) doc.rect(RIGHT_X, ry, RIGHT_W, 14).fill("#f0fdf4");
-    cx = RIGHT_X;
+    const ligne = lignes[idx]!;
+    if (idx % 2 === 0) doc.rect(tableX, ry, tableW, passRowH).fill("#f5f8f9");
+    cx = tableX;
     [
-      String(l.numeroPassage),
-      `${parseFloat(l.poidsBrutKg).toFixed(1)} kg`,
-      String(l.nbSacs),
-      formaterDateHeure(l.createdAt),
-    ].forEach((v, i) => {
-      doc.fontSize(7).fillColor("black").font("Helvetica")
-        .text(v, cx + 2, ry + 4, { width: dCols[i]! - 4, lineBreak: false });
-      cx += dCols[i]!;
+      String(ligne.numeroPassage),
+      `${parseFloat(ligne.poidsBrutKg).toFixed(1)} kg`,
+      String(ligne.nbSacs),
+      formaterDateHeure(ligne.createdAt),
+    ].forEach((value, columnIndex) => {
+      doc.fontSize(6.8).fillColor("#20374b").font("Helvetica")
+        .text(value, cx + 2, ry + 4, { width: tableCols[columnIndex]! - 4, lineBreak: false });
+      cx += tableCols[columnIndex]!;
     });
-    ry += 14;
+    ry += passRowH;
   }
+  const totalPassages = lignes.reduce((sum, ligne) => sum + ligne.nbSacs, 0);
+  doc.moveTo(tableX, ry + 2).lineTo(tableX + tableW, ry + 2).stroke("#d5dee5");
+  doc.fontSize(6.8).fillColor(GRIS).font("Helvetica")
+    .text("Poids total enregistré", tableX + 2, ry + 6, { lineBreak: false });
+  doc.fontSize(7).fillColor("#102e50").font("Helvetica-Bold")
+    .text(`${poidsBrutKg.toFixed(1)} kg · ${totalPassages} sacs`, tableX + 2, ry + 16, {
+      width: tableW - 4,
+      align: "right",
+      lineBreak: false,
+    });
 
-  y = Math.max(leftBottom, ry) + 16;
+  y = topY + panelH + 12;
 
   // ── Tableau de calcul ── colonnes calibrées pour BW ≈ 515 pt ──────────────
   const tW   = BW;   // 515.28 pt
   // Somme fixe des 6 premières colonnes = 70+48+70+70+80+85 = 423 → dernière = ~92
   const colW = [70, 48, 70, 70, 80, 85, tW - 70 - 48 - 70 - 70 - 80 - 85];
 
+  doc.roundedRect(M, y, tW, 18, 4).fill("#102e50");
+  doc.rect(M, y + 8, tW, 10).fill("#102e50");
+  doc.fontSize(9).fillColor("#ffffff").font("Helvetica-Bold")
+    .text("RÉCAPITULATIF DE RÈGLEMENT", M + 9, y + 5, { lineBreak: false });
+  y += 18;
+
   const HDR_H = 32;
-  doc.rect(M, y, tW, HDR_H).fill(VERT);
+  doc.rect(M, y, tW, HDR_H).fill("#173d63");
   cx = M;
   [
     "POIDS BRUT\n(KG)", "NBRE\nSACS", "POIDS NET\n(KG)",
@@ -5093,7 +5158,9 @@ export async function generateBordereauAchatSession(
   const SUB_H = 32;
   const ROW_H = autresLignes.length * SUB_H;
 
-  doc.rect(M, y, tW, ROW_H).fill("#f9fafb");
+  doc.rect(M, y, tW, ROW_H).fill("#fbfcfc");
+  const montantNetX = M + colW.slice(0, -1).reduce((sum, width) => sum + width, 0);
+  doc.rect(montantNetX, y, colW[colW.length - 1]!, ROW_H).fill("#e7f2e8");
   doc.rect(M, y, tW, ROW_H).stroke("#d1d5db");
 
   cx = M;
@@ -5114,7 +5181,7 @@ export async function generateBordereauAchatSession(
     `${formaterNombre(montantNet)} F`,
   ].forEach((v, i) => {
     if (v) {
-      doc.fontSize(10).fillColor("black").font("Helvetica-Bold")
+      doc.fontSize(10).fillColor(i === colW.length - 1 ? "#17632c" : "#102e50").font("Helvetica-Bold")
         .text(v, cx + 3, cellMidY, { width: colW[i]! - 6, align: "center", lineBreak: false });
     }
     cx += colW[i]!;
@@ -5159,7 +5226,35 @@ export async function generateBordereauAchatSession(
     ay += SUB_H;
   });
 
-  y += ROW_H + 16;
+  y += ROW_H + 10;
+
+  const totalBandH = 44;
+  const totalBlockW = 180;
+  const recapW = BW - totalBlockW - 10;
+  doc.roundedRect(M, y, recapW, totalBandH, 6).fillAndStroke("#f5f8f6", "#d5dee5");
+  doc.circle(M + 17, y + totalBandH / 2, 10).fill("#398b41");
+  doc.moveTo(M + 12, y + 22).lineTo(M + 16, y + 26).lineTo(M + 23, y + 17)
+    .lineWidth(1.8).stroke("#ffffff");
+  doc.fontSize(9.5).fillColor("#102e50").font("Helvetica-Bold")
+    .text("Montant total à payer", M + 33, y + 8, { lineBreak: false });
+  doc.fontSize(7.2).fillColor(GRIS).font("Helvetica-Oblique")
+    .text(`Arrêté à : ${nombreEnLettres(montantNet)} francs CFA`, M + 33, y + 23, {
+      width: recapW - 40,
+      lineBreak: false,
+    });
+  doc.roundedRect(M + BW - totalBlockW, y, totalBlockW, totalBandH, 6).fill("#17632c");
+  doc.fontSize(6.5).fillColor("#dceedd").font("Helvetica-Bold")
+    .text("NET À PAYER", M + BW - totalBlockW + 8, y + 7, {
+      width: totalBlockW - 16,
+      align: "center",
+      lineBreak: false,
+    });
+  doc.fontSize(13).fillColor("#ffffff").font("Helvetica-Bold")
+    .text(`${formaterNombre(montantNet)} F CFA`, M + BW - totalBlockW + 8, y + 20, {
+      width: totalBlockW - 16,
+      align: "center",
+      lineBreak: false,
+    });
 
   // ── Signatures épinglées au pied de page ────────────────────────────────────
   // Hauteur fixe de 80 pt ; les boîtes sont ancrées juste au-dessus du footer
@@ -5169,15 +5264,24 @@ export async function generateBordereauAchatSession(
   const sigW       = (BW - 16) / 3;
   const sigY       = footerSepY - 8 - sigBoxH - 14; // label au-dessus de la boîte
   const peseurNom = `${session.peseurPrenoms ?? ""} ${session.peseurNom ?? ""}`.trim();
-  ["PESEUR", "LIVREUR", "MAGASINIER"].forEach((lbl, i) => {
+  const livreurNom = `${deleguePrenoms} ${delegueNom}`.trim();
+  const signatures = [
+    { label: "PESEUR", nom: peseurNom },
+    { label: "DÉLÉGUÉ LIVREUR", nom: livreurNom },
+    { label: "MAGASINIER", nom: "" },
+  ];
+  signatures.forEach(({ label, nom }, i) => {
     const sx = M + i * (sigW + 8);
-    doc.fontSize(9).fillColor(GRIS).font("Helvetica-Bold")
-      .text(lbl, sx, sigY, { width: sigW, align: "center", lineBreak: false });
-    if (i === 0 && peseurNom) {
-      doc.fontSize(8).fillColor("black").font("Helvetica")
-        .text(peseurNom, sx, sigY + 10, { width: sigW, align: "center", lineBreak: false });
+    doc.roundedRect(sx, sigY + 14, sigW, sigBoxH, 5).fillAndStroke("#ffffff", "#d1d5db");
+    doc.roundedRect(sx, sigY + 14, sigW, 18, 5).fill("#102e50");
+    doc.rect(sx, sigY + 24, sigW, 8).fill("#102e50");
+    doc.fontSize(7.5).fillColor("#ffffff").font("Helvetica-Bold")
+      .text(label, sx + 4, sigY + 20, { width: sigW - 8, align: "center", lineBreak: false });
+    if (nom) {
+      doc.fontSize(8).fillColor("#1c3042").font("Helvetica-Bold")
+        .text(nom, sx + 6, sigY + 39, { width: sigW - 12, align: "center", lineBreak: false });
     }
-    doc.rect(sx, sigY + 14, sigW, sigBoxH).stroke("#d1d5db");
+    doc.moveTo(sx + 10, sigY + 78).lineTo(sx + sigW - 10, sigY + 78).stroke("#aebbc5");
   });
 
   await addFooters(doc, cooperativeId);

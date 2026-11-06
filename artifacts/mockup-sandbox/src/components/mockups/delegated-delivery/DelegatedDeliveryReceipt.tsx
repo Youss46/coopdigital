@@ -25,19 +25,6 @@ const getPreviewWidth = () => {
   return Math.min(620, Math.max(1, viewportWidth - (viewportWidth < 620 ? 24 : 0)));
 };
 
-function VerificationCode() {
-  const cells = [
-    "111111101001101111111", "100000101110001000001", "101110101010101011101",
-    "101110100101001011101", "101110101101101011101", "100000100011101000001",
-    "111111101010101111111", "000000001101000000000", "110101110010111010110",
-    "011010001110000110101", "101101110011101101001", "001011001101010010110",
-    "110100111000110111001", "000000001011101010010", "111111101100011101101",
-    "100000101011100010010", "101110101101011101111", "101110100010110001001",
-    "101110101111001110100", "100000101010110011011", "111111101101011101101",
-  ];
-  return <div className="qr-grid" aria-label="Code de vérification décoratif">{cells.join("").split("").map((cell, i) => <i key={i} className={cell === "1" ? "on" : ""} />)}</div>;
-}
-
 export function DelegatedDeliveryReceipt() {
   const [previewWidth, setPreviewWidth] = React.useState(getPreviewWidth);
 
@@ -130,8 +117,6 @@ export function DelegatedDeliveryReceipt() {
         .verify{display:flex;align-items:center;gap:8px}
         .verify-text{text-align:right;font-size:8px;color:#637587;line-height:1.4}
         .verify-text strong{display:block;color:var(--navy);font-size:9px}
-        .qr-grid{display:grid;grid-template-columns:repeat(21,3px);grid-template-rows:repeat(21,3px);padding:4px;background:white;border:1px solid #d5dee5;gap:0;flex:none}
-        .qr-grid i.on{background:var(--navy)}
         .legal-note{position:absolute;bottom:5px;left:30px;font-size:7px;color:#94a1ab;letter-spacing:.025em}
         @media print{
           @page{size:A4 portrait;margin:0}
@@ -227,7 +212,7 @@ export function DelegatedDeliveryReceipt() {
 
         <footer className="footer">
           <div className="footer-copy"><b>CoopDigital — Digitaliser pour mieux produire</b><br />Côte d’Ivoire &nbsp;·&nbsp; Document de démonstration<br />Vérifiez les informations auprès de votre coopérative.</div>
-          <div className="verify"><div className="verify-text"><strong>Vérification du bordereau</strong>Réf. PE-5-2026-00037<br />Aperçu QR de démonstration</div><VerificationCode /></div>
+          <div className="verify"><div className="verify-text"><strong>Référence du bordereau</strong>PE-5-2026-00037<br />À rappeler pour tout suivi</div></div>
         </footer>
         <div className="legal-note">Données fictives à des fins de démonstration · Campagne 2026–2027</div>
       </article>

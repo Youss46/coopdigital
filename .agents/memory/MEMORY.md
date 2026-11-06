@@ -73,6 +73,7 @@
 - [Avances délégués — architecture](avances-delegues-arch.md) — table dédiée avances_delegues; retenue automatique dans payerCommissions (même transaction); planType integral/partiel/reporte; UI onglet 4 dans DeleguesPage.
 - [Rapport global des avances de localités](rapport-avances-delegues-localites.md) — l’impression reste sur toutes les avances dues de la coopérative, même si un délégué est sélectionné à l’écran.
 - [Bons réception membres délégués — architecture](bons-reception-membres-delegues-arch.md) — frais avancés = créance membre 409x, récupérée sans produit; le compte de dette est figé à la livraison.
+- [Bordereau membre délégué sans QR](delegated-delivery-receipt-no-qr.md) — ne pas afficher de QR sur le bordereau tant que la vérification n’est pas prise en charge.
 - [Accès aux taux des délégués de localités](local-delegates-rate-access.md) — l’administration des taux suit le modèle des délégués terrain, sans dépendre de la permission `delegues`.
 - [Bons de réception — créateurs autorisés](bon-reception-createurs.md) — création autorisée au magasinier ET au peseur central; ne jamais retirer le parcours terrain lors de refactors d’autorisation.
 - [Tables push sans migration CREATE](push-created-tables-missing-migrations.md) — tables créées via drizzle push n’ont pas de CREATE TABLE dans lib/db/drizzle; toute migration ALTER doit d’abord CREATE TABLE IF NOT EXISTS.
