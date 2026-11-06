@@ -1795,13 +1795,19 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
     carte_producteur: "Carte producteur", mixte: "Paiement ventilé",
   };
 
-  const situation = chequeEnAttente
-    ? "Chèque émis — en attente d’encaissement"
-    : paiementRegle
-      ? "Montant encaissé"
-      : row.statut === "en_attente"
-        ? "En attente de validation"
-        : row.statut.replace(/_/g, " ").toUpperCase();
+  const statutAffiche = chequeEnAttente
+    ? "EN ATTENTE D’ENCAISSEMENT"
+    : row.statut === "effectue" || row.statut === "confirme"
+      ? "PAYÉ"
+      : row.statut.replace(/_/g, " ").toUpperCase();
+  const statutTone: RecuPaiementPdfTone = chequeEnAttente
+    ? "warning"
+    : row.statut === "effectue" || row.statut === "confirme"
+      ? "success"
+      : row.statut === "echec" || row.statut === "rejete"
+        ? "danger"
+        : "warning";
+  const situation = chequeEnAttente ? "EN ATTENTE" : statutAffiche;
   const details: RecuPaiementPdfDetail[] = [
     { label: "N° Reçu", value: ref },
     { label: "Campagne", value: campagne ?? "—" },
@@ -1849,7 +1855,7 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
     {
       label: "Situation",
       value: situation,
-      tone: chequeEnAttente ? "warning" : paiementRegle ? "success" : "neutral",
+      tone: statutTone,
     },
   ];
 
@@ -1916,18 +1922,6 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
     );
   }
 
-  const statutAffiche = chequeEnAttente
-    ? "EN ATTENTE D’ENCAISSEMENT"
-    : row.statut === "effectue" || row.statut === "confirme"
-    ? "PAYÉ"
-    : row.statut.replace(/_/g, " ").toUpperCase();
-  const statutTone: RecuPaiementPdfTone = chequeEnAttente
-    ? "warning"
-    : row.statut === "effectue" || row.statut === "confirme"
-      ? "success"
-      : row.statut === "echec" || row.statut === "rejete"
-        ? "danger"
-        : "warning";
   let validePar: string | null = null;
   if (row.validateurNom || row.validateurPrenoms) {
     const roleStr = String(row.validateurRole ?? "");

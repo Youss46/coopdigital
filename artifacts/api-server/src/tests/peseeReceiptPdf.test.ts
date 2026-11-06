@@ -421,10 +421,14 @@ describe("generateRecuPaiement (real PDF generation) — receipt number in PDF o
     setupDbSelect(makePaiementRow({ statut: "effectue" }));
     const buf = await generateRecuPaiement(PAIEMENT_ID, 1);
     const text = extractPdfText(buf);
+    const situationIndex = text.indexOf("Situation");
 
     expect(text).toContain("Statut");
     expect(text).toContain("PAYÉ");
     expect(text).not.toContain("Statut : EFFECTUE");
+    expect(situationIndex).toBeGreaterThanOrEqual(0);
+    expect(text.slice(situationIndex, situationIndex + 55)).toContain("PAYÉ");
+    expect(text.slice(situationIndex, situationIndex + 55)).not.toContain("Montant encaissé");
   });
 
   it("affiche le numéro canonique de la pesée liée au paiement", async () => {
