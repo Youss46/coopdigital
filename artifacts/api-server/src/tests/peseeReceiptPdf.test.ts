@@ -46,7 +46,7 @@ vi.mock("../services/portailService.js", () => ({
 
 // ─── Import SUTs after mocks ──────────────────────────────────────────────────
 const { genererNumeroRecu } = await import("../services/recuService.js");
-const { generateRecuPaiement } = await import("../services/pdfService.js");
+const { generateRecuPaiement, generateRecuLivraison } = await import("../services/pdfService.js");
 
 // ─── Fluent builder helpers ───────────────────────────────────────────────────
 
@@ -511,6 +511,160 @@ describe("generateRecuPaiement (real PDF generation) — receipt number in PDF o
     expect(textSansAccents).toContain("ENCAISSEMENT");
     expect(textSansAccents).toContain("MONTANT ENCAISSE");
     expect(text).toContain("0 FCFA");
+  });
+});
+
+describe("generateRecuLivraison — bordereau membre A4", () => {
+  const deliveryId = 100;
+  const campaign = {
+    libelle: "Campagne",
+    anneeDebut: 2026,
+    anneeFin: 2027,
+  };
+
+  function makeDeliveryRow(overrides: Record<string, unknown> = {}) {
+    return {
+      id: deliveryId,
+      membreId: 7,
+      numeroPesee: 37,
+      anneeNumeroPesee: 2026,
+      codeAchat: "ACH-2026-1047",
+      dateLivraison: "2026-09-10",
+      produit: "cacao",
+      nombreSacs: 23,
+      produitBrutKg: "2300.00",
+      retenueKg: "100.00",
+      poidsKg: "2200.00",
+      prixUnitaireFcfa: 1100,
+      montantBrutFcfa: 2420000,
+      avanceDeduiteFcfa: 100000,
+      intrantsDeduitsFcfa: 50000,
+      montantNetFcfa: 2270000,
+      statutPaiement: "À payer",
+      sectionLivraison: "Koffikro Nord",
+      planAvanceType: "integral",
+      certificationCacao: "RA",
+      membreNom: "DIABATÉ",
+      membrePrenoms: "David",
+      membreCni: "CI12345",
+      membreGroupement: "Union des producteurs de Koffikro",
+      membreTel: "+22507071153",
+      fournisseurNom: null,
+      fournisseurPrenoms: null,
+      fournisseurTel: null,
+      fournisseurSection: null,
+      agentId: 3,
+      agentNom: "KONÉ",
+      agentPrenoms: "Aïssata",
+      agentRole: "agent_terrain",
+      peseurId: 9,
+      peseurNom: "TRAORÉ",
+      peseurPrenoms: "Ibrahim",
+      createdAt: new Date("2026-09-10T13:22:00Z"),
+      ...overrides,
+    };
+  }
+
+  function setupDeliveryReceiptDb(
+    row: Record<string, unknown>,
+    payments: Array<Record<string, unknown>> = [],
+  ) {
+    vi.mocked(db.select).mockReturnValueOnce(
+      makeSelectChain([row]) as unknown as ReturnType<typeof db.select>,
+    );
+    const status = String(row["statutPaiement"] ?? "").trim().toUpperCase();
+    if (status === "PAYÉ" || status === "PAYE") {
+      vi.mocked(db.select).mockReturnValueOnce(
+        makeSelectChain(payments) as unknown as ReturnType<typeof db.select>,
+      );
+    }
+    vi.mocked(db.select).mockReturnValueOnce(
+      makeSelectChain([campaign]) as unknown as ReturnType<typeof db.select>,
+    );
+  }
+
+  beforeEach(() => {
+    vi.mocked(db.select).mockReset();
+    vi.mocked(drawHeader).mockClear();
+  });
+
+  it("prints the member's receipt details, deductions, net amount and amount in words on one A4 page without a QR", async () => {
+    setupDeliveryReceiptDb(makeDeliveryRow());
+    const pdf = await generateRecuLivraison(deliveryId, 1);
+    const text = extractPdfText(pdf);
+    const normalized = text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+    const pageCount = (pdf.toString("latin1").match(/\/Type\s*\/Page\b/g) ?? []).length;
+
+    expect(pdf.slice(0, 4).toString()).toBe("%PDF");
+    expect(pageCount).toBe(1);
+    expect(vi.mocked(drawHeader)).toHaveBeenCalledWith(
+      expect.anything(),
+      1,
+      expect.objectContaining({
+        titre_document: "Bordereau de livraison",
+        reference: "PES-S-2026-00037",
+      }),
+    );
+    expect(normalized).toContain("producteur membre");
+    expect(normalized).toContain("david diabate");
+    expect(normalized).toContain("union des producteurs de koffikro");
+    expect(normalized).toContain("koffikro nord");
+    expect(normalized).toContain("rainforest alliance");
+    expect(normalized).toContain("2 300,00 kg");
+    expect(normalized).toContain("100,00 kg");
+    expect(normalized).toContain("2 200,00 kg");
+    expect(text).toContain("1 100 FCFA / kg");
+    expect(text).toContain("2 420 000 FCFA");
+    expect(text).toContain("100 000 FCFA");
+    expect(text).toContain("50 000 FCFA");
+    expect(text).toContain("2 270 000 FCFA");
+    expect(normalized).toContain("deux millions deux cent soixante-dix mille francs cfa");
+    expect(normalized).toContain("a payer");
+    expect(normalized).not.toContain("qr");
+    expect(normalized).not.toContain("humidite");
+    expect(normalized).not.toContain("taxe");
+    expect(normalized).not.toContain("remise");
+  });
+
+  it("preserves the confirmed payment date on a paid member receipt", async () => {
+    setupDeliveryReceiptDb(
+      makeDeliveryRow({ statutPaiement: "PAYÉ" }),
+      [{
+        dateValidation: new Date("2026-09-11T13:00:00Z"),
+        createdAt: new Date("2026-09-11T13:00:00Z"),
+      }],
+    );
+
+    const pdf = await generateRecuLivraison(deliveryId, 1);
+    const normalized = extractPdfText(pdf).normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+
+    expect(normalized).toContain("date et heure de reglement");
+    expect(normalized).toContain("11/09/2026");
+    expect(normalized).toContain("paye");
+  });
+
+  it("keeps the existing external-supplier receipt layout", async () => {
+    setupDeliveryReceiptDb(makeDeliveryRow({
+      membreId: null,
+      membreNom: null,
+      membrePrenoms: null,
+      fournisseurNom: "VINI",
+      fournisseurPrenoms: "Junior",
+      fournisseurTel: "+22507080910",
+      fournisseurSection: "Koffikro",
+    }));
+
+    const pdf = await generateRecuLivraison(deliveryId, 1);
+    const normalized = extractPdfText(pdf).normalize("NFD").replace(/\p{Diacritic}/gu, "").toUpperCase();
+
+    expect(normalized).toContain("FOURNISSEUR EXTERNE");
+    expect(normalized).toContain("JUNIOR VINI");
+    expect(normalized).not.toContain("PRODUCTEUR MEMBRE");
+    expect(vi.mocked(drawHeader)).toHaveBeenCalledWith(
+      expect.anything(),
+      1,
+      expect.objectContaining({ titre_document: "Reçu de Livraison" }),
+    );
   });
 });
 

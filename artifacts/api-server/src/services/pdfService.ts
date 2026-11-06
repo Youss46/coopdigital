@@ -863,6 +863,313 @@ export async function generatePvAg(params: {
 // ─────────────────────────────────────────────────────────────────────────────
 // 5. Reçu de livraison
 // ─────────────────────────────────────────────────────────────────────────────
+type RecuLivraisonMembrePdfData = {
+  cooperativeId: number;
+  reference: string;
+  campagne: string | null;
+  mentionCertif: string;
+  dateReglementLivraison: Date | string | null;
+  livraison: {
+    dateLivraison: string | Date;
+    createdAt: Date | string | null;
+    produit: string | null;
+    nombreSacs: number | null;
+    produitBrutKg: string | null;
+    retenueKg: string | null;
+    poidsKg: string;
+    prixUnitaireFcfa: number;
+    montantBrutFcfa: number;
+    avanceDeduiteFcfa: number;
+    intrantsDeduitsFcfa: number;
+    montantNetFcfa: number;
+    statutPaiement: string | null;
+    sectionLivraison: string | null;
+    planAvanceType: string | null;
+  };
+  membre: {
+    nom: string | null;
+    prenoms: string | null;
+    cni: string | null;
+    groupement: string | null;
+    telephone: string | null;
+  };
+  peseur: {
+    id: number | null;
+    nom: string | null;
+    prenoms: string | null;
+  };
+  agent: {
+    id: number | null;
+    nom: string | null;
+    prenoms: string | null;
+    role: string | null;
+  };
+};
+
+async function generateRecuLivraisonMembrePdf(data: RecuLivraisonMembrePdfData): Promise<Buffer> {
+  const { doc, endPromise } = makePdfDoc();
+  await drawHeader(doc, data.cooperativeId, {
+    titre_document: "Bordereau de livraison",
+    reference: data.reference,
+  });
+
+  const x = MARGIN;
+  const width = PAGE_W - MARGIN * 2;
+  const name = `${data.membre.prenoms ?? ""} ${data.membre.nom ?? ""}`.trim() || "—";
+  const pesedAt = data.livraison.createdAt
+    ? new Date(data.livraison.createdAt).toLocaleTimeString("fr-FR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      timeZone: "Africa/Abidjan",
+    })
+    : "—";
+  const kg = (value: number) => {
+    const formatted = new Intl.NumberFormat("fr-FR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value).replace(/[\u202F\u00A0]/g, " ");
+    return `${formatted} kg`;
+  };
+  const netWeight = Number.parseFloat(data.livraison.poidsKg);
+  const retention = Number.parseFloat(data.livraison.retenueKg ?? "0");
+  const storedGross = Number.parseFloat(data.livraison.produitBrutKg ?? "");
+  const grossWeight = Number.isFinite(storedGross)
+    ? storedGross
+    : netWeight + (Number.isFinite(retention) ? retention : 0);
+  const productName = data.livraison.produit
+    ? data.livraison.produit.charAt(0).toUpperCase() + data.livraison.produit.slice(1)
+    : "Cacao";
+  const productLabel = data.mentionCertif.startsWith("Cacao")
+    ? data.mentionCertif
+    : `${productName} — ${data.mentionCertif}`;
+  const memberName = name;
+  const peseurName = `${data.peseur.prenoms ?? ""} ${data.peseur.nom ?? ""}`.trim();
+  const agentName = `${data.agent.prenoms ?? ""} ${data.agent.nom ?? ""}`.trim();
+  const receiverName = peseurName || agentName || "Agent réceptionnaire";
+  const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
+
+  let y = doc.y + 8;
+
+  // Identité du producteur et date de livraison.
+  doc.rect(x, y, width, 58).fillAndStroke("#f0f4ef", "#d9e3df");
+  doc.rect(x, y, 4, 58).fill("#43845d");
+  doc.fontSize(7).fillColor("#176345").font("Helvetica-Bold")
+    .text("PRODUCTEUR MEMBRE", x + 13, y + 8, { lineBreak: false });
+  doc.fontSize(13).fillColor("#173b5b").font("Helvetica-Bold")
+    .text(name, x + 13, y + 19, { width: width - 190, lineBreak: false });
+  const contact = [
+    data.membre.telephone ? data.membre.telephone : null,
+    data.membre.cni ? `CNI ${data.membre.cni}` : null,
+  ].filter(Boolean).join("   ·   ") || "—";
+  doc.fontSize(7.5).fillColor(GRIS).font("Helvetica")
+    .text(contact, x + 13, y + 40, { width: width - 190, lineBreak: false });
+  doc.fontSize(8.5).fillColor("#19334a").font("Helvetica-Bold")
+    .text(formaterDate(data.livraison.dateLivraison), x + width - 165, y + 17, {
+      width: 150,
+      align: "right",
+      lineBreak: false,
+    });
+  doc.fontSize(7).fillColor(GRIS).font("Helvetica")
+    .text(`Pesée enregistrée à ${pesedAt}`, x + width - 165, y + 32, {
+      width: 150,
+      align: "right",
+      lineBreak: false,
+    });
+  y += 68;
+
+  const drawSectionTitle = (label: string) => {
+    doc.rect(x, y, width, 18).fill("#173b5b");
+    doc.fontSize(8).fillColor("#ffffff").font("Helvetica-Bold")
+      .text(label.toUpperCase(), x + 8, y + 5, { lineBreak: false });
+    y += 18;
+  };
+
+  // Informations provenant de la fiche membre et de la livraison.
+  drawSectionTitle("Repères du membre");
+  doc.rect(x, y, width, 10 + 16 * 3).fillAndStroke("#ffffff", "#d9e3df");
+  const cellWidth = (width - 16) / 2;
+  const drawInfoCell = (cellX: number, rowY: number, label: string, value: string, cellW: number) => {
+    const labelW = label.length > 17 ? 103 : 76;
+    const valueW = cellW - labelW - 10;
+    doc.font("Helvetica").fontSize(7).fillColor(GRIS);
+    const labelHeight = doc.heightOfString(label, { width: labelW });
+    doc.font("Helvetica-Bold").fontSize(7.5).fillColor("#19334a");
+    const valueHeight = doc.heightOfString(value || "—", { width: valueW });
+    const cellH = Math.max(11, labelHeight, valueHeight);
+    doc.font("Helvetica").fontSize(7).fillColor(GRIS)
+      .text(label, cellX, rowY, { width: labelW, lineBreak: true });
+    doc.font("Helvetica-Bold").fontSize(7.5).fillColor("#19334a")
+      .text(value || "—", cellX + labelW + 4, rowY, { width: valueW, lineBreak: true });
+    return cellH;
+  };
+  const infoRows: Array<[[string, string], [string, string] | null]> = [
+    [
+      ["Groupement", data.membre.groupement ?? "—"],
+      ["Section livraison", data.livraison.sectionLivraison ?? "—"],
+    ],
+    [
+      ["Campagne", data.campagne ?? "—"],
+      ["Date de livraison", formaterDate(data.livraison.dateLivraison)],
+    ],
+    [
+      ["Heure de pesée", pesedAt],
+      data.dateReglementLivraison
+        ? ["Date et heure de règlement", formaterDateHeure(data.dateReglementLivraison)]
+        : null,
+    ],
+  ];
+  for (const [index, [left, right]] of infoRows.entries()) {
+    const rowY = y + 5 + index * 16;
+    const leftHeight = drawInfoCell(x + 8, rowY, left[0], left[1], cellWidth);
+    if (right) drawInfoCell(x + 8 + cellWidth, rowY, right[0], right[1], cellWidth);
+    if (index < infoRows.length - 1) {
+      doc.moveTo(x + 8, rowY + Math.max(11, leftHeight) + 2)
+        .lineTo(x + width - 8, rowY + Math.max(11, leftHeight) + 2)
+        .stroke("#edf1ed");
+    }
+  }
+  y += 58;
+  y += 10;
+
+  drawSectionTitle("Détail de la livraison");
+  doc.rect(x, y, width, 30).fillAndStroke("#edf3eb", "#d4e1d2");
+  doc.fontSize(6.5).fillColor(GRIS).font("Helvetica-Bold")
+    .text("PRODUIT / CERTIFICATION", x + 9, y + 5, { lineBreak: false });
+  doc.fontSize(8.5).fillColor("#285b40").font("Helvetica-Bold")
+    .text(productLabel, x + 9, y + 16, { width: width - 110, lineBreak: false });
+  doc.fontSize(8).fillColor("#173b5b").font("Helvetica-Bold")
+    .text(`${data.livraison.nombreSacs ?? "—"} sacs`, x + width - 92, y + 11, {
+      width: 82,
+      align: "right",
+      lineBreak: false,
+    });
+  y += 36;
+
+  const half = Math.floor(width * 0.53);
+  const drawMeasurementRow = (label: string, value: string, shade = false, emphasized = false) => {
+    const rowH = 17;
+    if (shade || emphasized) doc.rect(x, y, width, rowH).fill(emphasized ? "#f0f5ed" : "#f7f9f7");
+    doc.fontSize(7.5).fillColor(emphasized ? "#176345" : GRIS).font(emphasized ? "Helvetica-Bold" : "Helvetica")
+      .text(label, x + 8, y + 4, { width: half - 12, lineBreak: false });
+    doc.fontSize(8).fillColor(emphasized ? "#176345" : "#19334a").font("Helvetica-Bold")
+      .text(value, x + half, y + 4, { width: width - half - 8, align: "right", lineBreak: false });
+    doc.moveTo(x, y + rowH).lineTo(x + width, y + rowH).stroke("#e4eae5");
+    y += rowH;
+  };
+  doc.rect(x, y, width, 16).fill("#f0f3ef");
+  doc.fontSize(6.5).fillColor(GRIS).font("Helvetica-Bold")
+    .text("PESÉE", x + 8, y + 5, { lineBreak: false });
+  doc.fontSize(6.5).fillColor(GRIS).font("Helvetica-Bold")
+    .text("QUANTITÉ ENREGISTRÉE", x + half, y + 5, {
+      width: width - half - 8,
+      align: "right",
+      lineBreak: false,
+    });
+  y += 16;
+  drawMeasurementRow("Poids brut reçu", kg(grossWeight), true);
+  drawMeasurementRow("Retenue de poids", `− ${kg(Number.isFinite(retention) ? retention : 0)}`);
+  drawMeasurementRow("Poids net retenu", kg(netWeight), false, true);
+  drawMeasurementRow("Prix unitaire", `${formaterFCFA(data.livraison.prixUnitaireFcfa)} / kg`);
+  y += 10;
+
+  drawSectionTitle("Récapitulatif financier");
+  const planAvance = data.livraison.planAvanceType ?? "integral";
+  const avanceLabel = planAvance === "reporte"
+    ? "Avance reportée (non déduite)"
+    : planAvance === "partiel"
+      ? "Avance déduite (partiel)"
+      : "Avance déduite";
+  const drawFinancialRow = (label: string, value: string, shaded = false) => {
+    const rowH = 18;
+    if (shaded) doc.rect(x, y, width, rowH).fill("#f7f9f7");
+    doc.fontSize(8).fillColor("#536a70").font("Helvetica")
+      .text(label, x + 9, y + 5, { width: width - 145, lineBreak: false });
+    doc.fontSize(8).fillColor("#19334a").font("Helvetica-Bold")
+      .text(value, x + width - 132, y + 5, { width: 123, align: "right", lineBreak: false });
+    doc.moveTo(x, y + rowH).lineTo(x + width, y + rowH).stroke("#e4eae5");
+    y += rowH;
+  };
+  drawFinancialRow("Montant brut", formaterFCFA(data.livraison.montantBrutFcfa), true);
+  drawFinancialRow(
+    avanceLabel,
+    planAvance === "reporte" ? "—" : `− ${formaterFCFA(data.livraison.avanceDeduiteFcfa)}`,
+  );
+  drawFinancialRow("Intrants déduits", `− ${formaterFCFA(data.livraison.intrantsDeduitsFcfa)}`, true);
+
+  doc.rect(x, y, width, 40).fill("#176345");
+  doc.fontSize(9.5).fillColor("#ffffff").font("Helvetica-Bold")
+    .text("MONTANT NET", x + 9, y + 14, { width: 185, lineBreak: false });
+  doc.fontSize(12).fillColor("#ffffff").font("Helvetica-Bold")
+    .text(formaterFCFA(data.livraison.montantNetFcfa), x + 190, y + 12, {
+      width: width - 200,
+      align: "right",
+      lineBreak: false,
+    });
+  y += 44;
+  doc.fontSize(7.5).fillColor("#19334a").font("Helvetica-Oblique")
+    .text(`Arrêté à la somme de : ${capitalize(nombreEnLettres(data.livraison.montantNetFcfa))} francs CFA`, x, y, {
+      width,
+      align: "center",
+      lineBreak: false,
+    });
+  y += 15;
+
+  const statutPaiement = libelleStatutPaiement(data.livraison.statutPaiement);
+  const statutNormalise = (data.livraison.statutPaiement ?? "").trim().toUpperCase();
+  const statutPaye = statutNormalise === "PAYÉ" || statutNormalise === "PAYE";
+  doc.circle(x + 4, y + 4, 3).fill(statutPaye ? "#16a34a" : "#d3a34d");
+  doc.fontSize(8).fillColor("#536b6b").font("Helvetica")
+    .text("Statut du paiement :", x + 13, y, { continued: true })
+    .font("Helvetica-Bold").fillColor(statutPaye ? "#176345" : "#825e30")
+    .text(statutPaiement);
+  y += 13;
+  if (data.agent.id && agentName) {
+    const role = data.agent.role === "peseur" ? "Peseur"
+      : data.agent.role === "delegue" ? "Délégué"
+        : data.agent.role === "agent_terrain" ? "Agent terrain"
+          : data.agent.role === "directeur" ? "Directeur"
+            : data.agent.role || "Agent";
+    doc.fontSize(7.5).fillColor(GRIS).font("Helvetica")
+      .text(`Enregistré par : ${agentName} (${role})`, x, y, { lineBreak: false });
+  }
+
+  // Zones de signature au-dessus du pied de page, comme sur la maquette A4.
+  const signatureY = doc.page.height - MARGIN - 83;
+  const signatureGap = 14;
+  const signatureWidth = (width - signatureGap) / 2;
+  const signatures = [
+    { title: "Peseur / agent réceptionnaire", name: receiverName },
+    { title: "Producteur / mandataire", name: memberName },
+  ];
+  signatures.forEach((signature, index) => {
+    const sx = x + index * (signatureWidth + signatureGap);
+    doc.rect(sx, signatureY, signatureWidth, 60).fillAndStroke("#ffffff", "#d9e3df");
+    doc.rect(sx, signatureY, signatureWidth, 16).fill("#f0f3ef");
+    doc.fontSize(7).fillColor("#173b5b").font("Helvetica-Bold")
+      .text(signature.title.toUpperCase(), sx + 6, signatureY + 5, {
+        width: signatureWidth - 12,
+        lineBreak: false,
+      });
+    doc.fontSize(7.5).fillColor("#314d57").font("Helvetica-Bold")
+      .text(signature.name, sx + 8, signatureY + 23, {
+        width: signatureWidth - 16,
+        lineBreak: false,
+      });
+    doc.moveTo(sx + 8, signatureY + 45).lineTo(sx + signatureWidth - 8, signatureY + 45).stroke("#aebdb5");
+    doc.fontSize(6.5).fillColor(GRIS).font("Helvetica")
+      .text("Nom et signature", sx + 8, signatureY + 48, {
+        width: signatureWidth - 16,
+        align: "center",
+        lineBreak: false,
+      });
+  });
+
+  await addFooters(doc, data.cooperativeId);
+  doc.end();
+  return endPromise;
+}
+
 export async function generateRecuLivraison(livraisonId: number, cooperativeId: number): Promise<Buffer> {
   const agentUserAlias = alias(usersTable, "agent_user");
   const peseurUserAlias = alias(usersTable, "peseur_user");
@@ -940,15 +1247,60 @@ export async function generateRecuLivraison(livraisonId: number, cooperativeId: 
       ? getMentionCertification(row.membreId, cooperativeId)
       : Promise.resolve("Cacao ordinaire"),
   ]);
-  const { doc, endPromise } = makePdfDoc();
   const ref = formatNumeroPesee(row.numeroPesee, row.anneeNumeroPesee)
     ?? row.codeAchat
     ?? "NON-NUMÉROTÉE";
+  const isFournisseurExterne = row.fournisseurNom != null;
+  if (row.membreId != null && !isFournisseurExterne) {
+    return generateRecuLivraisonMembrePdf({
+      cooperativeId,
+      reference: ref,
+      campagne,
+      mentionCertif,
+      dateReglementLivraison,
+      livraison: {
+        dateLivraison: row.dateLivraison,
+        createdAt: row.createdAt,
+        produit: row.produit,
+        nombreSacs: row.nombreSacs,
+        produitBrutKg: row.produitBrutKg,
+        retenueKg: row.retenueKg,
+        poidsKg: row.poidsKg,
+        prixUnitaireFcfa: row.prixUnitaireFcfa,
+        montantBrutFcfa: row.montantBrutFcfa,
+        avanceDeduiteFcfa: row.avanceDeduiteFcfa,
+        intrantsDeduitsFcfa: row.intrantsDeduitsFcfa,
+        montantNetFcfa: row.montantNetFcfa,
+        statutPaiement: row.statutPaiement,
+        sectionLivraison: row.sectionLivraison,
+        planAvanceType: row.planAvanceType,
+      },
+      membre: {
+        nom: row.membreNom,
+        prenoms: row.membrePrenoms,
+        cni: row.membreCni,
+        groupement: row.membreGroupement,
+        telephone: row.membreTel,
+      },
+      peseur: {
+        id: row.peseurId,
+        nom: row.peseurNom,
+        prenoms: row.peseurPrenoms,
+      },
+      agent: {
+        id: row.agentId,
+        nom: row.agentNom,
+        prenoms: row.agentPrenoms,
+        role: row.agentRole,
+      },
+    });
+  }
+
+  const { doc, endPromise } = makePdfDoc();
   await drawHeader(doc, cooperativeId, { titre_document: "Reçu de Livraison", reference: ref });
 
   let y = doc.y;
   doc.rect(MARGIN, y, PAGE_W - MARGIN * 2, 52).fill("#f0fdf4").stroke("#bbf7d0");
-  const isFournisseurExterne = row.fournisseurNom != null;
   const nomTiers = isFournisseurExterne
     ? `${row.fournisseurPrenoms ?? ""} ${row.fournisseurNom ?? ""}`.trim()
     : `${row.membrePrenoms ?? ""} ${row.membreNom ?? "—"}`.trim();
