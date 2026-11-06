@@ -415,6 +415,7 @@ describe("generateRecuPaiement (real PDF generation) — receipt number in PDF o
     const text = extractPdfText(buf);
     expect(text).toContain("Date et heure de règlement");
     expect(text).toContain("18/08/2026");
+    expect(text).toContain("14:45");
   });
 
   it("affiche le statut utilisateur PAYÉ pour un paiement effectué", async () => {

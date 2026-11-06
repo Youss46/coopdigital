@@ -1427,6 +1427,7 @@ type RecuPaiementPdfDetail = {
   label: string;
   value: string;
   tone?: RecuPaiementPdfTone;
+  singleLine?: boolean;
 };
 
 type RecuPaiementPdfSummaryLine = {
@@ -1529,11 +1530,12 @@ async function renderRecuPaiementPdf(data: RecuPaiementPdfData): Promise<Buffer>
     const drawPill = Boolean(
       detail.tone
       && detail.tone !== "neutral"
+      && !detail.singleLine
       && doc.widthOfString(value) + 16 <= valueWidth,
     );
-    const valueHeight = doc.heightOfString(value, {
-      width: drawPill ? valueWidth - 16 : valueWidth,
-    });
+    const valueHeight = detail.singleLine
+      ? 11
+      : doc.heightOfString(value, { width: drawPill ? valueWidth - 16 : valueWidth });
     const rowHeight = Math.max(18, labelHeight + 7, valueHeight + 7);
     const background = index % 2 === 0 ? "#f8faf8" : "#ffffff";
     doc.rect(x, y, width, rowHeight).fill(background);
@@ -1556,7 +1558,10 @@ async function renderRecuPaiementPdf(data: RecuPaiementPdfData): Promise<Buffer>
     } else {
       const palette = toneColors[detail.tone ?? "neutral"];
       doc.font("Helvetica-Bold").fontSize(8.5).fillColor(palette.fg)
-        .text(value, valueX, y + 4, { width: valueWidth, lineBreak: true });
+        .text(value, valueX, y + 4, {
+          width: valueWidth,
+          lineBreak: !detail.singleLine,
+        });
     }
     doc.moveTo(x, y + rowHeight).lineTo(x + width, y + rowHeight).stroke("#e6ece7");
     y += rowHeight;
@@ -1820,6 +1825,7 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
         label: "Date et heure de règlement",
         value: formaterDateHeure(dateReglement),
         tone: "success" as const,
+        singleLine: true,
       }]
       : []),
     {
