@@ -290,10 +290,11 @@ describe("generateRecuPaiement (real PDF generation) — receipt number in PDF o
     row: Record<string, unknown>,
     history: Array<{ id: number }> = [],
     cheques: Array<Record<string, unknown>> = [],
+    paymentLines: Array<Record<string, unknown>> = [],
   ) {
     vi.mocked(db.select)
       .mockReturnValueOnce(makeSelectChain([row]) as unknown as ReturnType<typeof db.select>)
-      .mockReturnValueOnce(makeSelectChain([])  as unknown as ReturnType<typeof db.select>)
+      .mockReturnValueOnce(makeSelectChain(paymentLines)  as unknown as ReturnType<typeof db.select>)
       .mockReturnValueOnce(makeSelectChain(cheques)  as unknown as ReturnType<typeof db.select>)
       .mockReturnValueOnce(makeSelectChain(history)  as unknown as ReturnType<typeof db.select>)
       .mockReturnValueOnce(makeSelectChain([])  as unknown as ReturnType<typeof db.select>);
@@ -325,6 +326,84 @@ describe("generateRecuPaiement (real PDF generation) — receipt number in PDF o
     // PDFKit compresses page content with FlateDecode; inflate streams before searching.
     const text = extractPdfText(buf);
     expect(text).toContain(RECEIPT_NUM);
+  });
+
+  it("uses the approved one-page receipt layout without QR or unsupported verification", async () => {
+    setupDbSelect(makePaiementRow({
+      statut: "effectue",
+      dateValidation: new Date("2026-08-18T14:45:00Z"),
+      validateurNom: "Bakayoko",
+      validateurPrenoms: "Yérin",
+      validateurRole: "pca",
+    }));
+    const buf = await generateRecuPaiement(PAIEMENT_ID, 1);
+    const text = extractPdfText(buf);
+    const textSansAccents = text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toUpperCase();
+    const pdfSource = buf.toString("latin1");
+    const pageCount = (pdfSource.match(/\/Type\s*\/Page\b/g) ?? []).length;
+
+    expect(pageCount).toBe(1);
+    expect(pdfSource).toContain("/MediaBox [0 0 595.28 841.89]");
+    expect(vi.mocked(drawHeader)).toHaveBeenCalledWith(
+      expect.anything(),
+      1,
+      expect.objectContaining({ titre_document: "Reçu de Paiement", reference: RECEIPT_NUM }),
+    );
+    expect(textSansAccents).toContain("DETAILS DU PAIEMENT");
+    expect(textSansAccents).toContain("BENEFICIAIRE");
+    expect(textSansAccents).toContain("MONTANT ENCAISSE");
+    expect(textSansAccents).toContain("VALIDE PAR");
+    expect(textSansAccents).not.toContain("VERIFIE PAR");
+    expect(textSansAccents).not.toContain("QR");
+  });
+
+  it("preserves mixed-method amounts and the pending cheque status in the receipt", async () => {
+    setupDbSelect(
+      makePaiementRow({
+        montantFcfa: 700000,
+        modePaiement: "mixte",
+        modeReglement: "mixte",
+        statut: "effectue",
+        dateValidation: new Date("2026-08-18T14:45:00Z"),
+      }),
+      [{ id: PAIEMENT_ID }],
+      [{
+        paiementLigneId: 2,
+        montantFcfa: 400000,
+        statut: "emis",
+        dateEncaissement: null,
+      }],
+      [
+        {
+          id: 1,
+          modePaiement: "especes",
+          montantFcfa: 300000,
+          referenceTransaction: null,
+          numeroCheque: null,
+          banque: null,
+        },
+        {
+          id: 2,
+          modePaiement: "cheque",
+          montantFcfa: 400000,
+          referenceTransaction: null,
+          numeroCheque: "CH-42",
+          banque: "BICICI",
+        },
+      ],
+    );
+    const buf = await generateRecuPaiement(PAIEMENT_ID, 1);
+    const text = extractPdfText(buf);
+    const textSansAccents = text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toUpperCase();
+
+    expect(textSansAccents).toContain("PAIEMENT VENTILE");
+    expect(textSansAccents).toContain("ESPECES");
+    expect(textSansAccents).toContain("CH-42");
+    expect(textSansAccents).toContain("BICICI");
+    expect(textSansAccents).toContain("EN ATTENTE");
+    expect(textSansAccents).toContain("ENCAISSEMENT");
+    expect(text).toContain("300 000 FCFA");
+    expect(text).toContain("400 000 FCFA");
   });
 
   it("affiche obligatoirement la date de règlement pour un paiement effectué", async () => {

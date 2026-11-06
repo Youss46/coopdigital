@@ -1421,6 +1421,270 @@ export async function generateRecuLivraison(livraisonId: number, cooperativeId: 
 // ─────────────────────────────────────────────────────────────────────────────
 // 6. Reçu de paiement
 // ─────────────────────────────────────────────────────────────────────────────
+type RecuPaiementPdfTone = "neutral" | "success" | "warning" | "danger";
+
+type RecuPaiementPdfDetail = {
+  label: string;
+  value: string;
+  tone?: RecuPaiementPdfTone;
+};
+
+type RecuPaiementPdfSummaryLine = {
+  label: string;
+  value: string;
+  tone?: RecuPaiementPdfTone;
+};
+
+type RecuPaiementPdfData = {
+  cooperativeId: number;
+  reference: string;
+  beneficiaireLabel: string;
+  beneficiaireNom: string;
+  coordonnees: string;
+  details: RecuPaiementPdfDetail[];
+  ventilation: Array<{ label: string; montant: string }>;
+  montants: RecuPaiementPdfSummaryLine[];
+  montantEncaisse: string;
+  statut: string;
+  statutTone: RecuPaiementPdfTone;
+  validePar: string | null;
+  saisiPar: string | null;
+  signataireLabel: string;
+};
+
+async function renderRecuPaiementPdf(data: RecuPaiementPdfData): Promise<Buffer> {
+  const { doc, endPromise } = makePdfDoc();
+  await drawHeader(doc, data.cooperativeId, {
+    titre_document: "Reçu de Paiement",
+    reference: data.reference,
+  });
+
+  const x = MARGIN;
+  const width = PAGE_W - MARGIN * 2;
+  const forest = "#075c39";
+  const deepForest = "#073f2b";
+  const leaf = "#84bd4b";
+  const ink = "#172b32";
+  const muted = "#647873";
+  const rule = "#dce6df";
+  let y = doc.y + 9;
+
+  const toneColors: Record<RecuPaiementPdfTone, { bg: string; fg: string; border: string }> = {
+    neutral: { bg: "#f6f8f6", fg: ink, border: rule },
+    success: { bg: "#e8f5df", fg: "#17613b", border: "#c7e3b7" },
+    warning: { bg: "#fff6df", fg: "#8a5a13", border: "#f0dda8" },
+    danger: { bg: "#fdebea", fg: "#a52a2a", border: "#f2c8c5" },
+  };
+
+  // Bloc bénéficiaire inspiré de la maquette approuvée.
+  const beneficiaryHeight = 56;
+  const badgeWidth = 136;
+  doc.roundedRect(x, y, width, beneficiaryHeight, 6).fillAndStroke("#f0f5ed", "#d6e2d8");
+  doc.rect(x, y + 6, 4, beneficiaryHeight - 12).fill("#58a14e");
+  doc.font("Helvetica-Bold").fontSize(7).fillColor(forest)
+    .text(data.beneficiaireLabel.toUpperCase(), x + 14, y + 7, { lineBreak: false });
+  doc.font("Helvetica-Bold").fontSize(13).fillColor("#132b34")
+    .text(data.beneficiaireNom || "—", x + 14, y + 18, {
+      width: width - badgeWidth - 42,
+      lineBreak: false,
+    });
+  doc.font("Helvetica").fontSize(7.5).fillColor("#536a61")
+    .text(data.coordonnees || "—", x + 14, y + 39, {
+      width: width - badgeWidth - 42,
+      lineBreak: false,
+    });
+  const badgeX = x + width - badgeWidth - 10;
+  doc.roundedRect(badgeX, y + 8, badgeWidth, 40, 5).fillAndStroke("#ffffff", "#dce7dc");
+  doc.font("Helvetica-Bold").fontSize(7.5).fillColor(deepForest)
+    .text("REÇU DE RÈGLEMENT", badgeX + 5, y + 16, {
+      width: badgeWidth - 10,
+      align: "center",
+      lineBreak: false,
+    });
+  doc.font("Helvetica").fontSize(7).fillColor(muted)
+    .text("Justificatif à conserver", badgeX + 5, y + 29, {
+      width: badgeWidth - 10,
+      align: "center",
+      lineBreak: false,
+    });
+  y += beneficiaryHeight + 10;
+
+  const drawSectionHeader = (label: string) => {
+    doc.roundedRect(x, y, width, 21, 5).fill(forest);
+    doc.rect(x, y + 18, width, 3).fill(leaf);
+    doc.font("Helvetica-Bold").fontSize(9).fillColor("#ffffff")
+      .text(label.toUpperCase(), x + 12, y + 6, { lineBreak: false });
+    y += 25;
+  };
+
+  const drawDetailRow = (detail: RecuPaiementPdfDetail, index: number) => {
+    const labelX = x + 25;
+    const labelWidth = 178;
+    const valueX = x + 222;
+    const valueWidth = width - 232;
+    doc.font("Helvetica").fontSize(8);
+    const labelHeight = doc.heightOfString(detail.label, { width: labelWidth });
+    doc.font("Helvetica-Bold").fontSize(8.5);
+    const value = detail.value || "—";
+    const drawPill = Boolean(
+      detail.tone
+      && detail.tone !== "neutral"
+      && doc.widthOfString(value) + 16 <= valueWidth,
+    );
+    const valueHeight = doc.heightOfString(value, {
+      width: drawPill ? valueWidth - 16 : valueWidth,
+    });
+    const rowHeight = Math.max(18, labelHeight + 7, valueHeight + 7);
+    const background = index % 2 === 0 ? "#f8faf8" : "#ffffff";
+    doc.rect(x, y, width, rowHeight).fill(background);
+    doc.circle(x + 11, y + rowHeight / 2, 2.2)
+      .fill(detail.tone === "warning" ? "#d69b2d" : detail.tone === "danger" ? "#c6423a" : "#5b9d58");
+    doc.font("Helvetica").fontSize(8).fillColor(muted)
+      .text(detail.label, labelX, y + 4, { width: labelWidth, lineBreak: true });
+    doc.font("Helvetica").fontSize(8).fillColor("#80908a")
+      .text(":", x + 207, y + 4, { lineBreak: false });
+
+    if (detail.tone && detail.tone !== "neutral" && drawPill) {
+      const palette = toneColors[detail.tone];
+      const pillWidth = Math.max(64, doc.widthOfString(value) + 16);
+      doc.roundedRect(valueX, y + 3, pillWidth, rowHeight - 6, 7).fillAndStroke(palette.bg, palette.border);
+      doc.font("Helvetica-Bold").fontSize(8.5).fillColor(palette.fg)
+        .text(value, valueX + 8, y + 5, {
+          width: pillWidth - 14,
+          lineBreak: true,
+        });
+    } else {
+      const palette = toneColors[detail.tone ?? "neutral"];
+      doc.font("Helvetica-Bold").fontSize(8.5).fillColor(palette.fg)
+        .text(value, valueX, y + 4, { width: valueWidth, lineBreak: true });
+    }
+    doc.moveTo(x, y + rowHeight).lineTo(x + width, y + rowHeight).stroke("#e6ece7");
+    y += rowHeight;
+  };
+
+  drawSectionHeader("Détails du paiement");
+  data.details.forEach(drawDetailRow);
+
+  if (data.ventilation.length > 0) {
+    y += 7;
+    doc.font("Helvetica-Bold").fontSize(8).fillColor(forest)
+      .text("VENTILATION DU RÈGLEMENT", x + 2, y, { lineBreak: false });
+    y += 15;
+    data.ventilation.forEach((ligne, index) => {
+      const labelWidth = width - 142;
+      doc.font("Helvetica").fontSize(7.5);
+      const labelHeight = doc.heightOfString(ligne.label, { width: labelWidth });
+      const rowHeight = Math.max(18, labelHeight + 7);
+      if (index % 2 === 0) doc.rect(x, y, width, rowHeight).fill("#f8faf8");
+      doc.font("Helvetica").fontSize(7.5).fillColor(muted)
+        .text(ligne.label, x + 8, y + 4, { width: labelWidth - 8, lineBreak: true });
+      doc.font("Helvetica-Bold").fontSize(8).fillColor(ink)
+        .text(ligne.montant, x + width - 128, y + 4, {
+          width: 120,
+          align: "right",
+          lineBreak: false,
+        });
+      doc.moveTo(x, y + rowHeight).lineTo(x + width, y + rowHeight).stroke("#e6ece7");
+      y += rowHeight;
+    });
+  }
+
+  if (data.montants.length > 0) {
+    y += 8;
+    drawSectionHeader("Montants du règlement");
+    data.montants.forEach((ligne) => {
+      const palette = toneColors[ligne.tone ?? "neutral"];
+      const rowHeight = 19;
+      doc.rect(x, y, width, rowHeight).fillAndStroke(palette.bg, palette.border);
+      doc.font("Helvetica").fontSize(8.5).fillColor(palette.fg)
+        .text(ligne.label, x + 10, y + 5, { width: width - 150, lineBreak: false });
+      doc.font("Helvetica-Bold").fontSize(8.5).fillColor(palette.fg)
+        .text(ligne.value, x + width - 136, y + 5, {
+          width: 126,
+          align: "right",
+          lineBreak: false,
+        });
+      y += rowHeight;
+    });
+  }
+
+  y += 8;
+  doc.roundedRect(x, y, width, 42, 7).fill(deepForest);
+  doc.rect(x, y + 39, width, 3).fill(leaf);
+  doc.font("Helvetica-Bold").fontSize(10).fillColor("#ffffff")
+    .text("MONTANT ENCAISSÉ", x + 13, y + 15, { width: 220, lineBreak: false });
+  doc.font("Helvetica-Bold").fontSize(13).fillColor("#ffffff")
+    .text(data.montantEncaisse, x + 235, y + 13, {
+      width: width - 248,
+      align: "right",
+      lineBreak: false,
+    });
+  y += 50;
+
+  const statusPalette = toneColors[data.statutTone];
+  const statusHeight = data.validePar ? 42 : 32;
+  doc.roundedRect(x, y, width, statusHeight, 6).fillAndStroke(statusPalette.bg, statusPalette.border);
+  doc.circle(x + 20, y + (data.validePar ? 18 : 16), 9).fill(statusPalette.fg);
+  if (data.statutTone === "success") {
+    doc.moveTo(x + 16, y + 18).lineTo(x + 19, y + 21).lineTo(x + 25, y + 14)
+      .strokeColor("#ffffff").lineWidth(1.7).stroke();
+  } else {
+    doc.font("Helvetica-Bold").fontSize(10).fillColor("#ffffff")
+      .text("!", x + 17, y + (data.validePar ? 12 : 10), { lineBreak: false });
+  }
+  doc.font("Helvetica-Bold").fontSize(9).fillColor(statusPalette.fg)
+    .text(`Statut : ${data.statut}`, x + 38, y + 7, { lineBreak: false });
+  if (data.validePar) {
+    doc.font("Helvetica").fontSize(7.5).fillColor(ink)
+      .text(`Validé par : ${data.validePar}`, x + 38, y + 23, {
+        width: width - 50,
+        lineBreak: false,
+      });
+  }
+  y += statusHeight + 5;
+  if (data.saisiPar) {
+    doc.font("Helvetica").fontSize(7.5).fillColor(muted)
+      .text(`Saisi par : ${data.saisiPar}`, x, y, { width, lineBreak: false });
+    y += 13;
+  }
+
+  let signatureY = doc.page.height - MARGIN - 74;
+  if (y + 8 > signatureY) {
+    doc.addPage();
+    await drawHeader(doc, data.cooperativeId, {
+      titre_document: "Reçu de Paiement — suite",
+      reference: data.reference,
+    });
+    signatureY = doc.y + 12;
+    doc.font("Helvetica-Bold").fontSize(8).fillColor(forest)
+      .text("SIGNATURES", x, signatureY, { lineBreak: false });
+    signatureY += 14;
+  }
+
+  const signatureGap = 14;
+  const signatureWidth = (width - signatureGap) / 2;
+  const signatureHeight = 58;
+  const signatures = ["Caissier / Agent payeur", data.signataireLabel];
+  signatures.forEach((label, index) => {
+    const sx = x + index * (signatureWidth + signatureGap);
+    doc.roundedRect(sx, signatureY, signatureWidth, signatureHeight, 5)
+      .fillAndStroke("#fafbf8", "#d2dfd5");
+    doc.roundedRect(sx + 1, signatureY + 1, signatureWidth - 2, 17, 4).fill("#eef3ef");
+    doc.font("Helvetica-Bold").fontSize(7.5).fillColor("#193a34")
+      .text(label, sx + 6, signatureY + 6, {
+        width: signatureWidth - 12,
+        align: "center",
+        lineBreak: false,
+      });
+    doc.roundedRect(sx + 8, signatureY + 25, signatureWidth - 16, 25, 4)
+      .fillAndStroke("#ffffff", "#70a77e");
+  });
+
+  await addFooters(doc, data.cooperativeId);
+  doc.end();
+  return endPromise;
+}
+
 export async function generateRecuPaiement(paiementId: number, cooperativeId: number): Promise<Buffer> {
   const validateurAlias = alias(usersTable, "validateur");
   const saisiseurPayAlias = alias(usersTable, "saisiseur_pay");
@@ -1516,13 +1780,8 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
     ? versementsLivraison.findIndex((versement) => versement.id === row.id) + 1
     : 0;
 
-  const campagne = await getCampagneEnCours(cooperativeId);
-  const { doc, endPromise } = makePdfDoc();
   const ref = row.numeroRecu ?? `PAY-${String(row.id).padStart(5, "0")}`;
-  await drawHeader(doc, cooperativeId, { titre_document: "Reçu de Paiement", reference: ref });
-
-  let y = doc.y;
-  doc.rect(MARGIN, y, PAGE_W - MARGIN * 2, 52).fill("#f0fdf4").stroke("#bbf7d0");
+  const campagne = await getCampagneEnCours(cooperativeId);
   const isPieceRechange = row.depenseVehiculeType === "piece_rechange";
   const isFournisseurExterne = !isPieceRechange && row.fournisseurNom != null;
   const beneficiaireNom = isFournisseurExterne
@@ -1530,137 +1789,147 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
     : isPieceRechange
     ? row.depenseVehiculeDemandeur ?? "—"
     : `${row.membrePrenoms ?? ""} ${row.membreNom ?? "—"}`.trim();
-  doc.fontSize(8).fillColor(GRIS).font("Helvetica")
-    .text(isPieceRechange ? "DEMANDEUR" : "BÉNÉFICIAIRE", MARGIN + 8, y + 5);
-  doc.fontSize(11).fillColor(VERT).font("Helvetica-Bold")
-    .text(beneficiaireNom || "—", MARGIN + 8, y + 16);
-  doc.fontSize(8).fillColor(GRIS).font("Helvetica")
-    .text(
-      isPieceRechange
-        ? "Bon d’achat — pièce de rechange"
-        : isFournisseurExterne
-        ? `CNI : ${row.fournisseurCni ?? "—"}   |   Tél : ${row.fournisseurTel ?? "—"}`
-        : `CNI : ${row.membreCni ?? "—"}   |   Tél : ${row.membreTel ?? "—"}`,
-      MARGIN + 8,
-      y + 30,
-    );
-  y += 60;
-
-  doc.fontSize(10).fillColor(VERT).font("Helvetica-Bold").text("DÉTAILS DU PAIEMENT", MARGIN, y);
-  y += 14;
   const payModeLabel: Record<string, string> = {
     orange_money: "Orange Money", mtn_momo: "MTN MoMo", especes: "Espèces",
     cheque: "Chèque", virement: "Virement bancaire", wave: "Wave",
+    carte_producteur: "Carte producteur", mixte: "Paiement ventilé",
   };
-  const payDetails: Array<[string, string]> = [
-    ["N° Reçu",              ref],
-    ["Campagne",             campagne ?? "—"],
-    [row.livraisonId ? "Date de pesée" : "Date", row.livraisonDate
-      ? formaterDate(row.livraisonDate)
-      : formaterDateHeure(row.createdAt)],
+
+  const situation = chequeEnAttente
+    ? "Chèque émis — en attente d’encaissement"
+    : paiementRegle
+      ? "Montant encaissé"
+      : row.statut === "en_attente"
+        ? "En attente de validation"
+        : row.statut.replace(/_/g, " ").toUpperCase();
+  const details: RecuPaiementPdfDetail[] = [
+    { label: "N° Reçu", value: ref },
+    { label: "Campagne", value: campagne ?? "—" },
+    {
+      label: row.livraisonId ? "Date de pesée" : "Date",
+      value: row.livraisonDate ? formaterDate(row.livraisonDate) : formaterDateHeure(row.createdAt),
+    },
     ...(dateReglement
-      ? [["Date et heure de règlement", formaterDateHeure(dateReglement)] as [string, string]]
+      ? [{
+        label: "Date et heure de règlement",
+        value: formaterDateHeure(dateReglement),
+        tone: "success" as const,
+      }]
       : []),
-    ["Mode de paiement",     payModeLabel[(row.modeReglement ?? row.modePaiement) ?? ""] ?? row.modePaiement ?? "—"],
-    ["Référence transaction",row.referenceTransaction ?? "—"],
+    {
+      label: "Mode de paiement",
+      value: paiementLignes.length > 1
+        ? "Paiement ventilé"
+        : payModeLabel[(row.modeReglement ?? row.modePaiement) ?? ""]
+          ?? row.modeReglement
+          ?? row.modePaiement
+          ?? "—",
+    },
+    { label: "Référence transaction", value: row.referenceTransaction ?? "—" },
     ...(isPieceRechange
       ? [
-          ["Nature", "PIÈCE DE RECHANGE"],
-          ["Demandeur", row.depenseVehiculeDemandeur ?? "—"],
-        ] as Array<[string, string]>
+        { label: "Nature", value: "PIÈCE DE RECHANGE" },
+        { label: "Demandeur", value: row.depenseVehiculeDemandeur ?? "—" },
+      ]
       : []),
-    ["Libellé",              row.libelle ?? (isPieceRechange ? row.depenseVehiculeLibelle ?? "Pièce de rechange" : "Paiement livraison cacao")],
-    ["N° de pesée",          formatNumeroPesee(row.livraisonNumeroPesee, row.livraisonAnneeNumeroPesee)
-      ?? row.livraisonRef
-      ?? "NON-NUMÉROTÉE"],
-    ["Situation",            chequeEnAttente
-      ? "Chèque émis — en attente d’encaissement"
-      : "Montant encaissé"],
+    {
+      label: "Libellé",
+      value: row.libelle ?? (isPieceRechange
+        ? row.depenseVehiculeLibelle ?? "Pièce de rechange"
+        : "Paiement livraison cacao"),
+    },
+    ...(row.livraisonId
+      ? [{
+        label: "N° de pesée",
+        value: formatNumeroPesee(row.livraisonNumeroPesee, row.livraisonAnneeNumeroPesee)
+          ?? row.livraisonRef
+          ?? "NON-NUMÉROTÉE",
+      }]
+      : []),
+    {
+      label: "Situation",
+      value: situation,
+      tone: chequeEnAttente ? "warning" : paiementRegle ? "success" : "neutral",
+    },
   ];
-  for (const [i, [label, val]] of payDetails.entries()) {
-    const estDateReglement = label === "Date et heure de règlement";
-    if (i % 2 === 0) doc.rect(MARGIN, y, 370, 16).fill("#f9fafb");
-    doc.fontSize(8).fillColor(GRIS).font("Helvetica").text(label, MARGIN + 6, y + 4, { width: 160, lineBreak: false });
-    doc.fontSize(9).fillColor(estDateReglement ? "#15803d" : "#111827").font("Helvetica-Bold").text(val, MARGIN + 170, y + 4, { width: 190, lineBreak: false });
-    y += 16;
-  }
-  if (paiementLignes.length > 1) {
-    y += 6;
-    doc.fontSize(9).fillColor(VERT).font("Helvetica-Bold").text("VENTILATION DU RÈGLEMENT", MARGIN, y);
-    y += 14;
-    for (const ligne of paiementLignes) {
+
+  const ventilation = paiementLignes.length > 1
+    ? paiementLignes.map((ligne) => {
       const mode = payModeLabel[ligne.modePaiement] ?? ligne.modePaiement;
-      const details = ligne.modePaiement === "cheque" && ligne.numeroCheque
-        ? ` — N° ${ligne.numeroCheque}${ligne.banque ? ` (${ligne.banque})` : ""} — ${
-          chequesPaiement.find((cheque) => cheque.paiementLigneId === ligne.id)?.statut === "encaisse"
-            ? "encaissé"
-            : "en attente d’encaissement"
-        }`
+      const cheque = chequesPaiement.find((item) => item.paiementLigneId === ligne.id);
+      const statutCheque = cheque?.statut === "encaisse"
+        ? "encaissé"
+        : cheque?.statut === "emis"
+          ? "en attente d’encaissement"
+          : cheque?.statut
+            ? cheque.statut.replace(/_/g, " ")
+            : "en attente d’encaissement";
+      const detailsCheque = ligne.modePaiement === "cheque"
+        ? ` — ${ligne.numeroCheque ? `N° ${ligne.numeroCheque}` : "Chèque"}${ligne.banque ? ` (${ligne.banque})` : ""} — ${statutCheque}`
         : "";
-      doc.fontSize(8).fillColor(GRIS).font("Helvetica").text(`${mode}${details}`, MARGIN + 6, y + 4, { width: 230, lineBreak: false });
-      doc.fontSize(9).fillColor("black").font("Helvetica-Bold").text(formaterFCFA(ligne.montantFcfa), MARGIN + 265, y + 4, { width: 100, align: "right", lineBreak: false });
-      y += 16;
-    }
-    y += 4;
-  }
-  y += 10;
+      return {
+        label: `${mode}${detailsCheque}`,
+        montant: formaterFCFA(ligne.montantFcfa),
+      };
+    })
+    : [];
+
   const montantRestantLivraison = row.livraisonMontantRestant != null
     ? Number(row.livraisonMontantRestant)
     : null;
-  const livraisonEstReglee = (row.livraisonStatutPaiement ?? "")
+  const statutLivraisonNormalise = (row.livraisonStatutPaiement ?? "")
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
-    .toUpperCase() === "PAYE";
+    .toUpperCase();
+  const livraisonEstReglee = statutLivraisonNormalise === "PAYE";
+  const statutLivraison = livraisonEstReglee
+    ? "RÉGLÉE"
+    : statutLivraisonNormalise === "PARTIEL"
+      ? "PARTIELLE"
+      : statutLivraisonNormalise === "EN_ATTENTE"
+        ? "EN ATTENTE"
+        : "À RÉGLER";
+  const montants: RecuPaiementPdfSummaryLine[] = [];
   if (row.livraisonId && row.livraisonMontantNetFcfa != null && montantRestantLivraison != null) {
-    const statutLivraison = livraisonEstReglee ? "RÉGLÉE" : "PARTIELLE";
-    const payMontants: Array<[string, string, string]> = [
-      [`Montant encaissé${numeroVersement > 0 ? ` — règlement ${numeroVersement}` : ""}`, formaterFCFA(montantEffectivementEncaisse), "#f0fdf4"],
-      ["Reste dû", formaterFCFA(Math.max(0, montantRestantLivraison)), livraisonEstReglee ? "#f0fdf4" : "#fff7ed"],
-    ];
-    for (const [label, val, bg] of payMontants) {
-      doc.rect(MARGIN, y, 370, 18).fill(bg);
-      doc.fontSize(9).fillColor("black").font("Helvetica").text(label, MARGIN + 8, y + 5, { width: 250, lineBreak: false });
-      doc.font("Helvetica-Bold").text(val, MARGIN + 265, y + 5, { width: 100, align: "right", lineBreak: false });
-      y += 18;
-    }
-    doc.rect(MARGIN, y, 370, 18).fill(livraisonEstReglee ? "#dcfce7" : "#dbeafe");
-    doc.fontSize(9).fillColor(livraisonEstReglee ? "#166534" : "#1d4ed8").font("Helvetica-Bold")
-      .text(`Statut livraison : ${statutLivraison}`, MARGIN + 8, y + 5, { width: 350, lineBreak: false });
-    y += 18;
+    montants.push(
+      {
+        label: `Montant encaissé${numeroVersement > 0 ? ` — règlement ${numeroVersement}` : ""}`,
+        value: formaterFCFA(montantEffectivementEncaisse),
+        tone: "success",
+      },
+      {
+        label: "Reste dû",
+        value: formaterFCFA(Math.max(0, montantRestantLivraison)),
+        tone: livraisonEstReglee ? "success" : "warning",
+      },
+      {
+        label: "Statut livraison",
+        value: statutLivraison,
+        tone: livraisonEstReglee ? "success" : "warning",
+      },
+    );
   } else if (row.montantAPayerFcfa) {
-    const payMontants: Array<[string, string, string]> = [
-      ["Montant dû",    formaterFCFA(parseFloat(row.montantAPayerFcfa)),    "#f9fafb"],
-      ["Montant versé", formaterFCFA(parseFloat(row.montantVerseFcfa ?? "0")), "#f0fdf4"],
-      ["Reste à payer", formaterFCFA(parseFloat(row.resteAPayerFcfa ?? "0")), "#fff7ed"],
-    ];
-    for (const [label, val, bg] of payMontants) {
-      doc.rect(MARGIN, y, 370, 18).fill(bg);
-      doc.fontSize(9).fillColor("black").font("Helvetica").text(label, MARGIN + 8, y + 5, { width: 250, lineBreak: false });
-      doc.font("Helvetica-Bold").text(val, MARGIN + 265, y + 5, { width: 100, align: "right", lineBreak: false });
-      y += 18;
-    }
+    montants.push(
+      { label: "Montant dû", value: formaterFCFA(parseFloat(row.montantAPayerFcfa)), tone: "neutral" },
+      { label: "Montant versé", value: formaterFCFA(parseFloat(row.montantVerseFcfa ?? "0")), tone: "success" },
+      { label: "Reste à payer", value: formaterFCFA(parseFloat(row.resteAPayerFcfa ?? "0")), tone: "warning" },
+    );
   }
-  doc.rect(MARGIN, y, 370, 26).fill(VERT);
-  doc.fontSize(11).fillColor("white").font("Helvetica-Bold")
-    .text("MONTANT ENCAISSÉ", MARGIN + 8, y + 8, { width: 200, lineBreak: false });
-  doc.text(formaterFCFA(montantEffectivementEncaisse), MARGIN + 218, y + 8, { width: 145, align: "right", lineBreak: false });
-  y += 34;
-  const payStatutColor: Record<string, string> = { effectue: "#16a34a", confirme: "#16a34a", en_attente: "#f59e0b", echec: "#ef4444", rejete: "#ef4444" };
+
   const statutAffiche = chequeEnAttente
     ? "EN ATTENTE D’ENCAISSEMENT"
     : row.statut === "effectue" || row.statut === "confirme"
     ? "PAYÉ"
     : row.statut.replace(/_/g, " ").toUpperCase();
-  const statutColor = chequeEnAttente ? "#b45309" : (payStatutColor[row.statut] ?? GRIS);
-  doc.roundedRect(MARGIN, y - 3, 370, 22, 4).fill(chequeEnAttente ? "#fffbeb" : "#f0fdf4").stroke(chequeEnAttente ? "#fde68a" : "#bbf7d0");
-  doc.fontSize(8).font("Helvetica").fillColor(GRIS)
-    .text("Statut", MARGIN + 10, y + 4, { width: 55, lineBreak: false });
-  doc.fontSize(9).font("Helvetica-Bold").fillColor(statutColor)
-    .text(statutAffiche, MARGIN + 70, y + 3, { width: 290, lineBreak: false });
-
-  // — Ligne "Validé par" si l'agent validateur est connu
+  const statutTone: RecuPaiementPdfTone = chequeEnAttente
+    ? "warning"
+    : row.statut === "effectue" || row.statut === "confirme"
+      ? "success"
+      : row.statut === "echec" || row.statut === "rejete"
+        ? "danger"
+        : "warning";
+  let validePar: string | null = null;
   if (row.validateurNom || row.validateurPrenoms) {
-    y += 14;
     const roleStr = String(row.validateurRole ?? "");
     const roleLabel = roleStr === "delegue" ? "Délégué"
       : roleStr === "agent_terrain" ? "Agent terrain"
@@ -1669,31 +1938,29 @@ export async function generateRecuPaiement(paiementId: number, cooperativeId: nu
       : roleStr === "pca" ? "PCA"
       : roleStr || "Agent";
     const validateurFullName = `${row.validateurPrenoms ?? ""} ${row.validateurNom ?? ""}`.trim();
-    doc.fontSize(9).font("Helvetica").fillColor(GRIS)
-      .text("Validé par : ", MARGIN, y, { continued: true })
-      .font("Helvetica-Bold").fillColor("black")
-      .text(`${validateurFullName} (${roleLabel})`);
+    validePar = `${validateurFullName} (${roleLabel})`;
   }
-
-  // — Ligne "Saisi par" si l'opération a été saisie par proxy (gérant pour délégué)
-  if (row.agentSaisiseurId && row.agentSaisiseurNom) {
-    y += 14;
-    doc.fontSize(9).font("Helvetica").fillColor(GRIS)
-      .text("Saisi par : ", MARGIN, y, { continued: true })
-      .font("Helvetica-Bold").fillColor("black")
-      .text(row.agentSaisiseurNom);
-  }
-
-  y = 700;
-  doc.fontSize(8).fillColor(GRIS).font("Helvetica")
-    .text("Caissier / Agent payeur", MARGIN, y, { width: 150, align: "center" });
-  doc.text(isPieceRechange ? "Demandeur" : "Bénéficiaire", PAGE_W - MARGIN - 170, y, { width: 160, align: "center" });
-  doc.rect(MARGIN, y + 12, 150, 38).stroke("#d1d5db");
-  doc.rect(PAGE_W - MARGIN - 170, y + 12, 160, 38).stroke("#d1d5db");
-
-  await addFooters(doc, cooperativeId);
-  doc.end();
-  return endPromise;
+  const coordonnees = isPieceRechange
+    ? "Bon d’achat — pièce de rechange"
+    : isFournisseurExterne
+      ? `CNI : ${row.fournisseurCni ?? "—"}   |   Tél : ${row.fournisseurTel ?? "—"}`
+      : `CNI : ${row.membreCni ?? "—"}   |   Tél : ${row.membreTel ?? "—"}`;
+  return renderRecuPaiementPdf({
+    cooperativeId,
+    reference: ref,
+    beneficiaireLabel: isPieceRechange ? "Demandeur" : isFournisseurExterne ? "Fournisseur" : "Bénéficiaire",
+    beneficiaireNom: beneficiaireNom || "—",
+    coordonnees,
+    details,
+    ventilation,
+    montants,
+    montantEncaisse: formaterFCFA(montantEffectivementEncaisse),
+    statut: statutAffiche,
+    statutTone,
+    validePar,
+    saisiPar: row.agentSaisiseurId && row.agentSaisiseurNom ? row.agentSaisiseurNom : null,
+    signataireLabel: isPieceRechange ? "Demandeur" : "Bénéficiaire",
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
