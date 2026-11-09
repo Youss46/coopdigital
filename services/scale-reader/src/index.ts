@@ -32,17 +32,27 @@ log.info(`Port série : ${SCALE_PORT}  |  WS : ${WS_PORT}  |  HTTP : ${HTTP_PORT
 const server   = new ScaleServer(WS_PORT, HTTP_PORT);
 const filter   = new StabilityFilter();
 const reader   = new ScaleSerialReader(SCALE_PORT);
+const MAX_READING_GAP_MS = 3_000;
+let lastReadingAt = 0;
 
 // ── Câblage événements ────────────────────────────────────────────────────────
 reader.on("connected", () => {
   filter.reset();
-  server.publish({ isConnected: true, error: null });
+  lastReadingAt = 0;
+  server.publish({
+    weightKg: null,
+    isStable: false,
+    isConnected: true,
+    error: null,
+  });
   log.info("[main] Balance connectée — en attente de lectures…");
 });
 
 reader.on("disconnected", (reason: string) => {
   filter.reset();
+  lastReadingAt = 0;
   server.publish({
+    weightKg: null,
     isConnected: false,
     isStable: false,
     error: `Balance non connectée : ${reason}`,
@@ -51,11 +61,13 @@ reader.on("disconnected", (reason: string) => {
 });
 
 reader.on("reading", (weightKg: number, rawLine: string) => {
+  lastReadingAt = Date.now();
   const { isStable, weightKg: stableWeight } = filter.push(weightKg);
 
   server.publish({
     weightKg: stableWeight,
     isStable,
+    error: null,
   });
 
   if (isStable) {
@@ -65,6 +77,22 @@ reader.on("reading", (weightKg: number, rawLine: string) => {
   }
 });
 
+// Une liaison série peut rester ouverte alors que les trames ont cessé.
+// N'affichons jamais indéfiniment le dernier poids reçu dans ce cas.
+const staleReadingTimer = setInterval(() => {
+  if (!lastReadingAt || Date.now() - lastReadingAt <= MAX_READING_GAP_MS) return;
+
+  lastReadingAt = 0;
+  filter.reset();
+  server.publish({
+    weightKg: null,
+    isStable: false,
+    isConnected: true,
+    error: "Aucune lecture récente de la balance.",
+  });
+  log.warn("[main] Aucune trame balance reçue depuis 3 s — poids effacé.");
+}, 1_000);
+
 // ── Démarrage ─────────────────────────────────────────────────────────────────
 reader.start();
 
@@ -72,5 +100,5 @@ reader.start();
 server.publish({ isConnected: false, error: "Connexion au port série en cours…" });
 
 // ── Arrêt propre ──────────────────────────────────────────────────────────────
-process.on("SIGINT",  () => { log.info("Arrêt (SIGINT)…");  reader.stop(); process.exit(0); });
-process.on("SIGTERM", () => { log.info("Arrêt (SIGTERM)…"); reader.stop(); process.exit(0); });
+process.on("SIGINT",  () => { log.info("Arrêt (SIGINT)…");  clearInterval(staleReadingTimer); reader.stop(); process.exit(0); });
+process.on("SIGTERM", () => { log.info("Arrêt (SIGTERM)…"); clearInterval(staleReadingTimer); reader.stop(); process.exit(0); });

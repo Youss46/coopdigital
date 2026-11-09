@@ -21,6 +21,8 @@ export interface ScaleState {
   isConnected: boolean;
   /** Message d'erreur lisible, ou null */
   error: string | null;
+  /** Date de la dernière mise à jour publiée par scale-reader */
+  updatedAt?: string;
 }
 
 const DEFAULT_STATE: ScaleState = {
@@ -36,12 +38,14 @@ const WS_URL =
 
 const RECONNECT_DELAY_MS = 4_000;
 const MAX_RECONNECT_ATTEMPTS = 20; // arrêt après ~80 s d'échec
+const STALE_WEIGHT_AFTER_MS = 3_000;
 
 export function useScaleWeight() {
   const [state, setState] = useState<ScaleState>(DEFAULT_STATE);
   const wsRef = useRef<WebSocket | null>(null);
   const attemptsRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const staleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
 
   const connect = useCallback(() => {
@@ -72,7 +76,27 @@ export function useScaleWeight() {
         if (!mountedRef.current) return;
         try {
           const data = JSON.parse(ev.data as string) as ScaleState;
-          setState(data);
+          if (staleTimerRef.current) clearTimeout(staleTimerRef.current);
+
+          const updatedAt = data.updatedAt ? Date.parse(data.updatedAt) : Number.NaN;
+          const ageMs = Number.isFinite(updatedAt) ? Math.max(0, Date.now() - updatedAt) : 0;
+          const isAlreadyStale = data.weightKg !== null && ageMs >= STALE_WEIGHT_AFTER_MS;
+
+          setState(isAlreadyStale
+            ? { ...data, weightKg: null, isStable: false, error: "Aucune lecture récente de la balance." }
+            : data);
+
+          if (data.weightKg !== null && !isAlreadyStale) {
+            staleTimerRef.current = setTimeout(() => {
+              if (!mountedRef.current) return;
+              setState((current) => ({
+                ...current,
+                weightKg: null,
+                isStable: false,
+                error: "Aucune lecture récente de la balance.",
+              }));
+            }, STALE_WEIGHT_AFTER_MS - ageMs);
+          }
         } catch {
           /* trame non-JSON ignorée */
         }
@@ -83,6 +107,7 @@ export function useScaleWeight() {
         setState((s) => ({
           ...s,
           isConnected: false,
+          weightKg: null,
           isStable: false,
           error: null, // silencieux — le peseur sait que le câble est branché ou pas
         }));
@@ -107,6 +132,7 @@ export function useScaleWeight() {
       mountedRef.current = false;
       wsRef.current?.close();
       if (timerRef.current) clearTimeout(timerRef.current);
+      if (staleTimerRef.current) clearTimeout(staleTimerRef.current);
     };
   }, [connect]);
 

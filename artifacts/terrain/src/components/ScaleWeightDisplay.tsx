@@ -95,7 +95,11 @@ export default function ScaleWeightDisplay({ onUse, onConnectionChange }: Props)
 
         {/* Indicateur stable / en cours */}
         <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-          {isStable ? (
+          {error ? (
+            <span style={{ fontSize: ".65rem", color: "#fbbf24", fontWeight: 700 }}>
+              LECTURE INTERROMPUE
+            </span>
+          ) : isStable ? (
             <>
               <span
                 style={{
@@ -165,7 +169,7 @@ export default function ScaleWeightDisplay({ onUse, onConnectionChange }: Props)
               letterSpacing: ".04em",
             }}
           >
-            kilogrammes
+            {error ?? "kilogrammes"}
           </div>
         </div>
 
