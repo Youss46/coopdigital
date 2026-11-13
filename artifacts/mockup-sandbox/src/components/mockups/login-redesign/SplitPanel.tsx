@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   ArrowRight,
   BarChart3,
@@ -6,7 +6,9 @@ import {
   EyeOff,
   Fingerprint,
   Headset,
+  LockKeyhole,
   Leaf,
+  Mail,
   ShieldCheck,
   Zap,
 } from "lucide-react";
@@ -19,10 +21,12 @@ export function SplitPanel() {
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
   const [notice, setNotice] = useState("");
+  const noticeTimeout = useRef<number | undefined>(undefined);
 
   const showLocalNotice = (message: string) => {
+    window.clearTimeout(noticeTimeout.current);
     setNotice(message);
-    window.setTimeout(() => setNotice(""), 3200);
+    noticeTimeout.current = window.setTimeout(() => setNotice(""), 3000);
   };
 
   return (
@@ -30,7 +34,7 @@ export function SplitPanel() {
       <section className="coop-split__story" aria-label="CoopDigital, au cœur des coopératives">
         <div className="coop-split__story-inner">
           <div className="coop-split__brand">
-            <img src="/__mockup/images/coopdigital-logo.png" alt="Logo CoopDigital" />
+            <img src="/__mockup/images/coopdigital-login-source-logo.png" alt="Logo CoopDigital" />
             <div>
               <strong>Connexion</strong>
               <span>CoopDigital</span>
@@ -60,7 +64,7 @@ export function SplitPanel() {
             </div>
             <div className="coop-split__phone">
               <div className="coop-split__phone-camera" />
-              <img src="/__mockup/images/coopdigital-logo.png" alt="" />
+              <img src="/__mockup/images/coopdigital-login-source-logo.png" alt="" />
             </div>
             <div className="coop-split__leaf-mark"><Leaf size={26} /></div>
           </div>
@@ -80,9 +84,13 @@ export function SplitPanel() {
       </section>
 
       <section className="coop-split__panel" aria-label="Connexion">
+        <div className="coop-split__mobile-brand">
+          <img src="/__mockup/images/coopdigital-login-source-logo.png" alt="Logo CoopDigital" />
+          <span>CoopDigital</span>
+        </div>
         <div className="coop-split__panel-top">
           <div className="coop-split__panel-logo">
-            <img src="/__mockup/images/coopdigital-logo.png" alt="" />
+            <img src="/__mockup/images/coopdigital-login-source-logo.png" alt="" />
           </div>
           <h1>Connexion</h1>
           <p>Accédez à votre espace CoopDigital</p>
@@ -93,28 +101,39 @@ export function SplitPanel() {
           className="coop-split__form"
           onSubmit={(event) => {
             event.preventDefault();
+            if (!email.trim() || !password) {
+              showLocalNotice("Veuillez renseigner votre email et votre mot de passe.");
+              return;
+            }
+            if (password.length < 6) {
+              showLocalNotice("Le mot de passe doit contenir au moins 6 caractères.");
+              return;
+            }
             showLocalNotice("Cette maquette ne se connecte pas à un compte réel.");
           }}
         >
           <label className="coop-split__field">
-            <span>Adresse email</span>
+            <span className="coop-split__field-label"><Mail size={15} /> Adresse email</span>
             <input
               type="email"
+              required
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              placeholder="yerim@gmail.com"
-              autoComplete="email"
+              placeholder="exemple@domaine.com"
+              autoComplete="username"
             />
           </label>
 
           <label className="coop-split__field">
-            <span>Mot de passe</span>
+            <span className="coop-split__field-label"><LockKeyhole size={15} /> Mot de passe</span>
             <div className="coop-split__password">
               <input
                 type={showPassword ? "text" : "password"}
+                required
+                minLength={6}
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                placeholder="Saisissez votre mot de passe"
+                placeholder="Votre mot de passe"
                 autoComplete="current-password"
               />
               <button
@@ -168,7 +187,7 @@ export function SplitPanel() {
 
         <footer className="coop-split__footer">
           <p>CoopDigital — M15 Tech, Yamoussoukro</p>
-          <p><Headset size={14} /> Support : 07 14 77 48 62 <span>·</span> contacteyouss@gmail.com</p>
+          <p><Headset size={14} /> Support : 07 14 17 40 82 <span>·</span> contacteyouss@gmail.com</p>
         </footer>
         {notice && <div className="coop-split__notice" role="status">{notice}</div>}
       </section>
