@@ -70,19 +70,6 @@ const GRADIENT_THEMES: Record<
   },
 };
 
-const NB_FEUILLES = 12;
-
-function genererFeuilles() {
-  return Array.from({ length: NB_FEUILLES }, (_, i) => ({
-    id: i,
-    left: Math.random() * 100,
-    duration: 9 + Math.random() * 7,
-    delay: Math.random() * 10,
-    size: 14 + Math.random() * 10,
-    opacity: 0.5 + Math.random() * 0.35,
-  }));
-}
-
 export default function Login() {
   const [, navigate] = useLocation();
   const { login } = useAuth();
@@ -100,7 +87,6 @@ export default function Login() {
   const [biometrieEnCours, setBiometrieEnCours] = useState(false);
 
   const [periode, setPeriode] = useState<Periode>(() => getPeriodeJour());
-  const [feuilles] = useState(genererFeuilles);
   const theme = GRADIENT_THEMES[periode];
 
   useEffect(() => {
@@ -289,25 +275,6 @@ export default function Login() {
               />
             </div>
           ))}
-
-          {/* Particules — feuilles de cacao qui tombent doucement */}
-          <div className="absolute inset-0 z-[4] pointer-events-none overflow-hidden" aria-hidden="true">
-            {feuilles.map((f) => (
-              <span
-                key={f.id}
-                className="hero-leaf select-none"
-                style={{
-                  left: `${f.left}%`,
-                  animationDuration: `${f.duration}s`,
-                  animationDelay: `${f.delay}s`,
-                  fontSize: `${f.size}px`,
-                  opacity: f.opacity,
-                }}
-              >
-                🍃
-              </span>
-            ))}
-          </div>
 
           {/* Texte — remonté via key pour stagger */}
           <div
@@ -546,25 +513,6 @@ export default function Login() {
           animation: heroRise 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.5s both;
         }
 
-        /* ── Particules : feuilles de cacao qui tombent ──────────────── */
-        @keyframes heroLeafFall {
-          0%   { top: -10%; transform: translateX(0px) rotate(0deg); opacity: 0; }
-          10%  { opacity: 0.85; }
-          50%  { transform: translateX(18px) rotate(160deg); }
-          90%  { opacity: 0.6; }
-          100% { top: 110%; transform: translateX(-14px) rotate(340deg); opacity: 0; }
-        }
-        .hero-leaf {
-          position: absolute;
-          top: -10%;
-          animation-name: heroLeafFall;
-          animation-timing-function: ease-in-out;
-          animation-iteration-count: infinite;
-          will-change: top, transform, opacity;
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .hero-leaf { display: none; }
-        }
       `}</style>
     </div>
   );
