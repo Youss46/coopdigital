@@ -5,21 +5,18 @@ import { ApiError, useLogin } from "@workspace/api-client-react";
 import {
   AlertCircle,
   ArrowRight,
-  BarChart3,
   Eye,
   EyeOff,
   Fingerprint,
   Headset,
-  Leaf,
   LockKeyhole,
   Mail,
-  ShieldCheck,
-  Zap,
 } from "lucide-react";
 import { authentificateurPlateformeDisponible, connexionBiometrique } from "@/lib/webauthn";
 import "./Login.css";
 
 const DERNIER_EMAIL_KEY = "coop_last_email";
+const LOGIN_HERO_IMAGE = "/login-hero-coopdigital.webp";
 
 export default function Login() {
   const [, navigate] = useLocation();
@@ -126,55 +123,16 @@ export default function Login() {
   return (
     <main className="coop-split">
       <section className="coop-split__story" aria-label="Présentation de CoopDigital">
-        <div className="coop-split__story-inner">
-          <div className="coop-split__brand">
-            <img src="/login-logo.png" alt="Logo CoopDigital" />
-            <div>
-              <strong>Connexion</strong>
-              <span>CoopDigital</span>
-            </div>
-          </div>
-
-          <div className="coop-split__intro">
-            <span className="coop-split__dash" aria-hidden="true" />
-            <p className="coop-split__eyebrow">LE NUMÉRIQUE AU SERVICE DU CACAO</p>
-            <h2>Accédez à votre<br />espace <em>CoopDigital</em></h2>
-            <p className="coop-split__story-text">
-              Ensemble, construisons<br className="coop-split__desktop-break" /> une coopérative plus digitale.
-            </p>
-          </div>
-
-          <div className="coop-split__devices" aria-hidden="true">
-            <div className="coop-split__tablet">
-              <div className="coop-split__screen-top"><i /><i /><i /></div>
-              <div className="coop-split__screen-body">
-                <div className="coop-split__screen-nav"><b /><i /><i /><i /><i /></div>
-                <div className="coop-split__screen-main">
-                  <div className="coop-split__screen-title" />
-                  <div className="coop-split__mini-cards"><i /><i /><i /></div>
-                  <div className="coop-split__chart"><span /><span /><span /><span /><span /><span /><span /></div>
-                </div>
-              </div>
-            </div>
-            <div className="coop-split__phone">
-              <div className="coop-split__phone-camera" />
-              <img src="/login-logo.png" alt="" />
-            </div>
-            <div className="coop-split__leaf-mark"><Leaf size={26} /></div>
-          </div>
-
-          <div className="coop-split__benefits">
-            <div><span><ShieldCheck size={23} /></span><b>Sécurité<br />renforcée</b></div>
-            <div><span><Zap size={23} /></span><b>Accès<br />rapide</b></div>
-            <div><span><BarChart3 size={23} /></span><b>Gestion<br />simplifiée</b></div>
-          </div>
-        </div>
-        <div className="coop-split__landscape" aria-hidden="true">
-          <div className="coop-split__hill coop-split__hill--gold" />
-          <div className="coop-split__hill coop-split__hill--deep" />
-          <span className="coop-split__landscape-caption">ENSEMBLE, FAISONS GRANDIR LA FILIÈRE</span>
-        </div>
-        <div className="coop-split__grain" aria-hidden="true" />
+        <div
+          className="coop-split__hero-backdrop"
+          style={{ backgroundImage: `url(${LOGIN_HERO_IMAGE})` }}
+          aria-hidden="true"
+        />
+        <img
+          className="coop-split__hero-image"
+          src={LOGIN_HERO_IMAGE}
+          alt="Connexion CoopDigital. Accédez à votre espace. Ensemble, construisons une coopérative plus digitale."
+        />
       </section>
 
       <section className="coop-split__panel" aria-label="Connexion">
