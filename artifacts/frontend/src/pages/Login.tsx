@@ -123,11 +123,6 @@ export default function Login() {
   return (
     <main className="coop-split">
       <section className="coop-split__story" aria-label="Présentation de CoopDigital">
-        <div
-          className="coop-split__hero-backdrop"
-          style={{ backgroundImage: `url(${LOGIN_HERO_IMAGE})` }}
-          aria-hidden="true"
-        />
         <img
           className="coop-split__hero-image"
           src={LOGIN_HERO_IMAGE}
