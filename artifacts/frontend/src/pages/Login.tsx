@@ -11,7 +11,6 @@ type HeroSlide = {
   image: string;
   titre: string;
   citation: string;
-  stat?: string;
 };
 
 const slides: HeroSlide[] = [
@@ -26,14 +25,12 @@ const slides: HeroSlide[] = [
     titre: "Un producteur, une fiche, un QR code",
     citation:
       "Fini les registres papier. Chaque membre a sa fiche numérique et son historique complet.",
-    stat: "1 545 collectes enregistrées cette campagne",
   },
   {
     image: "/hero/hero-3.png",
     titre: "Ensemble pour une production durable",
     citation:
       "Formation, traçabilité, paiements mobiles : CoopDigital accompagne vos équipes terrain.",
-    stat: "100% conforme EUDR — Exportez en toute sérénité",
   },
 ];
 
@@ -317,13 +314,6 @@ export default function Login() {
             key={`text-${slideKey}`}
             className="absolute bottom-0 left-0 right-0 z-10 p-10"
           >
-            {slide.stat && (
-              <div className="hero-anim-badge inline-flex items-center gap-2 bg-[#c4962a]/90 backdrop-blur-sm text-white px-4 py-1.5 rounded-full text-sm font-semibold mb-5">
-                <span>📊</span>
-                <span>{slide.stat}</span>
-              </div>
-            )}
-
             {/* Titre */}
             <h2 className="hero-anim-title text-white text-3xl font-bold leading-tight mb-3 drop-shadow-lg">
               {slide.titre}
@@ -545,9 +535,6 @@ export default function Login() {
         @keyframes heroRise {
           from { opacity: 0; transform: translateY(22px); }
           to   { opacity: 1; transform: translateY(0); }
-        }
-        .hero-anim-badge {
-          animation: heroRise 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.05s both;
         }
         .hero-anim-title {
           animation: heroRise 0.65s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both;
