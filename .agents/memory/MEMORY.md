@@ -155,3 +155,4 @@
 - [Séparation des fiches règlement et carburant](reglements-fuel-report-separation.md) — les fiches générales en attente/effectuées excluent le carburant; ses bons ont des impressions dédiées.
 - [Annulation des pesées](delivery-cancellation-policy.md) — PCA/directeur seulement; bloquer après règlement confirmé ou rattachement à un lot, garder « Annulée » en historique et hors totaux actifs.
 - [Fraîcheur des lectures de bascule](scale-reading-freshness.md) — sur la coopérative testée, le lecteur revient bien à zéro; effacer les valeurs périmées plutôt que modifier le calibrage.
+- [Surfaces blanches de l’interface](ui-surface-colors.md) — privilégier les panneaux blancs et bordures gris neutre; réserver les teintes aux accents et états sémantiques.
