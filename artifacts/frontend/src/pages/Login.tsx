@@ -372,16 +372,13 @@ export default function Login() {
                 Adresse email
               </label>
               <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-base">
-                  ✉️
-                </span>
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="admin@coopdigital.ci"
                   autoComplete="email"
-                  className="w-full pl-10 pr-4 py-3.5 border-2 border-gray-200 rounded-xl text-base focus:border-[#1a4731] focus:outline-none transition-colors"
+                  className="w-full pl-4 pr-4 py-3.5 border-2 border-gray-200 rounded-xl text-base focus:border-[#1a4731] focus:outline-none transition-colors"
                 />
               </div>
             </div>
@@ -391,16 +388,13 @@ export default function Login() {
                 Mot de passe
               </label>
               <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-base">
-                  🔒
-                </span>
                 <input
                   type={afficherMdp ? "text" : "password"}
                   value={motDePasse}
                   onChange={(e) => setMotDePasse(e.target.value)}
                   placeholder="••••••••"
                   autoComplete="current-password"
-                  className="w-full pl-10 pr-12 py-3.5 border-2 border-gray-200 rounded-xl text-base focus:border-[#1a4731] focus:outline-none transition-colors"
+                  className="w-full pl-4 pr-12 py-3.5 border-2 border-gray-200 rounded-xl text-base focus:border-[#1a4731] focus:outline-none transition-colors"
                 />
                 <button
                   type="button"
