@@ -847,7 +847,7 @@
     height: calc(100dvh - 16px);
     min-height: 0;
     margin: 8px 8px 8px 0;
-    padding: 10px 28px 8px;
+    padding: 20px 28px 8px;
     overflow: hidden;
   }
   .coop-split__panel-top {
@@ -871,10 +871,10 @@
   .coop-split__error svg,
   .coop-split__error-copy > svg { width: 14px; height: 14px; }
   .coop-split__role-error a { margin-top: 4px; font-size: 10px; }
-  .coop-split__form { gap: 8px; margin-top: 10px; }
-  .coop-split__field-label { gap: 5px; margin-bottom: 3px; font-size: 10px; }
+  .coop-split__form { gap: 12px; margin-top: 24px; }
+  .coop-split__field-label { gap: 5px; margin-bottom: 4px; font-size: 10px; }
   .coop-split__field-label svg { width: 12px; height: 12px; }
-  .coop-split__field input { height: 38px; padding: 0 12px; border-radius: 12px; font-size: 12px; }
+  .coop-split__field input { height: 42px; padding: 0 12px; border-radius: 12px; font-size: 12px; }
   .coop-split__password input { padding-right: 42px; }
   .coop-split__visibility { right: 4px; width: 31px; height: 31px; }
   .coop-split__visibility svg { width: 16px; height: 16px; }
@@ -883,14 +883,14 @@
   .coop-split__check { width: 16px; height: 16px; }
   .coop-split__remember input:checked + .coop-split__check::after { width: 7px; height: 4px; }
   .coop-split__forgot { font-size: 9px; }
-  .coop-split__submit { min-height: 41px; gap: 9px; border-radius: 12px; font-size: 13px; }
+  .coop-split__submit { min-height: 44px; gap: 9px; border-radius: 12px; font-size: 13px; }
   .coop-split__submit-arrow { width: 25px; height: 25px; }
   .coop-split__submit-arrow svg { width: 16px; height: 16px; }
   .coop-split__spinner { width: 16px; height: 16px; }
   .coop-split__separator { gap: 8px; font-size: 9px; }
-  .coop-split__biometric { min-height: 39px; gap: 7px; border-radius: 12px; font-size: 11px; }
+  .coop-split__biometric { min-height: 42px; gap: 7px; border-radius: 12px; font-size: 11px; }
   .coop-split__biometric svg { width: 18px; height: 18px; }
-  .coop-split__agent { margin-top: 8px; }
+  .coop-split__agent { margin-top: 14px; }
   .coop-split__agent p { margin-bottom: 3px; font-size: 10px; }
   .coop-split__agent a { gap: 4px; font-size: 10px; }
   .coop-split__agent a svg { width: 12px; height: 12px; }
