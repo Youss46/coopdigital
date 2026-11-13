@@ -7,13 +7,19 @@ import { authentificateurPlateformeDisponible, connexionBiometrique } from "@/li
 
 const DERNIER_EMAIL_KEY = "coop_last_email";
 
-const slides = [
+type HeroSlide = {
+  image: string;
+  titre: string;
+  citation: string;
+  stat?: string;
+};
+
+const slides: HeroSlide[] = [
   {
     image: "/hero/hero-1.png",
     titre: "Des productrices fières de leur récolte",
     citation:
       "CoopDigital valorise chaque grain de cacao, de la parcelle jusqu'à l'exportateur.",
-    stat: "421 productrices membres digitalisées",
   },
   {
     image: "/hero/hero-2.png",
@@ -311,11 +317,12 @@ export default function Login() {
             key={`text-${slideKey}`}
             className="absolute bottom-0 left-0 right-0 z-10 p-10"
           >
-            {/* Badge stat */}
-            <div className="hero-anim-badge inline-flex items-center gap-2 bg-[#c4962a]/90 backdrop-blur-sm text-white px-4 py-1.5 rounded-full text-sm font-semibold mb-5">
-              <span>📊</span>
-              <span>{slide.stat}</span>
-            </div>
+            {slide.stat && (
+              <div className="hero-anim-badge inline-flex items-center gap-2 bg-[#c4962a]/90 backdrop-blur-sm text-white px-4 py-1.5 rounded-full text-sm font-semibold mb-5">
+                <span>📊</span>
+                <span>{slide.stat}</span>
+              </div>
+            )}
 
             {/* Titre */}
             <h2 className="hero-anim-title text-white text-3xl font-bold leading-tight mb-3 drop-shadow-lg">
