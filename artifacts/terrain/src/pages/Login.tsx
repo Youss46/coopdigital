@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { loginTerrain } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
@@ -25,14 +25,44 @@ function EyeIcon({ open }: { open: boolean }) {
   );
 }
 
+function formatTelephone(telephone: string) {
+  return telephone.replace(/\D/g, "").slice(0, 10).replace(/(\d{2})(?=\d)/g, "$1 ");
+}
+
+function caretPositionAfterDigits(formattedTelephone: string, digitsBeforeCaret: number) {
+  if (digitsBeforeCaret === 0) return 0;
+  let digitsSeen = 0;
+  for (let index = 0; index < formattedTelephone.length; index += 1) {
+    if (/\d/.test(formattedTelephone[index])) digitsSeen += 1;
+    if (digitsSeen === digitsBeforeCaret) return index + 1;
+  }
+  return formattedTelephone.length;
+}
+
 export default function Login() {
   const { login } = useAuth();
   const [, setLocation] = useLocation();
   const [telephone, setTelephone] = useState("");
+  const telephoneInputRef = useRef<HTMLInputElement>(null);
   const [motDePasse, setMotDePasse] = useState("");
   const [erreur, setErreur] = useState(() => getAuthMessage() ?? "");
   const [loading, setLoading] = useState(false);
   const [voirMdp, setVoirMdp] = useState(false);
+
+  function handleTelephoneChange(value: string, caret: number | null) {
+    const digitsBeforeCaret = value.slice(0, caret ?? value.length).replace(/\D/g, "").length;
+    const digits = value.replace(/\D/g, "").slice(0, 10);
+    const formatted = formatTelephone(digits);
+    setTelephone(digits);
+
+    const nextCaret = caretPositionAfterDigits(formatted, Math.min(digitsBeforeCaret, digits.length));
+    requestAnimationFrame(() => {
+      const input = telephoneInputRef.current;
+      if (input && document.activeElement === input) {
+        input.setSelectionRange(nextCaret, nextCaret);
+      }
+    });
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -75,13 +105,14 @@ export default function Login() {
             <input
               id="tel"
               type="tel"
+              ref={telephoneInputRef}
               className="t-input t-input--lg"
               placeholder="07 00 00 00 00"
-              value={telephone}
-              onChange={(e) => setTelephone(e.target.value)}
+              value={formatTelephone(telephone)}
+              onChange={(e) => handleTelephoneChange(e.target.value, e.currentTarget.selectionStart)}
               autoComplete="tel"
               inputMode="tel"
-              minLength={10} maxLength={10} pattern="[0-9]{10}"
+              minLength={14} maxLength={14} pattern="(?:[0-9]{2} ){4}[0-9]{2}"
             />
           </div>
 
