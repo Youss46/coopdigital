@@ -7,7 +7,10 @@ import {
   boolean,
   timestamp,
   pgEnum,
+  check,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { cooperativesTable } from "./cooperatives";
 import { usersTable } from "./users";
 
@@ -119,8 +122,18 @@ export const composantesSalaireTable = pgTable("composantes_salaire", {
   type: composanteTypeEnum("type").notNull(),
   calcul: composanteCalculEnum("calcul").notNull().default("fixe"),
   valeur: integer("valeur").notNull().default(0),
+  /** Plafond mensuel par salarié exonéré d'ITS et de CNPS; null = composante ordinaire. */
+  plafondExonerationFcfa: integer("plafond_exoneration_fcfa"),
   obligatoire: boolean("obligatoire").notNull().default(false),
-});
+}, (table) => [
+  uniqueIndex("composantes_salaire_transport_exoneree_unique")
+    .on(table.cooperativeId)
+    .where(sql`${table.plafondExonerationFcfa} IS NOT NULL`),
+  check(
+    "composantes_salaire_plafond_exoneration_check",
+    sql`${table.plafondExonerationFcfa} IS NULL OR (${table.plafondExonerationFcfa} >= 0 AND ${table.type} = 'avantage' AND ${table.calcul} = 'fixe')`,
+  ),
+]);
 
 export type ComposanteSalaire = typeof composantesSalaireTable.$inferSelect;
 
@@ -175,7 +188,14 @@ export const lignesBulletinTable = pgTable("lignes_bulletin", {
   libelle: text("libelle").notNull(),
   type: ligneBulletinTypeEnum("type").notNull(),
   montantFcfa: integer("montant_fcfa").notNull(),
-});
+  /** Part de l'avantage exclue des assiettes ITS et CNPS au moment de la génération. */
+  montantExonereItsCnpsFcfa: integer("montant_exonere_its_cnps_fcfa").notNull().default(0),
+}, (table) => [
+  check(
+    "lignes_bulletin_exoneration_borne_check",
+    sql`${table.montantExonereItsCnpsFcfa} >= 0 AND ${table.montantExonereItsCnpsFcfa} <= ${table.montantFcfa} AND (${table.montantExonereItsCnpsFcfa} = 0 OR ${table.type} = 'avantage')`,
+  ),
+]);
 
 export type LigneBulletin = typeof lignesBulletinTable.$inferSelect;
 

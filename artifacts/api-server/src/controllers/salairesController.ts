@@ -13,7 +13,7 @@ import {
   ecrituresComptablesTable,
   ecrituresEnAttenteTable,
 } from "@workspace/db";
-import { eq, and, asc, desc, sql, inArray, notExists } from "drizzle-orm";
+import { eq, and, asc, desc, sql, inArray, notExists, ne } from "drizzle-orm";
 import { generateBulletin, generateMasse } from "../services/paieService";
 import { generateEcrituresSalaire, insererEcrituresSalaireDirectes } from "../services/comptabiliteService";
 import { generateBulletinPaie, generateBulletinsPaieGroupes } from "../services/pdfService";
@@ -300,6 +300,24 @@ export async function getPersonnelHistorique(
 //  COMPOSANTES SALAIRE
 // ══════════════════════════════════════════════════════════════════════════════
 
+function erreurPlafondExoneration(
+  type: string,
+  calcul: string,
+  plafond: unknown,
+): string | null {
+  if (plafond == null) return null;
+  if (
+    typeof plafond !== "number" ||
+    !Number.isSafeInteger(plafond) ||
+    plafond < 0 ||
+    type !== "avantage" ||
+    calcul !== "fixe"
+  ) {
+    return "Le plafond ITS/CNPS doit être positif ou nul et lié à un avantage à montant fixe.";
+  }
+  return null;
+}
+
 export async function listComposantes(
   req: Request,
   res: Response,
@@ -319,13 +337,38 @@ export async function listComposantes(
 
 export async function createComposante(req: Request, res: Response): Promise<void> {
   try {
-    const { libelle, type, calcul, valeur, obligatoire } = req.body as {
+    const { libelle, type, calcul, valeur, obligatoire, plafondExonerationFcfa } = req.body as {
       libelle: string; type: "avantage" | "retenue"; calcul: "fixe" | "pourcentage";
-      valeur: number; obligatoire?: boolean;
+      valeur: number; obligatoire?: boolean; plafondExonerationFcfa?: number | null;
     };
     if (!libelle?.trim()) { res.status(400).json({ erreur: "Libellé requis" }); return; }
     if (!["avantage", "retenue"].includes(type)) { res.status(400).json({ erreur: "Type invalide" }); return; }
     if (!["fixe", "pourcentage"].includes(calcul)) { res.status(400).json({ erreur: "Mode de calcul invalide" }); return; }
+    const erreurPlafond = erreurPlafondExoneration(
+      type,
+      calcul,
+      plafondExonerationFcfa,
+    );
+    if (erreurPlafond) {
+      res.status(400).json({ erreur: erreurPlafond });
+      return;
+    }
+    if (plafondExonerationFcfa != null) {
+      const [existingTransport] = await db
+        .select({ id: composantesSalaireTable.id })
+        .from(composantesSalaireTable)
+        .where(and(
+          eq(composantesSalaireTable.cooperativeId, coopId(req)),
+          sql`${composantesSalaireTable.plafondExonerationFcfa} IS NOT NULL`,
+        ))
+        .limit(1);
+      if (existingTransport) {
+        res.status(409).json({
+          erreur: "Une seule composante exonérée de transport est autorisée par coopérative.",
+        });
+        return;
+      }
+    }
 
     const [row] = await db.insert(composantesSalaireTable).values({
       cooperativeId: coopId(req),
@@ -333,6 +376,7 @@ export async function createComposante(req: Request, res: Response): Promise<voi
       type,
       calcul,
       valeur: Math.round(valeur ?? 0),
+      plafondExonerationFcfa: plafondExonerationFcfa ?? null,
       obligatoire: obligatoire ?? false,
     }).returning();
     res.status(201).json(row);
@@ -346,14 +390,63 @@ export async function createComposante(req: Request, res: Response): Promise<voi
 export async function updateComposante(req: Request, res: Response): Promise<void> {
   try {
     const id = parseId(req.params["id"]);
-    const { libelle, type, calcul, valeur, obligatoire } = req.body as {
+    const { libelle, type, calcul, valeur, obligatoire, plafondExonerationFcfa } = req.body as {
       libelle: string; type: "avantage" | "retenue"; calcul: "fixe" | "pourcentage";
-      valeur: number; obligatoire?: boolean;
+      valeur: number; obligatoire?: boolean; plafondExonerationFcfa?: number | null;
     };
     if (!libelle?.trim()) { res.status(400).json({ erreur: "Libellé requis" }); return; }
+    if (!["avantage", "retenue"].includes(type)) { res.status(400).json({ erreur: "Type invalide" }); return; }
+    if (!["fixe", "pourcentage"].includes(calcul)) { res.status(400).json({ erreur: "Mode de calcul invalide" }); return; }
+    const hasPlafondExoneration = Object.prototype.hasOwnProperty.call(
+      req.body,
+      "plafondExonerationFcfa",
+    );
+    const [existing] = await db
+      .select({ plafondExonerationFcfa: composantesSalaireTable.plafondExonerationFcfa })
+      .from(composantesSalaireTable)
+      .where(and(
+        eq(composantesSalaireTable.id, id),
+        eq(composantesSalaireTable.cooperativeId, coopId(req)),
+      ))
+      .limit(1);
+    if (!existing) { res.status(404).json({ erreur: "Composante introuvable" }); return; }
+    const plafondEffectif = hasPlafondExoneration
+      ? plafondExonerationFcfa ?? null
+      : existing.plafondExonerationFcfa;
+    const erreurPlafond = erreurPlafondExoneration(type, calcul, plafondEffectif);
+    if (erreurPlafond) {
+      res.status(400).json({ erreur: erreurPlafond });
+      return;
+    }
+    if (plafondEffectif !== null) {
+      const [existingTransport] = await db
+        .select({ id: composantesSalaireTable.id })
+        .from(composantesSalaireTable)
+        .where(and(
+          eq(composantesSalaireTable.cooperativeId, coopId(req)),
+          sql`${composantesSalaireTable.plafondExonerationFcfa} IS NOT NULL`,
+          ne(composantesSalaireTable.id, id),
+        ))
+        .limit(1);
+      if (existingTransport) {
+        res.status(409).json({
+          erreur: "Une seule composante exonérée de transport est autorisée par coopérative.",
+        });
+        return;
+      }
+    }
 
     const [row] = await db.update(composantesSalaireTable)
-      .set({ libelle: libelle.trim(), type, calcul, valeur: Math.round(valeur ?? 0), obligatoire: obligatoire ?? false })
+      .set({
+        libelle: libelle.trim(),
+        type,
+        calcul,
+        valeur: Math.round(valeur ?? 0),
+        obligatoire: obligatoire ?? false,
+        ...(hasPlafondExoneration
+          ? { plafondExonerationFcfa: plafondExonerationFcfa ?? null }
+          : {}),
+      })
       .where(and(eq(composantesSalaireTable.id, id), eq(composantesSalaireTable.cooperativeId, coopId(req))))
       .returning();
     if (!row) { res.status(404).json({ erreur: "Composante introuvable" }); return; }

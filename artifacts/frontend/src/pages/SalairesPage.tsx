@@ -2325,11 +2325,18 @@ function TabConfigPaie() {
 type Composante = {
   id: number; libelle: string; type: "avantage" | "retenue";
   calcul: "fixe" | "pourcentage"; valeur: number; obligatoire: boolean;
+  plafondExonerationFcfa: number | null;
 };
 
 type ComposanteForm = Omit<Composante, "id" | "obligatoire">;
 
-const COMP_BLANK: ComposanteForm = { libelle: "", type: "avantage", calcul: "fixe", valeur: 0 };
+const COMP_BLANK: ComposanteForm = {
+  libelle: "",
+  type: "avantage",
+  calcul: "fixe",
+  valeur: 0,
+  plafondExonerationFcfa: null,
+};
 
 function valeurLabel(c: Pick<Composante, "calcul" | "valeur">) {
   return c.calcul === "fixe"
@@ -2374,7 +2381,13 @@ function ComposantesEditor({ canEdit }: { canEdit: boolean }) {
 
   const startEdit = (c: Composante) => {
     setEditId(c.id);
-    setForm({ libelle: c.libelle, type: c.type, calcul: c.calcul, valeur: c.valeur });
+    setForm({
+      libelle: c.libelle,
+      type: c.type,
+      calcul: c.calcul,
+      valeur: c.valeur,
+      plafondExonerationFcfa: c.plafondExonerationFcfa ?? null,
+    });
     setShowForm(true);
   };
   const cancelForm = () => { setShowForm(false); setEditId(null); setForm(COMP_BLANK); };
@@ -2423,6 +2436,7 @@ function ComposantesEditor({ canEdit }: { canEdit: boolean }) {
               <select
                 className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
                 value={form.type}
+                disabled={form.plafondExonerationFcfa !== null}
                 onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as "avantage" | "retenue" }))}
               >
                 <option value="avantage">Avantage (↑ net)</option>
@@ -2434,6 +2448,7 @@ function ComposantesEditor({ canEdit }: { canEdit: boolean }) {
               <select
                 className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
                 value={form.calcul}
+                disabled={form.plafondExonerationFcfa !== null}
                 onChange={(e) => setForm((f) => ({ ...f, calcul: e.target.value as "fixe" | "pourcentage" }))}
               >
                 <option value="fixe">Montant fixe (FCFA)</option>
@@ -2456,11 +2471,68 @@ function ComposantesEditor({ canEdit }: { canEdit: boolean }) {
                 }}
               />
             </div>
+            <div className="col-span-2 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
+              <label className="flex cursor-pointer items-start gap-2.5 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 accent-emerald-700"
+                  checked={form.plafondExonerationFcfa !== null}
+                  onChange={(e) => {
+                    const enabled = e.target.checked;
+                    setForm((f) => ({
+                      ...f,
+                      libelle: enabled && !f.libelle.trim()
+                        ? "Prime de transport"
+                        : f.libelle,
+                      type: enabled ? "avantage" : f.type,
+                      calcul: enabled ? "fixe" : f.calcul,
+                      valeur: enabled && f.calcul === "pourcentage" ? 0 : f.valeur,
+                      plafondExonerationFcfa: enabled ? 0 : null,
+                    }));
+                  }}
+                />
+                <span>
+                  <span className="block font-medium">Prime de transport</span>
+                  <span className="mt-0.5 block text-xs text-gray-600">
+                    Montant fixe; exonération ITS et CNPS dans la limite du plafond.
+                  </span>
+                </span>
+              </label>
+              {form.plafondExonerationFcfa !== null && (
+                <div className="mt-3">
+                  <label className="text-xs font-medium text-gray-600">
+                    Plafond mensuel exonéré par salarié (FCFA)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    className="mt-1 w-40 border border-gray-200 rounded-lg px-3 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-green-500"
+                    value={form.plafondExonerationFcfa}
+                    onChange={(e) => {
+                      const value = Number(e.target.value);
+                      setForm((f) => ({
+                        ...f,
+                        plafondExonerationFcfa: Number.isFinite(value)
+                          ? Math.max(0, Math.trunc(value))
+                          : 0,
+                      }));
+                    }}
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    0 signifie aucune exonération. La part au-dessus du plafond reste soumise à l’ITS et à la CNPS.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2 pt-1">
             <button
               onClick={() => saveMut.mutate(form)}
-              disabled={saveMut.isPending || !form.libelle.trim()}
+              disabled={
+                saveMut.isPending ||
+                !form.libelle.trim()
+              }
               className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50"
             >
               {saveMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}

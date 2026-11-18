@@ -401,6 +401,41 @@
           "name": "livraison_id"
         }
       ]
+    },
+    {
+      "migration": "0179_prime_transport_exoneration",
+      "objects": [
+        {
+          "kind": "column",
+          "schema": "public",
+          "table": "composantes_salaire",
+          "name": "plafond_exoneration_fcfa"
+        },
+        {
+          "kind": "index",
+          "schema": "public",
+          "table": "composantes_salaire",
+          "name": "composantes_salaire_transport_exoneree_unique"
+        },
+        {
+          "kind": "constraint",
+          "schema": "public",
+          "table": "composantes_salaire",
+          "name": "composantes_salaire_plafond_exoneration_check"
+        },
+        {
+          "kind": "column",
+          "schema": "public",
+          "table": "lignes_bulletin",
+          "name": "montant_exonere_its_cnps_fcfa"
+        },
+        {
+          "kind": "constraint",
+          "schema": "public",
+          "table": "lignes_bulletin",
+          "name": "lignes_bulletin_exoneration_borne_check"
+        }
+      ]
     }
   ]
 }

@@ -98,6 +98,34 @@ function calculerITS(salaireMensuelBrut: number): number {
   return Math.round(its);
 }
 
+export function calculerAssietteItsCnps(
+  salaireBrut: number,
+  avantages: Array<{
+    montant: number;
+    plafondExonerationFcfa: number | null;
+  }>,
+): {
+  assietteFcfa: number;
+  montantExonereFcfa: number;
+  montantsExoneresParAvantage: number[];
+} {
+  const montantsExoneresParAvantage = avantages.map((avantage) =>
+    avantage.plafondExonerationFcfa === null
+      ? 0
+      : Math.min(avantage.montant, avantage.plafondExonerationFcfa),
+  );
+  const montantExonereFcfa = montantsExoneresParAvantage.reduce(
+    (total, montant) => total + montant,
+    0,
+  );
+
+  return {
+    assietteFcfa: Math.max(0, salaireBrut - montantExonereFcfa),
+    montantExonereFcfa,
+    montantsExoneresParAvantage,
+  };
+}
+
 // ─── Prime d'ancienneté ──────────────────────────────────────────────────────
 
 function calculerPrimeAnciennete(
@@ -171,16 +199,25 @@ export async function generateBulletin(
     : 0;
 
   // 5. Lignes avantages personnalisés
-  const lignesAvantages: { libelle: string; montant: number }[] = [];
+  const lignesAvantagesBrutes: {
+    libelle: string;
+    montant: number;
+    plafondExonerationFcfa: number | null;
+  }[] = [];
   const lignesRetenues: { libelle: string; montant: number }[] = [];
 
   if (emp.sursalaireFcfa > 0) {
-    lignesAvantages.push({ libelle: "Sursalaire", montant: emp.sursalaireFcfa });
+    lignesAvantagesBrutes.push({
+      libelle: "Sursalaire",
+      montant: emp.sursalaireFcfa,
+      plafondExonerationFcfa: null,
+    });
   }
   if (primeAnciennete > 0) {
-    lignesAvantages.push({
+    lignesAvantagesBrutes.push({
       libelle: "Prime d'ancienneté",
       montant: primeAnciennete,
+      plafondExonerationFcfa: null,
     });
   }
 
@@ -191,7 +228,11 @@ export async function generateBulletin(
         : Math.round((baseEffective * c.valeur) / 10000); // valeur = % × 100
 
     if (c.type === "avantage") {
-      lignesAvantages.push({ libelle: c.libelle, montant });
+      lignesAvantagesBrutes.push({
+        libelle: c.libelle,
+        montant,
+        plafondExonerationFcfa: c.plafondExonerationFcfa ?? null,
+      });
     } else {
       lignesRetenues.push({ libelle: c.libelle, montant });
     }
@@ -245,13 +286,28 @@ export async function generateBulletin(
 
   // 8. Totaux
   const totalAvantages =
-    lignesAvantages.reduce((s, l) => s + l.montant, 0);
+    lignesAvantagesBrutes.reduce((s, l) => s + l.montant, 0);
   const brut = baseEffective + totalAvantages;
+  const {
+    assietteFcfa: assietteItsCnps,
+    montantsExoneresParAvantage,
+  } = calculerAssietteItsCnps(
+    brut,
+    lignesAvantagesBrutes.map((line) => ({
+      montant: line.montant,
+      plafondExonerationFcfa: line.plafondExonerationFcfa,
+    })),
+  );
+  const lignesAvantages = lignesAvantagesBrutes.map((line, index) => ({
+    libelle: line.libelle,
+    montant: line.montant,
+    montantExonereItsCnpsFcfa: montantsExoneresParAvantage[index] ?? 0,
+  }));
 
   // CNPS salariale (retenue employé)
   let cnpsSal = 0;
   if (cfg.cnpsSalarialeActif) {
-    const coupeCnpsAnnuel = Math.min(brut * 12, cfg.cnpsPlafondAnnuel);
+    const coupeCnpsAnnuel = Math.min(assietteItsCnps * 12, cfg.cnpsPlafondAnnuel);
     cnpsSal = Math.round((coupeCnpsAnnuel * cfg.cnpsSalarialeTaux) / 100 / 12 / 100);
     const taux = (cfg.cnpsSalarialeTaux / 100).toFixed(2).replace(".", ",");
     lignesRetenues.push({ libelle: `CNPS part salariale (${taux} %)`, montant: cnpsSal });
@@ -260,7 +316,7 @@ export async function generateBulletin(
   // ITS (barème mensuel, appliqué sur le brut mensuel)
   let its = 0;
   if (cfg.itsActif) {
-    its = calculerITS(brut);
+    its = calculerITS(assietteItsCnps);
     lignesRetenues.push({ libelle: "Impôt sur salaire (ITS)", montant: its });
   }
 
@@ -269,8 +325,8 @@ export async function generateBulletin(
 
   // 8. Charges patronales (info employeur uniquement)
   const cnpsPat = cfg.cnpsPatronaleActif
-    ? Math.round((brut * cfg.cnpsPatronaleTaux) / 10000) + (cfg.cnpsAtmpActif ? Math.round((brut * cfg.cnpsAtmpTaux) / 10000) : 0)
-    : (cfg.cnpsAtmpActif ? Math.round((brut * cfg.cnpsAtmpTaux) / 10000) : 0);
+    ? Math.round((assietteItsCnps * cfg.cnpsPatronaleTaux) / 10000) + (cfg.cnpsAtmpActif ? Math.round((assietteItsCnps * cfg.cnpsAtmpTaux) / 10000) : 0)
+    : (cfg.cnpsAtmpActif ? Math.round((assietteItsCnps * cfg.cnpsAtmpTaux) / 10000) : 0);
   const taxeApp = cfg.taxeApprentissageActif ? Math.round((brut * cfg.taxeApprentissageTaux) / 10000) : 0;
   const fpc     = cfg.fpcActif ? Math.round((brut * cfg.fpcTaux) / 10000) : 0;
   const coutTotalEmployeur =
@@ -305,12 +361,14 @@ export async function generateBulletin(
       libelle: l.libelle,
       type: "avantage" as const,
       montantFcfa: l.montant,
+      montantExonereItsCnpsFcfa: l.montantExonereItsCnpsFcfa,
     })),
     ...lignesRetenues.map((l) => ({
       bulletinId: bulletin.id,
       libelle: l.libelle,
       type: "retenue" as const,
       montantFcfa: l.montant,
+      montantExonereItsCnpsFcfa: 0,
     })),
   ];
 

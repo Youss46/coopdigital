@@ -1254,6 +1254,13 @@
       "when": 1793040345880,
       "tag": "0178_tracabilite_annulation_livraison",
       "breakpoints": true
+    },
+    {
+      "idx": 179,
+      "version": "7",
+      "when": 1795002306302,
+      "tag": "0179_prime_transport_exoneration",
+      "breakpoints": true
     }
   ]
 }

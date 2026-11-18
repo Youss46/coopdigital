@@ -113,6 +113,28 @@ describe.skipIf(!enabled)("contrôles du schéma PostgreSQL", () => {
           compte_source_type text,
           compte_source_id integer
         );
+        CREATE TABLE ${qualifiedIdentifier(schemaName, "composantes_salaire")} (
+          id integer NOT NULL,
+          cooperative_id integer NOT NULL,
+          type text,
+          calcul text,
+          plafond_exoneration_fcfa integer
+        );
+        CREATE UNIQUE INDEX ${quoteIdentifier("composantes_salaire_transport_exoneree_unique")}
+          ON ${qualifiedIdentifier(schemaName, "composantes_salaire")} (cooperative_id)
+          WHERE plafond_exoneration_fcfa IS NOT NULL;
+        ALTER TABLE ${qualifiedIdentifier(schemaName, "composantes_salaire")}
+          ADD CONSTRAINT ${quoteIdentifier("composantes_salaire_plafond_exoneration_check")}
+          CHECK (true);
+        CREATE TABLE ${qualifiedIdentifier(schemaName, "lignes_bulletin")} (
+          id integer NOT NULL,
+          type text,
+          montant_fcfa integer,
+          montant_exonere_its_cnps_fcfa integer
+        );
+        ALTER TABLE ${qualifiedIdentifier(schemaName, "lignes_bulletin")}
+          ADD CONSTRAINT ${quoteIdentifier("lignes_bulletin_exoneration_borne_check")}
+          CHECK (true);
         CREATE TABLE ${qualifiedIdentifier(schemaName, "charges_diverses")} (
           id integer NOT NULL,
           cooperative_id integer NOT NULL

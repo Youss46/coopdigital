@@ -30,7 +30,9 @@ function makeBulletin(
   deductionCount = 8,
 ): BulletinData {
   const avantages = Array.from({ length: advantageCount }, (_, index) => ({
-    libelle: `Prime variable ${String(index + 1).padStart(2, "0")}`,
+    libelle: index === 0
+      ? "Prime de transport"
+      : `Prime variable ${String(index + 1).padStart(2, "0")}`,
     type: "avantage" as const,
     montantFcfa: 1_000,
   }));
@@ -249,6 +251,7 @@ describe("mise en page PDF du bulletin de paie", () => {
     const text = normalizePdfText(extractPdfText(pdf));
     expect(text).toContain("703 000 fcfa");
     expect(text).toContain("702 800 fcfa");
+    expect(text).toContain("prime de transport");
     expect(text).toContain("prime variable 03");
     expect(text).toContain("retenue variable 02");
     expect(text).toContain("charges employeur");
