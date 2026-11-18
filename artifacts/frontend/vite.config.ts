@@ -22,8 +22,8 @@ export default defineConfig({
     tailwindcss(),
     runtimeErrorOverlay(),
     VitePWA({
-      registerType: "autoUpdate",
-      injectRegister: "auto",
+      registerType: "prompt",
+      injectRegister: false,
       scope: base,
       base,
       manifest: {
@@ -77,6 +77,8 @@ export default defineConfig({
         ],
       },
       workbox: {
+        skipWaiting: false,
+        clientsClaim: false,
         navigateFallback: `${base}index.html`,
         navigateFallbackDenylist: [/^\/api\//, /^\/(m15|portail|terrain)(\/|$)/],
         globPatterns: ["**/*.{js,css,html,ico,svg,woff2}"],

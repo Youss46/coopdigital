@@ -89,6 +89,7 @@ import NotFound from "@/pages/not-found";
 import { Toaster } from "@/components/ui/sonner";
 import { OnlineToast } from "@/components/OfflineIndicator";
 import { OfflineProvider } from "@/contexts/OfflineContext";
+import PwaUpdateBanner from "@/components/PwaUpdateBanner";
 import PdfViewerModal from "@/components/PdfViewerModal";
 import { useFeatureAccess, featureKeyForPath } from "@/hooks/useFeatureAccess";
 
@@ -405,6 +406,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <OfflineProvider>
+        <PwaUpdateBanner visible={splashTermine} />
         {!splashTermine && <SplashScreen onTermine={handleSplashTermine} />}
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <AuthProvider>
