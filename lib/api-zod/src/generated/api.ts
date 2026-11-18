@@ -2859,6 +2859,8 @@ export const GetBulletinsResponseItem = zod.object({
   "payePar": zod.number().nullish(),
   "createdAt": zod.coerce.date()
 }),
+  "assietteItsFcfa": zod.number(),
+  "assietteCnpsFcfa": zod.number(),
   "personnel": zod.object({
   "id": zod.number(),
   "nom": zod.string(),
@@ -3107,6 +3109,8 @@ export const GetRapportMensuelResponse = zod.object({
   "nbValides": zod.number(),
   "nbBrouillons": zod.number(),
   "totalBrut": zod.number(),
+  "totalAssietteItsFcfa": zod.number(),
+  "totalAssietteCnpsFcfa": zod.number(),
   "totalNet": zod.number(),
   "totalChargesPatronales": zod.number(),
   "coutTotalEmployeur": zod.number(),

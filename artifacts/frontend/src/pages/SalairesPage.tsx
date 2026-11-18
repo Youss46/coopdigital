@@ -725,6 +725,8 @@ function TabPaie() {
                 <tr>
                   <th className="px-4 py-3 text-left">Employé</th>
                   <th className="px-4 py-3 text-right">Brut</th>
+                  <th data-testid="heading-assiette-its" className="px-4 py-3 text-right">Assiette ITS</th>
+                  <th data-testid="heading-assiette-cnps" className="px-4 py-3 text-right">Assiette CNPS</th>
                   <th className="px-4 py-3 text-right">Retenues</th>
                   <th className="px-4 py-3 text-right font-bold">Net</th>
                   <th className="px-4 py-3 text-center">Statut</th>
@@ -732,7 +734,7 @@ function TabPaie() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {list.map(({ bulletin, personnel }: BulletinAvecPersonnel) => (
+                {list.map(({ bulletin, personnel, assietteItsFcfa, assietteCnpsFcfa }: BulletinAvecPersonnel) => (
                   <tr key={bulletin.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3">
                       <p className="font-medium text-gray-900">
@@ -742,6 +744,12 @@ function TabPaie() {
                     </td>
                     <td className="px-4 py-3 text-right text-gray-700">
                       {formatFcfa(bulletin.salaireBrutFcfa)}
+                    </td>
+                    <td data-testid={`value-assiette-its-${bulletin.id}`} className="px-4 py-3 text-right text-gray-700">
+                      {formatFcfa(assietteItsFcfa)}
+                    </td>
+                    <td data-testid={`value-assiette-cnps-${bulletin.id}`} className="px-4 py-3 text-right text-gray-700">
+                      {formatFcfa(assietteCnpsFcfa)}
                     </td>
                     <td className="px-4 py-3 text-right text-red-600">
                       − {formatFcfa(bulletin.totalRetenuesFcfa)}
@@ -766,7 +774,7 @@ function TabPaie() {
                         )}
                         {canPayer && bulletin.statut === "valide" && (
                           <button
-                            onClick={() => setShowPayer({ bulletin, personnel })}
+                            onClick={() => setShowPayer({ bulletin, personnel, assietteItsFcfa, assietteCnpsFcfa })}
                             className="text-xs text-green-600 hover:text-green-800 underline"
                           >
                             Payer
@@ -805,6 +813,12 @@ function TabPaie() {
                   <td className="px-4 py-3 text-sm text-gray-700">Total</td>
                   <td className="px-4 py-3 text-right text-sm">
                     {formatFcfa(list.reduce((s: number, b: BulletinAvecPersonnel) => s + b.bulletin.salaireBrutFcfa, 0))}
+                  </td>
+                  <td data-testid="total-assiette-its" className="px-4 py-3 text-right text-sm">
+                    {formatFcfa(list.reduce((s: number, b: BulletinAvecPersonnel) => s + b.assietteItsFcfa, 0))}
+                  </td>
+                  <td data-testid="total-assiette-cnps" className="px-4 py-3 text-right text-sm">
+                    {formatFcfa(list.reduce((s: number, b: BulletinAvecPersonnel) => s + b.assietteCnpsFcfa, 0))}
                   </td>
                   <td className="px-4 py-3 text-right text-sm text-red-600">
                     − {formatFcfa(list.reduce((s: number, b: BulletinAvecPersonnel) => s + b.bulletin.totalRetenuesFcfa, 0))}
@@ -889,14 +903,16 @@ function TabMasse() {
         </div>
       ) : rapport ? (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
             {[
               { label: "Masse salariale brute", value: formatFcfa(rapport.totalBrut), Icon: TrendingUp, cls: "bg-blue-50 text-blue-700 border-blue-100" },
+              { label: "Assiette ITS", value: formatFcfa(rapport.totalAssietteItsFcfa), Icon: BarChart2, cls: "bg-sky-50 text-sky-700 border-sky-100" },
+              { label: "Assiette CNPS", value: formatFcfa(rapport.totalAssietteCnpsFcfa), Icon: Building2, cls: "bg-indigo-50 text-indigo-700 border-indigo-100" },
               { label: "Masse salariale nette", value: formatFcfa(rapport.totalNet), Icon: Banknote, cls: "bg-green-50 text-green-700 border-green-100" },
               { label: "Charges patronales", value: formatFcfa(rapport.totalChargesPatronales), Icon: Building2, cls: "bg-amber-50 text-amber-700 border-amber-100" },
               { label: "Coût total employeur", value: formatFcfa(rapport.coutTotalEmployeur), Icon: UserCheck, cls: "bg-purple-50 text-purple-700 border-purple-100" },
             ].map(({ label, value, Icon, cls }) => (
-              <div key={label} className={`bg-white rounded-xl border p-4 shadow-sm ${cls}`}>
+              <div key={label} data-testid={label === "Assiette ITS" ? "card-assiette-its" : label === "Assiette CNPS" ? "card-assiette-cnps" : undefined} className={`bg-white rounded-xl border p-4 shadow-sm ${cls}`}>
                 <div className="flex items-start justify-between mb-2">
                   <p className="text-xs font-medium opacity-80">{label}</p>
                   <Icon className="h-4 w-4 opacity-60" />
@@ -905,6 +921,9 @@ function TabMasse() {
               </div>
             ))}
           </div>
+          <p className="text-xs text-gray-500" data-testid="text-assiettes-note">
+            Les assiettes affichées tiennent compte de la part exonérée de transport; le plafond légal CNPS reste appliqué au calcul des cotisations.
+          </p>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[

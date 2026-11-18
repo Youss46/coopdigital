@@ -10698,10 +10698,14 @@ components:
 
     BulletinAvecPersonnel:
       type: object
-      required: [bulletin, personnel]
+      required: [bulletin, personnel, assietteItsFcfa, assietteCnpsFcfa]
       properties:
         bulletin:
           $ref: "#/components/schemas/BulletinPaie"
+        assietteItsFcfa:
+          type: integer
+        assietteCnpsFcfa:
+          type: integer
         personnel:
           type: object
           required: [id, nom, prenoms, poste]
@@ -10830,7 +10834,7 @@ components:
 
     RapportMensuel:
       type: object
-      required: [mois, annee, nbPersonnelActifs, nbBulletins, nbPayes, nbValides, nbBrouillons, totalBrut, totalNet, totalChargesPatronales, coutTotalEmployeur, detailsParPoste]
+      required: [mois, annee, nbPersonnelActifs, nbBulletins, nbPayes, nbValides, nbBrouillons, totalBrut, totalAssietteItsFcfa, totalAssietteCnpsFcfa, totalNet, totalChargesPatronales, coutTotalEmployeur, detailsParPoste]
       properties:
         mois:
           type: integer
@@ -10847,6 +10851,10 @@ components:
         nbBrouillons:
           type: integer
         totalBrut:
+          type: integer
+        totalAssietteItsFcfa:
+          type: integer
+        totalAssietteCnpsFcfa:
           type: integer
         totalNet:
           type: integer

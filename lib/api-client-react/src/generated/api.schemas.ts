@@ -2858,6 +2858,8 @@ export type BulletinAvecPersonnelPersonnel = {
 
 export interface BulletinAvecPersonnel {
   bulletin: BulletinPaie;
+  assietteItsFcfa: number;
+  assietteCnpsFcfa: number;
   personnel: BulletinAvecPersonnelPersonnel;
 }
 
@@ -2918,6 +2920,8 @@ export interface RapportMensuel {
   nbValides: number;
   nbBrouillons: number;
   totalBrut: number;
+  totalAssietteItsFcfa: number;
+  totalAssietteCnpsFcfa: number;
   totalNet: number;
   totalChargesPatronales: number;
   coutTotalEmployeur: number;

@@ -79,6 +79,17 @@ function parseId(raw: unknown): number {
   return parseInt(String(raw ?? "0"), 10);
 }
 
+function assietteItsCnpsSql() {
+  return sql<number>`greatest(
+    ${bulletinsPaieTable.salaireBrutFcfa} - coalesce((
+      select sum(${lignesBulletinTable.montantExonereItsCnpsFcfa})
+      from ${lignesBulletinTable}
+      where ${lignesBulletinTable.bulletinId} = ${bulletinsPaieTable.id}
+    ), 0),
+    0
+  )::int`;
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 //  PERSONNEL
 // ══════════════════════════════════════════════════════════════════════════════
@@ -537,6 +548,7 @@ export async function listBulletins(
     const rows = await db
       .select({
         bulletin: bulletinsPaieTable,
+        assietteItsCnpsFcfa: assietteItsCnpsSql(),
         personnel: {
           id: personnelTable.id,
           nom: personnelTable.nom,
@@ -554,7 +566,11 @@ export async function listBulletins(
       .where(and(...conditions))
       .orderBy(desc(bulletinsPaieTable.annee), desc(bulletinsPaieTable.mois), personnelTable.nom);
 
-    res.json(rows);
+    res.json(rows.map(({ assietteItsCnpsFcfa, ...row }) => ({
+      ...row,
+      assietteItsFcfa: assietteItsCnpsFcfa,
+      assietteCnpsFcfa: assietteItsCnpsFcfa,
+    })));
   } catch (err) {
     if (err instanceof TenantError) { res.status(401).json({ erreur: (err as TenantError).erreur }); return; }
     req.log.error({ err }, "listBulletins");
@@ -1380,6 +1396,7 @@ export async function getRapportMensuel(
         nbValides: sql<number>`count(*) filter (where ${bulletinsPaieTable.statut} = 'valide')::int`,
         nbBrouillons: sql<number>`count(*) filter (where ${bulletinsPaieTable.statut} = 'brouillon')::int`,
         totalBrut: sql<number>`coalesce(sum(${bulletinsPaieTable.salaireBrutFcfa}), 0)::int`,
+        totalAssietteItsCnpsFcfa: sql<number>`coalesce(sum(${assietteItsCnpsSql()}), 0)::int`,
         totalNet: sql<number>`coalesce(sum(${bulletinsPaieTable.salaireNetFcfa}), 0)::int`,
         totalChargesPatronales: sql<number>`coalesce(sum(${bulletinsPaieTable.chargesCnpsPatronaleFcfa} + ${bulletinsPaieTable.chargesTaxeApprentissageFcfa} + ${bulletinsPaieTable.chargesFpcFcfa}), 0)::int`,
         coutTotalEmployeur: sql<number>`coalesce(sum(${bulletinsPaieTable.coutTotalEmployeurFcfa}), 0)::int`,
@@ -1424,14 +1441,21 @@ export async function getRapportMensuel(
         ),
       );
 
+    const totalAssiette = recap?.totalAssietteItsCnpsFcfa ?? 0;
     res.json({
       mois,
       annee,
       nbPersonnelActifs: nbPersonnelActifs ?? 0,
-      ...(recap ?? {
-        nbBulletins: 0, nbPayes: 0, nbValides: 0, nbBrouillons: 0,
-        totalBrut: 0, totalNet: 0, totalChargesPatronales: 0, coutTotalEmployeur: 0,
-      }),
+      nbBulletins: recap?.nbBulletins ?? 0,
+      nbPayes: recap?.nbPayes ?? 0,
+      nbValides: recap?.nbValides ?? 0,
+      nbBrouillons: recap?.nbBrouillons ?? 0,
+      totalBrut: recap?.totalBrut ?? 0,
+      totalAssietteItsFcfa: totalAssiette,
+      totalAssietteCnpsFcfa: totalAssiette,
+      totalNet: recap?.totalNet ?? 0,
+      totalChargesPatronales: recap?.totalChargesPatronales ?? 0,
+      coutTotalEmployeur: recap?.coutTotalEmployeur ?? 0,
       detailsParPoste: parPoste,
     });
   } catch (err) {
