@@ -329,7 +329,8 @@ function InitObligationsButton({ onDone }: { onDone: () => void }) {
     <button
       onClick={init}
       disabled={loading}
-      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 disabled:opacity-50"
+      data-testid="button-init-fiscal-obligations"
+      className="inline-flex w-full items-center justify-center gap-2 whitespace-normal px-4 py-2 text-center leading-snug rounded-lg text-sm font-medium bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 disabled:opacity-50 sm:w-auto"
     >
       <Calculator size={14} />
       {loading ? "Initialisation…" : "Initialiser les obligations standard (Côte d'Ivoire)"}
@@ -427,12 +428,12 @@ function TableauBordFiscal() {
       )}
 
       {/* Calendrier */}
-      <div className="bg-white rounded-xl border border-gray-100 p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+      <div className="bg-white rounded-xl border border-gray-100 p-4 sm:p-5">
+        <div className="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between">
+          <h3 className="font-semibold text-gray-800 flex items-start gap-2 min-w-0">
             <Calendar size={16} className="text-green-600" /> Calendrier des échéances (3 prochains mois)
           </h3>
-          <button onClick={charger} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600">
+          <button onClick={charger} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 self-start sm:self-auto whitespace-nowrap">
             <RefreshCw size={12} /> Actualiser
           </button>
         </div>
@@ -1039,21 +1040,21 @@ export default function FiscalitePage() {
   ];
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
+    <div className="w-full min-w-0 p-4 sm:p-6 max-w-7xl mx-auto">
+      <div className="flex items-center gap-3 mb-6 min-w-0">
         <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
           <Calculator size={20} className="text-white" />
         </div>
-        <div>
+        <div className="min-w-0">
           <h1 className="text-xl font-bold text-gray-900">Fiscalité</h1>
              <p className="text-sm text-gray-400">CNPS, ITS, TA, FPC, TSE — obligations ivoiriennes</p>
         </div>
       </div>
 
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-6 w-fit">
+      <div className="flex w-full max-w-full gap-1 bg-gray-100 p-1 rounded-xl mb-6 overflow-x-auto sm:w-fit">
         {TABS.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${tab === t.id ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
+            className={`shrink-0 whitespace-nowrap px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all ${tab === t.id ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
             {t.label}
           </button>
         ))}
@@ -1289,16 +1290,17 @@ function SectionObligations({ onObligationsChange }: { onObligationsChange?: () 
   const inactives = obligations?.filter(o => !o.actif) ?? [];
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+      <div className="bg-white rounded-xl border border-gray-100 p-4 sm:p-5">
+      <div className="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between">
+        <h3 className="font-semibold text-gray-800 flex items-start gap-2 min-w-0">
           <Settings size={16} className="text-green-600" /> Obligations fiscales configurées
         </h3>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           <InitObligationsButton onDone={() => { charger(); onObligationsChange?.(); }} />
           <button
             onClick={openAdd}
-            className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700">
+            data-testid="button-add-fiscal-obligation"
+            className="flex w-full items-center justify-center gap-1.5 px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 sm:w-auto">
             <Plus size={14} /> Ajouter
           </button>
         </div>
