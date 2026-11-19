@@ -6,6 +6,12 @@ const harness = vi.hoisted(() => ({
   updateServiceWorker: vi.fn<() => Promise<void>>(async () => {}),
   getPendingCount: vi.fn<() => Promise<number>>(async () => 0),
   triggerSync: vi.fn<() => Promise<void>>(async () => {}),
+  registrationOptions: null as null | {
+    onRegisteredSW?: (
+      swUrl: string,
+      registration?: ServiceWorkerRegistration,
+    ) => void;
+  },
   offline: {
     isOnline: true,
     pendingCount: 0,
@@ -16,10 +22,13 @@ const harness = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/pwaServiceWorker", () => ({
-  usePwaServiceWorker: () => ({
-    needRefresh: [true, vi.fn()],
-    updateServiceWorker: harness.updateServiceWorker,
-  }),
+  usePwaServiceWorker: (options: typeof harness.registrationOptions) => {
+    harness.registrationOptions = options;
+    return {
+      needRefresh: [true, vi.fn()],
+      updateServiceWorker: harness.updateServiceWorker,
+    };
+  },
 }));
 
 vi.mock("@/contexts/OfflineContext", () => ({
@@ -76,6 +85,29 @@ describe("bannière de mise à jour CoopDigital", () => {
       await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
     });
     expect(container.querySelector('[data-testid="pwa-update-banner"]')).not.toBeNull();
+  });
+
+  it("vérifie les mises à jour au retour dans l’application et toutes les cinq minutes", async () => {
+    vi.useFakeTimers();
+    const update = vi.fn<() => Promise<void>>(async () => {});
+
+    await act(async () => {
+      root.render(createElement(PwaUpdateBanner));
+    });
+    await act(async () => {
+      harness.registrationOptions?.onRegisteredSW?.("/sw.js", { update } as ServiceWorkerRegistration);
+    });
+    expect(update).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+    });
+    expect(update).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+    });
+    expect(update).toHaveBeenCalledTimes(3);
   });
 
   it("demande confirmation et synchronise les opérations avant le rechargement", async () => {

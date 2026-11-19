@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, Clock3, Loader2, RefreshCw, X } from "lucide-react";
 import { useOffline } from "@/contexts/OfflineContext";
 import { getPendingCount } from "@/lib/idb";
@@ -10,21 +10,30 @@ import {
   getPwaUpdateReminderAt,
 } from "@/lib/pwaUpdateReminder";
 
+export const PWA_UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
+
 export default function PwaUpdateBanner({ visible = true }: { visible?: boolean }) {
   const { isOnline, pendingCount, syncStatus, triggerSync } = useOffline();
   const updateCheckInterval = useRef<number | null>(null);
+  const serviceWorkerRegistration = useRef<ServiceWorkerRegistration | null>(null);
+  const checkForUpdate = useCallback(() => {
+    const registration = serviceWorkerRegistration.current;
+    if (!registration || !navigator.onLine) return;
+    void registration.update().catch(() => {});
+  }, []);
   const { needRefresh: [needRefresh], updateServiceWorker } = usePwaServiceWorker({
     immediate: true,
     onRegisteredSW: (_swUrl, registration) => {
       if (!registration) return;
 
-      void registration.update().catch(() => {});
+      serviceWorkerRegistration.current = registration;
+      checkForUpdate();
       if (updateCheckInterval.current !== null) {
         window.clearInterval(updateCheckInterval.current);
       }
       updateCheckInterval.current = window.setInterval(() => {
-        void registration.update().catch(() => {});
-      }, 60 * 60 * 1000);
+        if (document.visibilityState === "visible") checkForUpdate();
+      }, PWA_UPDATE_CHECK_INTERVAL_MS);
     },
     onOfflineReady: () => {
       console.info("CoopDigital prêt hors connexion");
@@ -47,12 +56,21 @@ export default function PwaUpdateBanner({ visible = true }: { visible?: boolean 
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    const checkWhenVisible = () => {
+      if (document.visibilityState === "visible") checkForUpdate();
+    };
+    window.addEventListener("focus", checkWhenVisible);
+    document.addEventListener("visibilitychange", checkWhenVisible);
+
     return () => {
+      window.removeEventListener("focus", checkWhenVisible);
+      document.removeEventListener("visibilitychange", checkWhenVisible);
       if (updateCheckInterval.current !== null) {
         window.clearInterval(updateCheckInterval.current);
       }
+      serviceWorkerRegistration.current = null;
     };
-  }, []);
+  }, [checkForUpdate]);
 
   useEffect(() => {
     if (!needRefresh) {
