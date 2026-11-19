@@ -5,6 +5,7 @@ import PhotoCropDialog from "@/components/PhotoCropDialog";
 import { UserRound, Camera, Trash2, Loader2 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useSaveAuthPhoto, ApiError } from "@workspace/api-client-react";
 
@@ -61,6 +62,7 @@ export default function MonProfilPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const [isPhotoPreviewOpen, setIsPhotoPreviewOpen] = useState(false);
 
   const savePhoto = useSaveAuthPhoto({
     mutation: {
@@ -134,12 +136,28 @@ export default function MonProfilPage() {
 
         <div className="flex items-center gap-4 mb-5">
           <div className="relative">
-            <Avatar className="w-20 h-20">
-              <AvatarImage src={utilisateur?.photoUrl ?? undefined} alt="Photo de profil" />
-              <AvatarFallback className="text-xl font-bold text-white" style={{ backgroundColor: "#c4962a" }}>
-                {initiale}
-              </AvatarFallback>
-            </Avatar>
+            {utilisateur?.photoUrl ? (
+              <button
+                type="button"
+                aria-label="Afficher la photo de profil"
+                data-testid="button-view-profile-photo"
+                className="block rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-700 focus-visible:ring-offset-2"
+                onClick={() => setIsPhotoPreviewOpen(true)}
+              >
+                <Avatar className="w-20 h-20">
+                  <AvatarImage src={utilisateur.photoUrl} alt="Photo de profil" />
+                  <AvatarFallback className="text-xl font-bold text-white" style={{ backgroundColor: "#c4962a" }}>
+                    {initiale}
+                  </AvatarFallback>
+                </Avatar>
+              </button>
+            ) : (
+              <Avatar className="w-20 h-20">
+                <AvatarFallback className="text-xl font-bold text-white" style={{ backgroundColor: "#c4962a" }}>
+                  {initiale}
+                </AvatarFallback>
+              </Avatar>
+            )}
             {isUploading && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full">
                 <Loader2 className="w-6 h-6 text-white animate-spin" />
@@ -204,6 +222,20 @@ export default function MonProfilPage() {
         onCancel={() => setCropSrc(null)}
         onConfirm={(dataUrl) => void handleCropConfirm(dataUrl)}
       />
+
+      <Dialog open={isPhotoPreviewOpen} onOpenChange={setIsPhotoPreviewOpen}>
+        <DialogContent className="max-w-[92vw] border-0 bg-transparent p-2 shadow-none sm:max-w-2xl">
+          <DialogTitle className="sr-only">Photo de profil</DialogTitle>
+          {utilisateur?.photoUrl && (
+            <img
+              src={utilisateur.photoUrl}
+              alt="Photo de profil agrandie"
+              data-testid="img-profile-photo-preview"
+              className="mx-auto max-h-[80dvh] max-w-full rounded-lg object-contain"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
