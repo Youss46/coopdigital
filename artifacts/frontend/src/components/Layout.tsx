@@ -59,6 +59,7 @@ import {
 } from "lucide-react";
 import { NAV_ITEMS, type NavItemConfig } from "@/config/navigation";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useOffline } from "@/contexts/OfflineContext";
 import { useFeatureAccess, featureKeyForPath } from "@/hooks/useFeatureAccess";
 import { useCountEcrituresEnAttente, getCountEcrituresEnAttenteQueryKey, useGetAnomaliesStats, getGetAnomaliesStatsQueryKey, useGetPaiementsStats, getGetPaiementsStatsQueryKey } from "@workspace/api-client-react";
@@ -171,6 +172,7 @@ const EUDR_ALERTE_ROLES = ["responsable_tracabilite"];
 function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout: () => void }) {
   const [location] = useLocation();
   const { utilisateur } = useAuth();
+  const [isPhotoPreviewOpen, setIsPhotoPreviewOpen] = useState(false);
   const { pendingCount } = useOffline();
   const { features, isFeatureLoading } = useFeatureAccess();
 
@@ -325,12 +327,28 @@ function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout:
       {/* User info */}
       <div className="px-4 py-4 border-t border-green-800">
         <div className="flex items-center gap-3 mb-3">
-          <Avatar className="w-8 h-8 flex-shrink-0">
-            <AvatarImage src={utilisateur?.photoUrl ?? undefined} alt="Photo de profil" />
-            <AvatarFallback className="text-sm font-bold text-white" style={{ backgroundColor: "#c4962a" }}>
-              {utilisateur?.nom?.[0]?.toUpperCase() ?? "U"}
-            </AvatarFallback>
-          </Avatar>
+          {utilisateur?.photoUrl ? (
+            <button
+              type="button"
+              aria-label="Afficher la photo de profil"
+              data-testid="button-view-sidebar-profile-photo"
+              className="flex-shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-green-900"
+              onClick={() => setIsPhotoPreviewOpen(true)}
+            >
+              <Avatar className="w-8 h-8">
+                <AvatarImage src={utilisateur.photoUrl} alt="Photo de profil" />
+                <AvatarFallback className="text-sm font-bold text-white" style={{ backgroundColor: "#c4962a" }}>
+                  {utilisateur?.nom?.[0]?.toUpperCase() ?? "U"}
+                </AvatarFallback>
+              </Avatar>
+            </button>
+          ) : (
+            <Avatar className="w-8 h-8 flex-shrink-0">
+              <AvatarFallback className="text-sm font-bold text-white" style={{ backgroundColor: "#c4962a" }}>
+                {utilisateur?.nom?.[0]?.toUpperCase() ?? "U"}
+              </AvatarFallback>
+            </Avatar>
+          )}
           <div className="overflow-hidden">
             <p className="text-white text-sm font-medium truncate">
               {utilisateur?.prenoms} {utilisateur?.nom}
@@ -356,6 +374,20 @@ function SidebarContent({ onClose, onLogout }: { onClose?: () => void; onLogout:
           <span>Déconnexion</span>
         </button>
       </div>
+
+      <Dialog open={isPhotoPreviewOpen} onOpenChange={setIsPhotoPreviewOpen}>
+        <DialogContent className="max-w-[92vw] border-0 bg-transparent p-2 shadow-none sm:max-w-2xl">
+          <DialogTitle className="sr-only">Photo de profil</DialogTitle>
+          {utilisateur?.photoUrl && (
+            <img
+              src={utilisateur.photoUrl}
+              alt="Photo de profil agrandie"
+              data-testid="img-sidebar-profile-photo-preview"
+              className="mx-auto max-h-[80dvh] max-w-full rounded-lg object-contain"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
