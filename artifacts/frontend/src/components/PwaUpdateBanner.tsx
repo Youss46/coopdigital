@@ -15,6 +15,8 @@ export const PWA_UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 export default function PwaUpdateBanner({ visible = true }: { visible?: boolean }) {
   const { isOnline, pendingCount, syncStatus, triggerSync } = useOffline();
   const updateCheckInterval = useRef<number | null>(null);
+  const updateReloadTimeout = useRef<number | null>(null);
+  const explicitUpdateRequested = useRef(false);
   const serviceWorkerRegistration = useRef<ServiceWorkerRegistration | null>(null);
   const checkForUpdate = useCallback(() => {
     const registration = serviceWorkerRegistration.current;
@@ -39,6 +41,13 @@ export default function PwaUpdateBanner({ visible = true }: { visible?: boolean 
       console.info("CoopDigital prêt hors connexion");
     },
     onNeedReload: () => {
+      if (!explicitUpdateRequested.current) return;
+
+      explicitUpdateRequested.current = false;
+      if (updateReloadTimeout.current !== null) {
+        window.clearTimeout(updateReloadTimeout.current);
+        updateReloadTimeout.current = null;
+      }
       clearPwaUpdateReminder(localStorage);
       window.location.reload();
     },
@@ -71,6 +80,12 @@ export default function PwaUpdateBanner({ visible = true }: { visible?: boolean 
       serviceWorkerRegistration.current = null;
     };
   }, [checkForUpdate]);
+
+  useEffect(() => () => {
+    if (updateReloadTimeout.current !== null) {
+      window.clearTimeout(updateReloadTimeout.current);
+    }
+  }, []);
 
   useEffect(() => {
     if (!needRefresh) {
@@ -146,8 +161,22 @@ export default function PwaUpdateBanner({ visible = true }: { visible?: boolean 
 
       clearPwaUpdateReminder(localStorage);
       setReminderAt(null);
+      explicitUpdateRequested.current = true;
       await updateServiceWorker(true);
+      if (explicitUpdateRequested.current) {
+        updateReloadTimeout.current = window.setTimeout(() => {
+          updateReloadTimeout.current = null;
+          if (!explicitUpdateRequested.current) return;
+          explicitUpdateRequested.current = false;
+          window.location.reload();
+        }, 5000);
+      }
     } catch {
+      explicitUpdateRequested.current = false;
+      if (updateReloadTimeout.current !== null) {
+        window.clearTimeout(updateReloadTimeout.current);
+        updateReloadTimeout.current = null;
+      }
       setUpdateMessage("La synchronisation n’a pas abouti. Vos opérations sont conservées; réessayez après vérification.");
     } finally {
       setUpdating(false);

@@ -157,3 +157,4 @@
 - [Fraîcheur des lectures de bascule](scale-reading-freshness.md) — sur la coopérative testée, le lecteur revient bien à zéro; effacer les valeurs périmées plutôt que modifier le calibrage.
 - [Surfaces blanches de l’interface](ui-surface-colors.md) — privilégier les panneaux blancs et bordures gris neutre; réserver les teintes aux accents et états sémantiques.
 - [Style visuel de la connexion](login-hero-effects.md) — conserver le carrousel sans particules et les champs sans pictogrammes décoratifs.
+- [Report des mises à jour PWA](pwa-update-deferral.md) — ne jamais recharger automatiquement après « me le rappeler »; recharger seulement après confirmation explicite.

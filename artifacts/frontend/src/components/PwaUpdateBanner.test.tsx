@@ -11,6 +11,7 @@ const harness = vi.hoisted(() => ({
       swUrl: string,
       registration?: ServiceWorkerRegistration,
     ) => void;
+    onNeedReload?: () => void;
   },
   offline: {
     isOnline: true,
@@ -79,6 +80,32 @@ describe("bannière de mise à jour CoopDigital", () => {
     await act(async () => {
       container.querySelector<HTMLButtonElement>('[data-testid="button-pwa-update-later"]')?.click();
     });
+    expect(container.querySelector('[data-testid="pwa-update-banner"]')).toBeNull();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
+    });
+    expect(container.querySelector('[data-testid="pwa-update-banner"]')).not.toBeNull();
+  });
+
+  it("ne recharge pas l’application pendant le délai de rappel", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-18T12:00:00Z"));
+
+    await act(async () => {
+      root.render(createElement(PwaUpdateBanner));
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[data-testid="button-pwa-update-later"]')?.click();
+    });
+    const reminderAt = localStorage.getItem("coop_pwa_update_reminder_at");
+    expect(reminderAt).not.toBeNull();
+
+    await act(async () => {
+      harness.registrationOptions?.onNeedReload?.();
+    });
+
+    expect(localStorage.getItem("coop_pwa_update_reminder_at")).toBe(reminderAt);
     expect(container.querySelector('[data-testid="pwa-update-banner"]')).toBeNull();
 
     await act(async () => {
